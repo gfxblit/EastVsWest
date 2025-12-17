@@ -6,12 +6,12 @@ This document describes the architecture of the EastVsWest game. The architectur
 
 The game follows a modular architecture with a clear separation of concerns. The core components of the game are:
 
-- **Game Logic**: Encapsulates the rules of the game, such as moving the snake, detecting collisions, and managing the food.
-- **Game State**: Manages the current state of the game, including the snake's position, the food's position, and the score.
+- **Game Logic**: Encapsulates the rules of the game, see GAME_DESIGN.md. 
+- **Game State**: Manages the current state of the game, see GAME_DESIGN.md.
 - **Rendering**: Responsible for drawing the game state on the screen.
-- **Player Input**: Handles input from the player to control the snake.
+- **Player Input**: Handles input from the player.
 - **Main**: The entry point of the application, responsible for initializing the game and managing the game loop.
-- **UI**: Responsible for updating the UI elements, such as the score.
+- **UI**: Responsible for updating the UI elements, see GAME_DESIGN.md.
 - **Network**: Manages real-time communication with Supabase to synchronize game state between players.
 
 ## Project Structure
@@ -25,7 +25,7 @@ The source files will be organized into the following files:
 - `index.html`: The main HTML file for the game.
 - `styles.css`: The CSS file for styling the game.
 - `main.js`: The entry point of the application.
-- `config.js`: Contains the configuration for the game, such as the size of the grid and the speed of the snake.
+- `config.js`: Contains the configuration for the game, see GAME_DESIGN.md.
 - `game.js`: Implements the core game logic.
 - `renderer.js`: Renders the game on the canvas.
 - `input.js`: Handles player input.
