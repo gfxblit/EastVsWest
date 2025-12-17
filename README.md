@@ -42,3 +42,14 @@ This project utilizes GitHub Issues for task management and roadmap tracking.
     - `roadmap`: Identifies the central roadmap issue.
     - `tracking`: Marks issues that serve as containers or checklists for other tasks.
     - `status:blocked`: Indicates an issue cannot be started due to a dependency on another issue, with the blocking issue referenced in its description. 
+- Prompts for generating the roadmap
+  - identify the major components from `ARCHITECTURE.md`
+  - identify interfaces between components to enable parallel development in each component
+  - identify when tasks need to be sequenced (e.g. implement the game state data model, THEN expose the interfaces to it)
+  - identify when to create a task to WRITE a design for a capability: it's too complex to state in a single issue
+  - favor getting end-to-end on a feature, vs. building all the components and seeing if they work together in the end
+
+  ## Tips for generating `GAME_DESIGN.md`
+  - take a template, say from https://github.com/gfxblit/SnakeClaude/blob/main/docs/game_design.md
+  - iterate with an agent, startig with a prompt like 'Help me write a game design doc for a multiplayer, top down, combat game, east vs west, where players can fight each other in a battle royal, picking up weapons and armor. See https://github.com/gfxblit/SnakeClaude/blob/main/docs/game_design.md as an example'
+  - iterate with 'read the design again, and see if there are any critical gaps before implementation. if there are, clarify'
