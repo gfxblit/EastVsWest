@@ -3,8 +3,8 @@
 This is an agentic development flow to make the East Vs West, a 2d multiplayer combat game, written in Javascript.
 
 The dev flow requires this as input:
-- The game design document (GDD) is `docs/game_design.md`. The GDD describes what the game is, how its played, etc.
-- The game architecture is described in `docs/architecture.md`. The architecture doc describes high level: how game state is managed, player inputs, etc; and low level: programming language, test frameworks, etc.
+- The game design document (GDD) is `GAME_DESIGN.md`. The GDD describes what the game is, how its played, etc.
+- The game architecture is described in `ARCHITECTURE.md`. The architecture doc describes high level: how game state is managed, player inputs, etc; and low level: programming language, test frameworks, etc.
 - The roadmap [issue](https://github.com/gfxblit/EastVsWest/issues/1), tracking the work.
 - CLAUDE.md describes the agent behavior, using test-driven development
 
