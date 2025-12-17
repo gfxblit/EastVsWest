@@ -117,7 +117,7 @@ Loot distribution is randomized, but skewed to reward players who venture into h
 6. Technical & Audio
 6.1 Technical Requirements
  * Movement Model: Fluid, pixel-based movement. There is no underlying grid for movement or object placement.
- * Netcode: High priority on low-latency synchronization (targeting 60 Hz minimum) for a responsive action-RPG combat feel.
+ * Netcode: Peer-to-Peer (with a player acting as host/server) for a responsive, but casual action-RPG combat feel.
  * Input Buffer: Essential single-step buffer for accurate input registration during fast combat.
 6.2 Simple Audio
  * Directional Audio: Essential for tracking enemies (footsteps, reloads) due to the lack of Fog of War.
