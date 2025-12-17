@@ -13,6 +13,10 @@ export class Renderer {
 
   init() {
     this.ctx = this.canvas.getContext('2d');
+    if (!this.ctx) {
+      console.error('Failed to get 2D context from canvas');
+      return;
+    }
     this.canvas.width = CONFIG.CANVAS.WIDTH;
     this.canvas.height = CONFIG.CANVAS.HEIGHT;
 
@@ -64,14 +68,14 @@ export class Renderer {
     // Simple player representation as a circle
     this.ctx.fillStyle = '#4ecdc4';
     this.ctx.beginPath();
-    this.ctx.arc(player.x, player.y, 20, 0, Math.PI * 2);
+    this.ctx.arc(player.x, player.y, CONFIG.RENDER.PLAYER_RADIUS, 0, Math.PI * 2);
     this.ctx.fill();
 
     // Health bar above player
-    const barWidth = 40;
-    const barHeight = 5;
+    const barWidth = CONFIG.RENDER.HEALTH_BAR_WIDTH;
+    const barHeight = CONFIG.RENDER.HEALTH_BAR_HEIGHT;
     const barX = player.x - barWidth / 2;
-    const barY = player.y - 30;
+    const barY = player.y - CONFIG.RENDER.HEALTH_BAR_OFFSET_Y;
 
     // Background
     this.ctx.fillStyle = '#333';

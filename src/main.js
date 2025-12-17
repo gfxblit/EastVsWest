@@ -17,6 +17,7 @@ class App {
     this.ui = null;
     this.lastTimestamp = 0;
     this.running = false;
+    this.animationFrameId = null;
   }
 
   init() {
@@ -58,6 +59,12 @@ class App {
       return;
     }
 
+    // Validate join code format (6 alphanumeric characters)
+    if (!/^[A-Z0-9]{6}$/i.test(joinCode)) {
+      alert('Please enter a valid 6-character join code (letters and numbers only)');
+      return;
+    }
+
     console.log('Joining game with code:', joinCode);
     this.startGame();
   }
@@ -92,7 +99,7 @@ class App {
     // Start game loop
     this.running = true;
     this.lastTimestamp = performance.now();
-    requestAnimationFrame((timestamp) => this.gameLoop(timestamp));
+    this.animationFrameId = requestAnimationFrame((timestamp) => this.gameLoop(timestamp));
   }
 
   gameLoop(timestamp) {
@@ -109,11 +116,15 @@ class App {
     this.renderer.render(this.game.getState());
 
     // Continue loop
-    requestAnimationFrame((timestamp) => this.gameLoop(timestamp));
+    this.animationFrameId = requestAnimationFrame((timestamp) => this.gameLoop(timestamp));
   }
 
   stopGame() {
     this.running = false;
+    if (this.animationFrameId) {
+      cancelAnimationFrame(this.animationFrameId);
+      this.animationFrameId = null;
+    }
     if (this.input) {
       this.input.destroy();
     }

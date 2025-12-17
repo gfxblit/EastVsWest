@@ -52,9 +52,9 @@ export class Game {
   updateConflictZone(deltaTime) {
     // Start shrinking after initial delay
     if (this.state.gameTime > CONFIG.GAME.INITIAL_ZONE_SHRINK_DELAY_SECONDS) {
-      const shrinkRate = 10 * Math.pow(CONFIG.ZONE.SHRINK_RATE_MULTIPLIER, this.state.phase);
+      const shrinkRate = CONFIG.ZONE.BASE_SHRINK_RATE * Math.pow(CONFIG.ZONE.SHRINK_RATE_MULTIPLIER, this.state.phase);
       this.state.conflictZone.radius = Math.max(
-        50,
+        CONFIG.ZONE.MIN_RADIUS,
         this.state.conflictZone.radius - shrinkRate * deltaTime
       );
     }
@@ -69,6 +69,19 @@ export class Game {
       // Keep player within canvas bounds
       player.x = Math.max(0, Math.min(CONFIG.CANVAS.WIDTH, player.x));
       player.y = Math.max(0, Math.min(CONFIG.CANVAS.HEIGHT, player.y));
+
+      // Check if player is outside conflict zone and apply damage
+      const distanceFromCenter = Math.sqrt(
+        Math.pow(player.x - this.state.conflictZone.centerX, 2) +
+        Math.pow(player.y - this.state.conflictZone.centerY, 2)
+      );
+
+      if (distanceFromCenter > this.state.conflictZone.radius) {
+        // Player is outside zone, apply damage
+        const damage = (CONFIG.ZONE.DAMAGE_PER_SECOND +
+          (CONFIG.ZONE.DAMAGE_INCREASE_PER_PHASE * this.state.phase)) * deltaTime;
+        player.health = Math.max(0, player.health - damage);
+      }
     }
   }
 
@@ -78,7 +91,12 @@ export class Game {
     if (!player) return;
 
     // Update player velocity based on input
-    const speed = CONFIG.PLAYER.BASE_MOVEMENT_SPEED;
+    // Apply speed modifier for double-handed weapons
+    const speedModifier = player.weapon?.stance === 'double'
+      ? CONFIG.PLAYER.DOUBLE_HANDED_SPEED_MODIFIER
+      : 1.0;
+    const speed = CONFIG.PLAYER.BASE_MOVEMENT_SPEED * speedModifier;
+
     player.velocity = {
       x: inputState.moveX * speed,
       y: inputState.moveY * speed,

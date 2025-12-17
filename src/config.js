@@ -28,9 +28,19 @@ export const CONFIG = {
   // Conflict Zone Settings
   ZONE: {
     INITIAL_RADIUS: 600,
+    MIN_RADIUS: 50, // Minimum zone size
+    BASE_SHRINK_RATE: 10, // Base shrink rate in pixels per second
     SHRINK_RATE_MULTIPLIER: 1.5, // Increases each phase
     DAMAGE_PER_SECOND: 10,
     DAMAGE_INCREASE_PER_PHASE: 5,
+  },
+
+  // Rendering Settings
+  RENDER: {
+    PLAYER_RADIUS: 20,
+    HEALTH_BAR_WIDTH: 40,
+    HEALTH_BAR_HEIGHT: 5,
+    HEALTH_BAR_OFFSET_Y: 30,
   },
 
   // Weapon Types

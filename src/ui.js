@@ -56,15 +56,24 @@ export class UI {
     const equipmentDisplay = document.getElementById('equipment-display');
     if (!equipmentDisplay) return;
 
-    let html = '';
+    // Clear existing content
+    equipmentDisplay.innerHTML = '';
+
+    // Add weapon slot if weapon exists
     if (weapon) {
-      html += `<div class="equipment-slot">Weapon: ${weapon.name}</div>`;
-    }
-    if (armor) {
-      html += `<div class="equipment-slot">Armor: ${armor.name}</div>`;
+      const weaponSlot = document.createElement('div');
+      weaponSlot.className = 'equipment-slot';
+      weaponSlot.textContent = `Weapon: ${weapon.name}`;
+      equipmentDisplay.appendChild(weaponSlot);
     }
 
-    equipmentDisplay.innerHTML = html;
+    // Add armor slot if armor exists
+    if (armor) {
+      const armorSlot = document.createElement('div');
+      armorSlot.className = 'equipment-slot';
+      armorSlot.textContent = `Armor: ${armor.name}`;
+      equipmentDisplay.appendChild(armorSlot);
+    }
   }
 
   showZoneWarning(show) {
