@@ -16,7 +16,11 @@ The game follows a modular architecture with a clear separation of concerns. The
 
 ## Project Structure
 
-The project will be organized into the following files:
+package.json - describes the project and dependecies
+src/ - source files
+dist/ - the built app
+
+The source files will be organized into the following files:
 
 - `index.html`: The main HTML file for the game.
 - `styles.css`: The CSS file for styling the game.
@@ -68,3 +72,4 @@ The project will use [Jest](https.jestjs.io/) for unit and integration testing. 
 - **Programming Language**: Vanilla JavaScript (ES6 modules)
 - **Environment**: Node.js for development and testing.
 - **Dependencies**: No framework dependencies for the core game logic. Jest will be used for testing.
+- **Build**: Use Vite
