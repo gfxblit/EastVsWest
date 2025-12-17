@@ -20,12 +20,16 @@ Here's the dev flow:
 (note: multiple Claudes may be working on separate issues in parallel)
 
 ## Infrastructure
-- After a PR is created, Claude performs a code-review (see claude-code-reviewer.yml)
-- In parallel, the PR triggers a deployment to gh-pages under https://<username>.github.io/<project-name>/pr-<pr-number>. For example, `https://gfxblit.github.io/EastVsWest/pr-123`.This allows the human to review the PR and preview the change.
-- The `gh-pages` branch is maintained as an empty branch, solely used to host the compiled static assets for deployment.
-- Github deployment using gh-pages
+- Human configuration
+  - Create an empty `gh-pages` branch, solely used to host the compiled static assets for deployment.
+  - Configure Github pages to use the `gh-pages` branch
+  - Protect your `main` branch by only allowing pull requests to update it. This keeps agents from directly pushing to origin/main, bypassing human review. You can ask Claude to use the gh cli to do this for you.
+
+- Configured via Github workflows
+  - After a PR is created, Claude performs a code-review (see claude-code-reviewer.yml)
+  - In parallel, the PR triggers a deployment to gh-pages under https://<username>.github.io/<project-name>/pr-<pr-number>. For example, `https://gfxblit.github.io/EastVsWest/pr-123`.This allows the human to review the PR and preview the change. (see pr.yml)
+
 - Once the PR is approved and Claude merges the PR to main, this will kickoff a gh-pages main deployment to https://<username>.github.io/<project-name>/, e.g. `https://gfxblit.github.io/EastVsWest`.
-- Protect your `main` branch by only allowing pull requests to update it. This keeps agents from directly pushing to origin/main, bypassing human review.
 
 ## Build Workflow
 To get started with local development and deploy the project:
