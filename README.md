@@ -48,6 +48,7 @@ This project utilizes GitHub Issues for task management and roadmap tracking.
   - identify when tasks need to be sequenced (e.g. implement the game state data model, THEN expose the interfaces to it)
   - identify when to create a task to WRITE a design for a capability: it's too complex to state in a single issue
   - favor getting end-to-end on a feature, vs. building all the components and seeing if they work together in the end
+- Tip: you may generate multiple roadmap options (e.g. prefer multiplayer functionality first), and ask Claude to compare roadmaps, and suggest which one has highest likelihood of success, and why.
 
   ## Tips for generating `GAME_DESIGN.md`
   - take a template, say from https://github.com/gfxblit/SnakeClaude/blob/main/docs/game_design.md
