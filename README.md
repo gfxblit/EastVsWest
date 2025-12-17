@@ -1,12 +1,12 @@
 # EastVsWest
 
-This is an agentic development flow to make the East Vs West, a 2d multiplayer combat game, written in Javascript.
+This is an agentic development flow to create a video game.
 
-The dev flow requires this as input:
-- The game design document (GDD) is `GAME_DESIGN.md`. The GDD describes what the game is, how its played, etc.
-- The game architecture is described in `ARCHITECTURE.md`. The architecture doc describes high level: how game state is managed, player inputs, etc; and low level: programming language, test frameworks, etc.
-- The roadmap [issue](https://github.com/gfxblit/EastVsWest/issues/1), tracking the work.
-- CLAUDE.md describes the agent behavior, using test-driven development
+The flow requires these inputs:
+- `GAME_DESIGN.md`: describes what the game is, how its played, etc.
+- `ARCHITECTURE.md`: describes high level: how game state is managed, player inputs, etc; and low level: programming language, test frameworks, etc.
+- `Roadmap` issue: provides an ordering of work to be done, linking to issues, and tracks status.
+- `CLAUDE.md`: describes the agent behavior, using test-driven development
 
 Here's the dev flow:
 
@@ -35,7 +35,7 @@ To get started with local development and deploy the project:
 
 ## Project Management
 This project utilizes GitHub Issues for task management and roadmap tracking.
-- **Roadmap Issue:** A central "Laserbyte Development Roadmap" [issue](https://github.com/gfxblit/EastVsWest/issues/1) serves as the project's master tracking document. It contains an exhaustive checklist of all tasks and their corresponding GitHub Issues. Tasks that need to be sequenced have increasing numbers. Parallelizable tasks are under "Dev A", "Dev B", etc.
+- **Roadmap Issue:** A central `Roadmap` issue serves as the project's master tracking document. It contains an exhaustive checklist of all tasks and their corresponding GitHub Issues. Tasks that need to be sequenced have increasing numbers. Parallelizable tasks are under "Dev A", "Dev B", etc.
 - **Epics as Milestones:** Major development phases (Epics) are tracked using GitHub Milestones, providing a high-level view of progress.
 - **Task Issues:** Individual, actionable tasks are managed as separate GitHub Issues, each linked back to the roadmap.
 - **Labels for Clarity:**
