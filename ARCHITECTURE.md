@@ -55,7 +55,7 @@ The game state will be managed in a central `game.js` module. In a multiplayer s
 
 ## Player Input
 
-Player input will be handled by the `input.js` module. This module will listen for keyboard/touch events and update the direction of the snake in the game state.
+Player input will be handled by the `input.js` module. This module will listen for keyboard/mouse/touch events and translate them into player actions (movement, attacks, abilities) in the game state.
 
 ## Rendering
 
