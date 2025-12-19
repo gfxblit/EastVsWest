@@ -2,6 +2,10 @@
 .claude/
 gha-creds-*.json
 .env
+.env.local
 node_modules
 dist/
 coverage/
+.supabase/
+VITE_SUPABASE_URL
+VITE_SUPABASE_ANON_KEY

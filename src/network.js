@@ -1,7 +1,8 @@
 /**
  * Network Manager
- * Handles multiplayer communication via Supabase (placeholder for future implementation)
+ * Handles multiplayer communication via Supabase
  */
+import { supabase } from './supabase.js';
 
 export class Network {
   constructor() {
@@ -11,44 +12,52 @@ export class Network {
   }
 
   async hostGame() {
-    // Placeholder: Will implement Supabase integration in future phases
-    console.log('Network: Host game (not yet implemented)');
     this.isHost = true;
-    this.joinCode = this.generateJoinCode();
+    const { data, error } = await supabase
+      .from('games')
+      .insert([{}])
+      .select();
+
+    if (error) {
+      console.error('Error hosting game:', error);
+      return null;
+    }
+
+    this.joinCode = data[0].join_code;
     return this.joinCode;
   }
 
   async joinGame(joinCode) {
-    // Placeholder: Will implement Supabase integration in future phases
-    console.log('Network: Join game with code', joinCode);
+    const { data, error } = await supabase
+      .from('games')
+      .select('*')
+      .eq('join_code', joinCode)
+      .single();
+
+    if (error || !data) {
+      console.error('Error joining game:', error);
+      return false;
+    }
+
     this.isHost = false;
     this.joinCode = joinCode;
     this.connected = true;
+    return true;
   }
 
   sendGameState(state) {
-    // Placeholder: Will send game state to Supabase
+    // Will send game state to Supabase
     console.log('Network: Send game state (not yet implemented)');
   }
 
   onGameStateUpdate(callback) {
-    // Placeholder: Will listen for game state updates from Supabase
+    // Will listen for game state updates from Supabase
     console.log('Network: Listen for game state updates (not yet implemented)');
   }
 
   disconnect() {
-    // Placeholder: Will disconnect from Supabase
+    // Will disconnect from Supabase
     console.log('Network: Disconnect (not yet implemented)');
     this.connected = false;
-  }
-
-  generateJoinCode() {
-    // Generate a random 6-character join code
-    const chars = 'ABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789';
-    let code = '';
-    for (let i = 0; i < 6; i++) {
-      code += chars.charAt(Math.floor(Math.random() * chars.length));
-    }
-    return code;
   }
 }
