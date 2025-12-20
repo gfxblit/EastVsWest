@@ -1,11 +1,3 @@
-.gemini/
-.claude/
-gha-creds-*.json
-.env
-node_modules
-dist/
-coverage/
-
 # Supabase
 .branches
 .temp
