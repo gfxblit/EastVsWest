@@ -1,3 +1,4 @@
+import { jest } from '@jest/globals';
 /**
  * Input Handler Tests
  * Unit tests for input.js following TDD workflow

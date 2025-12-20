@@ -1,6 +1,6 @@
 /**
  * Network Manager
- * Handles multiplayer communication via Supabase (placeholder for future implementation)
+ * Handles multiplayer communication via Supabase
  */
 
 export class Network {
@@ -8,14 +8,50 @@ export class Network {
     this.isHost = false;
     this.joinCode = null;
     this.connected = false;
+    this.supabase = null;
+    this.hostId = null;
+  }
+
+  initialize(supabaseClient, hostId) {
+    this.supabase = supabaseClient;
+    this.hostId = hostId;
+
   }
 
   async hostGame() {
-    // Placeholder: Will implement Supabase integration in future phases
-    console.log('Network: Host game (not yet implemented)');
-    this.isHost = true;
-    this.joinCode = this.generateJoinCode();
-    return this.joinCode;
+    if (!this.supabase) {
+      throw new Error('Supabase client not initialized. Call initialize() first.');
+    }
+    if (!this.hostId) {
+      throw new Error('Host ID not set. Call initialize() with a host ID.');
+    }
+
+    // Generate a new join code
+    const newJoinCode = this.generateJoinCode();
+
+    console.log('Network: Attempting to host game with code:', newJoinCode, 'by host:', this.hostId);
+
+    try {
+      const { data, error } = await this.supabase
+        .from('game_sessions')
+        .insert([{ join_code: newJoinCode, host_id: this.hostId }])
+        .select()
+        .single();
+
+      if (error || !data) { // Added !data check here
+        console.error('Error creating game session:', error?.message || 'No data returned.');
+        throw error || new Error('Failed to create session: No data returned.'); // Throw appropriate error
+      }
+
+      console.log('Game session created:', data);
+      this.isHost = true;
+      this.joinCode = data.join_code; // Use the join_code returned from the DB
+      return this.joinCode;
+
+    } catch (err) {
+      console.error('Failed to host game:', err.message);
+      throw err;
+    }
   }
 
   async joinGame(joinCode) {
