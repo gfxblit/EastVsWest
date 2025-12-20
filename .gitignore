@@ -5,3 +5,12 @@ gha-creds-*.json
 node_modules
 dist/
 coverage/
+
+# Supabase
+.branches
+.temp
+
+# dotenvx
+.env.keys
+.env.local
+.env.*.local
