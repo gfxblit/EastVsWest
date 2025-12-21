@@ -31,6 +31,29 @@ Here's the dev flow:
 
 - Once the PR is approved and Claude merges the PR to main, this will kickoff a gh-pages main deployment to https://<username>.github.io/<project-name>/, e.g. `https://gfxblit.github.io/EastVsWest`.
 
+## Testing
+
+### End-to-end Testing
+
+Running the end-to-end tests requires a running Supabase instance.
+
+1.  Start the local Supabase development environment:
+    ```bash
+    supabase start
+    ```
+    Wait for the Docker dependencies to load.
+
+2.  Get the Supabase credentials by running:
+    ```bash
+    supabase status
+    ```
+    This will output the `SUPABASE_URL` and `SUPABASE_ANON_KEY`.
+
+3.  Set the environment variables and run the tests. For example, to run the network integration tests:
+    ```bash
+    SUPABASE_URL="<your-supabase-url>" SUPABASE_ANON_KEY="<your-supabase-anon-key>" npm run test:e2e e2e/network.integration.test.js
+    ```
+
 ## Build Workflow
 To get started with local development and deploy the project:
 
