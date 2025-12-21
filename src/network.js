@@ -66,18 +66,21 @@ export class Network {
     console.log('Network: Attempting to join game with code:', joinCode, 'player:', playerName);
 
     try {
-      // Step 1: Look up the session by join code
-      const { data: session, error: sessionError } = await this.supabase
-        .from('game_sessions')
-        .select('*')
-        .eq('join_code', joinCode)
-        .single();
+      // Step 1: Look up the session by join code using the RPC function
+      const { data: sessionData, error: sessionError } = await this.supabase
+        .rpc('get_session_by_join_code', { p_join_code: joinCode });
 
       // Step 2: Validate session exists
-      if (sessionError || !session) {
-        console.error('Error finding session:', sessionError?.message || 'Session not found');
-        throw sessionError || new Error('Session not found');
+      if (sessionError) {
+        console.error('Error finding session:', sessionError.message);
+        throw sessionError;
       }
+
+      if (!sessionData || sessionData.length === 0) {
+        throw new Error('Session not found');
+      }
+
+      const session = sessionData[0]; // Extract the single session object from the array
 
       console.log('Found session:', session);
 

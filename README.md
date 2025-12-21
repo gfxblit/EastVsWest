@@ -47,7 +47,7 @@ Running the end-to-end tests requires a running Supabase instance.
     ```bash
     supabase status
     ```
-    This will output the `SUPABASE_URL` and `SUPABASE_ANON_KEY`.
+    This will output the `SUPABASE_URL` and `SUPABASE_ANON_KEY`. The agent can run this command for you.
 
 3.  Set the environment variables and run the tests. For example, to run the network integration tests:
     ```bash
