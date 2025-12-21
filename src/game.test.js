@@ -1,3 +1,4 @@
+import { jest } from '@jest/globals';
 /**
  * Game Logic Tests
  * Unit tests for game.js following TDD workflow
