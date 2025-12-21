@@ -54,12 +54,73 @@ export class Network {
     }
   }
 
-  async joinGame(joinCode) {
-    // Placeholder: Will implement Supabase integration in future phases
-    console.log('Network: Join game with code', joinCode);
-    this.isHost = false;
-    this.joinCode = joinCode;
-    this.connected = true;
+  async joinGame(joinCode, playerName) {
+    // Validate prerequisites
+    if (!this.supabase) {
+      throw new Error('Supabase client not initialized. Call initialize() first.');
+    }
+    if (!this.hostId) {
+      throw new Error('Player ID not set. Call initialize() with a player ID.');
+    }
+
+    console.log('Network: Attempting to join game with code:', joinCode, 'player:', playerName);
+
+    try {
+      // Step 1: Look up the session by join code
+      const { data: session, error: sessionError } = await this.supabase
+        .from('game_sessions')
+        .select('*')
+        .eq('join_code', joinCode)
+        .single();
+
+      // Step 2: Validate session exists
+      if (sessionError || !session) {
+        console.error('Error finding session:', sessionError?.message || 'Session not found');
+        throw sessionError || new Error('Session not found');
+      }
+
+      console.log('Found session:', session);
+
+      // Step 3: Validate session is joinable
+      if (session.status !== 'lobby') {
+        throw new Error('Session is not joinable. Only sessions in lobby status can be joined.');
+      }
+
+      if (session.current_player_count >= session.max_players) {
+        throw new Error('Session is full. Maximum players reached.');
+      }
+
+      // Step 4: Add player to session_players table
+      const { data: playerRecord, error: playerError } = await this.supabase
+        .from('session_players')
+        .insert([{
+          session_id: session.id,
+          player_id: this.hostId, // Using hostId as playerId
+          player_name: playerName,
+          is_host: false,
+          is_connected: true,
+        }])
+        .select()
+        .single();
+
+      if (playerError || !playerRecord) {
+        console.error('Error adding player to session:', playerError?.message || 'No data returned');
+        throw playerError || new Error('Failed to join session: Could not add player.');
+      }
+
+      console.log('Player added to session:', playerRecord);
+
+      // Step 5: Update network state
+      this.isHost = false;
+      this.joinCode = joinCode;
+      this.connected = true;
+
+      return session;
+
+    } catch (err) {
+      console.error('Failed to join game:', err.message);
+      throw err;
+    }
   }
 
   sendGameState(state) {
