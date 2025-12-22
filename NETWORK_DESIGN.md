@@ -25,6 +25,16 @@ The EastVsWest multiplayer system uses a **hybrid host-authority model** where:
 - Sessions are private and accessed via 6-character join codes
 - Maximum 12 players per session
 
+### Authoritative Action Flow
+
+A core pattern for all host-authoritative actions (joining, combat, item pickups) follows a **Request-Approve-Broadcast** model:
+
+1.  **Request (Client → Host):** A **Client** sends a message to the **Host** requesting to perform an action (e.g., `item_pickup_request`). The client does not change its own state yet.
+2.  **Approve (Host):** The **Host** receives the request and validates it against the authoritative game state and rules. If valid, the Host applies the change to the master state (e.g., updates the Database).
+3.  **Broadcast (Host → All Clients):** The **Host** broadcasts the result of the action (e.g., `item_pickup_result`) to **all Clients** in the session. Only upon receiving this broadcast do the clients update their local game state.
+
+This ensures the Host is the single source of truth and prevents cheating.
+
 ### Authority Distribution
 
 - **Client-Authoritative**: Player movement (position updates)
