@@ -31,6 +31,7 @@ export class Network extends EventEmitter {
     this.supabase = null;
     this.playerId = null;
     this.channel = null;
+    this.positionBuffer = new Map(); // Stores position updates by player_id
   }
 
   initialize(supabaseClient, playerId) {
@@ -161,6 +162,11 @@ export class Network extends EventEmitter {
     if (this.isHost && payload.type === 'player_join_request') {
       this._handlePlayerJoinRequest(payload);
     }
+
+    if (this.isHost && payload.type === 'position_update') {
+      // Store position update in buffer for batching
+      this.positionBuffer.set(payload.from, payload.data);
+    }
   }
 
   async _handlePlayerJoinRequest(payload) {
@@ -240,6 +246,51 @@ export class Network extends EventEmitter {
       event: 'message',
       payload: message,
     });
+  }
+
+  sendPositionUpdate(positionData) {
+    if (!this.channel || !this.connected) {
+      console.warn('Cannot send message, channel not connected.');
+      return;
+    }
+    const message = {
+      type: 'position_update',
+      from: this.playerId,
+      timestamp: Date.now(),
+      data: positionData,
+    };
+    this.channel.send({
+      type: 'broadcast',
+      event: 'message',
+      payload: message,
+    });
+  }
+
+  broadcastPositionUpdates() {
+    if (!this.isHost) return;
+    if (this.positionBuffer.size === 0) return;
+    if (!this.channel || !this.connected) return;
+
+    const updates = Array.from(this.positionBuffer.entries()).map(([player_id, data]) => ({
+      player_id,
+      ...data,
+    }));
+
+    const message = {
+      type: 'position_broadcast',
+      from: this.playerId,
+      timestamp: Date.now(),
+      data: { updates },
+    };
+
+    this.channel.send({
+      type: 'broadcast',
+      event: 'message',
+      payload: message,
+    });
+
+    // Clear the buffer after broadcasting
+    this.positionBuffer.clear();
   }
 
   disconnect() {

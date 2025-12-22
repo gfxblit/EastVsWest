@@ -162,9 +162,10 @@ export const CONFIG = {
     INTERACT_KEY: 'f',
   },
 
-  // Network Settings (for future multiplayer implementation)
+  // Network Settings
   NETWORK: {
-    TICK_RATE: 60, // updates per second
+    POSITION_UPDATE_RATE: 20, // position updates per second (20 Hz as per NETWORK_DESIGN.md)
+    POSITION_UPDATE_INTERVAL_MS: 50, // interval between position updates (1000ms / 20Hz = 50ms)
     INTERPOLATION_DELAY_MS: 100,
   },
 };

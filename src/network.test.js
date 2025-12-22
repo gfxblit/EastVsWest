@@ -373,4 +373,228 @@ describe('Network', () => {
       });
     });
   });
+
+  describe('Position Updates (Client-Authoritative Movement)', () => {
+    const MOCK_PLAYER_ID = 'test-player-id';
+    const MOCK_CHANNEL_NAME = 'game_session:TEST123';
+
+    beforeEach(() => {
+      jest.clearAllMocks();
+      network = new Network();
+      network.initialize(mockSupabaseClient, MOCK_PLAYER_ID);
+      network.connected = true;
+      network.playerId = MOCK_PLAYER_ID;
+    });
+
+    describe('sendPositionUpdate', () => {
+      describe('WhenClientSendsPositionUpdate_ShouldSendCorrectMessage', () => {
+        it('should send position_update message with correct format', () => {
+          const mockChannel = {
+            send: jest.fn().mockResolvedValue({ status: 'ok' }),
+          };
+          network.channel = mockChannel;
+
+          const positionData = {
+            position: { x: 100, y: 200 },
+            rotation: 1.57,
+            velocity: { x: 1.0, y: 0.5 },
+          };
+
+          network.sendPositionUpdate(positionData);
+
+          expect(mockChannel.send).toHaveBeenCalledWith({
+            type: 'broadcast',
+            event: 'message',
+            payload: {
+              type: 'position_update',
+              from: MOCK_PLAYER_ID,
+              timestamp: expect.any(Number),
+              data: positionData,
+            },
+          });
+        });
+
+        it('should not send if channel is not connected', () => {
+          network.connected = false;
+          const mockChannel = {
+            send: jest.fn(),
+          };
+          network.channel = mockChannel;
+
+          const positionData = {
+            position: { x: 100, y: 200 },
+            rotation: 1.57,
+            velocity: { x: 1.0, y: 0.5 },
+          };
+
+          network.sendPositionUpdate(positionData);
+
+          expect(mockChannel.send).not.toHaveBeenCalled();
+        });
+
+        it('should not send if channel is null', () => {
+          network.channel = null;
+          const consoleWarnSpy = jest.spyOn(console, 'warn').mockImplementation(() => {});
+
+          const positionData = {
+            position: { x: 100, y: 200 },
+            rotation: 1.57,
+            velocity: { x: 1.0, y: 0.5 },
+          };
+
+          network.sendPositionUpdate(positionData);
+
+          expect(consoleWarnSpy).toHaveBeenCalledWith(
+            'Cannot send message, channel not connected.'
+          );
+
+          consoleWarnSpy.mockRestore();
+        });
+      });
+    });
+
+    describe('Host Position Broadcast', () => {
+      describe('WhenHostReceivesPositionUpdates_ShouldBatchAndBroadcast', () => {
+        it('should collect position updates from multiple clients', () => {
+          network.isHost = true;
+          const mockChannel = {
+            send: jest.fn().mockResolvedValue({ status: 'ok' }),
+          };
+          network.channel = mockChannel;
+
+          const update1 = {
+            type: 'position_update',
+            from: 'player-1',
+            timestamp: Date.now(),
+            data: {
+              position: { x: 100, y: 200 },
+              rotation: 0,
+              velocity: { x: 1, y: 0 },
+            },
+          };
+
+          const update2 = {
+            type: 'position_update',
+            from: 'player-2',
+            timestamp: Date.now(),
+            data: {
+              position: { x: 300, y: 400 },
+              rotation: 1.57,
+              velocity: { x: 0, y: 1 },
+            },
+          };
+
+          network._handleRealtimeMessage(update1);
+          network._handleRealtimeMessage(update2);
+
+          // Manually call the batch broadcast method
+          network.broadcastPositionUpdates();
+
+          expect(mockChannel.send).toHaveBeenCalledWith({
+            type: 'broadcast',
+            event: 'message',
+            payload: {
+              type: 'position_broadcast',
+              from: MOCK_PLAYER_ID,
+              timestamp: expect.any(Number),
+              data: {
+                updates: [
+                  {
+                    player_id: 'player-1',
+                    position: { x: 100, y: 200 },
+                    rotation: 0,
+                    velocity: { x: 1, y: 0 },
+                  },
+                  {
+                    player_id: 'player-2',
+                    position: { x: 300, y: 400 },
+                    rotation: 1.57,
+                    velocity: { x: 0, y: 1 },
+                  },
+                ],
+              },
+            },
+          });
+        });
+
+        it('should clear position buffer after broadcasting', () => {
+          network.isHost = true;
+          const mockChannel = {
+            send: jest.fn().mockResolvedValue({ status: 'ok' }),
+          };
+          network.channel = mockChannel;
+
+          const update1 = {
+            type: 'position_update',
+            from: 'player-1',
+            timestamp: Date.now(),
+            data: {
+              position: { x: 100, y: 200 },
+              rotation: 0,
+              velocity: { x: 1, y: 0 },
+            },
+          };
+
+          network._handleRealtimeMessage(update1);
+          network.broadcastPositionUpdates();
+
+          // Clear the mock to verify the second call
+          mockChannel.send.mockClear();
+
+          // Call again - should not broadcast anything
+          network.broadcastPositionUpdates();
+
+          expect(mockChannel.send).not.toHaveBeenCalled();
+        });
+
+        it('should not broadcast if no position updates are pending', () => {
+          network.isHost = true;
+          const mockChannel = {
+            send: jest.fn().mockResolvedValue({ status: 'ok' }),
+          };
+          network.channel = mockChannel;
+
+          network.broadcastPositionUpdates();
+
+          expect(mockChannel.send).not.toHaveBeenCalled();
+        });
+      });
+    });
+
+    describe('Client Position Broadcast Reception', () => {
+      describe('WhenClientReceivesPositionBroadcast_ShouldEmitEvent', () => {
+        it('should emit position_broadcast event with all player positions', () => {
+          network.isHost = false;
+          const eventListener = jest.fn();
+          network.on('position_broadcast', eventListener);
+
+          const broadcastMessage = {
+            type: 'position_broadcast',
+            from: 'host-id',
+            timestamp: Date.now(),
+            data: {
+              updates: [
+                {
+                  player_id: 'player-1',
+                  position: { x: 100, y: 200 },
+                  rotation: 0,
+                  velocity: { x: 1, y: 0 },
+                },
+                {
+                  player_id: 'player-2',
+                  position: { x: 300, y: 400 },
+                  rotation: 1.57,
+                  velocity: { x: 0, y: 1 },
+                },
+              ],
+            },
+          };
+
+          network._handleRealtimeMessage(broadcastMessage);
+
+          expect(eventListener).toHaveBeenCalledWith(broadcastMessage);
+        });
+      });
+    });
+  });
 });

@@ -184,4 +184,165 @@ describe('Network Module Integration with Supabase', () => {
     // Clean up
     await playerClient.auth.signOut();
   });
+
+  describe('Position Updates (Client-Authoritative Movement)', () => {
+    test('should send position updates from client to host and broadcast to all clients', async () => {
+      // Host creates a session
+      const hostName = 'HostPlayer';
+      const { session: hostSession } = await network.hostGame(hostName);
+      testSessionId = hostSession.id;
+      const joinCode = hostSession.join_code;
+
+      // Create two players
+      const player1Client = createClient(supabaseUrl, supabaseAnonKey);
+      const { data: player1Auth } = await player1Client.auth.signInAnonymously();
+      const player1Network = new Network();
+      player1Network.initialize(player1Client, player1Auth.user.id);
+
+      const player2Client = createClient(supabaseUrl, supabaseAnonKey);
+      const { data: player2Auth } = await player2Client.auth.signInAnonymously();
+      const player2Network = new Network();
+      player2Network.initialize(player2Client, player2Auth.user.id);
+
+      // Players join the session
+      await player1Network.joinGame(joinCode, 'Player1');
+      await player2Network.joinGame(joinCode, 'Player2');
+
+      // Set up a listener for position broadcasts on player2
+      const player2Broadcasts = [];
+      player2Network.on('position_broadcast', (payload) => {
+        player2Broadcasts.push(payload);
+      });
+
+      // Player 1 sends a position update
+      const positionData = {
+        position: { x: 100, y: 200 },
+        rotation: 1.57,
+        velocity: { x: 1.0, y: 0.5 },
+      };
+
+      player1Network.sendPositionUpdate(positionData);
+
+      // Host collects the position update and broadcasts
+      await new Promise(resolve => setTimeout(resolve, 100)); // Wait for message to arrive
+      network.broadcastPositionUpdates();
+
+      // Wait for broadcast to reach player2
+      await new Promise(resolve => setTimeout(resolve, 100));
+
+      // Verify player2 received the position broadcast
+      expect(player2Broadcasts.length).toBeGreaterThan(0);
+      const latestBroadcast = player2Broadcasts[player2Broadcasts.length - 1];
+      expect(latestBroadcast.type).toBe('position_broadcast');
+      expect(latestBroadcast.data.updates).toBeDefined();
+
+      // Find player1's update in the broadcast
+      const player1Update = latestBroadcast.data.updates.find(
+        u => u.player_id === player1Auth.user.id
+      );
+      expect(player1Update).toBeDefined();
+      expect(player1Update.position).toEqual({ x: 100, y: 200 });
+      expect(player1Update.rotation).toBe(1.57);
+
+      // Clean up
+      await player1Client.auth.signOut();
+      await player2Client.auth.signOut();
+    });
+
+    test('should batch multiple position updates from different clients', async () => {
+      // Host creates a session
+      const { session: hostSession } = await network.hostGame('HostPlayer');
+      testSessionId = hostSession.id;
+      const joinCode = hostSession.join_code;
+
+      // Create two players
+      const player1Client = createClient(supabaseUrl, supabaseAnonKey);
+      const { data: player1Auth } = await player1Client.auth.signInAnonymously();
+      const player1Network = new Network();
+      player1Network.initialize(player1Client, player1Auth.user.id);
+
+      const player2Client = createClient(supabaseUrl, supabaseAnonKey);
+      const { data: player2Auth } = await player2Client.auth.signInAnonymously();
+      const player2Network = new Network();
+      player2Network.initialize(player2Client, player2Auth.user.id);
+
+      // Players join
+      await player1Network.joinGame(joinCode, 'Player1');
+      await player2Network.joinGame(joinCode, 'Player2');
+
+      // Set up listener on player1 for broadcasts
+      const receivedBroadcasts = [];
+      player1Network.on('position_broadcast', (payload) => {
+        receivedBroadcasts.push(payload);
+      });
+
+      // Both players send position updates
+      player1Network.sendPositionUpdate({
+        position: { x: 100, y: 200 },
+        rotation: 0,
+        velocity: { x: 1, y: 0 },
+      });
+
+      player2Network.sendPositionUpdate({
+        position: { x: 300, y: 400 },
+        rotation: 1.57,
+        velocity: { x: 0, y: 1 },
+      });
+
+      // Wait for messages to arrive at host
+      await new Promise(resolve => setTimeout(resolve, 100));
+
+      // Host broadcasts batched updates
+      network.broadcastPositionUpdates();
+
+      // Wait for broadcast to reach clients
+      await new Promise(resolve => setTimeout(resolve, 100));
+
+      // Verify player1 received the batched broadcast
+      expect(receivedBroadcasts.length).toBeGreaterThan(0);
+      const latestBroadcast = receivedBroadcasts[receivedBroadcasts.length - 1];
+      expect(latestBroadcast.type).toBe('position_broadcast');
+      expect(latestBroadcast.data.updates).toHaveLength(2);
+
+      // Verify both players' positions are in the batch
+      const updates = latestBroadcast.data.updates;
+      expect(updates.some(u => u.player_id === player1Auth.user.id)).toBe(true);
+      expect(updates.some(u => u.player_id === player2Auth.user.id)).toBe(true);
+
+      // Clean up
+      await player1Client.auth.signOut();
+      await player2Client.auth.signOut();
+    });
+
+    test('should clear position buffer after broadcasting', async () => {
+      // Host creates a session
+      const { session: hostSession } = await network.hostGame('HostPlayer');
+      testSessionId = hostSession.id;
+      const joinCode = hostSession.join_code;
+
+      // Create a player
+      const playerClient = createClient(supabaseUrl, supabaseAnonKey);
+      const { data: playerAuth } = await playerClient.auth.signInAnonymously();
+      const playerNetwork = new Network();
+      playerNetwork.initialize(playerClient, playerAuth.user.id);
+      await playerNetwork.joinGame(joinCode, 'Player1');
+
+      // Player sends position update
+      playerNetwork.sendPositionUpdate({
+        position: { x: 100, y: 200 },
+        rotation: 0,
+        velocity: { x: 1, y: 0 },
+      });
+
+      // Wait for message to arrive and broadcast
+      await new Promise(resolve => setTimeout(resolve, 100));
+      network.broadcastPositionUpdates();
+
+      // Verify buffer was cleared
+      expect(network.positionBuffer.size).toBe(0);
+
+      // Clean up
+      await playerClient.auth.signOut();
+    });
+  });
 });
