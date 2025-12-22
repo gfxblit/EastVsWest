@@ -58,8 +58,6 @@ export class Network extends EventEmitter {
     const newJoinCode = this.generateJoinCode();
     const channelName = `game_session:${newJoinCode}`;
 
-    console.log('Network: Attempting to host game with code:', newJoinCode);
-
     const { data: sessionData, error: sessionError } = await this.supabase
       .from('game_sessions')
       .insert({
@@ -89,15 +87,12 @@ export class Network extends EventEmitter {
     this.joinCode = newJoinCode;
     await this._subscribeToChannel(channelName);
 
-    console.log('Game session created and subscribed to channel:', channelName);
     return { session: sessionData, player: playerRecord };
   }
 
   async joinGame(joinCode, playerName) {
     if (!this.supabase) throw new Error('Supabase client not initialized.');
     if (!this.playerId) throw new Error('Player ID not set.');
-
-    console.log('Network: Attempting to join game with code:', joinCode);
 
     const { data: sessionData, error: sessionError } = await this.supabase
       .rpc('get_session_by_join_code', { p_join_code: joinCode });
@@ -134,7 +129,6 @@ export class Network extends EventEmitter {
           this.isHost = false;
           this.joinCode = joinCode;
           this.connected = true;
-          console.log('Successfully joined game:', payload.data);
           resolve(payload.data);
         }
       };
@@ -168,7 +162,6 @@ export class Network extends EventEmitter {
         })
         .subscribe((status) => {
           if (status === 'SUBSCRIBED') {
-            console.log('Successfully subscribed to channel:', channelName);
             this.connected = true;
             resolve();
           }
@@ -177,7 +170,6 @@ export class Network extends EventEmitter {
   }
 
   _handleRealtimeMessage(payload) {
-    console.log('Received message:', payload);
     this.emit(payload.type, payload);
 
     if (this.isHost && payload.type === 'player_join_request') {
@@ -241,8 +233,6 @@ export class Network extends EventEmitter {
     const { playerName } = payload.data;
     const joiningPlayerId = payload.from;
 
-    console.log(`Host: Received join request from ${playerName} (${joiningPlayerId})`);
-
     // 1. Get session
     const { data: session } = await this.supabase
       .from('game_sessions')
@@ -293,8 +283,6 @@ export class Network extends EventEmitter {
       event: 'message',
       payload: broadcastPayload,
     });
-
-    console.log('Host: Broadcasted player_joined event');
   }
 
 
@@ -374,15 +362,12 @@ export class Network extends EventEmitter {
     this.broadcastInterval = setInterval(() => {
       this.broadcastPositionUpdates();
     }, CONFIG.NETWORK.POSITION_UPDATE_INTERVAL_MS);
-
-    console.log(`Host: Started position broadcasting at ${CONFIG.NETWORK.POSITION_UPDATE_RATE} Hz.`);
   }
 
   stopPositionBroadcasting() {
     if (this.broadcastInterval) {
       clearInterval(this.broadcastInterval);
       this.broadcastInterval = null;
-      console.log('Host: Stopped position broadcasting.');
     }
   }
 
@@ -392,7 +377,6 @@ export class Network extends EventEmitter {
       this.channel = null;
     }
     this.connected = false;
-    console.log('Network: Disconnected');
   }
 
   generateJoinCode() {
