@@ -10,26 +10,7 @@ import { Input } from './input.js';
 import { UI } from './ui.js';
 import { Network } from './network.js';
 import { createClient } from '@supabase/supabase-js';
-import { secrets } from '../../secrets.js';
-
-class App {
-  constructor() {
-    this.game = null;
-    this.renderer = null;
-    this.input = null;
-    this.ui = null;
-    this.network = null;
-    this.supabase = null;
-    this.lastTimestamp = 0;
-    this.running = false;
-    this.animationFrameId = null;
-  }
-
-  init() {
-    console.log('Initializing Conflict Zone: East vs West');
-
-    // Initialize Supabase and Network
-    this.supabase = createClient(secrets.SUPABASE_URL, secrets.SUPABASE_ANON_KEY);
+    this.supabase = createClient(import.meta.env.VITE_SUPABASE_URL, import.meta.env.VITE_SUPABASE_ANON_KEY);
     this.network = new Network();
     // For now, generate a random player ID. In a real app, this would come from auth.
     const tempPlayerId = `player-${Math.random().toString(36).substr(2, 9)}`;
