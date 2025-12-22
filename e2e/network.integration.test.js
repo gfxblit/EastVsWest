@@ -10,6 +10,8 @@ describe('Network Module Integration with Supabase', () => {
   let supabaseClient;
   let network;
   let testSessionId; // To store the ID of the created session for cleanup
+  let hostUser; // Store authenticated host user
+  let playerUser; // Store authenticated player user
 
   // A check to ensure the test doesn't run without the necessary config
   if (!supabaseUrl || !supabaseAnonKey) {
@@ -20,15 +22,26 @@ describe('Network Module Integration with Supabase', () => {
     return;
   }
 
-  beforeAll(() => {
+  beforeAll(async () => {
     // Initialize a REAL Supabase client
     supabaseClient = createClient(supabaseUrl, supabaseAnonKey);
-    network = new Network();
 
-    // In a real app, you'd get the hostId from an authenticated user.
-    // For this test, we can use a static UUID.
-    const mockHostId = 'f47ac10b-58cc-4372-a567-0e02b2c3d479';
-    network.initialize(supabaseClient, mockHostId);
+    // Sign in anonymously to get an authenticated session for the host
+    const { data: authData, error: authError } = await supabaseClient.auth.signInAnonymously();
+    if (authError) {
+      throw new Error(`Failed to authenticate host: ${authError.message}`);
+    }
+    hostUser = authData.user;
+
+    network = new Network();
+    network.initialize(supabaseClient, hostUser.id);
+  });
+
+  afterAll(async () => {
+    // Sign out after all tests
+    if (supabaseClient) {
+      await supabaseClient.auth.signOut();
+    }
   });
 
   afterEach(async () => {
@@ -63,11 +76,8 @@ describe('Network Module Integration with Supabase', () => {
   });
 
   test('joinGame() should add a player to an existing session', async () => {
-    // First, create a host session
-    const hostNetwork = new Network();
-    const mockHostId = 'f47ac10b-58cc-4372-a567-0e02b2c3d479';
-    hostNetwork.initialize(supabaseClient, mockHostId);
-    const joinCode = await hostNetwork.hostGame();
+    // First, create a host session (using the existing authenticated host)
+    const joinCode = await network.hostGame();
 
     // Store session ID for cleanup
     const { data: sessionData } = await supabaseClient
@@ -77,11 +87,18 @@ describe('Network Module Integration with Supabase', () => {
       .single();
     testSessionId = sessionData.id;
 
-    // Now, create a new player and join the session
+    // Create a new Supabase client for the player and authenticate
+    const playerClient = createClient(supabaseUrl, supabaseAnonKey);
+    const { data: playerAuthData, error: playerAuthError } = await playerClient.auth.signInAnonymously();
+    if (playerAuthError) {
+      throw new Error(`Failed to authenticate player: ${playerAuthError.message}`);
+    }
+    playerUser = playerAuthData.user;
+
+    // Now, create a new player network instance and join the session
     const playerNetwork = new Network();
-    const mockPlayerId = 'a1b2c3d4-e5f6-7890-abcd-ef1234567890';
     const playerName = 'TestPlayer';
-    playerNetwork.initialize(supabaseClient, mockPlayerId);
+    playerNetwork.initialize(playerClient, playerUser.id);
 
     const session = await playerNetwork.joinGame(joinCode, playerName);
 
@@ -100,7 +117,7 @@ describe('Network Module Integration with Supabase', () => {
       .from('session_players')
       .select('*')
       .eq('session_id', sessionData.id)
-      .eq('player_id', mockPlayerId)
+      .eq('player_id', playerUser.id)
       .single();
 
     expect(playerError).toBeNull();
@@ -108,23 +125,29 @@ describe('Network Module Integration with Supabase', () => {
     expect(playerData.player_name).toBe(playerName);
     expect(playerData.is_host).toBe(false);
     expect(playerData.is_connected).toBe(true);
+
+    // Clean up: sign out the player
+    await playerClient.auth.signOut();
   });
 
   test('joinGame() should fail when session does not exist', async () => {
+    // Create a new authenticated player
+    const playerClient = createClient(supabaseUrl, supabaseAnonKey);
+    const { data: playerAuthData } = await playerClient.auth.signInAnonymously();
+
     const playerNetwork = new Network();
-    const mockPlayerId = 'a1b2c3d4-e5f6-7890-abcd-ef1234567890';
-    playerNetwork.initialize(supabaseClient, mockPlayerId);
+    playerNetwork.initialize(playerClient, playerAuthData.user.id);
 
     await expect(playerNetwork.joinGame('INVALID', 'TestPlayer'))
       .rejects.toThrow();
+
+    // Clean up
+    await playerClient.auth.signOut();
   });
 
   test('joinGame() should fail when session is not in lobby status', async () => {
-    // Create a session and manually set its status to 'active'
-    const hostNetwork = new Network();
-    const mockHostId = 'f47ac10b-58cc-4372-a567-0e02b2c3d479';
-    hostNetwork.initialize(supabaseClient, mockHostId);
-    const joinCode = await hostNetwork.hostGame();
+    // Create a session using the existing authenticated host
+    const joinCode = await network.hostGame();
 
     // Update session status to 'active'
     const { data: sessionData } = await supabaseClient
@@ -139,12 +162,17 @@ describe('Network Module Integration with Supabase', () => {
       .update({ status: 'active' })
       .eq('id', sessionData.id);
 
-    // Try to join
+    // Create a new authenticated player to try joining
+    const playerClient = createClient(supabaseUrl, supabaseAnonKey);
+    const { data: playerAuthData } = await playerClient.auth.signInAnonymously();
+
     const playerNetwork = new Network();
-    const mockPlayerId = 'a1b2c3d4-e5f6-7890-abcd-ef1234567890';
-    playerNetwork.initialize(supabaseClient, mockPlayerId);
+    playerNetwork.initialize(playerClient, playerAuthData.user.id);
 
     await expect(playerNetwork.joinGame(joinCode, 'TestPlayer'))
       .rejects.toThrow('Session is not joinable');
+
+    // Clean up
+    await playerClient.auth.signOut();
   });
 });

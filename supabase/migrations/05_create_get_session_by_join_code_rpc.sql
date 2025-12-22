@@ -27,5 +27,5 @@ BEGIN
 END;
 $$;
 
--- Grant execution privileges to authenticated roles
-GRANT EXECUTE ON FUNCTION public.get_session_by_join_code(VARCHAR(6)) TO authenticated;
+-- Grant execution privileges to authenticated and anonymous users
+GRANT EXECUTE ON FUNCTION public.get_session_by_join_code(VARCHAR(6)) TO authenticated, anon;

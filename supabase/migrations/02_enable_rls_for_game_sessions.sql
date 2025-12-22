@@ -12,12 +12,12 @@ CREATE POLICY "Allow read access to all game sessions"
   TO anon, authenticated
   USING (true);
 
--- 2. Allow authenticated users to create sessions.
+-- 2. Allow authenticated and anonymous users to create sessions.
 -- The creator automatically becomes the host.
 CREATE POLICY "Allow authenticated users to create game sessions"
   ON public.game_sessions
   FOR INSERT
-  TO authenticated
+  TO anon, authenticated
   WITH CHECK (auth.uid() = host_id);
 
 -- 3. Allow hosts to update their own sessions.
@@ -25,7 +25,7 @@ CREATE POLICY "Allow authenticated users to create game sessions"
 CREATE POLICY "Allow host to update their own game session"
   ON public.game_sessions
   FOR UPDATE
-  TO authenticated
+  TO anon, authenticated
   USING (auth.uid() = host_id)
   WITH CHECK (auth.uid() = host_id);
 
@@ -34,5 +34,5 @@ CREATE POLICY "Allow host to update their own game session"
 CREATE POLICY "Allow host to delete their own game session"
   ON public.game_sessions
   FOR DELETE
-  TO authenticated
+  TO anon, authenticated
   USING (auth.uid() = host_id);
