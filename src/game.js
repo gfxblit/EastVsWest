@@ -22,7 +22,6 @@ export class Game {
   }
 
   init() {
-    console.log('Game initialized');
     this.state.isRunning = true;
 
     // Create a test player for Phase 0

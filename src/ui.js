@@ -16,8 +16,6 @@ export class UI {
     this.screens.lobby = document.getElementById('lobby-screen');
     this.screens.game = document.getElementById('game-screen');
     this.screens.gameOver = document.getElementById('game-over-screen');
-
-    console.log('UI initialized');
   }
 
   showScreen(screenName) {

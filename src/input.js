@@ -37,8 +37,6 @@ export class Input {
     window.addEventListener('mousemove', this.boundHandlers.mousemove);
     window.addEventListener('mousedown', this.boundHandlers.mousedown);
     window.addEventListener('mouseup', this.boundHandlers.mouseup);
-
-    console.log('Input initialized');
   }
 
   handleKeyDown(event) {
@@ -134,7 +132,5 @@ export class Input {
     window.removeEventListener('mousemove', this.boundHandlers.mousemove);
     window.removeEventListener('mousedown', this.boundHandlers.mousedown);
     window.removeEventListener('mouseup', this.boundHandlers.mouseup);
-
-    console.log('Input destroyed');
   }
 }
