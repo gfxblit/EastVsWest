@@ -21,7 +21,8 @@ BEGIN
     conflict_zone_radius,
     conflict_zone_center_x,
     conflict_zone_center_y,
-    expires_at
+    expires_at,
+    realtime_channel_name
   FROM public.game_sessions
   WHERE join_code = p_join_code;
 END;

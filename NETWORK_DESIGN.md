@@ -85,6 +85,9 @@ CREATE TABLE game_sessions (
   -- Session expiry
   expires_at TIMESTAMP WITH TIME ZONE DEFAULT (NOW() + INTERVAL '2 hours'),
 
+  -- Realtime channel name, to be derived from the join code
+  realtime_channel_name VARCHAR(255) UNIQUE,
+
   CONSTRAINT valid_status CHECK (status IN ('lobby', 'active', 'ended')),
   CONSTRAINT valid_phase CHECK (game_phase IN ('lobby', 'deployment', 'combat', 'ended'))
 );
@@ -208,7 +211,8 @@ CREATE POLICY "Host can update session"
   ON game_sessions FOR UPDATE
   USING (auth.uid() = host_id);
 
--- Policy: Players can read data from their session
+-- Policy: Players can read all player data within any session they are a part of.
+-- This is required for the client to render other players.
 CREATE POLICY "Players can read session players"
   ON session_players FOR SELECT
   USING (
@@ -217,10 +221,24 @@ CREATE POLICY "Players can read session players"
     )
   );
 
--- Policy: Players can update their own data
+-- Policy: Players can update their own data (e.g., for client-authoritative movement).
 CREATE POLICY "Players can update own data"
   ON session_players FOR UPDATE
   USING (player_id = auth.uid());
+
+-- Policy: Only the host of a session can insert new players into it.
+-- This is a critical policy for enforcing the host-authority model.
+-- The `EXISTS` clause checks if the user performing the insert is the
+-- host of the `game_sessions` record corresponding to the new player's session.
+CREATE POLICY "Host can insert players into their session"
+  ON session_players FOR INSERT
+  WITH CHECK (
+    EXISTS (
+      SELECT 1
+      FROM game_sessions
+      WHERE id = session_players.session_id AND host_id = auth.uid()
+    )
+  );
 
 -- Similar policies for session_items and session_events
 ```
@@ -238,6 +256,8 @@ Each game session uses a dedicated Realtime channel for pub/sub messaging.
 ```
 game_session:{join_code}
 ```
+
+The exact channel name is stored in the `game_sessions.realtime_channel_name` field for robustness.
 
 Example: `game_session:ABC123`
 
@@ -258,15 +278,14 @@ All messages follow this base structure:
 
 ##### 1. Connection Messages
 
-**CLIENT → HOST: `player_join`**
+**CLIENT → HOST: `player_join_request`**
 ```javascript
 {
-  type: 'player_join',
+  type: 'player_join_request',
   from: 'player_uuid',
   timestamp: 1703001234567,
   data: {
-    player_name: 'Player1',
-    player_id: 'player_uuid'
+    player_name: 'Player1'
   }
 }
 ```

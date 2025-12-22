@@ -3,148 +3,256 @@
  * Handles multiplayer communication via Supabase
  */
 
-export class Network {
+class EventEmitter {
   constructor() {
+    this.events = {};
+  }
+
+  on(eventName, listener) {
+    if (!this.events[eventName]) {
+      this.events[eventName] = [];
+    }
+    this.events[eventName].push(listener);
+  }
+
+  emit(eventName, ...args) {
+    if (this.events[eventName]) {
+      this.events[eventName].forEach(listener => listener(...args));
+    }
+  }
+}
+
+export class Network extends EventEmitter {
+  constructor() {
+    super();
     this.isHost = false;
     this.joinCode = null;
     this.connected = false;
     this.supabase = null;
-    this.hostId = null;
+    this.playerId = null;
+    this.channel = null;
   }
 
-  initialize(supabaseClient, hostId) {
+  initialize(supabaseClient, playerId) {
     this.supabase = supabaseClient;
-    this.hostId = hostId;
-
+    this.playerId = playerId;
   }
 
-  async hostGame() {
-    if (!this.supabase) {
-      throw new Error('Supabase client not initialized. Call initialize() first.');
-    }
-    if (!this.hostId) {
-      throw new Error('Host ID not set. Call initialize() with a host ID.');
-    }
+  async hostGame(playerName) {
+    if (!this.supabase) throw new Error('Supabase client not initialized.');
+    if (!this.playerId) throw new Error('Player ID not set.');
 
-    // Generate a new join code
     const newJoinCode = this.generateJoinCode();
+    const channelName = `game_session:${newJoinCode}`;
 
-    console.log('Network: Attempting to host game with code:', newJoinCode, 'by host:', this.hostId);
+    console.log('Network: Attempting to host game with code:', newJoinCode);
 
-    try {
-      const { data, error } = await this.supabase
-        .from('game_sessions')
-        .insert([{ join_code: newJoinCode, host_id: this.hostId }])
-        .select()
-        .single();
+    const { data: sessionData, error: sessionError } = await this.supabase
+      .from('game_sessions')
+      .insert({
+        join_code: newJoinCode,
+        host_id: this.playerId,
+        realtime_channel_name: channelName,
+      })
+      .select()
+      .single();
 
-      if (error || !data) { // Added !data check here
-        console.error('Error creating game session:', error?.message || 'No data returned.');
-        throw error || new Error('Failed to create session: No data returned.'); // Throw appropriate error
-      }
+    if (sessionError) throw sessionError;
 
-      console.log('Game session created:', data);
-      this.isHost = true;
-      this.joinCode = data.join_code; // Use the join_code returned from the DB
-      return this.joinCode;
+    const { data: playerRecord, error: playerError } = await this.supabase
+      .from('session_players')
+      .insert({
+        session_id: sessionData.id,
+        player_id: this.playerId,
+        player_name: playerName,
+        is_host: true,
+      })
+      .select()
+      .single();
+    
+    if (playerError) throw playerError;
 
-    } catch (err) {
-      console.error('Failed to host game:', err.message);
-      throw err;
-    }
+    this.isHost = true;
+    this.joinCode = newJoinCode;
+    this._subscribeToChannel(channelName);
+
+    console.log('Game session created and subscribed to channel:', channelName);
+    return { session: sessionData, player: playerRecord };
   }
 
   async joinGame(joinCode, playerName) {
-    // Validate prerequisites
-    if (!this.supabase) {
-      throw new Error('Supabase client not initialized. Call initialize() first.');
+    if (!this.supabase) throw new Error('Supabase client not initialized.');
+    if (!this.playerId) throw new Error('Player ID not set.');
+
+    console.log('Network: Attempting to join game with code:', joinCode);
+
+    const { data: sessionData, error: sessionError } = await this.supabase
+      .rpc('get_session_by_join_code', { p_join_code: joinCode });
+
+    if (sessionError) throw sessionError;
+    if (!sessionData || sessionData.length === 0) throw new Error('Session not found');
+
+    const session = sessionData[0];
+    if (session.status !== 'lobby') throw new Error('Session is not joinable.');
+    if (session.current_player_count >= session.max_players) throw new Error('Session is full.');
+
+    this._subscribeToChannel(session.realtime_channel_name);
+
+    const joinRequest = {
+      type: 'player_join_request',
+      from: this.playerId,
+      timestamp: Date.now(),
+      data: { playerName },
+    };
+
+    await this.channel.send({
+      type: 'broadcast',
+      event: 'message',
+      payload: joinRequest,
+    });
+
+    return new Promise((resolve, reject) => {
+      const timeout = setTimeout(() => {
+        reject(new Error('Join request timed out.'));
+      }, 10000); // 10 second timeout
+
+      this.on('player_joined', (payload) => {
+        if (payload.data.player.player_id === this.playerId) {
+          clearTimeout(timeout);
+          this.isHost = false;
+          this.joinCode = joinCode;
+          this.connected = true;
+          console.log('Successfully joined game:', payload.data);
+          resolve(payload.data);
+        }
+      });
+    });
+  }
+
+  _subscribeToChannel(channelName) {
+    if (this.channel) {
+      this.supabase.removeChannel(this.channel);
     }
-    if (!this.hostId) {
-      throw new Error('Player ID not set. Call initialize() with a player ID.');
-    }
 
-    console.log('Network: Attempting to join game with code:', joinCode, 'player:', playerName);
+    this.channel = this.supabase.channel(channelName, {
+      config: {
+        broadcast: {
+          ack: true,
+        },
+      },
+    });
 
-    try {
-      // Step 1: Look up the session by join code using the RPC function
-      const { data: sessionData, error: sessionError } = await this.supabase
-        .rpc('get_session_by_join_code', { p_join_code: joinCode });
+    this.channel
+      .on('broadcast', { event: 'message' }, ({ payload }) => {
+        this._handleRealtimeMessage(payload);
+      })
+      .subscribe((status) => {
+        if (status === 'SUBSCRIBED') {
+          console.log('Successfully subscribed to channel:', channelName);
+          this.connected = true;
+        }
+      });
+  }
 
-      // Step 2: Validate session exists
-      if (sessionError) {
-        console.error('Error finding session:', sessionError.message);
-        throw sessionError;
-      }
+  _handleRealtimeMessage(payload) {
+    console.log('Received message:', payload);
+    this.emit(payload.type, payload);
 
-      if (!sessionData || sessionData.length === 0) {
-        throw new Error('Session not found');
-      }
-
-      const session = sessionData[0]; // Extract the single session object from the array
-
-      console.log('Found session:', session);
-
-      // Step 3: Validate session is joinable
-      if (session.status !== 'lobby') {
-        throw new Error('Session is not joinable. Only sessions in lobby status can be joined.');
-      }
-
-      if (session.current_player_count >= session.max_players) {
-        throw new Error('Session is full. Maximum players reached.');
-      }
-
-      // Step 4: Add player to session_players table
-      const { data: playerRecord, error: playerError } = await this.supabase
-        .from('session_players')
-        .insert([{
-          session_id: session.id,
-          player_id: this.hostId, // Using hostId as playerId
-          player_name: playerName,
-          is_host: false,
-          is_connected: true,
-        }])
-        .select()
-        .single();
-
-      if (playerError || !playerRecord) {
-        console.error('Error adding player to session:', playerError?.message || 'No data returned');
-        throw playerError || new Error('Failed to join session: Could not add player.');
-      }
-
-      console.log('Player added to session:', playerRecord);
-
-      // Step 5: Update network state
-      this.isHost = false;
-      this.joinCode = joinCode;
-      this.connected = true;
-
-      return session;
-
-    } catch (err) {
-      console.error('Failed to join game:', err.message);
-      throw err;
+    if (this.isHost && payload.type === 'player_join_request') {
+      this._handlePlayerJoinRequest(payload);
     }
   }
 
-  sendGameState(state) {
-    // Placeholder: Will send game state to Supabase
-    console.log('Network: Send game state (not yet implemented)');
+  async _handlePlayerJoinRequest(payload) {
+    const { playerName } = payload.data;
+    const joiningPlayerId = payload.from;
+
+    console.log(`Host: Received join request from ${playerName} (${joiningPlayerId})`);
+
+    // 1. Get session
+    const { data: session } = await this.supabase
+      .from('game_sessions')
+      .select('*')
+      .eq('join_code', this.joinCode)
+      .single();
+    
+    // TODO: Add validation (session full, etc.)
+
+    // 2. Add player to DB
+    const { data: newPlayer, error } = await this.supabase
+      .from('session_players')
+      .insert({
+        session_id: session.id,
+        player_id: joiningPlayerId,
+        player_name: playerName,
+        is_host: false,
+      })
+      .select()
+      .single();
+    
+    if (error) {
+      console.error('Host: Error adding player to DB:', error);
+      // TODO: Send rejection message
+      return;
+    }
+
+    // 3. Get all players in session
+    const { data: players } = await this.supabase
+      .from('session_players')
+      .select('*')
+      .eq('session_id', session.id);
+
+    // 4. Broadcast `player_joined`
+    const broadcastPayload = {
+      type: 'player_joined',
+      from: this.playerId,
+      timestamp: Date.now(),
+      data: {
+        player: newPlayer,
+        allPlayers: players,
+        session: session,
+      },
+    };
+
+    await this.channel.send({
+      type: 'broadcast',
+      event: 'message',
+      payload: broadcastPayload,
+    });
+
+    console.log('Host: Broadcasted player_joined event');
   }
 
-  onGameStateUpdate(callback) {
-    // Placeholder: Will listen for game state updates from Supabase
-    console.log('Network: Listen for game state updates (not yet implemented)');
+
+  send(type, data) {
+    if (!this.channel || !this.connected) {
+      console.warn('Cannot send message, channel not connected.');
+      return;
+    }
+    const message = {
+      type,
+      from: this.playerId,
+      timestamp: Date.now(),
+      data,
+    };
+    this.channel.send({
+      type: 'broadcast',
+      event: 'message',
+      payload: message,
+    });
   }
 
   disconnect() {
-    // Placeholder: Will disconnect from Supabase
-    console.log('Network: Disconnect (not yet implemented)');
+    if (this.channel) {
+      this.supabase.removeChannel(this.channel);
+      this.channel = null;
+    }
     this.connected = false;
+    console.log('Network: Disconnected');
   }
 
   generateJoinCode() {
-    // Generate a random 6-character join code
-    const chars = 'ABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789';
+    const chars = 'ABCDEFGHJKLMNPQRSTUVWXYZ23456789';
     let code = '';
     for (let i = 0; i < 6; i++) {
       code += chars.charAt(Math.floor(Math.random() * chars.length));

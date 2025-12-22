@@ -13,14 +13,20 @@ CREATE POLICY "Allow read access to session players"
   TO authenticated
   USING (true);
 
--- 2. Allow authenticated users to insert themselves into a session
--- This is for joining a game
--- Note: This includes anonymous sign-ins (which get 'authenticated' role)
-CREATE POLICY "Allow authenticated users to join sessions"
+-- 2. Allow only the host to add players to a session.
+-- This enforces the host-authority model. The check verifies that the
+-- user performing the insert is the host of the session being inserted into.
+CREATE POLICY "Allow host to insert players into their session"
   ON public.session_players
   FOR INSERT
   TO authenticated
-  WITH CHECK (auth.uid() = player_id);
+  WITH CHECK (
+    EXISTS (
+      SELECT 1
+      FROM public.game_sessions
+      WHERE id = session_players.session_id AND host_id = auth.uid()
+    )
+  );
 
 -- 3. Allow players to update their own data
 -- This is for position updates, status changes, etc.
