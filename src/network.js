@@ -226,11 +226,13 @@ export class Network extends EventEmitter {
       // Allow for some buffer, e.g., 2x the normal movement distance in one interval
       const maxDistance = (CONFIG.PLAYER.BASE_MOVEMENT_SPEED / CONFIG.NETWORK.POSITION_UPDATE_RATE) * 2;
       if (distance > maxDistance) {
+        console.warn(`Host: Received invalid position update from ${from}`, payload.data);
         return false; // Position changed too much
       }
     }
 
     return true;
+  }
 
   async _handlePlayerJoinRequest(payload) {
     const { playerName } = payload.data;
