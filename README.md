@@ -72,6 +72,21 @@ To get started with local development and deploy the project:
 *   **Build for Deployment**: To create optimized, production-ready files, run `npm run build`. This command will generate a `dist/` folder containing `bundle.js` and `index.html`.
 *   **Deployment**: The contents of the `dist/` folder are ready for deployment.
 
+## Production Environment
+For the application to connect to Supabase in a production environment, you must provide the necessary credentials via a `.env` file.
+
+1.  Create a file named `.env` in the root of the project.
+2.  Add the following environment variables to the `.env` file, replacing the placeholder values with your actual Supabase credentials:
+
+    ```
+    VITE_SUPABASE_URL="<your-supabase-url>"
+    VITE_SUPABASE_ANON_KEY="<your-supabase-anon-key>"
+    ```
+
+    **Note:** The `VITE_` prefix is required for Vite to expose these variables to the client-side code.
+
+    These credentials can be found in your Supabase project's dashboard under "Project Settings" > "API".
+
 ## Project Management
 This project utilizes GitHub Issues for task management and roadmap tracking.
 - **Roadmap Issue:** A central `Roadmap` issue serves as the project's master tracking document. It contains an exhaustive checklist of all tasks and their corresponding GitHub Issues. Tasks that need to be sequenced have increasing numbers. Parallelizable tasks are under "Dev A", "Dev B", etc.

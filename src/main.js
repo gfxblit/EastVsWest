@@ -8,20 +8,28 @@ import { Game } from './game.js';
 import { Renderer } from './renderer.js';
 import { Input } from './input.js';
 import { UI } from './ui.js';
-
+import { Network } from './network.js';
+import { createClient } from '@supabase/supabase-js';
 class App {
   constructor() {
     this.game = null;
     this.renderer = null;
     this.input = null;
     this.ui = null;
-    this.lastTimestamp = 0;
+    this.network = null;
+    this.supabase = null;
     this.running = false;
+    this.lastTimestamp = 0;
     this.animationFrameId = null;
   }
 
   init() {
-    console.log('Initializing Conflict Zone: East vs West');
+    this.supabase = createClient(import.meta.env.VITE_SUPABASE_URL, import.meta.env.VITE_SUPABASE_ANON_KEY);
+    this.network = new Network();
+    // For now, generate a random player ID. In a real app, this would come from auth.
+    const tempPlayerId = `player-${Math.random().toString(36).substr(2, 9)}`;
+    this.network.initialize(this.supabase, tempPlayerId);
+
 
     // Initialize UI
     this.ui = new UI();
@@ -44,15 +52,23 @@ class App {
     }
   }
 
-  hostGame() {
+  async hostGame() {
     console.log('Hosting game...');
-    this.ui.showJoinCode('DEMO-CODE'); // Placeholder for now
-    this.startGame();
+    try {
+      const playerName = `Host-${Math.random().toString(36).substr(2, 5)}`;
+      const { session } = await this.network.hostGame(playerName);
+      this.ui.showJoinCode(session.join_code);
+      this.network.startPositionBroadcasting();
+      this.startGame();
+    } catch (error) {
+      console.error('Failed to host game:', error);
+      alert(`Error hosting game: ${error.message}`);
+    }
   }
 
-  joinGame() {
+  async joinGame() {
     const joinCodeInput = document.getElementById('join-code-input');
-    const joinCode = joinCodeInput?.value.trim();
+    const joinCode = joinCodeInput?.value.trim().toUpperCase();
 
     if (!joinCode) {
       alert('Please enter a join code');
@@ -60,13 +76,20 @@ class App {
     }
 
     // Validate join code format (6 alphanumeric characters)
-    if (!/^[A-Z0-9]{6}$/i.test(joinCode)) {
-      alert('Please enter a valid 6-character join code (letters and numbers only)');
+    if (!/^[A-Z0-9]{6}$/.test(joinCode)) {
+      alert('Please enter a valid 6-character join code');
       return;
     }
 
     console.log('Joining game with code:', joinCode);
-    this.startGame();
+    try {
+      const playerName = `Player-${Math.random().toString(36).substr(2, 5)}`;
+      await this.network.joinGame(joinCode, playerName);
+      this.startGame();
+    } catch (error) {
+      console.error('Failed to join game:', error);
+      alert(`Error joining game: ${error.message}`);
+    }
   }
 
   startGame() {
@@ -127,6 +150,10 @@ class App {
     }
     if (this.input) {
       this.input.destroy();
+    }
+    if (this.network) {
+      this.network.stopPositionBroadcasting();
+      this.network.disconnect();
     }
   }
 }
