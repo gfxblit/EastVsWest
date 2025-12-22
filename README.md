@@ -47,12 +47,24 @@ Running the end-to-end tests requires a running Supabase instance.
     ```bash
     supabase status
     ```
-    This will output the `SUPABASE_URL` and `SUPABASE_ANON_KEY`.
+    This will output the `SUPABASE_URL` and `SUPABASE_ANON_KEY`. The agent can run this command for you.
 
 3.  Set the environment variables and run the tests. For example, to run the network integration tests:
     ```bash
     SUPABASE_URL="<your-supabase-url>" SUPABASE_ANON_KEY="<your-supabase-anon-key>" npm run test:e2e e2e/network.integration.test.js
     ```
+
+#### Resetting the Local Database
+If you modify an existing migration file or encounter issues with the local database state, you will need to reset it. This ensures all migrations are re-applied from a clean state.
+
+To reset the database, run the following commands:
+```bash
+# Stop the Supabase instance and delete all local data
+supabase stop --no-backup
+
+# Restart the instance to re-apply all migrations
+supabase start
+```
 
 ## Build Workflow
 To get started with local development and deploy the project:

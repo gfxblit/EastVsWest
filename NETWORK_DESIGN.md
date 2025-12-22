@@ -25,6 +25,23 @@ The EastVsWest multiplayer system uses a **hybrid host-authority model** where:
 - Sessions are private and accessed via 6-character join codes
 - Maximum 12 players per session
 
+### Authoritative Action Flow
+
+A core pattern for all host-authoritative actions (joining, combat, item pickups) follows a **Request-Approve-Broadcast** model:
+
+1.  **Request (Client → Host):** A **Client** sends a message to the **Host** requesting to perform an action (e.g., `item_pickup_request`). The client does not change its own state yet.
+2.  **Approve (Host):** The **Host** receives the request and validates it against the authoritative game state and rules. If valid, the Host applies the change to the master state (e.g., updates the Database).
+3.  **Broadcast (Host → All Clients):** The **Host** broadcasts the result of the action (e.g., `item_pickup_result`) to **all Clients** in the session. Only upon receiving this broadcast do the clients update their local game state.
+
+This ensures the Host is the single source of truth and prevents cheating.
+
+Client-authoritative actions like movement follow a **Tell-Broadcast** model for maximum responsiveness:
+
+1.  **Tell (Client → Host):** The **Client** moves locally first (client-side prediction) and sends a `position_update` message to the **Host**, stating its new position.
+2.  **Broadcast (Host → Other Clients):** The **Host** acts as a simple relay, broadcasting this position to all **other Clients** in a `position_broadcast` message.
+
+This gives the illusion of zero-latency movement for the player.
+
 ### Authority Distribution
 
 - **Client-Authoritative**: Player movement (position updates)
@@ -67,6 +84,9 @@ CREATE TABLE game_sessions (
 
   -- Session expiry
   expires_at TIMESTAMP WITH TIME ZONE DEFAULT (NOW() + INTERVAL '2 hours'),
+
+  -- Realtime channel name, to be derived from the join code
+  realtime_channel_name VARCHAR(255) UNIQUE,
 
   CONSTRAINT valid_status CHECK (status IN ('lobby', 'active', 'ended')),
   CONSTRAINT valid_phase CHECK (game_phase IN ('lobby', 'deployment', 'combat', 'ended'))
@@ -191,7 +211,8 @@ CREATE POLICY "Host can update session"
   ON game_sessions FOR UPDATE
   USING (auth.uid() = host_id);
 
--- Policy: Players can read data from their session
+-- Policy: Players can read all player data within any session they are a part of.
+-- This is required for the client to render other players.
 CREATE POLICY "Players can read session players"
   ON session_players FOR SELECT
   USING (
@@ -200,10 +221,24 @@ CREATE POLICY "Players can read session players"
     )
   );
 
--- Policy: Players can update their own data
+-- Policy: Players can update their own data (e.g., for client-authoritative movement).
 CREATE POLICY "Players can update own data"
   ON session_players FOR UPDATE
   USING (player_id = auth.uid());
+
+-- Policy: Only the host of a session can insert new players into it.
+-- This is a critical policy for enforcing the host-authority model.
+-- The `EXISTS` clause checks if the user performing the insert is the
+-- host of the `game_sessions` record corresponding to the new player's session.
+CREATE POLICY "Host can insert players into their session"
+  ON session_players FOR INSERT
+  WITH CHECK (
+    EXISTS (
+      SELECT 1
+      FROM game_sessions
+      WHERE id = session_players.session_id AND host_id = auth.uid()
+    )
+  );
 
 -- Similar policies for session_items and session_events
 ```
@@ -221,6 +256,8 @@ Each game session uses a dedicated Realtime channel for pub/sub messaging.
 ```
 game_session:{join_code}
 ```
+
+The exact channel name is stored in the `game_sessions.realtime_channel_name` field for robustness.
 
 Example: `game_session:ABC123`
 
@@ -241,15 +278,14 @@ All messages follow this base structure:
 
 ##### 1. Connection Messages
 
-**CLIENT → HOST: `player_join`**
+**CLIENT → HOST: `player_join_request`**
 ```javascript
 {
-  type: 'player_join',
+  type: 'player_join_request',
   from: 'player_uuid',
   timestamp: 1703001234567,
   data: {
-    player_name: 'Player1',
-    player_id: 'player_uuid'
+    player_name: 'Player1'
   }
 }
 ```
@@ -649,7 +685,7 @@ CLIENT A          SUPABASE CHANNEL          HOST              OTHER CLIENTS
    │                    │                     │                    │
 ```
 
-**Frequency**: 60 Hz (every ~16ms)
+**Frequency**: 20 Hz (every ~50ms)
 **Optimization**: Host batches position updates and sends one broadcast per tick containing all player positions.
 
 ### Detailed Data Flow: Item Pickup (Host-Authoritative)

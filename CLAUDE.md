@@ -1,6 +1,8 @@
-# Test-Driven Development Workflow for SnakeClaude
+# Test-Driven Development Workflow for Claude
 
 ## Overview
+Start by reading README.md
+
 This workflow enforces strict Test-Driven Development (TDD) for the SnakeClaude game using Jest for unit/integration tests and Puppeteer for end-to-end tests. Follow each phase sequentially.
 
 ## Architecture

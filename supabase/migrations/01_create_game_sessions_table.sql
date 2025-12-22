@@ -18,6 +18,9 @@ CREATE TABLE game_sessions (
   -- Session expiry
   expires_at TIMESTAMP WITH TIME ZONE DEFAULT (NOW() + INTERVAL '2 hours'),
 
+  -- Realtime channel name
+  realtime_channel_name VARCHAR(255) UNIQUE,
+
   CONSTRAINT valid_status CHECK (status IN ('lobby', 'active', 'ended')),
   CONSTRAINT valid_phase CHECK (game_phase IN ('lobby', 'deployment', 'combat', 'ended'))
 );
