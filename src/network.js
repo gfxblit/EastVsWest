@@ -372,6 +372,7 @@ export class Network extends EventEmitter {
   }
 
   disconnect() {
+    this.stopPositionBroadcasting();
     if (this.channel) {
       this.supabase.removeChannel(this.channel);
       this.channel = null;
