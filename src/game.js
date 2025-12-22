@@ -96,9 +96,18 @@ export class Game {
       : 1.0;
     const speed = CONFIG.PLAYER.BASE_MOVEMENT_SPEED * speedModifier;
 
+    let velocityX = inputState.moveX * speed;
+    let velocityY = inputState.moveY * speed;
+
+    // Normalize diagonal movement
+    if (inputState.moveX !== 0 && inputState.moveY !== 0) {
+      velocityX /= Math.SQRT2;
+      velocityY /= Math.SQRT2;
+    }
+
     player.velocity = {
-      x: inputState.moveX * speed,
-      y: inputState.moveY * speed,
+      x: velocityX,
+      y: velocityY,
     };
   }
 
