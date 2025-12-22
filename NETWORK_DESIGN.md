@@ -35,6 +35,13 @@ A core pattern for all host-authoritative actions (joining, combat, item pickups
 
 This ensures the Host is the single source of truth and prevents cheating.
 
+Client-authoritative actions like movement follow a **Tell-Broadcast** model for maximum responsiveness:
+
+1.  **Tell (Client → Host):** The **Client** moves locally first (client-side prediction) and sends a `position_update` message to the **Host**, stating its new position.
+2.  **Broadcast (Host → Other Clients):** The **Host** acts as a simple relay, broadcasting this position to all **other Clients** in a `position_broadcast` message.
+
+This gives the illusion of zero-latency movement for the player.
+
 ### Authority Distribution
 
 - **Client-Authoritative**: Player movement (position updates)
@@ -659,7 +666,7 @@ CLIENT A          SUPABASE CHANNEL          HOST              OTHER CLIENTS
    │                    │                     │                    │
 ```
 
-**Frequency**: 60 Hz (every ~16ms)
+**Frequency**: 20 Hz (every ~50ms)
 **Optimization**: Host batches position updates and sends one broadcast per tick containing all player positions.
 
 ### Detailed Data Flow: Item Pickup (Host-Authoritative)
