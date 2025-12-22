@@ -6,18 +6,20 @@ ALTER TABLE public.session_players ENABLE ROW LEVEL SECURITY;
 -- 1. Allow read access to all session players
 -- Players can query session_players to see who's in sessions
 -- Access is controlled by knowing the session_id (which comes from join code)
+-- Note: Anonymous sign-ins get the 'authenticated' role, not 'anon'
 CREATE POLICY "Allow read access to session players"
   ON public.session_players
   FOR SELECT
-  TO anon, authenticated
+  TO authenticated
   USING (true);
 
 -- 2. Allow authenticated users to insert themselves into a session
 -- This is for joining a game
+-- Note: This includes anonymous sign-ins (which get 'authenticated' role)
 CREATE POLICY "Allow authenticated users to join sessions"
   ON public.session_players
   FOR INSERT
-  TO anon, authenticated
+  TO authenticated
   WITH CHECK (auth.uid() = player_id);
 
 -- 3. Allow players to update their own data
@@ -25,7 +27,7 @@ CREATE POLICY "Allow authenticated users to join sessions"
 CREATE POLICY "Allow players to update their own data"
   ON public.session_players
   FOR UPDATE
-  TO anon, authenticated
+  TO authenticated
   USING (auth.uid() = player_id)
   WITH CHECK (auth.uid() = player_id);
 
@@ -33,5 +35,5 @@ CREATE POLICY "Allow players to update their own data"
 CREATE POLICY "Allow players to delete their own data"
   ON public.session_players
   FOR DELETE
-  TO anon, authenticated
+  TO authenticated
   USING (auth.uid() = player_id);
