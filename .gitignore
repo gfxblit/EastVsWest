@@ -14,3 +14,4 @@ coverage/
 .env.keys
 .env.local
 .env.*.local
+secrets.js

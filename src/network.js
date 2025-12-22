@@ -3,6 +3,8 @@
  * Handles multiplayer communication via Supabase
  */
 
+import { CONFIG } from './config.js';
+
 class EventEmitter {
   constructor() {
     this.events = {};
@@ -13,6 +15,14 @@ class EventEmitter {
       this.events[eventName] = [];
     }
     this.events[eventName].push(listener);
+  }
+
+  off(eventName, listenerToRemove) {
+    if (!this.events[eventName]) return;
+
+    this.events[eventName] = this.events[eventName].filter(
+      listener => listener !== listenerToRemove
+    );
   }
 
   emit(eventName, ...args) {
@@ -32,6 +42,8 @@ export class Network extends EventEmitter {
     this.playerId = null;
     this.channel = null;
     this.positionBuffer = new Map(); // Stores position updates by player_id
+    this.playerPositions = new Map(); // Stores last known positions for validation
+    this.broadcastInterval = null;
   }
 
   initialize(supabaseClient, playerId) {
@@ -113,20 +125,26 @@ export class Network extends EventEmitter {
     });
 
     return new Promise((resolve, reject) => {
-      const timeout = setTimeout(() => {
-        reject(new Error('Join request timed out.'));
-      }, 10000); // 10 second timeout
+      let timeout;
 
-      this.on('player_joined', (payload) => {
+      const onPlayerJoined = (payload) => {
         if (payload.data.player.player_id === this.playerId) {
           clearTimeout(timeout);
+          this.off('player_joined', onPlayerJoined); // Clean up listener
           this.isHost = false;
           this.joinCode = joinCode;
           this.connected = true;
           console.log('Successfully joined game:', payload.data);
           resolve(payload.data);
         }
-      });
+      };
+
+      timeout = setTimeout(() => {
+        this.off('player_joined', onPlayerJoined); // Clean up listener on timeout
+        reject(new Error('Join request timed out.'));
+      }, 10000); // 10 second timeout
+
+      this.on('player_joined', onPlayerJoined);
     });
   }
 
@@ -164,10 +182,55 @@ export class Network extends EventEmitter {
     }
 
     if (this.isHost && payload.type === 'position_update') {
-      // Store position update in buffer for batching
-      this.positionBuffer.set(payload.from, payload.data);
+      if (this._isValidPositionUpdate(payload)) {
+        // Store position update in buffer for batching
+        this.positionBuffer.set(payload.from, payload.data);
+        this.playerPositions.set(payload.from, payload.data.position);
+      } else {
+        console.warn(`Host: Received invalid position update from ${payload.from}`, payload.data);
+      }
     }
   }
+
+  _isValidPositionUpdate(payload) {
+    const { from, data } = payload;
+    const { position, rotation, velocity } = data;
+
+    // 1. Type and structure validation
+    if (
+      typeof position?.x !== 'number' ||
+      typeof position?.y !== 'number' ||
+      typeof rotation !== 'number' ||
+      typeof velocity?.x !== 'number' ||
+      typeof velocity?.y !== 'number'
+    ) {
+      return false;
+    }
+
+    // 2. Bounds checking
+    if (
+      position.x < 0 || position.x > CONFIG.CANVAS.WIDTH ||
+      position.y < 0 || position.y > CONFIG.CANVAS.HEIGHT
+    ) {
+      return false;
+    }
+
+    // 3. Anti-teleport check
+    const lastPosition = this.playerPositions.get(from);
+    if (lastPosition) {
+      const distance = Math.sqrt(
+        Math.pow(position.x - lastPosition.x, 2) +
+        Math.pow(position.y - lastPosition.y, 2)
+      );
+
+      // Allow for some buffer, e.g., 2x the normal movement distance in one interval
+      const maxDistance = (CONFIG.PLAYER.BASE_MOVEMENT_SPEED / CONFIG.NETWORK.POSITION_UPDATE_RATE) * 2;
+      if (distance > maxDistance) {
+        return false; // Position changed too much
+      }
+    }
+
+    return true;
 
   async _handlePlayerJoinRequest(payload) {
     const { playerName } = payload.data;
@@ -298,6 +361,24 @@ export class Network extends EventEmitter {
 
     // Clear the buffer after broadcasting
     this.positionBuffer.clear();
+  }
+
+  startPositionBroadcasting() {
+    if (!this.isHost || this.broadcastInterval) return;
+
+    this.broadcastInterval = setInterval(() => {
+      this.broadcastPositionUpdates();
+    }, CONFIG.NETWORK.POSITION_UPDATE_INTERVAL_MS);
+
+    console.log(`Host: Started position broadcasting at ${CONFIG.NETWORK.POSITION_UPDATE_RATE} Hz.`);
+  }
+
+  stopPositionBroadcasting() {
+    if (this.broadcastInterval) {
+      clearInterval(this.broadcastInterval);
+      this.broadcastInterval = null;
+      console.log('Host: Stopped position broadcasting.');
+    }
   }
 
   disconnect() {

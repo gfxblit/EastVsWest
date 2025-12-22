@@ -373,5 +373,65 @@ describe('Network Module Integration with Supabase', () => {
       playerNetwork.disconnect();
       await playerClient.auth.signOut();
     });
+
+    test('should periodically broadcast positions when broadcasting is started', async () => {
+      // Host creates a session
+      const { session: hostSession } = await network.hostGame('HostPlayer');
+      testSessionId = hostSession.id;
+      const joinCode = hostSession.join_code;
+
+      // Create a player
+      const playerClient = createClient(supabaseUrl, supabaseAnonKey);
+      const { data: playerAuth } = await playerClient.auth.signInAnonymously();
+      const playerNetwork = new Network();
+      playerNetwork.initialize(playerClient, playerAuth.user.id);
+      await playerNetwork.joinGame(joinCode, 'Player1');
+
+      // Listen for broadcasts on the client
+      const receivedBroadcasts = [];
+      playerNetwork.on('position_broadcast', (payload) => {
+        receivedBroadcasts.push(payload);
+      });
+
+      // Host starts broadcasting
+      network.startPositionBroadcasting();
+
+      // Host sends its own position update
+      network.sendPositionUpdate({
+        position: { x: 10, y: 10 },
+        rotation: 0,
+        velocity: { x: 0, y: 0 },
+      });
+
+      // Wait for at least one broadcast interval
+      await new Promise(resolve => setTimeout(resolve, 60)); // Interval is 50ms
+
+      expect(receivedBroadcasts.length).toBe(1);
+      expect(receivedBroadcasts[0].data.updates[0].player_id).toBe(hostUser.id);
+
+      // Wait for another broadcast interval
+      await new Promise(resolve => setTimeout(resolve, 50));
+      
+      // another broadcast should not have been sent because buffer is empty
+      expect(receivedBroadcasts.length).toBe(1);
+
+      // Host stops broadcasting
+      network.stopPositionBroadcasting();
+
+      // Host sends another update
+       network.sendPositionUpdate({
+        position: { x: 20, y: 20 },
+        rotation: 0,
+        velocity: { x: 0, y: 0 },
+      });
+
+      // Wait and verify no new broadcast is received
+      await new Promise(resolve => setTimeout(resolve, 60));
+      expect(receivedBroadcasts.length).toBe(1);
+
+      // Clean up
+      playerNetwork.disconnect();
+      await playerClient.auth.signOut();
+    }, 10000);
   });
 });

@@ -335,6 +335,62 @@ describe('Network', () => {
       });
     });
 
+    describe('Join Game Event Listener', () => {
+      let onSpy, offSpy;
+
+      beforeEach(() => {
+        onSpy = jest.spyOn(network, 'on');
+        offSpy = jest.spyOn(network, 'off');
+
+        // Mock the session lookup to avoid actual DB calls
+        const mockSession = {
+            id: MOCK_SESSION_ID,
+            join_code: MOCK_JOIN_CODE,
+            host_id: 'host-uuid',
+            status: 'lobby',
+            max_players: 12,
+            current_player_count: 1,
+            realtime_channel_name: 'game_session:ABC123',
+          };
+        
+        mockSupabaseClient.rpc = jest.fn().mockResolvedValue({ data: [mockSession], error: null });
+        network.channel = { send: jest.fn().mockResolvedValue('ok') };
+      });
+
+      afterEach(() => {
+        onSpy.mockRestore();
+        offSpy.mockRestore();
+      });
+
+      it('should clean up player_joined listener on successful join', async () => {
+        const joinPromise = network.joinGame(MOCK_JOIN_CODE, MOCK_PLAYER_NAME);
+
+        // Simulate the player_joined event
+        const payload = { data: { player: { player_id: MOCK_PLAYER_ID } } };
+        network.emit('player_joined', payload);
+
+        await joinPromise;
+
+        expect(onSpy).toHaveBeenCalledWith('player_joined', expect.any(Function));
+        expect(offSpy).toHaveBeenCalledWith('player_joined', expect.any(Function));
+      });
+
+      it('should clean up player_joined listener on timeout', async () => {
+        jest.useFakeTimers();
+        const joinPromise = network.joinGame(MOCK_JOIN_CODE, MOCK_PLAYER_NAME);
+
+        // Advance timers to trigger the timeout
+        jest.advanceTimersByTime(10000);
+
+        await expect(joinPromise).rejects.toThrow('Join request timed out.');
+
+        expect(onSpy).toHaveBeenCalledWith('player_joined', expect.any(Function));
+        expect(offSpy).toHaveBeenCalledWith('player_joined', expect.any(Function));
+
+        jest.useRealTimers();
+      });
+    });
+
     describe('WhenPlayerInsertFails_ShouldThrowError', () => {
       it('should throw an error if adding player to session_players fails', async () => {
         const mockSession = {
@@ -658,6 +714,143 @@ describe('Network', () => {
           expect(eventListener).toHaveBeenCalledWith(broadcastMessage);
         });
       });
+    });
+  });
+
+  describe('Position Broadcasting Timer', () => {
+    beforeEach(() => {
+      jest.useFakeTimers();
+    });
+
+    afterEach(() => {
+      jest.useRealTimers();
+    });
+
+    it('should call broadcastPositionUpdates periodically when started by host', () => {
+      network.isHost = true;
+      network.broadcastPositionUpdates = jest.fn();
+
+      network.startPositionBroadcasting();
+
+      // Advance time by one interval
+      jest.advanceTimersByTime(50);
+      expect(network.broadcastPositionUpdates).toHaveBeenCalledTimes(1);
+
+      // Advance time by another interval
+      jest.advanceTimersByTime(50);
+      expect(network.broadcastPositionUpdates).toHaveBeenCalledTimes(2);
+    });
+
+    it('should stop calling broadcastPositionUpdates when stopped', () => {
+      network.isHost = true;
+      network.broadcastPositionUpdates = jest.fn();
+
+      network.startPositionBroadcasting();
+      jest.advanceTimersByTime(50);
+      expect(network.broadcastPositionUpdates).toHaveBeenCalledTimes(1);
+
+      network.stopPositionBroadcasting();
+
+      // Advance time again, but broadcast should not be called
+      jest.advanceTimersByTime(50);
+      expect(network.broadcastPositionUpdates).toHaveBeenCalledTimes(1);
+    });
+
+    it('should not start broadcasting if not the host', () => {
+      network.isHost = false;
+      network.startPositionBroadcasting();
+      expect(network.broadcastInterval).toBeNull();
+    });
+
+    it('should not start a new interval if one is already running', () => {
+      network.isHost = true;
+      network.startPositionBroadcasting();
+      const firstIntervalId = network.broadcastInterval;
+
+      network.startPositionBroadcasting();
+      expect(network.broadcastInterval).toBe(firstIntervalId);
+    });
+  });
+
+  describe('Position Update Validation', () => {
+    beforeEach(() => {
+      network.isHost = true;
+    });
+
+    it('should accept a valid position update', () => {
+      const payload = {
+        from: 'player-1',
+        data: {
+          position: { x: 100, y: 100 },
+          rotation: 0,
+          velocity: { x: 10, y: 10 },
+        },
+      };
+      expect(network._isValidPositionUpdate(payload)).toBe(true);
+    });
+
+    it('should reject an update with invalid data types', () => {
+      const payload = {
+        from: 'player-1',
+        data: {
+          position: { x: '100', y: 100 }, // x is a string
+          rotation: 0,
+          velocity: { x: 10, y: 10 },
+        },
+      };
+      expect(network._isValidPositionUpdate(payload)).toBe(false);
+    });
+
+    it('should reject an update with out-of-bounds position', () => {
+      const payload = {
+        from: 'player-1',
+        data: {
+          position: { x: 2000, y: 100 }, // x is out of bounds
+          rotation: 0,
+          velocity: { x: 10, y: 10 },
+        },
+      };
+      expect(network._isValidPositionUpdate(payload)).toBe(false);
+    });
+
+    it('should reject an update that teleports the player', () => {
+      const player1Id = 'player-1';
+      network.playerPositions.set(player1Id, { x: 100, y: 100 });
+      const payload = {
+        from: player1Id,
+        data: {
+          position: { x: 500, y: 500 }, // large jump
+          rotation: 0,
+          velocity: { x: 10, y: 10 },
+        },
+      };
+      expect(network._isValidPositionUpdate(payload)).toBe(false);
+    });
+
+    it('should accept the first position update from a player', () => {
+      const payload = {
+        from: 'new-player',
+        data: {
+          position: { x: 100, y: 100 },
+          rotation: 0,
+          velocity: { x: 10, y: 10 },
+        },
+      };
+      expect(network._isValidPositionUpdate(payload)).toBe(true);
+    });
+
+    it('should accept a subsequent valid position update', () => {
+      const player1Id = 'player-1';
+      network.playerPositions.set(player1Id, { x: 100, y: 100 });
+      const payload = {
+        from: player1Id,
+        data: {
+          position: { x: 105, y: 105 }, // small move
+          rotation: 0,
+          velocity: { x: 10, y: 10 },
+        },
+      };
+      expect(network._isValidPositionUpdate(payload)).toBe(true);
     });
   });
 });
