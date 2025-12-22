@@ -10,6 +10,20 @@ import { Input } from './input.js';
 import { UI } from './ui.js';
 import { Network } from './network.js';
 import { createClient } from '@supabase/supabase-js';
+class App {
+  constructor() {
+    this.game = null;
+    this.renderer = null;
+    this.input = null;
+    this.ui = null;
+    this.network = null;
+    this.supabase = null;
+    this.running = false;
+    this.lastTimestamp = 0;
+    this.animationFrameId = null;
+  }
+
+  init() {
     this.supabase = createClient(import.meta.env.VITE_SUPABASE_URL, import.meta.env.VITE_SUPABASE_ANON_KEY);
     this.network = new Network();
     // For now, generate a random player ID. In a real app, this would come from auth.
