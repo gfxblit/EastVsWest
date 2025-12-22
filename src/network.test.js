@@ -517,6 +517,69 @@ describe('Network', () => {
           });
         });
 
+        it('should include host own position when host calls sendPositionUpdate on itself', () => {
+          network.isHost = true;
+          const mockChannel = {
+            send: jest.fn().mockResolvedValue({ status: 'ok' }),
+          };
+          network.channel = mockChannel;
+
+          // Host sends its own position update
+          // This should immediately add to buffer since Supabase doesn't echo back
+          const hostPositionData = {
+            position: { x: 50, y: 100 },
+            rotation: 0.5,
+            velocity: { x: 0.5, y: 0.5 },
+          };
+          network.sendPositionUpdate(hostPositionData);
+
+          // Receive position update from another client
+          const clientUpdate = {
+            type: 'position_update',
+            from: 'player-1',
+            timestamp: Date.now(),
+            data: {
+              position: { x: 100, y: 200 },
+              rotation: 0,
+              velocity: { x: 1, y: 0 },
+            },
+          };
+          network._handleRealtimeMessage(clientUpdate);
+
+          // Clear previous send calls
+          mockChannel.send.mockClear();
+
+          // Host broadcasts all position updates
+          network.broadcastPositionUpdates();
+
+          // Verify broadcast includes BOTH host and client positions
+          expect(mockChannel.send).toHaveBeenCalledWith({
+            type: 'broadcast',
+            event: 'message',
+            payload: {
+              type: 'position_broadcast',
+              from: MOCK_PLAYER_ID,
+              timestamp: expect.any(Number),
+              data: {
+                updates: expect.arrayContaining([
+                  {
+                    player_id: MOCK_PLAYER_ID,
+                    position: { x: 50, y: 100 },
+                    rotation: 0.5,
+                    velocity: { x: 0.5, y: 0.5 },
+                  },
+                  {
+                    player_id: 'player-1',
+                    position: { x: 100, y: 200 },
+                    rotation: 0,
+                    velocity: { x: 1, y: 0 },
+                  },
+                ]),
+              },
+            },
+          });
+        });
+
         it('should clear position buffer after broadcasting', () => {
           network.isHost = true;
           const mockChannel = {

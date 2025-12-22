@@ -259,6 +259,13 @@ export class Network extends EventEmitter {
       timestamp: Date.now(),
       data: positionData,
     };
+
+    // If host, add own position to buffer immediately since Supabase
+    // Realtime doesn't echo messages back to the sender
+    if (this.isHost) {
+      this.positionBuffer.set(this.playerId, positionData);
+    }
+
     this.channel.send({
       type: 'broadcast',
       event: 'message',

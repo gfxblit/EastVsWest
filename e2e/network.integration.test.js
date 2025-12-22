@@ -220,17 +220,24 @@ describe('Network Module Integration with Supabase', () => {
         player2Broadcasts.push(payload);
       });
 
+      // Host sends its own position update
+      const hostPositionData = {
+        position: { x: 50, y: 100 },
+        rotation: 0.5,
+        velocity: { x: 0.5, y: 0.5 },
+      };
+      network.sendPositionUpdate(hostPositionData);
+
       // Player 1 sends a position update
       const positionData = {
         position: { x: 100, y: 200 },
         rotation: 1.57,
         velocity: { x: 1.0, y: 0.5 },
       };
-
       player1Network.sendPositionUpdate(positionData);
 
-      // Host collects the position update and broadcasts
-      await new Promise(resolve => setTimeout(resolve, 100)); // Wait for message to arrive
+      // Host collects the position updates and broadcasts
+      await new Promise(resolve => setTimeout(resolve, 100)); // Wait for messages to arrive
       network.broadcastPositionUpdates();
 
       // Wait for broadcast to reach player2
@@ -241,6 +248,17 @@ describe('Network Module Integration with Supabase', () => {
       const latestBroadcast = player2Broadcasts[player2Broadcasts.length - 1];
       expect(latestBroadcast.type).toBe('position_broadcast');
       expect(latestBroadcast.data.updates).toBeDefined();
+
+      // Verify broadcast contains positions from BOTH host and player1
+      expect(latestBroadcast.data.updates.length).toBe(2);
+
+      // Find host's update in the broadcast
+      const hostUpdate = latestBroadcast.data.updates.find(
+        u => u.player_id === hostUser.id
+      );
+      expect(hostUpdate).toBeDefined();
+      expect(hostUpdate.position).toEqual({ x: 50, y: 100 });
+      expect(hostUpdate.rotation).toBe(0.5);
 
       // Find player1's update in the broadcast
       const player1Update = latestBroadcast.data.updates.find(
