@@ -38,7 +38,10 @@ describe('Network Module Integration with Supabase', () => {
   });
 
   afterAll(async () => {
-    // Sign out after all tests
+    // Disconnect network and sign out after all tests
+    if (network) {
+      network.disconnect();
+    }
     if (supabaseClient) {
       await supabaseClient.auth.signOut();
     }
@@ -140,7 +143,8 @@ describe('Network Module Integration with Supabase', () => {
     expect(playerData.is_host).toBe(false);
     expect(playerData.is_connected).toBe(true);
 
-    // Clean up: sign out the player
+    // Clean up: disconnect and sign out the player
+    playerNetwork.disconnect();
     await playerClient.auth.signOut();
   });
 
@@ -156,6 +160,7 @@ describe('Network Module Integration with Supabase', () => {
       .rejects.toThrow();
 
     // Clean up
+    playerNetwork.disconnect();
     await playerClient.auth.signOut();
   });
 
@@ -182,6 +187,7 @@ describe('Network Module Integration with Supabase', () => {
       .rejects.toThrow('Session is not joinable');
 
     // Clean up
+    playerNetwork.disconnect();
     await playerClient.auth.signOut();
   });
 
@@ -245,6 +251,8 @@ describe('Network Module Integration with Supabase', () => {
       expect(player1Update.rotation).toBe(1.57);
 
       // Clean up
+      player1Network.disconnect();
+      player2Network.disconnect();
       await player1Client.auth.signOut();
       await player2Client.auth.signOut();
     });
@@ -310,6 +318,8 @@ describe('Network Module Integration with Supabase', () => {
       expect(updates.some(u => u.player_id === player2Auth.user.id)).toBe(true);
 
       // Clean up
+      player1Network.disconnect();
+      player2Network.disconnect();
       await player1Client.auth.signOut();
       await player2Client.auth.signOut();
     });
@@ -342,6 +352,7 @@ describe('Network Module Integration with Supabase', () => {
       expect(network.positionBuffer.size).toBe(0);
 
       // Clean up
+      playerNetwork.disconnect();
       await playerClient.auth.signOut();
     });
   });
