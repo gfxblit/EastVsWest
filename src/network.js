@@ -87,7 +87,7 @@ export class Network extends EventEmitter {
 
     this.isHost = true;
     this.joinCode = newJoinCode;
-    this._subscribeToChannel(channelName);
+    await this._subscribeToChannel(channelName);
 
     console.log('Game session created and subscribed to channel:', channelName);
     return { session: sessionData, player: playerRecord };
@@ -109,7 +109,7 @@ export class Network extends EventEmitter {
     if (session.status !== 'lobby') throw new Error('Session is not joinable.');
     if (session.current_player_count >= session.max_players) throw new Error('Session is full.');
 
-    this._subscribeToChannel(session.realtime_channel_name);
+    await this._subscribeToChannel(session.realtime_channel_name);
 
     const joinRequest = {
       type: 'player_join_request',
@@ -161,16 +161,19 @@ export class Network extends EventEmitter {
       },
     });
 
-    this.channel
-      .on('broadcast', { event: 'message' }, ({ payload }) => {
-        this._handleRealtimeMessage(payload);
-      })
-      .subscribe((status) => {
-        if (status === 'SUBSCRIBED') {
-          console.log('Successfully subscribed to channel:', channelName);
-          this.connected = true;
-        }
-      });
+    return new Promise((resolve) => {
+      this.channel
+        .on('broadcast', { event: 'message' }, ({ payload }) => {
+          this._handleRealtimeMessage(payload);
+        })
+        .subscribe((status) => {
+          if (status === 'SUBSCRIBED') {
+            console.log('Successfully subscribed to channel:', channelName);
+            this.connected = true;
+            resolve();
+          }
+        });
+    });
   }
 
   _handleRealtimeMessage(payload) {
