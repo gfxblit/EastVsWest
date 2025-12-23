@@ -52,8 +52,28 @@ class App {
     }
   }
 
+  showLobbyError(message) {
+    const errorElement = document.getElementById('lobby-error');
+    if (errorElement) {
+      errorElement.textContent = message;
+      errorElement.classList.remove('hidden');
+      // Auto-hide after 5 seconds
+      setTimeout(() => {
+        errorElement.classList.add('hidden');
+      }, 5000);
+    }
+  }
+
+  hideLobbyError() {
+    const errorElement = document.getElementById('lobby-error');
+    if (errorElement) {
+      errorElement.classList.add('hidden');
+    }
+  }
+
   async hostGame() {
     console.log('Hosting game...');
+    this.hideLobbyError();
     try {
       const playerName = `Host-${Math.random().toString(36).substr(2, 5)}`;
       const { session } = await this.network.hostGame(playerName);
@@ -62,7 +82,7 @@ class App {
       this.startGame();
     } catch (error) {
       console.error('Failed to host game:', error);
-      alert(`Error hosting game: ${error.message}`);
+      this.showLobbyError(`Error hosting game: ${error.message}`);
     }
   }
 
@@ -70,14 +90,16 @@ class App {
     const joinCodeInput = document.getElementById('join-code-input');
     const joinCode = joinCodeInput?.value.trim().toUpperCase();
 
+    this.hideLobbyError();
+
     if (!joinCode) {
-      alert('Please enter a join code');
+      this.showLobbyError('Please enter a join code');
       return;
     }
 
     // Validate join code format (6 alphanumeric characters)
     if (!/^[A-Z0-9]{6}$/.test(joinCode)) {
-      alert('Please enter a valid 6-character join code');
+      this.showLobbyError('Please enter a valid 6-character join code');
       return;
     }
 
@@ -88,7 +110,7 @@ class App {
       this.startGame();
     } catch (error) {
       console.error('Failed to join game:', error);
-      alert(`Error joining game: ${error.message}`);
+      this.showLobbyError(`Error joining game: ${error.message}`);
     }
   }
 

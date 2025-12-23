@@ -4,39 +4,46 @@
  */
 
 import puppeteer from 'puppeteer';
-import { fileURLToPath } from 'url';
-import { dirname, join } from 'path';
-
-const __filename = fileURLToPath(import.meta.url);
-const __dirname = dirname(__filename);
+import { startViteServer, stopViteServer } from './helpers/vite-server.js';
 
 describe('Lobby UI Interactions', () => {
   let browser;
   let page;
-  const indexPath = join(__dirname, '..', 'index.html');
+  let serverUrl;
 
   beforeAll(async () => {
+    // Start Vite dev server
+    serverUrl = await startViteServer();
+
     browser = await puppeteer.launch({
       executablePath: '/Applications/Google Chrome.app/Contents/MacOS/Google Chrome',
       headless: "new",
       args: [
-        '--no-sandbox', 
-        '--disable-setuid-sandbox',
-        '--disable-web-security',
-        '--allow-file-access-from-files'
+        '--no-sandbox',
+        '--disable-setuid-sandbox'
       ],
       env: { ...process.env, ARCHPREFERENCE: 'arm64' },
-      dumpio: true
+      dumpio: false
     });
-  });
+  }, 60000); // Increase timeout for server startup
 
   afterAll(async () => {
     await browser.close();
+    await stopViteServer();
   });
 
   beforeEach(async () => {
     page = await browser.newPage();
-    await page.goto('file://' + indexPath);
+
+    // Capture console errors for debugging
+    page.on('pageerror', error => {
+      console.log('Page script error:', error.message);
+    });
+
+    await page.goto(serverUrl);
+
+    // Wait for page to load
+    await page.waitForSelector('#lobby-screen');
   });
 
   afterEach(async () => {
@@ -119,101 +126,71 @@ describe('Lobby UI Interactions', () => {
   });
 
   describe('Join Button Validation', () => {
-    // FIXME: Dialog tests hang because Puppeteer dialog handling is unreliable in this setup
-    // The app does show alerts, but the page.once('dialog') handler doesn't always catch them
-    test.skip('WhenClickingJoinWithEmptyInput_ShouldShowAlert', async () => {
-      // Set up dialog handler before clicking
-      const dialogPromise = new Promise((resolve) => {
-        page.once('dialog', async (dialog) => {
-          expect(dialog.message()).toBe('Please enter a join code');
-          await dialog.accept();
-          resolve();
-        });
-      });
-
+    test('WhenClickingJoinWithEmptyInput_ShouldShowError', async () => {
       await page.click('#join-game-btn');
-      await dialogPromise;
+
+      // Wait for error message to appear
+      await page.waitForSelector('#lobby-error:not(.hidden)', { timeout: 1000 });
+
+      const errorText = await page.$eval('#lobby-error', (el) => el.textContent);
+      expect(errorText).toBe('Please enter a join code');
+
+      const isVisible = await page.$eval('#lobby-error', (el) => {
+        return !el.classList.contains('hidden');
+      });
+      expect(isVisible).toBe(true);
     });
 
-    test.skip('WhenClickingJoinWithWhitespaceInput_ShouldShowAlert', async () => {
+    test('WhenClickingJoinWithWhitespaceInput_ShouldShowError', async () => {
       await page.type('#join-code-input', '   ');
-
-      const dialogPromise = new Promise((resolve) => {
-        page.once('dialog', async (dialog) => {
-          expect(dialog.message()).toBe('Please enter a join code');
-          await dialog.accept();
-          resolve();
-        });
-      });
-
       await page.click('#join-game-btn');
-      await dialogPromise;
+
+      await page.waitForSelector('#lobby-error:not(.hidden)', { timeout: 1000 });
+
+      const errorText = await page.$eval('#lobby-error', (el) => el.textContent);
+      expect(errorText).toBe('Please enter a join code');
     });
 
-    test.skip('WhenClickingJoinWithTooShortCode_ShouldShowAlert', async () => {
+    test('WhenClickingJoinWithTooShortCode_ShouldShowError', async () => {
       await page.type('#join-code-input', 'ABC12');
-
-      const dialogPromise = new Promise((resolve) => {
-        page.once('dialog', async (dialog) => {
-          expect(dialog.message()).toBe('Please enter a valid 6-character join code');
-          await dialog.accept();
-          resolve();
-        });
-      });
-
       await page.click('#join-game-btn');
-      await dialogPromise;
+
+      await page.waitForSelector('#lobby-error:not(.hidden)', { timeout: 1000 });
+
+      const errorText = await page.$eval('#lobby-error', (el) => el.textContent);
+      expect(errorText).toBe('Please enter a valid 6-character join code');
     });
 
-    test.skip('WhenClickingJoinWithTooLongCode_ShouldShowAlert', async () => {
+    test('WhenClickingJoinWithTooLongCode_ShouldShowError', async () => {
       await page.type('#join-code-input', 'ABC1234');
-
-      const dialogPromise = new Promise((resolve) => {
-        page.once('dialog', async (dialog) => {
-          expect(dialog.message()).toBe('Please enter a valid 6-character join code');
-          await dialog.accept();
-          resolve();
-        });
-      });
-
       await page.click('#join-game-btn');
-      await dialogPromise;
+
+      await page.waitForSelector('#lobby-error:not(.hidden)', { timeout: 1000 });
+
+      const errorText = await page.$eval('#lobby-error', (el) => el.textContent);
+      expect(errorText).toBe('Please enter a valid 6-character join code');
     });
 
-    test.skip('WhenClickingJoinWithInvalidCharacters_ShouldShowAlert', async () => {
+    test('WhenClickingJoinWithInvalidCharacters_ShouldShowError', async () => {
       await page.type('#join-code-input', 'ABC@12');
-
-      const dialogPromise = new Promise((resolve) => {
-        page.once('dialog', async (dialog) => {
-          expect(dialog.message()).toBe('Please enter a valid 6-character join code');
-          await dialog.accept();
-          resolve();
-        });
-      });
-
       await page.click('#join-game-btn');
-      await dialogPromise;
+
+      await page.waitForSelector('#lobby-error:not(.hidden)', { timeout: 1000 });
+
+      const errorText = await page.$eval('#lobby-error', (el) => el.textContent);
+      expect(errorText).toBe('Please enter a valid 6-character join code');
     });
 
+    // TODO: Integrate with Supabase to test actual join functionality
     test.skip('WhenClickingJoinWithValidCode_ShouldAttemptToJoin', async () => {
       await page.type('#join-code-input', 'ABC123');
-
-      // Set up a handler to catch any error dialogs (network will fail)
-      const dialogPromise = new Promise((resolve) => {
-        page.once('dialog', async (dialog) => {
-          // We expect a network error since we're not connected to Supabase
-          expect(dialog.message()).toContain('Error joining game');
-          await dialog.accept();
-          resolve();
-        });
-      });
-
-      const timeoutPromise = new Promise((_, reject) =>
-        setTimeout(() => reject(new Error('Dialog did not appear within 5 seconds')), 5000)
-      );
-
       await page.click('#join-game-btn');
-      await Promise.race([dialogPromise, timeoutPromise]);
+
+      // Wait for error message to appear (network will fail since we're not connected)
+      await page.waitForSelector('#lobby-error:not(.hidden)', { timeout: 5000 });
+
+      const errorText = await page.$eval('#lobby-error', (el) => el.textContent);
+      expect(errorText).toContain('Error joining game');
     });
   });
 
@@ -226,23 +203,15 @@ describe('Lobby UI Interactions', () => {
       expect(isClickable).toBe(true);
     });
 
+    // TODO: Integrate with Supabase to test actual host functionality
     test.skip('WhenClickingHostButton_ShouldAttemptToHost', async () => {
-      // Set up a handler to catch error dialogs (network will fail)
-      const dialogPromise = new Promise((resolve) => {
-        page.once('dialog', async (dialog) => {
-          // We expect a network error since we're not connected to Supabase
-          expect(dialog.message()).toContain('Error hosting game');
-          await dialog.accept();
-          resolve();
-        });
-      });
-
-      const timeoutPromise = new Promise((_, reject) =>
-        setTimeout(() => reject(new Error('Dialog did not appear within 5 seconds')), 5000)
-      );
-
       await page.click('#host-game-btn');
-      await Promise.race([dialogPromise, timeoutPromise]);
+
+      // Wait for error message to appear (network will fail since we're not connected)
+      await page.waitForSelector('#lobby-error:not(.hidden)', { timeout: 5000 });
+
+      const errorText = await page.$eval('#lobby-error', (el) => el.textContent);
+      expect(errorText).toContain('Error hosting game');
     });
   });
 
