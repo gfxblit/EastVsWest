@@ -113,6 +113,27 @@ For the application to connect to Supabase in a production environment, you must
 
     These credentials can be found in your Supabase project's dashboard under "Project Settings" > "API".
 
+### GitHub Pages Deployment
+For GitHub Pages deployment, environment variables must be configured as GitHub repository secrets since Vite embeds them at build time during the CI/CD workflow.
+
+1.  **Get Production Credentials:**
+    ```bash
+    npx supabase projects list
+    npx supabase projects api-keys --project-ref <your-project-ref>
+    ```
+
+2.  **Add GitHub Secrets:**
+    Navigate to your repository: **Settings → Secrets and variables → Actions → New repository secret**
+
+    Add these two secrets:
+    - **Name:** `VITE_SUPABASE_URL`
+      **Value:** Your production Supabase URL (e.g., `https://xxxxx.supabase.co`)
+
+    - **Name:** `VITE_SUPABASE_ANON_KEY`
+      **Value:** Your production Supabase anon/public key
+
+**Note:** The anon key is safe to expose client-side. Security is enforced through Row Level Security (RLS) policies in your database, not by hiding the anon key.
+
 ## Project Management
 This project utilizes GitHub Issues for task management and roadmap tracking.
 - **Roadmap Issue:** A central `Roadmap` issue serves as the project's master tracking document. It contains an exhaustive checklist of all tasks and their corresponding GitHub Issues. Tasks that need to be sequenced have increasing numbers. Parallelizable tasks are under "Dev A", "Dev B", etc.
