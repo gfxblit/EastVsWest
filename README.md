@@ -47,11 +47,19 @@ Running the end-to-end tests requires a running Supabase instance.
     ```bash
     supabase status
     ```
-    This will output the `SUPABASE_URL` and `SUPABASE_ANON_KEY`. The agent can run this command for you.
+    This will output the `Project URL` and look for the anon key. The default local Supabase anon key is:
+    ```
+    eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZS1kZW1vIiwicm9sZSI6ImFub24iLCJleHAiOjE5ODM4MTI5OTZ9.CRXP1A7WOeoJeXxjNni43kdQwgnWNReilDMblYTn_I0
+    ```
 
-3.  Set the environment variables and run the tests. For example, to run the network integration tests:
+3.  Set the environment variables and run the tests. For example, to run the lobby E2E tests:
     ```bash
-    SUPABASE_URL="<your-supabase-url>" SUPABASE_ANON_KEY="<your-supabase-anon-key>" npm run test:e2e e2e/network.integration.test.js
+    SUPABASE_URL="http://127.0.0.1:54321" SUPABASE_ANON_KEY="eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZS1kZW1vIiwicm9sZSI6ImFub24iLCJleHAiOjE5ODM4MTI5OTZ9.CRXP1A7WOeoJeXxjNni43kdQwgnWNReilDMblYTn_I0" npm run test:e2e e2e/lobby.test.js
+    ```
+
+    **Note:** For Puppeteer to use the bundled Chromium instead of the system Chrome, set `PUPPETEER_EXECUTABLE_PATH=""`:
+    ```bash
+    PUPPETEER_EXECUTABLE_PATH="" SUPABASE_URL="http://127.0.0.1:54321" SUPABASE_ANON_KEY="eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZS1kZW1vIiwicm9sZSI6ImFub24iLCJleHAiOjE5ODM4MTI5OTZ9.CRXP1A7WOeoJeXxjNni43kdQwgnWNReilDMblYTn_I0" npm run test:e2e e2e/lobby.test.js
     ```
 
 #### Resetting the Local Database
@@ -72,7 +80,27 @@ To get started with local development and deploy the project:
 *   **Build for Deployment**: To create optimized, production-ready files, run `npm run build`. This command will generate a `dist/` folder containing `bundle.js` and `index.html`.
 *   **Deployment**: The contents of the `dist/` folder are ready for deployment.
 
-## Production Environment
+## Environment Configuration
+
+### Local Development
+For local development, create a `.env.local` file in the root of the project with your local Supabase credentials.
+
+**Quick Setup:**
+```bash
+cp .env.local.example .env.local
+```
+
+The default configuration in `.env.local.example` uses the standard local Supabase development credentials:
+```bash
+VITE_SUPABASE_URL=http://127.0.0.1:54321
+VITE_SUPABASE_ANON_KEY=eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZS1kZW1vIiwicm9sZSI6ImFub24iLCJleHAiOjE5ODM4MTI5OTZ9.CRXP1A7WOeoJeXxjNni43kdQwgnWNReilDMblYTn_I0
+```
+
+**Note:** The `VITE_` prefix is required for Vite to expose these variables to the client-side code.
+
+This file will be automatically loaded by Vite during local development (`npm run dev`).
+
+### Production Environment
 For the application to connect to Supabase in a production environment, you must provide the necessary credentials via a `.env` file.
 
 1.  Create a file named `.env` in the root of the project.
@@ -82,8 +110,6 @@ For the application to connect to Supabase in a production environment, you must
     VITE_SUPABASE_URL="<your-supabase-url>"
     VITE_SUPABASE_ANON_KEY="<your-supabase-anon-key>"
     ```
-
-    **Note:** The `VITE_` prefix is required for Vite to expose these variables to the client-side code.
 
     These credentials can be found in your Supabase project's dashboard under "Project Settings" > "API".
 

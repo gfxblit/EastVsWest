@@ -23,13 +23,19 @@ class App {
     this.animationFrameId = null;
   }
 
-  init() {
+  async init() {
     this.supabase = createClient(import.meta.env.VITE_SUPABASE_URL, import.meta.env.VITE_SUPABASE_ANON_KEY);
-    this.network = new Network();
-    // For now, generate a random player ID. In a real app, this would come from auth.
-    const tempPlayerId = `player-${Math.random().toString(36).substr(2, 9)}`;
-    this.network.initialize(this.supabase, tempPlayerId);
 
+    // Sign in anonymously to get an auth.uid()
+    const { data: authData, error: authError } = await this.supabase.auth.signInAnonymously();
+    if (authError) {
+      console.error('Failed to sign in anonymously:', authError);
+      return;
+    }
+
+    this.network = new Network();
+    // Use the authenticated user's ID as the player ID
+    this.network.initialize(this.supabase, authData.user.id);
 
     // Initialize UI
     this.ui = new UI();
@@ -52,8 +58,28 @@ class App {
     }
   }
 
+  showLobbyError(message) {
+    const errorElement = document.getElementById('lobby-error');
+    if (errorElement) {
+      errorElement.textContent = message;
+      errorElement.classList.remove('hidden');
+      // Auto-hide after 5 seconds
+      setTimeout(() => {
+        errorElement.classList.add('hidden');
+      }, 5000);
+    }
+  }
+
+  hideLobbyError() {
+    const errorElement = document.getElementById('lobby-error');
+    if (errorElement) {
+      errorElement.classList.add('hidden');
+    }
+  }
+
   async hostGame() {
     console.log('Hosting game...');
+    this.hideLobbyError();
     try {
       const playerName = `Host-${Math.random().toString(36).substr(2, 5)}`;
       const { session } = await this.network.hostGame(playerName);
@@ -62,7 +88,7 @@ class App {
       this.startGame();
     } catch (error) {
       console.error('Failed to host game:', error);
-      alert(`Error hosting game: ${error.message}`);
+      this.showLobbyError(`Error hosting game: ${error.message}`);
     }
   }
 
@@ -70,14 +96,16 @@ class App {
     const joinCodeInput = document.getElementById('join-code-input');
     const joinCode = joinCodeInput?.value.trim().toUpperCase();
 
+    this.hideLobbyError();
+
     if (!joinCode) {
-      alert('Please enter a join code');
+      this.showLobbyError('Please enter a join code');
       return;
     }
 
     // Validate join code format (6 alphanumeric characters)
     if (!/^[A-Z0-9]{6}$/.test(joinCode)) {
-      alert('Please enter a valid 6-character join code');
+      this.showLobbyError('Please enter a valid 6-character join code');
       return;
     }
 
@@ -88,7 +116,7 @@ class App {
       this.startGame();
     } catch (error) {
       console.error('Failed to join game:', error);
-      alert(`Error joining game: ${error.message}`);
+      this.showLobbyError(`Error joining game: ${error.message}`);
     }
   }
 
@@ -159,7 +187,7 @@ class App {
 }
 
 // Initialize app when DOM is ready
-document.addEventListener('DOMContentLoaded', () => {
+document.addEventListener('DOMContentLoaded', async () => {
   const app = new App();
-  app.init();
+  await app.init();
 });

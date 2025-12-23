@@ -1,0 +1,77 @@
+name: E2E Tests
+
+# Disabled by default - rename to e2e-tests.yml to enable
+on:
+  workflow_dispatch: # Manual trigger only
+
+jobs:
+  e2e-tests:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '18'
+          cache: 'npm'
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Run E2E tests
+        run: npm run test:e2e
+        env:
+          # Puppeteer will use bundled Chromium in CI
+          CI: true
+          GITHUB_ACTIONS: true
+
+      - name: Upload test results
+        if: failure()
+        uses: actions/upload-artifact@v4
+        with:
+          name: test-results
+          path: |
+            coverage/
+            screenshots/
+          retention-days: 7
+
+  e2e-integration-tests:
+    runs-on: ubuntu-latest
+
+    # Only run integration tests if Supabase secrets are available
+    if: ${{ vars.SUPABASE_URL != '' }}
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '18'
+          cache: 'npm'
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Setup Supabase CLI
+        uses: supabase/setup-cli@v1
+        with:
+          version: latest
+
+      - name: Start Supabase
+        run: supabase start
+
+      - name: Run integration tests
+        run: |
+          # Get Supabase credentials from local instance
+          export SUPABASE_URL=$(supabase status --output json | jq -r '.API_URL')
+          export SUPABASE_ANON_KEY=$(supabase status --output json | jq -r '.ANON_KEY')
+          npm run test:e2e e2e/network.integration.test.js
+
+      - name: Stop Supabase
+        if: always()
+        run: supabase stop
