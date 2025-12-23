@@ -15,8 +15,10 @@ describe('Conflict Zone: East vs West E2E', () => {
 
   beforeAll(async () => {
     browser = await puppeteer.launch({
+      executablePath: '/Applications/Google Chrome.app/Contents/MacOS/Google Chrome',
       headless: "new",
       args: ['--no-sandbox', '--disable-setuid-sandbox'],
+      env: { ...process.env, ARCHPREFERENCE: 'arm64' }
     });
     page = await browser.newPage();
   });
