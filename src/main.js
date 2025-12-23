@@ -3,6 +3,7 @@
  * Initializes the game and manages the game loop
  */
 
+import eruda from 'eruda';
 import { CONFIG } from './config.js';
 import { Game } from './game.js';
 import { Renderer } from './renderer.js';
@@ -10,6 +11,9 @@ import { Input } from './input.js';
 import { UI } from './ui.js';
 import { Network } from './network.js';
 import { createClient } from '@supabase/supabase-js';
+
+// Initialize Eruda for mobile debugging (console, network, elements inspector)
+eruda.init();
 class App {
   constructor() {
     this.game = null;

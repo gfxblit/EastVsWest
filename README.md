@@ -80,6 +80,39 @@ To get started with local development and deploy the project:
 *   **Build for Deployment**: To create optimized, production-ready files, run `npm run build`. This command will generate a `dist/` folder containing `bundle.js` and `index.html`.
 *   **Deployment**: The contents of the `dist/` folder are ready for deployment.
 
+## Mobile Debugging
+
+The project includes [Eruda](https://github.com/liriliri/eruda), an in-browser developer console for mobile devices. This is essential for debugging on iOS/iPadOS where Safari and Chrome do not provide access to the developer console.
+
+### Features
+
+Eruda provides:
+- **Console**: View `console.log()`, `console.error()`, `console.warn()`, and uncaught errors
+- **Elements Inspector**: Inspect and modify DOM elements in real-time
+- **Network Monitor**: Track network requests and responses
+- **Resources Viewer**: View localStorage, sessionStorage, and cookies
+- **Sources**: View loaded JavaScript and CSS files
+
+### Usage
+
+Eruda is automatically initialized when the application starts and is available in both development and production builds.
+
+To access Eruda:
+1. Open the application in a mobile browser (Safari, Chrome, etc.)
+2. Look for a floating gear icon (⚙️) in the bottom-right corner of the screen
+3. Tap the icon to open the Eruda developer panel
+4. Use the tabs at the bottom to switch between Console, Elements, Network, etc.
+
+**Tip:** You can drag the gear icon to reposition it if it's blocking game content.
+
+### When to Use
+
+- Debugging JavaScript errors on mobile devices
+- Inspecting network requests to Supabase
+- Viewing console logs during mobile gameplay
+- Testing responsive layout issues on actual mobile hardware
+- Debugging touch input handling
+
 ## Environment Configuration
 
 ### Local Development
