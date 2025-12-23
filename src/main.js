@@ -3,7 +3,6 @@
  * Initializes the game and manages the game loop
  */
 
-import eruda from 'eruda';
 import { CONFIG } from './config.js';
 import { Game } from './game.js';
 import { Renderer } from './renderer.js';
@@ -13,7 +12,21 @@ import { Network } from './network.js';
 import { createClient } from '@supabase/supabase-js';
 
 // Initialize Eruda for mobile debugging (console, network, elements inspector)
-eruda.init();
+// Only load in development/preview builds, or when ?debug=true query parameter is present
+export async function initializeDebugTools(env = import.meta.env, location = window.location) {
+  const urlParams = new URLSearchParams(location.search);
+  const debugParam = urlParams.get('debug') === 'true';
+
+  if (env.DEV || debugParam) {
+    const eruda = await import('eruda');
+    eruda.default.init();
+    return true; // Return true to indicate Eruda was initialized
+  }
+  return false; // Return false to indicate Eruda was not initialized
+}
+
+// Initialize debug tools asynchronously (non-blocking)
+initializeDebugTools().catch(err => console.warn('Failed to initialize debug tools:', err));
 class App {
   constructor() {
     this.game = null;

@@ -93,11 +93,29 @@ Eruda provides:
 - **Resources Viewer**: View localStorage, sessionStorage, and cookies
 - **Sources**: View loaded JavaScript and CSS files
 
+### Availability
+
+Eruda is automatically enabled in:
+- **Development mode** (`npm run dev`)
+- **Production builds** when you add `?debug=true` to the URL
+
+This approach keeps production bundle sizes small (~210KB smaller) while still allowing mobile debugging when needed.
+
 ### Usage
 
-Eruda is automatically initialized when the application starts and is available in both development and production builds.
+**For Local Development:**
+```bash
+npm run dev
+```
+Eruda will be automatically available - look for the floating gear icon (⚙️).
 
-To access Eruda:
+**For Production/Deployed Builds:**
+Add `?debug=true` to the URL to enable Eruda:
+```
+https://gfxblit.github.io/EastVsWest/?debug=true
+```
+
+**To access Eruda:**
 1. Open the application in a mobile browser (Safari, Chrome, etc.)
 2. Look for a floating gear icon (⚙️) in the bottom-right corner of the screen
 3. Tap the icon to open the Eruda developer panel
