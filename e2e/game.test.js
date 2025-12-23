@@ -5,6 +5,7 @@
 import puppeteer from 'puppeteer';
 import { fileURLToPath } from 'url';
 import { dirname, join } from 'path';
+import { getPuppeteerConfig } from './helpers/puppeteer-config.js';
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = dirname(__filename);
@@ -14,12 +15,7 @@ describe('Conflict Zone: East vs West E2E', () => {
   let page;
 
   beforeAll(async () => {
-    browser = await puppeteer.launch({
-      executablePath: '/Applications/Google Chrome.app/Contents/MacOS/Google Chrome',
-      headless: "new",
-      args: ['--no-sandbox', '--disable-setuid-sandbox'],
-      env: { ...process.env, ARCHPREFERENCE: 'arm64' }
-    });
+    browser = await puppeteer.launch(getPuppeteerConfig());
     page = await browser.newPage();
   });
 

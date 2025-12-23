@@ -5,6 +5,7 @@
 
 import puppeteer from 'puppeteer';
 import { startViteServer, stopViteServer } from './helpers/vite-server.js';
+import { getPuppeteerConfig } from './helpers/puppeteer-config.js';
 
 describe('Lobby UI Interactions', () => {
   let browser;
@@ -15,16 +16,7 @@ describe('Lobby UI Interactions', () => {
     // Start Vite dev server
     serverUrl = await startViteServer();
 
-    browser = await puppeteer.launch({
-      executablePath: '/Applications/Google Chrome.app/Contents/MacOS/Google Chrome',
-      headless: "new",
-      args: [
-        '--no-sandbox',
-        '--disable-setuid-sandbox'
-      ],
-      env: { ...process.env, ARCHPREFERENCE: 'arm64' },
-      dumpio: false
-    });
+    browser = await puppeteer.launch(getPuppeteerConfig());
   }, 60000); // Increase timeout for server startup
 
   afterAll(async () => {
