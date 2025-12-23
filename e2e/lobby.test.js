@@ -180,16 +180,65 @@ describe('Lobby UI Interactions', () => {
       expect(errorText).toBe('Please enter a valid 6-character join code');
     });
 
-    // TODO: Integrate with Supabase to test actual join functionality
-    test.skip('WhenClickingJoinWithValidCode_ShouldAttemptToJoin', async () => {
-      await page.type('#join-code-input', 'ABC123');
-      await page.click('#join-game-btn');
+    test('WhenClickingJoinWithValidCode_ShouldJoinSessionSuccessfully', async () => {
+      // First, create a host session to get a valid join code
+      await page.click('#host-game-btn');
+      await page.waitForSelector('#join-code-display:not(.hidden)', { timeout: 5000 });
+      const joinCode = await page.$eval('#join-code', (el) => el.textContent);
 
-      // Wait for error message to appear (network will fail since we're not connected)
-      await page.waitForSelector('#lobby-error:not(.hidden)', { timeout: 5000 });
+      // Create a new incognito browser context for the joining player
+      // This ensures they have a separate auth session from the host
+      const playerContext = await browser.createBrowserContext();
+      const playerPage = await playerContext.newPage();
 
-      const errorText = await page.$eval('#lobby-error', (el) => el.textContent);
-      expect(errorText).toContain('Error joining game');
+      // Capture console logs for debugging
+      playerPage.on('console', msg => {
+        const type = msg.type();
+        if (type === 'error' || type === 'warning' || type === 'log') {
+          console.log(`Player browser ${type}:`, msg.text());
+        }
+      });
+
+      playerPage.on('pageerror', error => {
+        console.log('Player page script error:', error.message);
+      });
+
+      await playerPage.goto(serverUrl);
+      await playerPage.waitForSelector('#lobby-screen');
+
+      // Wait a bit for the async initialization (auth) to complete
+      // The app needs to sign in anonymously before it can join
+      await new Promise(resolve => setTimeout(resolve, 1000));
+
+      // Enter the join code and click join
+      await playerPage.type('#join-code-input', joinCode);
+      await playerPage.click('#join-game-btn');
+
+      // Wait for the lobby screen to be hidden (indicating game started)
+      await playerPage.waitForFunction(() => {
+        const lobbyScreen = document.getElementById('lobby-screen');
+        return lobbyScreen && (
+          lobbyScreen.classList.contains('hidden') ||
+          window.getComputedStyle(lobbyScreen).display === 'none'
+        );
+      }, { timeout: 5000 });
+
+      // Verify lobby screen is hidden
+      const lobbyHidden = await playerPage.$eval('#lobby-screen', (el) => {
+        return el.classList.contains('hidden') || window.getComputedStyle(el).display === 'none';
+      });
+      expect(lobbyHidden).toBe(true);
+
+      // Verify game canvas is visible
+      const canvasVisible = await playerPage.$eval('#game-canvas', (el) => {
+        const rect = el.getBoundingClientRect();
+        return rect.width > 0 && rect.height > 0;
+      });
+      expect(canvasVisible).toBe(true);
+
+      // Clean up
+      await playerPage.close();
+      await playerContext.close();
     });
   });
 

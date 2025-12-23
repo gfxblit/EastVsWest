@@ -255,7 +255,7 @@ export class Network extends EventEmitter {
       .single();
     
     if (error) {
-      console.error('Host: Error adding player to DB:', error);
+      console.error('Host: Error adding player to DB:', JSON.stringify(error, null, 2));
       // TODO: Send rejection message
       return;
     }
