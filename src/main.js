@@ -23,13 +23,19 @@ class App {
     this.animationFrameId = null;
   }
 
-  init() {
+  async init() {
     this.supabase = createClient(import.meta.env.VITE_SUPABASE_URL, import.meta.env.VITE_SUPABASE_ANON_KEY);
-    this.network = new Network();
-    // For now, generate a random player ID. In a real app, this would come from auth.
-    const tempPlayerId = `player-${Math.random().toString(36).substr(2, 9)}`;
-    this.network.initialize(this.supabase, tempPlayerId);
 
+    // Sign in anonymously to get an auth.uid()
+    const { data: authData, error: authError } = await this.supabase.auth.signInAnonymously();
+    if (authError) {
+      console.error('Failed to sign in anonymously:', authError);
+      return;
+    }
+
+    this.network = new Network();
+    // Use the authenticated user's ID as the player ID
+    this.network.initialize(this.supabase, authData.user.id);
 
     // Initialize UI
     this.ui = new UI();
@@ -181,7 +187,7 @@ class App {
 }
 
 // Initialize app when DOM is ready
-document.addEventListener('DOMContentLoaded', () => {
+document.addEventListener('DOMContentLoaded', async () => {
   const app = new App();
-  app.init();
+  await app.init();
 });

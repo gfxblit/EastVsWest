@@ -27,7 +27,14 @@ describe('Lobby UI Interactions', () => {
   beforeEach(async () => {
     page = await browser.newPage();
 
-    // Capture console errors for debugging
+    // Capture console errors and logs for debugging
+    page.on('console', msg => {
+      const type = msg.type();
+      if (type === 'error' || type === 'warning' || type === 'log') {
+        console.log(`Browser ${type}:`, msg.text());
+      }
+    });
+
     page.on('pageerror', error => {
       console.log('Page script error:', error.message);
     });
@@ -195,15 +202,24 @@ describe('Lobby UI Interactions', () => {
       expect(isClickable).toBe(true);
     });
 
-    // TODO: Integrate with Supabase to test actual host functionality
-    test.skip('WhenClickingHostButton_ShouldAttemptToHost', async () => {
+    test('WhenClickingHostButton_ShouldCreateSessionAndDisplayJoinCode', async () => {
       await page.click('#host-game-btn');
 
-      // Wait for error message to appear (network will fail since we're not connected)
-      await page.waitForSelector('#lobby-error:not(.hidden)', { timeout: 5000 });
+      // Wait for join code display to become visible
+      await page.waitForSelector('#join-code-display:not(.hidden)', { timeout: 5000 });
 
-      const errorText = await page.$eval('#lobby-error', (el) => el.textContent);
-      expect(errorText).toContain('Error hosting game');
+      // Verify join code is displayed
+      const isVisible = await page.$eval('#join-code-display', (el) => {
+        return !el.classList.contains('hidden');
+      });
+      expect(isVisible).toBe(true);
+
+      // Get the displayed join code
+      const joinCode = await page.$eval('#join-code', (el) => el.textContent);
+
+      // Verify join code format (6 alphanumeric characters)
+      expect(joinCode).toMatch(/^[A-Z0-9]{6}$/);
+      expect(joinCode.length).toBe(6);
     });
   });
 
