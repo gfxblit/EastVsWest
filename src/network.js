@@ -285,6 +285,9 @@ export class Network extends EventEmitter {
       event: 'message',
       payload: broadcastPayload,
     });
+
+    // 5. Emit locally for host's own UI update
+    this.emit('player_joined', broadcastPayload);
   }
 
 
