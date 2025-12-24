@@ -27,25 +27,21 @@ The EastVsWest multiplayer system uses a **hybrid host-authority model** where:
 
 ### Authoritative Action Flow
 
-A core pattern for all host-authoritative actions (joining, combat, item pickups) follows a **Request-Approve-Broadcast** model:
+A core pattern for **Host-Authoritative** actions (combat, item pickups, game state transitions) follows a **Request-Approve-Broadcast** model:
 
-1.  **Request (Client → Host):** A **Client** sends a message to the **Host** requesting to perform an action (e.g., `item_pickup_request`). The client does not change its own state yet.
-2.  **Approve (Host):** The **Host** receives the request and validates it against the authoritative game state and rules. If valid, the Host applies the change to the master state (e.g., updates the Database).
-3.  **Broadcast (Host → All Clients):** The **Host** broadcasts the result of the action (e.g., `item_pickup_result`) to **all Clients** in the session. Only upon receiving this broadcast do the clients update their local game state.
+1.  **Request (Client → Host):** A **Client** sends a message to the **Host** requesting to perform an action.
+2.  **Approve (Host):** The **Host** validates the request. If valid, the Host applies the change to the master state (Database).
+3.  **Broadcast (Host → All Clients):** The **Host** broadcasts the result to **all Clients**.
 
-This ensures the Host is the single source of truth and prevents cheating.
+**Client-Authoritative** actions follow a **Tell-Broadcast** or **Self-Insert** model:
 
-Client-authoritative actions like movement follow a **Tell-Broadcast** model for maximum responsiveness:
-
-1.  **Tell (Client → Host):** The **Client** moves locally first (client-side prediction) and sends a `position_update` message to the **Host**, stating its new position.
-2.  **Broadcast (Host → Other Clients):** The **Host** acts as a simple relay, broadcasting this position to all **other Clients** in a `position_broadcast` message.
-
-This gives the illusion of zero-latency movement for the player.
+-   **Movement:** The **Client** moves locally and sends a `position_update` to the **Host**, who relays it.
+-   **Joining:** The **Client** fetches the session via join code and self-inserts into `session_players`. The **Host** monitors the table to enforce `max_players` and reconcile state.
 
 ### Authority Distribution
 
-- **Client-Authoritative**: Player movement (position updates)
-- **Host-Authoritative**: Item pickups, combat interactions, game state changes, zone progression
+- **Client-Authoritative**: Player movement, session joining (lobby phase)
+- **Host-Authoritative**: Item pickups, combat interactions, game state changes, zone progression, player eviction (max count enforcement)
 
 ### Technology Stack
 
@@ -74,7 +70,6 @@ CREATE TABLE game_sessions (
   started_at TIMESTAMP WITH TIME ZONE,
   ended_at TIMESTAMP WITH TIME ZONE,
   max_players INTEGER DEFAULT 12,
-  current_player_count INTEGER DEFAULT 1,
 
   -- Game state metadata
   game_phase VARCHAR(20) DEFAULT 'lobby',
@@ -211,31 +206,35 @@ CREATE POLICY "Host can update session"
   ON game_sessions FOR UPDATE
   USING (auth.uid() = host_id);
 
--- Policy: Players can read all player data within any session they are a part of.
--- This is required for the client to render other players.
+-- Policy: Players can read player data ONLY for sessions they have joined.
+-- This prevents players from scanning the entire table for other active sessions.
 CREATE POLICY "Players can read session players"
   ON session_players FOR SELECT
   USING (
     session_id IN (
-      SELECT session_id FROM session_players WHERE player_id = auth.uid()
+      SELECT s.session_id 
+      FROM session_players s 
+      WHERE s.player_id = auth.uid()
     )
   );
 
--- Policy: Players can update their own data (e.g., for client-authoritative movement).
+-- Policy: Players can update their own data.
 CREATE POLICY "Players can update own data"
   ON session_players FOR UPDATE
   USING (player_id = auth.uid());
 
--- Policy: Only the host of a session can insert new players into it.
--- This is a critical policy for enforcing the host-authority model.
--- The `EXISTS` clause checks if the user performing the insert is the
--- host of the `game_sessions` record corresponding to the new player's session.
-CREATE POLICY "Host can insert players into their session"
+-- Policy: Players can self-insert into a session.
+-- The Host is responsible for evicting players if the session is full or already started.
+CREATE POLICY "Players can insert themselves"
   ON session_players FOR INSERT
-  WITH CHECK (
+  WITH CHECK (player_id = auth.uid());
+
+-- Policy: Only the host can delete players (eviction).
+CREATE POLICY "Host can evict players"
+  ON session_players FOR DELETE
+  USING (
     EXISTS (
-      SELECT 1
-      FROM game_sessions
+      SELECT 1 FROM game_sessions
       WHERE id = session_players.session_id AND host_id = auth.uid()
     )
   );
@@ -276,37 +275,35 @@ All messages follow this base structure:
 
 #### Message Type Catalog
 
-##### 1. Connection Messages
+##### 1. Connection & Lobby Flow
 
-**CLIENT → HOST: `player_join_request`**
+Joining is **Client-Authoritative** via Database Inserts.
+
+1.  **Join:** Client calls `get_session_by_join_code` RPC to get `session_id`.
+2.  **Insert:** Client performs `INSERT` into `session_players` with their metadata.
+3.  **Listen:** Client subscribes to **Postgres Changes** on the `session_players` table (filtered by `session_id`).
+
+**DB INSERT (Client): `session_players`**
 ```javascript
 {
-  type: 'player_join_request',
-  from: 'player_uuid',
-  timestamp: 1703001234567,
-  data: {
-    player_name: 'Player1'
-  }
+  session_id: 'uuid',
+  player_id: 'auth.uid()',
+  player_name: 'Player1',
+  is_host: false
 }
 ```
 
-**HOST → ALL: `player_joined`**
-```javascript
-{
-  type: 'player_joined',
-  from: 'host_uuid',
-  timestamp: 1703001234567,
-  data: {
-    player_id: 'player_uuid',
-    player_name: 'Player1',
-    position: { x: 0, y: 0 },
-    current_players: [
-      { id: 'uuid1', name: 'Host', is_host: true },
-      { id: 'uuid2', name: 'Player1', is_host: false }
-    ]
-  }
-}
-```
+**TABLE CHANGE (DB → ALL): `INSERT` / `DELETE` events**
+Supabase Realtime sends these events to all subscribed clients in the session. This is the primary way the lobby list is kept in sync.
+
+#### Lobby Consistency & Realtime Synchronization
+
+Since broadcast messages are not guaranteed, the lobby uses a **Snapshot + Deltas** pattern to ensure every player has a consistent view:
+
+1.  **The Snapshot (Source of Truth):** Upon joining, every client performs a standard `SELECT * FROM session_players`. This provides the initial ground truth.
+2.  **The Deltas (Live Updates):** Clients listen to Postgres Change events (`INSERT` and `DELETE`). These events update the local UI state.
+3.  **The Reconciliation (Recovery):** If a client's WebSocket connection drops and reconnects, the client MUST re-fetch the Snapshot (Step 1) to ensure they didn't miss any changes while offline.
+4.  **The Janitor (Host Enforcement):** The Host monitors the table. If multiple clients join simultaneously and exceed `max_players`, the Host deletes the `session_players` rows with the latest `joined_at` timestamps. Clients treat a `DELETE` of their own record as an eviction notice.
 
 **CLIENT → HOST: `player_disconnect`**
 ```javascript
@@ -802,11 +799,12 @@ finalDamage = baseDamage * (1 - damageMultiplier)
 
 The host must maintain authoritative state and process:
 
-1. **Session Management**
-   - Create session with join code
-   - Accept/reject join requests (max 12 players)
-   - Track connected players
-   - Handle disconnections and timeouts
+1. **Session & Lobby Management**
+   - Create session with join code.
+   - **Monitor `session_players` table:** Enforce `max_players` by deleting excess/late-joining rows (Eviction).
+   - Ensure game hasn't already started before allowing new joins (Cleanup).
+   - Track connected players via heartbeats and DB state.
+   - Handle disconnections and timeouts.
 
 2. **Game State Management**
    - Initialize game state (spawn positions, items)
@@ -1003,11 +1001,12 @@ When a player joins mid-game (if allowed) or reconnects after disconnect:
 ┌──────────┐
 │  LOBBY   │
 │          │  Host creates session
-│          │  Players join via code
+│          │  Players join via DB Insert
 │          │
-│  Events: │  • player_join
-│          │  • player_joined
-└────┬─────┘  • player_left
+│  Events: │  • DB: session_players (INSERT)
+│          │  • DB: session_players (DELETE)
+│          │  • player_left (broadcast/heartbeat)
+└────┬─────┘
      │
      │ host sends: game_start
      ↓
