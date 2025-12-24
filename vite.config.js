@@ -1,6 +1,7 @@
 import { defineConfig } from 'vite';
 
 export default defineConfig({
+  base: '/EastVsWest/',
   root: '.',
   build: {
     outDir: 'dist',
