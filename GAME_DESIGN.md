@@ -5,33 +5,37 @@ Perspective: 2D Top-Down (Pixel Art)
 Theme: Post-Conflict East vs. West / Asymmetric Gear Combat
 1. Executive Summary
 Conflict Zone: East vs West is a 12-player Battle Royale built on a classic 2D top-down pixel art engine. The core challenge lies in mastering the gear sets of different weapon types (East vs West). The gameplay uses action-rpg controls, for mobile/touch first, and keyboard-mouse support. Matches are fast-paced, lasting approximately 5 minutes due to the constantly shrinking "Conflict Zone."
-2. Game Flow Loop & Visual Mocks
-(Note on Mocks: Visual descriptions focus on clarity and high-contrast pixel graphics. Final style: High-fidelity pixel art with distinct faction color palettes.)
-STAGE 1: Lobby & Intro Screen (Intro Screen)
- * Goal: Allow players to see input instructions, and either host a game (thus getting a join code), or join a game with a given join code.
+2. Game Flow Loop
+(Visual style: High-fidelity pixel art with distinct faction color palettes and high-contrast UI.)
 
-DESIGN MOCKUP - STAGE 1 (Lobby) (TBD)
+### Phase 1: Entry (Intro Screen)
+*   **Purpose:** Initial landing page for all players.
+*   **Actions:**
+    *   **Host Game:** Create a session and generate a unique Join Code.
+    *   **Join Game:** Enter a 6-character Join Code to enter a friend's lobby.
+    *   **Instructions:** View basic WASD/Touch controls.
 
-⬇️ (Transition: Cinematic drop sequence over the map.)
-STAGE 2: Gameplay & Combat
- * Goal: Survive, scavenge weapons and armor, fight other players, pick up their weapons/armor
-DESIGN MOCKUP - STAGE 2 (2D Gameplay) (TBD)
+### Phase 2: Preparation (Game Lobby)
+*   **Purpose:** Group players and manage session status.
+*   **Mechanics:**
+    *   **Join Code:** Displayed prominently for the host to share.
+    *   **Player List:** Real-time list of all connected players.
+    *   **Host Control:** Host has the "Start Game" button; guests see "Waiting for host..."
+*   **Transition:** Host triggers a global transition to the gameplay map.
 
-⬇️ (Transition: Player eliminated or Match ends.)
-STAGE 3: Game Over & Spectator Mode
+### Phase 3: Engagement (Gameplay & Combat)
+*   **Purpose:** The core Battle Royale match.
+*   **Loop:** Drop (fists only) -> Scavenge (weapons/armor) -> Fight -> Survive the Zone.
+*   **Elimination (Spectator Mode):**
+    *   Eliminated players view the match through the perspective of their killer.
+    *   Can cycle through all remaining living players.
+    *   Option to "Leave Match" returns the player to the Intro Screen.
 
- * **Eliminated Player:**
-   * **Goal:** Allow eliminated players to remain engaged by observing the rest of the match.
-   * **Mechanic:** Upon elimination, players see a brief summary of their performance. They then enter Spectator Mode, attaching their view to the player who eliminated them, and can cycle through spectating any remaining living players. A 'Leave Match' button is available. If the host picks 'Leave Match', a confirmation warning is shown that leaving the match will end the match for all players.
- DESIGN MOCKUP - STAGE 3 (Spectator Overlay) (TBD)
-
- * **Match End (All but one eliminated):**
-   * **Goal:** Report overall match performance and allow the host to initiate the next game.
-   * **Mechanic:** When a winner is declared, all players (including the winner and spectators) see a final match summary.
-   * **Host Action:** The host's screen will display a prominent "Start Next Game" button. Clicking this button immediately transitions all connected players (winner and spectators) into a new match (STAGE 2: Gameplay), bypassing the lobby.
-DESIGN MOCKUP - STAGE 3 (Summary Overlay / Host Controls) (TBD)
-
-⬇️ (Action: Host initiates 'Start Next Game' to begin a new match.)
+### Phase 4: Resolution (Match Summary & Reset)
+*   **Purpose:** Review performance and loop back to play again.
+*   **Flow:** When a winner is declared, all players (winner and spectators) return to the **Game Lobby**.
+*   **Match Summary:** The Lobby screen updates to show stats (Winner, Kills, Survival Time).
+*   **Reset:** The host can immediately click "Start Game" to begin a new match with the same group, bypassing the intro.
 
 3. Gameplay Mechanics & Combat
 3.1 The Core Loop (Scavenge, Fight, Survive)

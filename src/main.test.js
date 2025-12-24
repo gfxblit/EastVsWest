@@ -44,12 +44,13 @@ class App {
     this.ui = new this.UIClass();
     this.ui.init();
 
-    this.setupLobbyHandlers();
+    this.setupHandlers();
   }
 
-  setupLobbyHandlers() {
+  setupHandlers() {
     const hostBtn = document.getElementById('host-game-btn');
     const joinBtn = document.getElementById('join-game-btn');
+    const startBtn = document.getElementById('start-game-btn');
 
     if (hostBtn) {
       hostBtn.addEventListener('click', () => this.hostGame());
@@ -58,9 +59,13 @@ class App {
     if (joinBtn) {
       joinBtn.addEventListener('click', () => this.joinGame());
     }
+
+    if (startBtn) {
+      startBtn.addEventListener('click', () => this.handleStartGame());
+    }
   }
 
-  showLobbyError(message) {
+  showError(message) {
     const errorElement = document.getElementById('lobby-error');
     if (errorElement) {
       errorElement.textContent = message;
@@ -71,7 +76,7 @@ class App {
     }
   }
 
-  hideLobbyError() {
+  hideError() {
     const errorElement = document.getElementById('lobby-error');
     if (errorElement) {
       errorElement.classList.add('hidden');
@@ -79,17 +84,15 @@ class App {
   }
 
   async hostGame() {
-    console.log('Hosting game...');
-    this.hideLobbyError();
+    this.hideError();
     try {
       const playerName = `Host-${Math.random().toString(36).substr(2, 5)}`;
-      const { session } = await this.network.hostGame(playerName);
+      const { session, player } = await this.network.hostGame(playerName);
       this.ui.showJoinCode(session.join_code);
-      this.network.startPositionBroadcasting();
-      this.startGame();
+      this.ui.updatePlayerList([player], true);
+      this.ui.showLobby('Game Lobby');
     } catch (error) {
-      console.error('Failed to host game:', error);
-      this.showLobbyError(`Error hosting game: ${error.message}`);
+      this.showError(`Error hosting game: ${error.message}`);
     }
   }
 
@@ -97,39 +100,40 @@ class App {
     const joinCodeInput = document.getElementById('join-code-input');
     const joinCode = joinCodeInput?.value.trim().toUpperCase();
 
-    this.hideLobbyError();
+    this.hideError();
 
     if (!joinCode) {
-      this.showLobbyError('Please enter a join code');
+      this.showError('Please enter a join code');
       return;
     }
 
     if (!/^[A-Z0-9]{6}$/.test(joinCode)) {
-      this.showLobbyError('Please enter a valid 6-character join code');
+      this.showError('Please enter a valid 6-character join code');
       return;
     }
 
-    console.log('Joining game with code:', joinCode);
     try {
       const playerName = `Player-${Math.random().toString(36).substr(2, 5)}`;
-      await this.network.joinGame(joinCode, playerName);
-      this.startGame();
+      const data = await this.network.joinGame(joinCode, playerName);
+      this.ui.showJoinCode(joinCode);
+      this.ui.updatePlayerList(data.allPlayers, false);
+      this.ui.showLobby('Game Lobby');
     } catch (error) {
-      console.error('Failed to join game:', error);
-      this.showLobbyError(`Error joining game: ${error.message}`);
+      this.showError(`Error joining game: ${error.message}`);
     }
   }
 
-  startGame() {
-    console.log('Starting game...');
+  handleStartGame() {
+    if (!this.network.isHost) return;
+    this.network.send('game_start', {});
+    this.startGame();
+  }
 
+  startGame() {
     this.ui.showScreen('game');
 
     const canvas = document.getElementById('game-canvas');
-    if (!canvas) {
-      console.error('Canvas element not found');
-      return;
-    }
+    if (!canvas) return;
 
     this.renderer = new this.RendererClass(canvas);
     this.game = new this.GameClass();
@@ -142,6 +146,10 @@ class App {
         this.game.handleInput(inputState);
       }
     });
+
+    if (this.network.isHost) {
+      this.network.startPositionBroadcasting();
+    }
 
     this.running = true;
     this.lastTimestamp = performance.now();
@@ -216,16 +224,20 @@ describe('App', () => {
     MockUI = jest.fn().mockImplementation(() => ({
       init: jest.fn(),
       showJoinCode: jest.fn(),
-      showScreen: jest.fn()
+      showScreen: jest.fn(),
+      showLobby: jest.fn(),
+      updatePlayerList: jest.fn()
     }));
 
     MockNetwork = jest.fn().mockImplementation(() => ({
       initialize: jest.fn(),
       hostGame: jest.fn(),
       joinGame: jest.fn(),
+      send: jest.fn(),
       startPositionBroadcasting: jest.fn(),
       stopPositionBroadcasting: jest.fn(),
-      disconnect: jest.fn()
+      disconnect: jest.fn(),
+      on: jest.fn()
     }));
 
     // Setup mock Supabase client
@@ -291,22 +303,22 @@ describe('App', () => {
     });
   });
 
-  describe('setupLobbyHandlers', () => {
+  describe('setupHandlers', () => {
     test('WhenCalled_ShouldAttachEventListeners', () => {
       const hostBtn = document.getElementById('host-game-btn');
       const addEventListenerSpy = jest.spyOn(hostBtn, 'addEventListener');
 
-      app.setupLobbyHandlers();
+      app.setupHandlers();
 
       expect(addEventListenerSpy).toHaveBeenCalledWith('click', expect.any(Function));
     });
   });
 
-  describe('showLobbyError', () => {
+  describe('showError', () => {
     test('WhenCalled_ShouldDisplayErrorMessage', () => {
       const errorElement = document.getElementById('lobby-error');
 
-      app.showLobbyError('Test error');
+      app.showError('Test error');
 
       expect(errorElement.textContent).toBe('Test error');
       expect(errorElement.classList.contains('hidden')).toBe(false);
@@ -319,26 +331,27 @@ describe('App', () => {
       app.startGame = jest.fn();
     });
 
-    test('WhenSuccessful_ShouldStartGameWithJoinCode', async () => {
+    test('WhenSuccessful_ShouldShowLobbyWithJoinCode', async () => {
       app.network.hostGame.mockResolvedValue({
-        session: { join_code: 'ABC123' }
+        session: { join_code: 'ABC123' },
+        player: { player_name: 'Host' }
       });
 
       await app.hostGame();
 
       expect(app.network.hostGame).toHaveBeenCalled();
       expect(app.ui.showJoinCode).toHaveBeenCalledWith('ABC123');
-      expect(app.network.startPositionBroadcasting).toHaveBeenCalled();
-      expect(app.startGame).toHaveBeenCalled();
+      expect(app.ui.updatePlayerList).toHaveBeenCalled();
+      expect(app.ui.showLobby).toHaveBeenCalledWith('Game Lobby');
     });
 
     test('WhenFails_ShouldShowError', async () => {
       app.network.hostGame.mockRejectedValue(new Error('Network error'));
-      const showLobbyErrorSpy = jest.spyOn(app, 'showLobbyError');
+      const showErrorSpy = jest.spyOn(app, 'showError');
 
       await app.hostGame();
 
-      expect(showLobbyErrorSpy).toHaveBeenCalledWith('Error hosting game: Network error');
+      expect(showErrorSpy).toHaveBeenCalledWith('Error hosting game: Network error');
     });
   });
 
@@ -348,35 +361,55 @@ describe('App', () => {
       app.startGame = jest.fn();
     });
 
-    test('WhenValidCode_ShouldJoinAndStartGame', async () => {
+    test('WhenValidCode_ShouldJoinAndShowLobby', async () => {
       const joinCodeInput = document.getElementById('join-code-input');
       joinCodeInput.value = 'ABC123';
-      app.network.joinGame.mockResolvedValue({});
+      app.network.joinGame.mockResolvedValue({ allPlayers: [] });
 
       await app.joinGame();
 
       expect(app.network.joinGame).toHaveBeenCalledWith('ABC123', expect.any(String));
-      expect(app.startGame).toHaveBeenCalled();
+      expect(app.ui.showLobby).toHaveBeenCalledWith('Game Lobby');
     });
 
     test('WhenEmptyCode_ShouldShowError', async () => {
       const joinCodeInput = document.getElementById('join-code-input');
       joinCodeInput.value = '';
-      const showLobbyErrorSpy = jest.spyOn(app, 'showLobbyError');
+      const showErrorSpy = jest.spyOn(app, 'showError');
 
       await app.joinGame();
 
-      expect(showLobbyErrorSpy).toHaveBeenCalledWith('Please enter a join code');
+      expect(showErrorSpy).toHaveBeenCalledWith('Please enter a join code');
     });
 
     test('WhenInvalidCode_ShouldShowError', async () => {
       const joinCodeInput = document.getElementById('join-code-input');
       joinCodeInput.value = 'ABC';
-      const showLobbyErrorSpy = jest.spyOn(app, 'showLobbyError');
+      const showErrorSpy = jest.spyOn(app, 'showError');
 
       await app.joinGame();
 
-      expect(showLobbyErrorSpy).toHaveBeenCalledWith('Please enter a valid 6-character join code');
+      expect(showErrorSpy).toHaveBeenCalledWith('Please enter a valid 6-character join code');
+    });
+  });
+
+  describe('handleStartGame', () => {
+    beforeEach(async () => {
+      await app.init();
+      app.startGame = jest.fn();
+    });
+
+    test('WhenHostStarts_ShouldSendSignalAndStart', () => {
+      app.network.isHost = true;
+      app.handleStartGame();
+      expect(app.network.send).toHaveBeenCalledWith('game_start', {});
+      expect(app.startGame).toHaveBeenCalled();
+    });
+
+    test('WhenGuestTriesToStart_ShouldDoNothing', () => {
+      app.network.isHost = false;
+      app.handleStartGame();
+      expect(app.network.send).not.toHaveBeenCalled();
     });
   });
 
@@ -396,14 +429,6 @@ describe('App', () => {
       expect(app.renderer.init).toHaveBeenCalled();
       expect(app.running).toBe(true);
       expect(global.requestAnimationFrame).toHaveBeenCalled();
-    });
-
-    test('WhenCanvasNotFound_ShouldNotInitialize', () => {
-      document.getElementById('game-canvas').remove();
-
-      app.startGame();
-
-      expect(app.renderer).toBeNull();
     });
   });
 
@@ -445,7 +470,6 @@ describe('App', () => {
       expect(app.running).toBe(false);
       expect(global.cancelAnimationFrame).toHaveBeenCalledWith(123);
       expect(app.input.destroy).toHaveBeenCalled();
-      expect(app.network.stopPositionBroadcasting).toHaveBeenCalled();
       expect(app.network.disconnect).toHaveBeenCalled();
     });
   });

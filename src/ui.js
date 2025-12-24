@@ -6,6 +6,7 @@
 export class UI {
   constructor() {
     this.screens = {
+      intro: null,
       lobby: null,
       game: null,
       gameOver: null,
@@ -13,9 +14,9 @@ export class UI {
   }
 
   init() {
+    this.screens.intro = document.getElementById('intro-screen');
     this.screens.lobby = document.getElementById('lobby-screen');
     this.screens.game = document.getElementById('game-screen');
-    this.screens.gameOver = document.getElementById('game-over-screen');
   }
 
   showScreen(screenName) {
@@ -34,12 +35,67 @@ export class UI {
   }
 
   showJoinCode(code) {
-    const joinCodeDisplay = document.getElementById('join-code-display');
     const joinCodeElement = document.getElementById('join-code');
-
-    if (joinCodeDisplay && joinCodeElement) {
+    if (joinCodeElement) {
       joinCodeElement.textContent = code;
-      joinCodeDisplay.classList.remove('hidden');
+    }
+  }
+
+  updatePlayerList(players, isHost) {
+    const playerList = document.getElementById('player-list');
+    const startBtn = document.getElementById('start-game-btn');
+    const waitingMsg = document.getElementById('waiting-msg');
+
+    if (playerList) {
+      playerList.innerHTML = '';
+      players.forEach(player => {
+        const li = document.createElement('li');
+        li.textContent = player.player_name + (player.is_host ? ' (Host)' : '');
+        playerList.appendChild(li);
+      });
+    }
+
+    if (startBtn && waitingMsg) {
+      if (isHost) {
+        startBtn.classList.remove('hidden');
+        waitingMsg.classList.add('hidden');
+      } else {
+        startBtn.classList.add('hidden');
+        waitingMsg.classList.remove('hidden');
+      }
+    }
+  }
+
+  showLobby(title = 'Game Lobby', summary = null) {
+    const titleElement = document.getElementById('lobby-title');
+    const summaryContainer = document.getElementById('match-summary-container');
+    const summaryContent = document.getElementById('match-summary');
+
+    if (titleElement) titleElement.textContent = title;
+
+    if (summaryContainer && summaryContent) {
+      if (summary) {
+        summaryContent.innerHTML = summary;
+        summaryContainer.classList.remove('hidden');
+      } else {
+        summaryContainer.classList.add('hidden');
+      }
+    }
+
+    this.showScreen('lobby');
+  }
+
+  showSpectatorControls(isSpectating, name = '') {
+    const controls = document.getElementById('spectator-controls');
+    const nameSpan = document.getElementById('spectating-name');
+
+    if (controls) {
+      if (isSpectating) {
+        controls.classList.remove('hidden');
+        if (nameSpan) nameSpan.textContent = name;
+      } else {
+        controls.classList.add('hidden');
+      }
     }
   }
 
@@ -83,20 +139,5 @@ export class UI {
         zoneWarning.classList.add('hidden');
       }
     }
-  }
-
-  showGameOver(result, summary) {
-    const gameResult = document.getElementById('game-result');
-    const matchSummary = document.getElementById('match-summary');
-
-    if (gameResult) {
-      gameResult.textContent = result;
-    }
-
-    if (matchSummary) {
-      matchSummary.innerHTML = summary;
-    }
-
-    this.showScreen('gameOver');
   }
 }

@@ -46,7 +46,7 @@ class App {
     // Initialize UI first so we can show errors/interact
     this.ui = new UI();
     this.ui.init();
-    this.setupLobbyHandlers();
+    this.setupHandlers();
 
     try {
       console.log('Creating Supabase client...');
@@ -78,7 +78,7 @@ class App {
       if (!supabaseUrl || !supabaseKey) {
         const msg = 'Missing Supabase credentials in environment variables';
         console.error(msg);
-        this.showLobbyError(msg);
+        this.showError(msg);
         return;
       }
 
@@ -105,7 +105,7 @@ class App {
         }
       } catch (netErr) {
         console.error('Failed to reach Supabase server:', netErr);
-        this.showLobbyError(`Cannot reach server at ${supabaseUrl}. Check Firewall/Wi-Fi.`);
+        this.showError(`Cannot reach server at ${supabaseUrl}. Check Firewall/Wi-Fi.`);
         return;
       }
 
@@ -115,7 +115,7 @@ class App {
       if (authError) {
         const msg = `Failed to sign in anonymously: ${authError.message}`;
         console.error(msg, authError);
-        this.showLobbyError(msg);
+        this.showError(msg);
         return;
       }
       console.log('Signed in anonymously', authData.user.id);
@@ -123,38 +123,58 @@ class App {
       this.network = new Network();
       // Use the authenticated user's ID as the player ID
       this.network.initialize(this.supabase, authData.user.id);
+      this.setupNetworkHandlers();
 
       console.log('App initialization complete');
     } catch (err) {
       console.error('Error during app initialization:', err);
-      this.showLobbyError(`Initialization error: ${err.message}`);
+      this.showError(`Initialization error: ${err.message}`);
     }
   }
 
-  setupLobbyHandlers() {
-    console.log('Setting up lobby handlers...');
+  setupHandlers() {
+    console.log('Setting up handlers...');
     const hostBtn = document.getElementById('host-game-btn');
     const joinBtn = document.getElementById('join-game-btn');
+    const startBtn = document.getElementById('start-game-btn');
+    const leaveBtn = document.getElementById('leave-lobby-btn');
 
     if (hostBtn) {
-      console.log('Host button found, attaching listener');
-      hostBtn.addEventListener('click', () => {
-        console.log('Host button clicked');
-        this.hostGame();
-      });
-    } else {
-      console.error('Host button not found');
+      hostBtn.addEventListener('click', () => this.hostGame());
     }
 
     if (joinBtn) {
-      console.log('Join button found, attaching listener');
       joinBtn.addEventListener('click', () => this.joinGame());
-    } else {
-      console.error('Join button not found');
+    }
+
+    if (startBtn) {
+      startBtn.addEventListener('click', () => this.handleStartGame());
+    }
+
+    if (leaveBtn) {
+      leaveBtn.addEventListener('click', () => this.leaveGame());
     }
   }
 
-  showLobbyError(message) {
+  setupNetworkHandlers() {
+    this.network.on('player_joined', (payload) => {
+      console.log('Player joined:', payload.data.player.player_name);
+      this.ui.updatePlayerList(payload.data.allPlayers, this.network.isHost);
+    });
+
+    this.network.on('game_start', () => {
+      console.log('Game starting signal received');
+      this.startGame();
+    });
+
+    this.network.on('match_end', (payload) => {
+      console.log('Match ended');
+      this.stopGameLoop();
+      this.ui.showLobby('Match Ended', payload.data.summary);
+    });
+  }
+
+  showError(message) {
     const errorElement = document.getElementById('lobby-error');
     if (errorElement) {
       errorElement.textContent = message;
@@ -166,7 +186,7 @@ class App {
     }
   }
 
-  hideLobbyError() {
+  hideError() {
     const errorElement = document.getElementById('lobby-error');
     if (errorElement) {
       errorElement.classList.add('hidden');
@@ -175,22 +195,23 @@ class App {
 
   async hostGame() {
     console.log('Hosting game...');
-    this.hideLobbyError();
+    this.hideError();
 
     if (!this.network) {
-      this.showLobbyError('Network not initialized. Please wait or refresh.');
+      this.showError('Network not initialized. Please wait or refresh.');
       return;
     }
 
     try {
       const playerName = `Host-${Math.random().toString(36).substr(2, 5)}`;
-      const { session } = await this.network.hostGame(playerName);
+      const { session, player } = await this.network.hostGame(playerName);
+      
       this.ui.showJoinCode(session.join_code);
-      this.network.startPositionBroadcasting();
-      this.startGame();
+      this.ui.updatePlayerList([player], true);
+      this.ui.showLobby('Game Lobby');
     } catch (error) {
       console.error('Failed to host game:', error);
-      this.showLobbyError(`Error hosting game: ${error.message}`);
+      this.showError(`Error hosting game: ${error.message}`);
     }
   }
 
@@ -198,37 +219,54 @@ class App {
     const joinCodeInput = document.getElementById('join-code-input');
     const joinCode = joinCodeInput?.value.trim().toUpperCase();
 
-    this.hideLobbyError();
+    this.hideError();
 
     if (!joinCode) {
-      this.showLobbyError('Please enter a join code');
+      this.showError('Please enter a join code');
       return;
     }
 
     if (!this.network) {
-      this.showLobbyError('Network not initialized. Please wait or refresh.');
+      this.showError('Network not initialized. Please wait or refresh.');
       return;
     }
 
     // Validate join code format (6 alphanumeric characters)
     if (!/^[A-Z0-9]{6}$/.test(joinCode)) {
-      this.showLobbyError('Please enter a valid 6-character join code');
+      this.showError('Please enter a valid 6-character join code');
       return;
     }
 
     console.log('Joining game with code:', joinCode);
     try {
       const playerName = `Player-${Math.random().toString(36).substr(2, 5)}`;
-      await this.network.joinGame(joinCode, playerName);
-      this.startGame();
+      const data = await this.network.joinGame(joinCode, playerName);
+      
+      this.ui.showJoinCode(joinCode);
+      this.ui.updatePlayerList(data.allPlayers, false);
+      this.ui.showLobby('Game Lobby');
     } catch (error) {
       console.error('Failed to join game:', error);
-      this.showLobbyError(`Error joining game: ${error.message}`);
+      this.showError(`Error joining game: ${error.message}`);
     }
   }
 
+  handleStartGame() {
+    if (!this.network.isHost) return;
+
+    console.log('Host starting game...');
+    this.network.send('game_start', {});
+    this.startGame();
+  }
+
+  leaveGame() {
+    console.log('Leaving game...');
+    this.stopGame();
+    this.ui.showScreen('intro');
+  }
+
   startGame() {
-    console.log('Starting game...');
+    console.log('Entering game screen...');
 
     // Switch to game screen
     this.ui.showScreen('game');
@@ -254,6 +292,10 @@ class App {
       }
     });
 
+    if (this.network.isHost) {
+      this.network.startPositionBroadcasting();
+    }
+
     // Start game loop
     this.running = true;
     this.lastTimestamp = performance.now();
@@ -277,7 +319,7 @@ class App {
     this.animationFrameId = requestAnimationFrame((timestamp) => this.gameLoop(timestamp));
   }
 
-  stopGame() {
+  stopGameLoop() {
     this.running = false;
     if (this.animationFrameId) {
       cancelAnimationFrame(this.animationFrameId);
@@ -288,6 +330,12 @@ class App {
     }
     if (this.network) {
       this.network.stopPositionBroadcasting();
+    }
+  }
+
+  stopGame() {
+    this.stopGameLoop();
+    if (this.network) {
       this.network.disconnect();
     }
   }
