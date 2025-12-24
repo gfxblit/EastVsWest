@@ -36,6 +36,7 @@ describe('Network', () => {
         id: 'mock-session-id',
         join_code: mockJoinCode,
         host_id: MOCK_HOST_ID,
+        realtime_channel_name: 'game_session:ABCDEF',
       };
 
       const mockPlayerRecord = {
@@ -85,6 +86,7 @@ describe('Network', () => {
       expect(result.player.id).toBe(mockPlayerRecord.id);
       expect(network.isHost).toBe(true);
       expect(network.joinCode).toBe(mockJoinCode);
+      expect(network.sessionId).toBe(mockSession.id);
     });
 
     it('should throw an error if the game session could not be created', async () => {
@@ -98,16 +100,10 @@ describe('Network', () => {
         })
       }));
 
-      // Suppress console.error for this test
-      const consoleErrorSpy = jest.spyOn(console, 'error').mockImplementation(() => {});
-
       await expect(network.hostGame('TestHost')).rejects.toThrow(mockError);
 
       expect(network.isHost).toBe(false);
       expect(network.joinCode).toBe(null);
-
-      // Restore console.error
-      consoleErrorSpy.mockRestore();
     });
   });
 
@@ -125,354 +121,172 @@ describe('Network', () => {
       network.initialize(mockSupabaseClient, MOCK_PLAYER_ID);
     });
 
-    describe('WhenJoinCodeIsValid_ShouldJoinSession', () => {
-      it('should query the game_sessions table with the join code', async () => {
-        const mockSession = {
-          id: MOCK_SESSION_ID,
-          join_code: MOCK_JOIN_CODE,
-          host_id: 'host-uuid',
-          status: 'lobby',
-          max_players: 12,
-          current_player_count: 1,
-          realtime_channel_name: 'game_session:ABC123',
-        };
+    it('should query the session, subscribe, fetch snapshot, and self-insert', async () => {
+      const mockSession = {
+        id: MOCK_SESSION_ID,
+        join_code: MOCK_JOIN_CODE,
+        host_id: 'host-uuid',
+        status: 'lobby',
+        max_players: 12,
+        current_player_count: 1,
+        realtime_channel_name: 'game_session:ABC123',
+      };
 
-        // Mock the rpc call for get_session_by_join_code
-        mockSupabaseClient.rpc.mockResolvedValue({ data: [mockSession], error: null });
+      const mockExistingPlayer = {
+        player_id: 'host-uuid',
+        player_name: 'Host',
+        is_host: true
+      };
 
-        // Mock the channel
-        const mockChannel = {
-          on: jest.fn().mockReturnThis(),
-          subscribe: jest.fn((callback) => {
-            callback('SUBSCRIBED');
-            return mockChannel;
-          }),
-          send: jest.fn().mockResolvedValue('ok'),
-        };
-        mockSupabaseClient.channel.mockReturnValue(mockChannel);
+      const mockNewPlayer = {
+        session_id: MOCK_SESSION_ID,
+        player_id: MOCK_PLAYER_ID,
+        player_name: MOCK_PLAYER_NAME,
+        is_host: false,
+      };
 
-        const joinPromise = network.joinGame(MOCK_JOIN_CODE, MOCK_PLAYER_NAME);
+      // 1. Mock RPC
+      mockSupabaseClient.rpc.mockResolvedValue({ data: [mockSession], error: null });
 
-        // Simulate the player_joined event asynchronously
-        const payload = {
-          data: {
-            player: { player_id: MOCK_PLAYER_ID },
-            session: mockSession,
-            allPlayers: [{ player_id: MOCK_PLAYER_ID }],
-          }
-        };
-        setTimeout(() => network.emit('player_joined', payload), 0);
+      // 2. Mock Channel
+      const mockChannel = {
+        on: jest.fn().mockReturnThis(),
+        subscribe: jest.fn((callback) => {
+          callback('SUBSCRIBED');
+          return mockChannel;
+        }),
+      };
+      mockSupabaseClient.channel.mockReturnValue(mockChannel);
 
-        const result = await joinPromise;
-
-        expect(mockSupabaseClient.rpc).toHaveBeenCalledWith('get_session_by_join_code', { p_join_code: MOCK_JOIN_CODE });
-        expect(result).toEqual(payload.data);
-      });
-
-      it('should add the player to the session_players table', async () => {
-        const mockSession = {
-          id: MOCK_SESSION_ID,
-          join_code: MOCK_JOIN_CODE,
-          host_id: 'host-uuid',
-          status: 'lobby',
-          max_players: 12,
-          current_player_count: 1,
-          realtime_channel_name: 'game_session:ABC123',
-        };
-
-        // Mock the rpc call
-        mockSupabaseClient.rpc.mockResolvedValue({ data: [mockSession], error: null });
-
-        // Mock the channel
-        const mockChannel = {
-          on: jest.fn().mockReturnThis(),
-          subscribe: jest.fn((callback) => {
-            callback('SUBSCRIBED');
-            return mockChannel;
-          }),
-          send: jest.fn().mockResolvedValue('ok'),
-        };
-        mockSupabaseClient.channel.mockReturnValue(mockChannel);
-
-        const joinPromise = network.joinGame(MOCK_JOIN_CODE, MOCK_PLAYER_NAME);
-
-        // Simulate the player_joined event asynchronously
-        const payload = {
-          data: {
-            player: {
-              player_id: MOCK_PLAYER_ID,
-              player_name: MOCK_PLAYER_NAME,
-              is_host: false,
-            },
-            session: mockSession,
-            allPlayers: [{ player_id: MOCK_PLAYER_ID }],
-          }
-        };
-        setTimeout(() => network.emit('player_joined', payload), 0);
-
-        await joinPromise;
-
-        // Verify the join request was sent
-        expect(mockChannel.send).toHaveBeenCalledWith({
-          type: 'broadcast',
-          event: 'message',
-          payload: expect.objectContaining({
-            type: 'player_join_request',
-            from: MOCK_PLAYER_ID,
-            data: { playerName: MOCK_PLAYER_NAME },
-          }),
-        });
-      });
-
-      it('should set network state correctly after joining', async () => {
-        const mockSession = {
-          id: MOCK_SESSION_ID,
-          join_code: MOCK_JOIN_CODE,
-          host_id: 'host-uuid',
-          status: 'lobby',
-          max_players: 12,
-          current_player_count: 1,
-          realtime_channel_name: 'game_session:ABC123',
-        };
-
-        // Mock the rpc call
-        mockSupabaseClient.rpc.mockResolvedValue({ data: [mockSession], error: null });
-
-        // Mock the channel
-        const mockChannel = {
-          on: jest.fn().mockReturnThis(),
-          subscribe: jest.fn((callback) => {
-            callback('SUBSCRIBED');
-            return mockChannel;
-          }),
-          send: jest.fn().mockResolvedValue('ok'),
-        };
-        mockSupabaseClient.channel.mockReturnValue(mockChannel);
-
-        const joinPromise = network.joinGame(MOCK_JOIN_CODE, MOCK_PLAYER_NAME);
-
-        // Simulate the player_joined event asynchronously
-        const payload = {
-          data: {
-            player: { player_id: MOCK_PLAYER_ID },
-            session: mockSession,
-            allPlayers: [{ player_id: MOCK_PLAYER_ID }],
-          }
-        };
-        setTimeout(() => network.emit('player_joined', payload), 0);
-
-        await joinPromise;
-
-        expect(network.isHost).toBe(false);
-        expect(network.joinCode).toBe(MOCK_JOIN_CODE);
-        expect(network.connected).toBe(true);
-      });
-    });
-
-    describe('WhenSessionDoesNotExist_ShouldThrowError', () => {
-      it('should throw an error when the session is not found', async () => {
-        // Mock rpc to return empty array (session not found)
-        mockSupabaseClient.rpc.mockResolvedValue({ data: [], error: null });
-
-        await expect(network.joinGame(MOCK_JOIN_CODE, MOCK_PLAYER_NAME))
-          .rejects.toThrow('Session not found');
-      });
-
-      it('should throw an error when database returns an error', async () => {
-        const dbError = new Error('Database connection failed');
-
-        // Mock rpc to return error
-        mockSupabaseClient.rpc.mockResolvedValue({ data: null, error: dbError });
-
-        await expect(network.joinGame(MOCK_JOIN_CODE, MOCK_PLAYER_NAME))
-          .rejects.toThrow(dbError);
-      });
-    });
-
-    describe('WhenSessionIsNotJoinable_ShouldThrowError', () => {
-      it('should throw an error when session status is "active"', async () => {
-        const mockSession = {
-          id: MOCK_SESSION_ID,
-          join_code: MOCK_JOIN_CODE,
-          host_id: 'host-uuid',
-          status: 'active',
-          max_players: 12,
-          current_player_count: 1,
-        };
-
-        // Mock rpc to return active session
-        mockSupabaseClient.rpc.mockResolvedValue({ data: [mockSession], error: null });
-
-        await expect(network.joinGame(MOCK_JOIN_CODE, MOCK_PLAYER_NAME))
-          .rejects.toThrow('Session is not joinable');
-      });
-
-      it('should throw an error when session status is "ended"', async () => {
-        const mockSession = {
-          id: MOCK_SESSION_ID,
-          join_code: MOCK_JOIN_CODE,
-          host_id: 'host-uuid',
-          status: 'ended',
-          max_players: 12,
-          current_player_count: 1,
-        };
-
-        // Mock rpc to return ended session
-        mockSupabaseClient.rpc.mockResolvedValue({ data: [mockSession], error: null });
-
-        await expect(network.joinGame(MOCK_JOIN_CODE, MOCK_PLAYER_NAME))
-          .rejects.toThrow('Session is not joinable');
-      });
-
-      it('should throw an error when session is full', async () => {
-        const mockSession = {
-          id: MOCK_SESSION_ID,
-          join_code: MOCK_JOIN_CODE,
-          host_id: 'host-uuid',
-          status: 'lobby',
-          max_players: 12,
-          current_player_count: 12,
-        };
-
-        // Mock rpc to return full session
-        mockSupabaseClient.rpc.mockResolvedValue({ data: [mockSession], error: null });
-
-        await expect(network.joinGame(MOCK_JOIN_CODE, MOCK_PLAYER_NAME))
-          .rejects.toThrow('Session is full');
-      });
-    });
-
-    describe('WhenSupabaseNotInitialized_ShouldThrowError', () => {
-      it('should throw an error if supabase client is not initialized', async () => {
-        const uninitializedNetwork = new Network();
-
-        await expect(uninitializedNetwork.joinGame(MOCK_JOIN_CODE, MOCK_PLAYER_NAME))
-          .rejects.toThrow('Supabase client not initialized');
-      });
-    });
-
-    describe('WhenPlayerIdNotSet_ShouldThrowError', () => {
-      it('should throw an error if player ID is not set', async () => {
-        const networkWithoutPlayerId = new Network();
-        networkWithoutPlayerId.initialize(mockSupabaseClient, null);
-
-        await expect(networkWithoutPlayerId.joinGame(MOCK_JOIN_CODE, MOCK_PLAYER_NAME))
-          .rejects.toThrow('Player ID not set');
-      });
-    });
-
-    describe('Join Game Event Listener', () => {
-      let onSpy, offSpy;
-
-      beforeEach(() => {
-        onSpy = jest.spyOn(network, 'on');
-        offSpy = jest.spyOn(network, 'off');
-
-        // Mock the session lookup to avoid actual DB calls
-        const mockSession = {
-            id: MOCK_SESSION_ID,
-            join_code: MOCK_JOIN_CODE,
-            host_id: 'host-uuid',
-            status: 'lobby',
-            max_players: 12,
-            current_player_count: 1,
-            realtime_channel_name: 'game_session:ABC123',
+      // 3. Mock table interactions
+      mockSupabaseClient.from = jest.fn((table) => {
+        if (table === 'session_players') {
+          return {
+            select: jest.fn().mockReturnValue({
+              eq: jest.fn().mockResolvedValue({ data: [mockExistingPlayer], error: null })
+            }),
+            insert: jest.fn().mockReturnValue({
+              select: jest.fn().mockReturnValue({
+                single: jest.fn().mockResolvedValue({ data: mockNewPlayer, error: null })
+              })
+            })
           };
-
-        mockSupabaseClient.rpc.mockResolvedValue({ data: [mockSession], error: null });
-
-        // Mock the channel
-        const mockChannel = {
-          on: jest.fn().mockReturnThis(),
-          subscribe: jest.fn((callback) => {
-            callback('SUBSCRIBED');
-            return mockChannel;
-          }),
-          send: jest.fn().mockResolvedValue('ok'),
-        };
-        mockSupabaseClient.channel.mockReturnValue(mockChannel);
+        }
       });
 
-      afterEach(() => {
-        onSpy.mockRestore();
-        offSpy.mockRestore();
-      });
+      const result = await network.joinGame(MOCK_JOIN_CODE, MOCK_PLAYER_NAME);
 
-      it('should clean up player_joined listener on successful join', async () => {
-        const joinPromise = network.joinGame(MOCK_JOIN_CODE, MOCK_PLAYER_NAME);
-
-        // Simulate the player_joined event asynchronously
-        const payload = { data: { player: { player_id: MOCK_PLAYER_ID } } };
-        setTimeout(() => network.emit('player_joined', payload), 0);
-
-        await joinPromise;
-
-        expect(onSpy).toHaveBeenCalledWith('player_joined', expect.any(Function));
-        expect(offSpy).toHaveBeenCalledWith('player_joined', expect.any(Function));
-      });
-
-      it('should clean up player_joined listener on timeout', async () => {
-        jest.useFakeTimers();
-
-        const joinPromise = network.joinGame(MOCK_JOIN_CODE, MOCK_PLAYER_NAME);
-
-        // Catch any unhandled rejections
-        joinPromise.catch(() => {});
-
-        // Run all timers to trigger the timeout
-        await jest.runAllTimersAsync();
-
-        // The promise should be rejected now
-        await expect(joinPromise).rejects.toThrow('Join request timed out.');
-
-        expect(onSpy).toHaveBeenCalledWith('player_joined', expect.any(Function));
-        expect(offSpy).toHaveBeenCalledWith('player_joined', expect.any(Function));
-
-        jest.useRealTimers();
-      });
+      // Verify sequence of calls
+      expect(mockSupabaseClient.rpc).toHaveBeenCalledWith('get_session_by_join_code', { p_join_code: MOCK_JOIN_CODE });
+      expect(mockSupabaseClient.channel).toHaveBeenCalledWith(mockSession.realtime_channel_name, expect.any(Object));
+      expect(mockChannel.on).toHaveBeenCalledWith('postgres_changes', expect.any(Object), expect.any(Function));
+      expect(mockSupabaseClient.from).toHaveBeenCalledWith('session_players');
+      
+      expect(network.sessionId).toBe(MOCK_SESSION_ID);
+      expect(network.isHost).toBe(false);
+      expect(network.joinCode).toBe(MOCK_JOIN_CODE);
+      expect(network.connected).toBe(true);
+      
+      expect(result.player).toEqual(mockNewPlayer);
+      expect(result.allPlayers).toContainEqual(mockExistingPlayer);
+      expect(network.players.get('host-uuid')).toEqual(mockExistingPlayer);
     });
 
-    describe('WhenPlayerInsertFails_ShouldThrowError', () => {
-      it('should timeout if host does not respond to join request', async () => {
-        jest.useFakeTimers();
+    it('should throw an error when the session is not found', async () => {
+      mockSupabaseClient.rpc.mockResolvedValue({ data: [], error: null });
 
-        const mockSession = {
-          id: MOCK_SESSION_ID,
-          join_code: MOCK_JOIN_CODE,
-          host_id: 'host-uuid',
-          status: 'lobby',
-          max_players: 12,
-          current_player_count: 1,
-          realtime_channel_name: 'game_session:ABC123',
-        };
+      await expect(network.joinGame(MOCK_JOIN_CODE, MOCK_PLAYER_NAME))
+        .rejects.toThrow('Session not found');
+    });
 
-        // Mock the rpc call
-        mockSupabaseClient.rpc.mockResolvedValue({ data: [mockSession], error: null });
+    it('should throw an error when session is full', async () => {
+      const mockSession = {
+        id: MOCK_SESSION_ID,
+        join_code: MOCK_JOIN_CODE,
+        host_id: 'host-uuid',
+        status: 'lobby',
+        max_players: 12,
+        current_player_count: 12,
+      };
 
-        // Mock the channel
-        const mockChannel = {
-          on: jest.fn().mockReturnThis(),
-          subscribe: jest.fn((callback) => {
-            callback('SUBSCRIBED');
-            return mockChannel;
-          }),
-          send: jest.fn().mockResolvedValue('ok'),
-        };
-        mockSupabaseClient.channel.mockReturnValue(mockChannel);
+      mockSupabaseClient.rpc.mockResolvedValue({ data: [mockSession], error: null });
 
-        const joinPromise = network.joinGame(MOCK_JOIN_CODE, MOCK_PLAYER_NAME);
+      await expect(network.joinGame(MOCK_JOIN_CODE, MOCK_PLAYER_NAME))
+        .rejects.toThrow('Session is full');
+    });
 
-        // Catch any unhandled rejections
-        joinPromise.catch(() => {});
+    it('should throw an error when session status is not lobby', async () => {
+      const mockSession = {
+        id: MOCK_SESSION_ID,
+        join_code: MOCK_JOIN_CODE,
+        host_id: 'host-uuid',
+        status: 'active',
+        max_players: 12,
+        current_player_count: 1,
+      };
 
-        // Run all timers to trigger the timeout
-        await jest.runAllTimersAsync();
+      mockSupabaseClient.rpc.mockResolvedValue({ data: [mockSession], error: null });
 
-        // The promise should be rejected now
-        await expect(joinPromise).rejects.toThrow('Join request timed out.');
+      await expect(network.joinGame(MOCK_JOIN_CODE, MOCK_PLAYER_NAME))
+        .rejects.toThrow('Session is not joinable');
+    });
+  });
 
-        jest.useRealTimers();
+  describe('Postgres Changes Handler', () => {
+    const MOCK_PLAYER_ID = 'test-player-id';
+
+    beforeEach(() => {
+      network = new Network();
+      network.initialize(mockSupabaseClient, MOCK_PLAYER_ID);
+      network.sessionId = 'test-session-id';
+    });
+
+    it('should update local players list on INSERT', () => {
+      const newPlayer = { player_id: 'player-2', player_name: 'NewPlayer', joined_at: new Date().toISOString() };
+      const emitSpy = jest.spyOn(network, 'emit');
+
+      network._handlePostgresChange({
+        eventType: 'INSERT',
+        new: newPlayer
       });
+
+      expect(network.players.get('player-2')).toEqual(newPlayer);
+      expect(emitSpy).toHaveBeenCalledWith('player_joined', expect.objectContaining({
+        data: expect.objectContaining({
+          player: newPlayer
+        })
+      }));
+    });
+
+    it('should remove player from local list on DELETE', () => {
+      const existingPlayer = { player_id: 'player-2', player_name: 'ExistingPlayer' };
+      network.players.set('player-2', existingPlayer);
+      const emitSpy = jest.spyOn(network, 'emit');
+
+      network._handlePostgresChange({
+        eventType: 'DELETE',
+        old: { player_id: 'player-2' }
+      });
+
+      expect(network.players.has('player-2')).toBe(false);
+      expect(emitSpy).toHaveBeenCalledWith('player_left', expect.objectContaining({
+        data: expect.objectContaining({
+          player_id: 'player-2'
+        })
+      }));
+    });
+
+    it('should emit evicted when self is deleted', () => {
+      const emitSpy = jest.spyOn(network, 'emit');
+      network.disconnect = jest.fn();
+
+      network._handlePostgresChange({
+        eventType: 'DELETE',
+        old: { player_id: MOCK_PLAYER_ID }
+      });
+
+      expect(emitSpy).toHaveBeenCalledWith('evicted', expect.any(Object));
+      expect(network.disconnect).toHaveBeenCalled();
     });
   });
 

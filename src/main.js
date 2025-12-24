@@ -162,6 +162,17 @@ class App {
       this.ui.updatePlayerList(payload.data.allPlayers, this.network.isHost);
     });
 
+    this.network.on('player_left', (payload) => {
+      console.log('Player left:', payload.data.player_id);
+      this.ui.updatePlayerList(payload.data.allPlayers, this.network.isHost);
+    });
+
+    this.network.on('evicted', (payload) => {
+      console.warn('Evicted from session:', payload.reason);
+      this.showError(`Evicted: ${payload.reason}`);
+      this.ui.showScreen('intro');
+    });
+
     this.network.on('game_start', () => {
       console.log('Game starting signal received');
       this.startGame();
@@ -207,7 +218,7 @@ class App {
       const { session, player } = await this.network.hostGame(playerName);
       
       this.ui.showJoinCode(session.join_code);
-      this.ui.updatePlayerList([player], true);
+      // Player list will be updated via 'player_joined' network event
       this.ui.showLobby('Game Lobby');
     } catch (error) {
       console.error('Failed to host game:', error);
@@ -243,7 +254,7 @@ class App {
       const data = await this.network.joinGame(joinCode, playerName);
       
       this.ui.showJoinCode(joinCode);
-      this.ui.updatePlayerList(data.allPlayers, false);
+      // Player list will be updated via 'player_joined' network event
       this.ui.showLobby('Game Lobby');
     } catch (error) {
       console.error('Failed to join game:', error);

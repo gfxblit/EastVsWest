@@ -40,6 +40,8 @@ export class Network extends EventEmitter {
     this.connected = false;
     this.supabase = null;
     this.playerId = null;
+    this.sessionId = null;
+    this.players = new Map();
     this.channel = null;
     this.positionBuffer = new Map(); // Stores position updates by player_id
     this.playerPositions = new Map(); // Stores last known positions for validation
@@ -70,10 +72,17 @@ export class Network extends EventEmitter {
 
     if (sessionError) throw sessionError;
 
+    this.sessionId = sessionData.id;
+    this.isHost = true;
+    this.joinCode = newJoinCode;
+    
+    // Subscribe to channel and postgres changes
+    await this._subscribeToChannel(channelName);
+
     const { data: playerRecord, error: playerError } = await this.supabase
       .from('session_players')
       .insert({
-        session_id: sessionData.id,
+        session_id: this.sessionId,
         player_id: this.playerId,
         player_name: playerName,
         is_host: true,
@@ -83,10 +92,7 @@ export class Network extends EventEmitter {
     
     if (playerError) throw playerError;
 
-    this.isHost = true;
-    this.joinCode = newJoinCode;
-    await this._subscribeToChannel(channelName);
-
+    // Local player list will be updated via postgres_changes event
     return { session: sessionData, player: playerRecord };
   }
 
@@ -94,6 +100,7 @@ export class Network extends EventEmitter {
     if (!this.supabase) throw new Error('Supabase client not initialized.');
     if (!this.playerId) throw new Error('Player ID not set.');
 
+    // 1. Get session info via RPC
     const { data: sessionData, error: sessionError } = await this.supabase
       .rpc('get_session_by_join_code', { p_join_code: joinCode });
 
@@ -104,42 +111,52 @@ export class Network extends EventEmitter {
     if (session.status !== 'lobby') throw new Error('Session is not joinable.');
     if (session.current_player_count >= session.max_players) throw new Error('Session is full.');
 
+    this.sessionId = session.id;
+    this.isHost = false;
+    this.joinCode = joinCode;
+
+    // 2. Client-authoritative join: Self-insert into session_players FIRST
+    // This ensures RLS policies allow us to read/listen to other players in this session
+    const { data: playerRecord, error: insertError } = await this.supabase
+      .from('session_players')
+      .insert({
+        session_id: this.sessionId,
+        player_id: this.playerId,
+        player_name: playerName,
+        is_host: false,
+      })
+      .select()
+      .single();
+
+    if (insertError) {
+      if (insertError.code === '23505') { // Unique constraint violation
+        throw new Error('You are already in this session.');
+      }
+      throw insertError;
+    }
+
+    // 3. Subscribe to channel and postgres changes
     await this._subscribeToChannel(session.realtime_channel_name);
 
-    const joinRequest = {
-      type: 'player_join_request',
-      from: this.playerId,
-      timestamp: Date.now(),
-      data: { playerName },
+    // 4. Fetch initial snapshot of players
+    const { data: allPlayers, error: playersError } = await this.supabase
+      .from('session_players')
+      .select('*')
+      .eq('session_id', this.sessionId);
+    
+    if (playersError) throw playersError;
+
+    // Initialize local players map
+    this.players.clear();
+    allPlayers.forEach(p => this.players.set(p.player_id, p));
+
+    this.connected = true;
+
+    return { 
+      session, 
+      player: playerRecord, 
+      allPlayers: Array.from(this.players.values()) 
     };
-
-    await this.channel.send({
-      type: 'broadcast',
-      event: 'message',
-      payload: joinRequest,
-    });
-
-    return new Promise((resolve, reject) => {
-      let timeout;
-
-      const onPlayerJoined = (payload) => {
-        if (payload.data.player.player_id === this.playerId) {
-          clearTimeout(timeout);
-          this.off('player_joined', onPlayerJoined); // Clean up listener
-          this.isHost = false;
-          this.joinCode = joinCode;
-          this.connected = true;
-          resolve(payload.data);
-        }
-      };
-
-      timeout = setTimeout(() => {
-        this.off('player_joined', onPlayerJoined); // Clean up listener on timeout
-        reject(new Error('Join request timed out.'));
-      }, 10000); // 10 second timeout
-
-      this.on('player_joined', onPlayerJoined);
-    });
   }
 
   _subscribeToChannel(channelName) {
@@ -160,6 +177,14 @@ export class Network extends EventEmitter {
         .on('broadcast', { event: 'message' }, ({ payload }) => {
           this._handleRealtimeMessage(payload);
         })
+        .on('postgres_changes', { 
+          event: '*', 
+          schema: 'public', 
+          table: 'session_players',
+          filter: `session_id=eq.${this.sessionId}` 
+        }, (payload) => {
+          this._handlePostgresChange(payload);
+        })
         .subscribe((status, error) => {
           if (status === 'SUBSCRIBED') {
             this.connected = true;
@@ -174,10 +199,6 @@ export class Network extends EventEmitter {
   _handleRealtimeMessage(payload) {
     this.emit(payload.type, payload);
 
-    if (this.isHost && payload.type === 'player_join_request') {
-      this._handlePlayerJoinRequest(payload);
-    }
-
     if (this.isHost && payload.type === 'position_update') {
       if (this._isValidPositionUpdate(payload)) {
         // Store position update in buffer for batching
@@ -185,6 +206,76 @@ export class Network extends EventEmitter {
         this.playerPositions.set(payload.from, payload.data.position);
       } else {
         console.warn(`Host: Received invalid position update from ${payload.from}`, payload.data);
+      }
+    }
+  }
+
+  _handlePostgresChange(payload) {
+    const { eventType, new: newRecord, old: oldRecord } = payload;
+    
+    if (eventType === 'INSERT') {
+      this.players.set(newRecord.player_id, newRecord);
+      this.emit('player_joined', {
+        type: 'player_joined',
+        data: {
+          player: newRecord,
+          allPlayers: Array.from(this.players.values())
+        }
+      });
+
+      if (this.isHost) {
+        this._enforceMaxPlayers();
+      }
+    } else if (eventType === 'DELETE') {
+      const deletedPlayerId = oldRecord.player_id;
+      this.players.delete(deletedPlayerId);
+      
+      this.emit('player_left', {
+        type: 'player_left',
+        data: {
+          player_id: deletedPlayerId,
+          allPlayers: Array.from(this.players.values())
+        }
+      });
+
+      if (deletedPlayerId === this.playerId) {
+        this.emit('evicted', { reason: 'Session full or host evicted you' });
+        this.disconnect();
+      }
+    } else if (eventType === 'UPDATE') {
+      this.players.set(newRecord.player_id, newRecord);
+      this.emit('player_updated', {
+        type: 'player_updated',
+        data: {
+          player: newRecord,
+          allPlayers: Array.from(this.players.values())
+        }
+      });
+    }
+  }
+
+  async _enforceMaxPlayers() {
+    if (!this.isHost || !this.sessionId) return;
+
+    // Get current players sorted by join time
+    const players = Array.from(this.players.values()).sort((a, b) => 
+      new Date(a.joined_at) - new Date(b.joined_at)
+    );
+
+    const { data: session } = await this.supabase
+      .from('game_sessions')
+      .select('max_players')
+      .eq('id', this.sessionId)
+      .single();
+
+    if (players.length > session.max_players) {
+      console.log(`Host: Session full (${players.length}/${session.max_players}). Evicting latest joiners.`);
+      const excessPlayers = players.slice(session.max_players);
+      for (const p of excessPlayers) {
+        await this.supabase
+          .from('session_players')
+          .delete()
+          .eq('id', p.id);
       }
     }
   }
@@ -230,66 +321,6 @@ export class Network extends EventEmitter {
 
     return true;
   }
-
-  async _handlePlayerJoinRequest(payload) {
-    const { playerName } = payload.data;
-    const joiningPlayerId = payload.from;
-
-    // 1. Get session
-    const { data: session } = await this.supabase
-      .from('game_sessions')
-      .select('*')
-      .eq('join_code', this.joinCode)
-      .single();
-    
-    // TODO: Add validation (session full, etc.)
-
-    // 2. Add player to DB
-    const { data: newPlayer, error } = await this.supabase
-      .from('session_players')
-      .insert({
-        session_id: session.id,
-        player_id: joiningPlayerId,
-        player_name: playerName,
-        is_host: false,
-      })
-      .select()
-      .single();
-    
-    if (error) {
-      console.error('Host: Error adding player to DB:', JSON.stringify(error, null, 2));
-      // TODO: Send rejection message
-      return;
-    }
-
-    // 3. Get all players in session
-    const { data: players } = await this.supabase
-      .from('session_players')
-      .select('*')
-      .eq('session_id', session.id);
-
-    // 4. Broadcast `player_joined`
-    const broadcastPayload = {
-      type: 'player_joined',
-      from: this.playerId,
-      timestamp: Date.now(),
-      data: {
-        player: newPlayer,
-        allPlayers: players,
-        session: session,
-      },
-    };
-
-    await this.channel.send({
-      type: 'broadcast',
-      event: 'message',
-      payload: broadcastPayload,
-    });
-
-    // 5. Emit locally for host's own UI update
-    this.emit('player_joined', broadcastPayload);
-  }
-
 
   send(type, data) {
     if (!this.channel || !this.connected) {
