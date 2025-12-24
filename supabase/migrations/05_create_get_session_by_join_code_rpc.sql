@@ -16,7 +16,6 @@ BEGIN
     started_at,
     ended_at,
     max_players,
-    current_player_count,
     game_phase,
     conflict_zone_radius,
     conflict_zone_center_x,

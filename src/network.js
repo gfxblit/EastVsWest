@@ -109,7 +109,6 @@ export class Network extends EventEmitter {
 
     const session = sessionData[0];
     if (session.status !== 'lobby') throw new Error('Session is not joinable.');
-    if (session.current_player_count >= session.max_players) throw new Error('Session is full.');
 
     this.sessionId = session.id;
     this.isHost = false;

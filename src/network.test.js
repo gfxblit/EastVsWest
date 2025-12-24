@@ -128,7 +128,6 @@ describe('Network', () => {
         host_id: 'host-uuid',
         status: 'lobby',
         max_players: 12,
-        current_player_count: 1,
         realtime_channel_name: 'game_session:ABC123',
       };
 
@@ -199,22 +198,6 @@ describe('Network', () => {
         .rejects.toThrow('Session not found');
     });
 
-    it('should throw an error when session is full', async () => {
-      const mockSession = {
-        id: MOCK_SESSION_ID,
-        join_code: MOCK_JOIN_CODE,
-        host_id: 'host-uuid',
-        status: 'lobby',
-        max_players: 12,
-        current_player_count: 12,
-      };
-
-      mockSupabaseClient.rpc.mockResolvedValue({ data: [mockSession], error: null });
-
-      await expect(network.joinGame(MOCK_JOIN_CODE, MOCK_PLAYER_NAME))
-        .rejects.toThrow('Session is full');
-    });
-
     it('should throw an error when session status is not lobby', async () => {
       const mockSession = {
         id: MOCK_SESSION_ID,
@@ -222,7 +205,6 @@ describe('Network', () => {
         host_id: 'host-uuid',
         status: 'active',
         max_players: 12,
-        current_player_count: 1,
       };
 
       mockSupabaseClient.rpc.mockResolvedValue({ data: [mockSession], error: null });

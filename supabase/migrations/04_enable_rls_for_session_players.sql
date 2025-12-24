@@ -13,22 +13,27 @@ CREATE POLICY "Allow read access to session players"
   TO authenticated
   USING (true);
 
--- 2. Allow only the host to add players to a session.
--- This enforces the host-authority model. The check verifies that the
--- user performing the insert is the host of the session being inserted into.
-CREATE POLICY "Allow host to insert players into their session"
+-- 2. Allow players to self-insert into a session.
+-- The Host is responsible for evicting players if the session is full or already started.
+CREATE POLICY "Allow players to insert themselves"
   ON public.session_players
   FOR INSERT
   TO authenticated
-  WITH CHECK (
+  WITH CHECK (auth.uid() = player_id);
+
+-- 3. Allow host to evict players (delete rows in their own session).
+CREATE POLICY "Allow host to evict players"
+  ON public.session_players
+  FOR DELETE
+  TO authenticated
+  USING (
     EXISTS (
-      SELECT 1
-      FROM public.game_sessions
+      SELECT 1 FROM public.game_sessions
       WHERE id = session_players.session_id AND host_id = auth.uid()
     )
   );
 
--- 3. Allow players to update their own data
+-- 4. Allow players to update their own data
 -- This is for position updates, status changes, etc.
 CREATE POLICY "Allow players to update their own data"
   ON public.session_players
@@ -37,7 +42,7 @@ CREATE POLICY "Allow players to update their own data"
   USING (auth.uid() = player_id)
   WITH CHECK (auth.uid() = player_id);
 
--- 4. Allow players to delete their own session record (for leaving a game)
+-- 5. Allow players to delete their own session record (for leaving a game)
 CREATE POLICY "Allow players to delete their own data"
   ON public.session_players
   FOR DELETE

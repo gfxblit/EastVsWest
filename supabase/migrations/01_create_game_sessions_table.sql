@@ -7,7 +7,6 @@ CREATE TABLE game_sessions (
   started_at TIMESTAMP WITH TIME ZONE,
   ended_at TIMESTAMP WITH TIME ZONE,
   max_players INTEGER DEFAULT 12,
-  current_player_count INTEGER DEFAULT 1,
 
   -- Game state metadata
   game_phase VARCHAR(20) DEFAULT 'lobby',

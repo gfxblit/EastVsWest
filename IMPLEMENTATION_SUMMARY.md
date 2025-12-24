@@ -31,7 +31,6 @@ async joinGame(joinCode, playerName)
 - Error if player ID is not set
 - Error if session is not found
 - Error if session status is not 'lobby' (rejects 'active' and 'ended' sessions)
-- Error if session is full (current_player_count >= max_players)
 - Error if player insertion fails
 
 ### Implementation Flow
@@ -46,7 +45,6 @@ async joinGame(joinCode, playerName)
 
 3. **Validate Session is Joinable**
    - Check session status is 'lobby'
-   - Check session is not full
 
 4. **Add Player to Session**
    - Insert player record into `session_players` table with:
