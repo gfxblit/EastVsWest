@@ -80,6 +80,57 @@ To get started with local development and deploy the project:
 *   **Build for Deployment**: To create optimized, production-ready files, run `npm run build`. This command will generate a `dist/` folder containing `bundle.js` and `index.html`.
 *   **Deployment**: The contents of the `dist/` folder are ready for deployment.
 
+## Mobile Debugging
+
+The project includes [Eruda](https://github.com/liriliri/eruda), an in-browser developer console for mobile devices. This is essential for debugging on iOS/iPadOS where Safari and Chrome do not provide access to the developer console.
+
+### Features
+
+Eruda provides:
+- **Console**: View `console.log()`, `console.error()`, `console.warn()`, and uncaught errors
+- **Elements Inspector**: Inspect and modify DOM elements in real-time
+- **Network Monitor**: Track network requests and responses
+- **Resources Viewer**: View localStorage, sessionStorage, and cookies
+- **Sources**: View loaded JavaScript and CSS files
+
+### Availability
+
+Eruda is automatically enabled in:
+- **Development mode** (`npm run dev`)
+- **Production builds** when you add `?debug=true` to the URL
+
+This approach keeps production bundle sizes small (~210KB smaller) while still allowing mobile debugging when needed.
+
+### Usage
+
+**For Local Development:**
+```bash
+npm run dev
+```
+Eruda will be automatically available - look for the floating gear icon (⚙️).
+
+**For Production/Deployed Builds:**
+Add `?debug=true` to the URL to enable Eruda:
+```
+https://gfxblit.github.io/EastVsWest/?debug=true
+```
+
+**To access Eruda:**
+1. Open the application in a mobile browser (Safari, Chrome, etc.)
+2. Look for a floating gear icon (⚙️) in the bottom-right corner of the screen
+3. Tap the icon to open the Eruda developer panel
+4. Use the tabs at the bottom to switch between Console, Elements, Network, etc.
+
+**Tip:** You can drag the gear icon to reposition it if it's blocking game content.
+
+### When to Use
+
+- Debugging JavaScript errors on mobile devices
+- Inspecting network requests to Supabase
+- Viewing console logs during mobile gameplay
+- Testing responsive layout issues on actual mobile hardware
+- Debugging touch input handling
+
 ## Environment Configuration
 
 ### Local Development
@@ -100,6 +151,26 @@ VITE_SUPABASE_ANON_KEY=eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFz
 
 This file will be automatically loaded by Vite during local development (`npm run dev`).
 
+### Remote Development (LAN / Tailscale)
+To test the game on other devices (like mobile phones) connected to your local network or via [Tailscale](https://tailscale.com/):
+
+1.  **Start the Server:**
+    Run the development server with the `--host` flag to expose it to the network:
+    ```bash
+    npm run dev -- --host
+    ```
+
+2.  **Connect:**
+    The terminal will display your Network URLs (e.g., `http://192.168.1.5:3000` or `http://my-machine.tailnet.ts.net:3000`).
+    Open this URL on your mobile device.
+
+3.  **Automatic Backend Configuration:**
+    The application automatically detects the hostname you are using. If you connect via a custom hostname or LAN IP, it will attempt to communicate with the Supabase backend on the **same hostname** at port `54321`.
+    
+    *Example:* If you connect to `http://192.168.1.5:3000`, the app will automatically use `http://192.168.1.5:54321` for the backend API.
+    
+    **Requirement:** Ensure your computer's firewall allows incoming connections on port `54321` (Supabase) and `3000` (Vite).
+
 ### Production Environment
 For the application to connect to Supabase in a production environment, you must provide the necessary credentials via a `.env` file.
 
@@ -112,6 +183,27 @@ For the application to connect to Supabase in a production environment, you must
     ```
 
     These credentials can be found in your Supabase project's dashboard under "Project Settings" > "API".
+
+### GitHub Pages Deployment
+For GitHub Pages deployment, environment variables must be configured as GitHub repository secrets since Vite embeds them at build time during the CI/CD workflow.
+
+1.  **Get Production Credentials:**
+    ```bash
+    npx supabase projects list
+    npx supabase projects api-keys --project-ref <your-project-ref>
+    ```
+
+2.  **Add GitHub Secrets:**
+    Navigate to your repository: **Settings → Secrets and variables → Actions → New repository secret**
+
+    Add these two secrets:
+    - **Name:** `VITE_SUPABASE_URL`
+      **Value:** Your production Supabase URL (e.g., `https://xxxxx.supabase.co`)
+
+    - **Name:** `VITE_SUPABASE_ANON_KEY`
+      **Value:** Your production Supabase anon/public key
+
+**Note:** The anon key is safe to expose client-side. Security is enforced through Row Level Security (RLS) policies in your database, not by hiding the anon key.
 
 ## Project Management
 This project utilizes GitHub Issues for task management and roadmap tracking.

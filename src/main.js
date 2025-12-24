@@ -10,6 +10,23 @@ import { Input } from './input.js';
 import { UI } from './ui.js';
 import { Network } from './network.js';
 import { createClient } from '@supabase/supabase-js';
+
+// Initialize Eruda for mobile debugging (console, network, elements inspector)
+// Only load in development/preview builds, or when ?debug=true query parameter is present
+export async function initializeDebugTools(env = import.meta.env, location = window.location) {
+  const urlParams = new URLSearchParams(location.search);
+  const debugParam = urlParams.get('debug') === 'true';
+
+  if (env.DEV || debugParam) {
+    const eruda = await import('eruda');
+    eruda.default.init();
+    return true; // Return true to indicate Eruda was initialized
+  }
+  return false; // Return false to indicate Eruda was not initialized
+}
+
+// Initialize debug tools asynchronously (non-blocking)
+initializeDebugTools().catch(err => console.warn('Failed to initialize debug tools:', err));
 class App {
   constructor() {
     this.game = null;
@@ -24,30 +41,103 @@ class App {
   }
 
   async init() {
-    this.supabase = createClient(import.meta.env.VITE_SUPABASE_URL, import.meta.env.VITE_SUPABASE_ANON_KEY);
-
-    // Sign in anonymously to get an auth.uid()
-    const { data: authData, error: authError } = await this.supabase.auth.signInAnonymously();
-    if (authError) {
-      console.error('Failed to sign in anonymously:', authError);
-      return;
-    }
-
-    this.network = new Network();
-    // Use the authenticated user's ID as the player ID
-    this.network.initialize(this.supabase, authData.user.id);
-
-    // Initialize UI
+    console.log('App initializing...');
+    
+    // Initialize UI first so we can show errors/interact
     this.ui = new UI();
     this.ui.init();
+    this.setupHandlers();
 
-    // Set up lobby event handlers
-    this.setupLobbyHandlers();
+    try {
+      console.log('Creating Supabase client...');
+      let supabaseUrl = import.meta.env.VITE_SUPABASE_URL;
+      let supabaseKey = import.meta.env.VITE_SUPABASE_ANON_KEY;
+      
+      // Dynamic URL construction for development to support Tailscale/LAN/Localhost seamlessly
+      if (import.meta.env.DEV) {
+        const currentHost = window.location.hostname;
+        console.log(`Development mode detected. Current hostname: ${currentHost}`);
+        
+        // If we are on a custom hostname (like Tailscale or LAN IP), try to use that for the backend too
+        // This assumes the backend is running on port 54321 on the same machine
+        if (currentHost !== 'localhost' && currentHost !== '127.0.0.1') {
+            const dynamicUrl = `http://${currentHost}:54321`;
+            console.log(`Overriding VITE_SUPABASE_URL to match hostname: ${dynamicUrl}`);
+            supabaseUrl = dynamicUrl;
+        }
+      }
+
+      // Fallback for local development if env vars are missing
+      if ((!supabaseUrl || !supabaseKey) && import.meta.env.DEV) {
+        console.warn('Supabase credentials missing in env, falling back to local defaults');
+        supabaseUrl = 'http://127.0.0.1:54321';
+        // Default local Supabase Anon Key
+        supabaseKey = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZS1kZW1vIiwicm9sZSI6ImFub24iLCJleHAiOjE5ODM4MTI5OTZ9.CRXP1A7WOeoJeXxjNni43kdQwgnWNReilDMblYTn_I0';
+      }
+      
+      if (!supabaseUrl || !supabaseKey) {
+        const msg = 'Missing Supabase credentials in environment variables';
+        console.error(msg);
+        this.showError(msg);
+        return;
+      }
+
+      this.supabase = createClient(supabaseUrl, supabaseKey);
+
+      // Diagnostic: Check if we can actually reach the Supabase server
+      console.log(`Testing connectivity to ${supabaseUrl}...`);
+      try {
+        // Shorter timeout for the connectivity check
+        const controller = new AbortController();
+        const id = setTimeout(() => controller.abort(), 5000);
+        
+        // Fetch the root of the REST API to check reachability
+        const response = await fetch(`${supabaseUrl}/rest/v1/`, { 
+          signal: controller.signal,
+          headers: { 'apikey': supabaseKey }
+        });
+        clearTimeout(id);
+        
+        if (!response.ok) {
+           console.warn('Supabase connectivity check returned non-OK status:', response.status);
+        } else {
+           console.log('Supabase is reachable.');
+        }
+      } catch (netErr) {
+        console.error('Failed to reach Supabase server:', netErr);
+        this.showError(`Cannot reach server at ${supabaseUrl}. Check Firewall/Wi-Fi.`);
+        return;
+      }
+
+      // Sign in anonymously to get an auth.uid()
+      console.log('Signing in anonymously...');
+      const { data: authData, error: authError } = await this.supabase.auth.signInAnonymously();
+      if (authError) {
+        const msg = `Failed to sign in anonymously: ${authError.message}`;
+        console.error(msg, authError);
+        this.showError(msg);
+        return;
+      }
+      console.log('Signed in anonymously', authData.user.id);
+
+      this.network = new Network();
+      // Use the authenticated user's ID as the player ID
+      this.network.initialize(this.supabase, authData.user.id);
+      this.setupNetworkHandlers();
+
+      console.log('App initialization complete');
+    } catch (err) {
+      console.error('Error during app initialization:', err);
+      this.showError(`Initialization error: ${err.message}`);
+    }
   }
 
-  setupLobbyHandlers() {
+  setupHandlers() {
+    console.log('Setting up handlers...');
     const hostBtn = document.getElementById('host-game-btn');
     const joinBtn = document.getElementById('join-game-btn');
+    const startBtn = document.getElementById('start-game-btn');
+    const leaveBtn = document.getElementById('leave-lobby-btn');
 
     if (hostBtn) {
       hostBtn.addEventListener('click', () => this.hostGame());
@@ -56,9 +146,35 @@ class App {
     if (joinBtn) {
       joinBtn.addEventListener('click', () => this.joinGame());
     }
+
+    if (startBtn) {
+      startBtn.addEventListener('click', () => this.handleStartGame());
+    }
+
+    if (leaveBtn) {
+      leaveBtn.addEventListener('click', () => this.leaveGame());
+    }
   }
 
-  showLobbyError(message) {
+  setupNetworkHandlers() {
+    this.network.on('player_joined', (payload) => {
+      console.log('Player joined:', payload.data.player.player_name);
+      this.ui.updatePlayerList(payload.data.allPlayers, this.network.isHost);
+    });
+
+    this.network.on('game_start', () => {
+      console.log('Game starting signal received');
+      this.startGame();
+    });
+
+    this.network.on('match_end', (payload) => {
+      console.log('Match ended');
+      this.stopGameLoop();
+      this.ui.showLobby('Match Ended', payload.data.summary);
+    });
+  }
+
+  showError(message) {
     const errorElement = document.getElementById('lobby-error');
     if (errorElement) {
       errorElement.textContent = message;
@@ -70,7 +186,7 @@ class App {
     }
   }
 
-  hideLobbyError() {
+  hideError() {
     const errorElement = document.getElementById('lobby-error');
     if (errorElement) {
       errorElement.classList.add('hidden');
@@ -79,16 +195,23 @@ class App {
 
   async hostGame() {
     console.log('Hosting game...');
-    this.hideLobbyError();
+    this.hideError();
+
+    if (!this.network) {
+      this.showError('Network not initialized. Please wait or refresh.');
+      return;
+    }
+
     try {
       const playerName = `Host-${Math.random().toString(36).substr(2, 5)}`;
-      const { session } = await this.network.hostGame(playerName);
+      const { session, player } = await this.network.hostGame(playerName);
+      
       this.ui.showJoinCode(session.join_code);
-      this.network.startPositionBroadcasting();
-      this.startGame();
+      this.ui.updatePlayerList([player], true);
+      this.ui.showLobby('Game Lobby');
     } catch (error) {
       console.error('Failed to host game:', error);
-      this.showLobbyError(`Error hosting game: ${error.message}`);
+      this.showError(`Error hosting game: ${error.message}`);
     }
   }
 
@@ -96,32 +219,54 @@ class App {
     const joinCodeInput = document.getElementById('join-code-input');
     const joinCode = joinCodeInput?.value.trim().toUpperCase();
 
-    this.hideLobbyError();
+    this.hideError();
 
     if (!joinCode) {
-      this.showLobbyError('Please enter a join code');
+      this.showError('Please enter a join code');
+      return;
+    }
+
+    if (!this.network) {
+      this.showError('Network not initialized. Please wait or refresh.');
       return;
     }
 
     // Validate join code format (6 alphanumeric characters)
     if (!/^[A-Z0-9]{6}$/.test(joinCode)) {
-      this.showLobbyError('Please enter a valid 6-character join code');
+      this.showError('Please enter a valid 6-character join code');
       return;
     }
 
     console.log('Joining game with code:', joinCode);
     try {
       const playerName = `Player-${Math.random().toString(36).substr(2, 5)}`;
-      await this.network.joinGame(joinCode, playerName);
-      this.startGame();
+      const data = await this.network.joinGame(joinCode, playerName);
+      
+      this.ui.showJoinCode(joinCode);
+      this.ui.updatePlayerList(data.allPlayers, false);
+      this.ui.showLobby('Game Lobby');
     } catch (error) {
       console.error('Failed to join game:', error);
-      this.showLobbyError(`Error joining game: ${error.message}`);
+      this.showError(`Error joining game: ${error.message}`);
     }
   }
 
+  handleStartGame() {
+    if (!this.network.isHost) return;
+
+    console.log('Host starting game...');
+    this.network.send('game_start', {});
+    this.startGame();
+  }
+
+  leaveGame() {
+    console.log('Leaving game...');
+    this.stopGame();
+    this.ui.showScreen('intro');
+  }
+
   startGame() {
-    console.log('Starting game...');
+    console.log('Entering game screen...');
 
     // Switch to game screen
     this.ui.showScreen('game');
@@ -147,6 +292,10 @@ class App {
       }
     });
 
+    if (this.network.isHost) {
+      this.network.startPositionBroadcasting();
+    }
+
     // Start game loop
     this.running = true;
     this.lastTimestamp = performance.now();
@@ -170,7 +319,7 @@ class App {
     this.animationFrameId = requestAnimationFrame((timestamp) => this.gameLoop(timestamp));
   }
 
-  stopGame() {
+  stopGameLoop() {
     this.running = false;
     if (this.animationFrameId) {
       cancelAnimationFrame(this.animationFrameId);
@@ -181,6 +330,12 @@ class App {
     }
     if (this.network) {
       this.network.stopPositionBroadcasting();
+    }
+  }
+
+  stopGame() {
+    this.stopGameLoop();
+    if (this.network) {
       this.network.disconnect();
     }
   }

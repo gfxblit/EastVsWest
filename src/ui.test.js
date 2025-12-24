@@ -11,17 +11,23 @@ describe('UI', () => {
   beforeEach(() => {
     // Set up DOM elements
     document.body.innerHTML = `
+      <div id="intro-screen" class="screen"></div>
       <div id="lobby-screen" class="screen"></div>
       <div id="game-screen" class="screen"></div>
-      <div id="game-over-screen" class="screen"></div>
-      <div id="join-code-display" class="hidden">
-        <span id="join-code"></span>
+      <div id="lobby-title"></div>
+      <div id="match-summary-container" class="hidden">
+        <div id="match-summary"></div>
       </div>
+      <div id="join-code"></div>
+      <ul id="player-list"></ul>
+      <button id="start-game-btn" class="hidden"></button>
+      <p id="waiting-msg"></p>
       <div id="health-bar" style="width: 100%;"></div>
       <div id="equipment-display"></div>
       <div id="zone-warning" class="hidden"></div>
-      <div id="game-result"></div>
-      <div id="match-summary"></div>
+      <div id="spectator-controls" class="hidden">
+        <span id="spectating-name"></span>
+      </div>
     `;
 
     ui = new UI();
@@ -34,9 +40,9 @@ describe('UI', () => {
   describe('Constructor', () => {
     test('WhenConstructed_ShouldInitializeScreensObject', () => {
       expect(ui.screens).toBeDefined();
+      expect(ui.screens.intro).toBeNull();
       expect(ui.screens.lobby).toBeNull();
       expect(ui.screens.game).toBeNull();
-      expect(ui.screens.gameOver).toBeNull();
     });
   });
 
@@ -44,15 +50,20 @@ describe('UI', () => {
     test('WhenInitialized_ShouldFindAllScreenElements', () => {
       ui.init();
 
+      expect(ui.screens.intro).toBe(document.getElementById('intro-screen'));
       expect(ui.screens.lobby).toBe(document.getElementById('lobby-screen'));
       expect(ui.screens.game).toBe(document.getElementById('game-screen'));
-      expect(ui.screens.gameOver).toBe(document.getElementById('game-over-screen'));
     });
   });
 
   describe('showScreen', () => {
     beforeEach(() => {
       ui.init();
+    });
+
+    test('WhenShowingIntroScreen_ShouldAddActiveClass', () => {
+      ui.showScreen('intro');
+      expect(ui.screens.intro.classList.contains('active')).toBe(true);
     });
 
     test('WhenShowingLobbyScreen_ShouldAddActiveClass', () => {
@@ -65,24 +76,15 @@ describe('UI', () => {
       expect(ui.screens.game.classList.contains('active')).toBe(true);
     });
 
-    test('WhenShowingGameOverScreen_ShouldAddActiveClass', () => {
-      ui.showScreen('gameOver');
-      expect(ui.screens.gameOver.classList.contains('active')).toBe(true);
-    });
-
     test('WhenShowingNewScreen_ShouldHideOtherScreens', () => {
-      ui.screens.lobby.classList.add('active');
+      ui.screens.intro.classList.add('active');
       ui.screens.game.classList.add('active');
 
-      ui.showScreen('gameOver');
+      ui.showScreen('lobby');
 
-      expect(ui.screens.lobby.classList.contains('active')).toBe(false);
+      expect(ui.screens.intro.classList.contains('active')).toBe(false);
       expect(ui.screens.game.classList.contains('active')).toBe(false);
-      expect(ui.screens.gameOver.classList.contains('active')).toBe(true);
-    });
-
-    test('WhenInvalidScreenName_ShouldNotThrowError', () => {
-      expect(() => ui.showScreen('invalid')).not.toThrow();
+      expect(ui.screens.lobby.classList.contains('active')).toBe(true);
     });
   });
 
@@ -93,17 +95,74 @@ describe('UI', () => {
       const joinCodeElement = document.getElementById('join-code');
       expect(joinCodeElement.textContent).toBe('ABC123');
     });
+  });
 
-    test('WhenJoinCodeProvided_ShouldRemoveHiddenClass', () => {
-      ui.showJoinCode('ABC123');
+  describe('updatePlayerList', () => {
+    test('WhenPlayersProvided_ShouldUpdateList', () => {
+      const players = [
+        { player_name: 'Player 1', is_host: true },
+        { player_name: 'Player 2', is_host: false }
+      ];
+      ui.updatePlayerList(players, true);
 
-      const joinCodeDisplay = document.getElementById('join-code-display');
-      expect(joinCodeDisplay.classList.contains('hidden')).toBe(false);
+      const playerList = document.getElementById('player-list');
+      expect(playerList.children.length).toBe(2);
+      expect(playerList.children[0].textContent).toContain('Player 1 (Host)');
     });
 
-    test('WhenElementsNotFound_ShouldNotThrowError', () => {
-      document.body.innerHTML = '';
-      expect(() => ui.showJoinCode('ABC123')).not.toThrow();
+    test('WhenIsHost_ShouldShowStartButton', () => {
+      ui.updatePlayerList([], true);
+
+      const startBtn = document.getElementById('start-game-btn');
+      const waitingMsg = document.getElementById('waiting-msg');
+      expect(startBtn.classList.contains('hidden')).toBe(false);
+      expect(waitingMsg.classList.contains('hidden')).toBe(true);
+    });
+
+    test('WhenIsNotHost_ShouldShowWaitingMessage', () => {
+      ui.updatePlayerList([], false);
+
+      const startBtn = document.getElementById('start-game-btn');
+      const waitingMsg = document.getElementById('waiting-msg');
+      expect(startBtn.classList.contains('hidden')).toBe(true);
+      expect(waitingMsg.classList.contains('hidden')).toBe(false);
+    });
+  });
+
+  describe('showLobby', () => {
+    beforeEach(() => {
+      ui.init();
+    });
+
+    test('WhenCalled_ShouldSetTitle', () => {
+      ui.showLobby('New Title');
+      expect(document.getElementById('lobby-title').textContent).toBe('New Title');
+    });
+
+    test('WhenSummaryProvided_ShouldShowSummary', () => {
+      ui.showLobby('Lobby', 'Match summary');
+      expect(document.getElementById('match-summary-container').classList.contains('hidden')).toBe(false);
+      expect(document.getElementById('match-summary').textContent).toBe('Match summary');
+    });
+
+    test('WhenNoSummary_ShouldHideSummary', () => {
+      document.getElementById('match-summary-container').classList.remove('hidden');
+      ui.showLobby('Lobby', null);
+      expect(document.getElementById('match-summary-container').classList.contains('hidden')).toBe(true);
+    });
+  });
+
+  describe('showSpectatorControls', () => {
+    test('WhenSpectating_ShouldShowControlsAndName', () => {
+      ui.showSpectatorControls(true, 'TestPlayer');
+      expect(document.getElementById('spectator-controls').classList.contains('hidden')).toBe(false);
+      expect(document.getElementById('spectating-name').textContent).toBe('TestPlayer');
+    });
+
+    test('WhenNotSpectating_ShouldHideControls', () => {
+      document.getElementById('spectator-controls').classList.remove('hidden');
+      ui.showSpectatorControls(false);
+      expect(document.getElementById('spectator-controls').classList.contains('hidden')).toBe(true);
     });
   });
 
@@ -229,52 +288,6 @@ describe('UI', () => {
     test('WhenZoneWarningNotFound_ShouldNotThrowError', () => {
       document.body.innerHTML = '';
       expect(() => ui.showZoneWarning(true)).not.toThrow();
-    });
-  });
-
-  describe('showGameOver', () => {
-    beforeEach(() => {
-      ui.init();
-    });
-
-    test('WhenCalled_ShouldSetGameResult', () => {
-      ui.showGameOver('Victory!', 'You won the match');
-
-      const gameResult = document.getElementById('game-result');
-      expect(gameResult.textContent).toBe('Victory!');
-    });
-
-    test('WhenCalled_ShouldSetMatchSummary', () => {
-      const summary = '<p>Kills: 5</p>';
-      ui.showGameOver('Victory!', summary);
-
-      const matchSummary = document.getElementById('match-summary');
-      expect(matchSummary.children.length).toBeGreaterThan(0);
-    });
-
-    test('WhenCalled_ShouldShowGameOverScreen', () => {
-      ui.showGameOver('Victory!', 'Summary');
-
-      expect(ui.screens.gameOver.classList.contains('active')).toBe(true);
-    });
-
-    test('WhenResultElementNotFound_ShouldNotThrowError', () => {
-      document.getElementById('game-result').remove();
-      expect(() => ui.showGameOver('Victory!', 'Summary')).not.toThrow();
-    });
-
-    test('WhenSummaryElementNotFound_ShouldNotThrowError', () => {
-      document.getElementById('match-summary').remove();
-      expect(() => ui.showGameOver('Victory!', 'Summary')).not.toThrow();
-    });
-
-    test('WhenSummaryContainsHTML_ShouldRenderHTML', () => {
-      const summary = '<p>Kills: <strong>5</strong></p>';
-      ui.showGameOver('Victory!', summary);
-
-      const matchSummary = document.getElementById('match-summary');
-      expect(matchSummary.querySelector('strong')).not.toBeNull();
-      expect(matchSummary.querySelector('strong').textContent).toBe('5');
     });
   });
 });

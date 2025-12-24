@@ -191,6 +191,42 @@ describe('Network Module Integration with Supabase', () => {
     await playerClient.auth.signOut();
   });
 
+  test('host should receive player_joined event locally when a player joins', async () => {
+    // Host creates a session
+    const hostName = 'HostPlayer';
+    const { session: hostSession, player: hostPlayerRecord } = await network.hostGame(hostName);
+    testSessionId = hostSession.id;
+    const joinCode = hostSession.join_code;
+
+    // Set up listener for player_joined on the host
+    const hostPlayerJoinedEvents = [];
+    network.on('player_joined', (payload) => {
+      hostPlayerJoinedEvents.push(payload);
+    });
+
+    // Create a new player and join
+    const playerClient = createClient(supabaseUrl, supabaseAnonKey);
+    const { data: playerAuthData } = await playerClient.auth.signInAnonymously();
+    const playerNetwork = new Network();
+    playerNetwork.initialize(playerClient, playerAuthData.user.id);
+
+    const playerName = 'TestPlayer';
+    await playerNetwork.joinGame(joinCode, playerName);
+
+    // Wait for event to propagate
+    await new Promise(resolve => setTimeout(resolve, 200));
+
+    // Verify host received the player_joined event
+    expect(hostPlayerJoinedEvents.length).toBeGreaterThan(0);
+    const joinEvent = hostPlayerJoinedEvents[0];
+    expect(joinEvent.data.player.player_name).toBe(playerName);
+    expect(joinEvent.data.allPlayers).toHaveLength(2); // Host + new player
+
+    // Clean up
+    playerNetwork.disconnect();
+    await playerClient.auth.signOut();
+  });
+
   describe('Position Updates (Client-Authoritative Movement)', () => {
     test('should send position updates from client to host and broadcast to all clients', async () => {
       // Host creates a session
