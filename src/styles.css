@@ -6,8 +6,8 @@
 
 body {
   font-family: 'Courier New', monospace;
-  background-color: #1a1a1a;
-  color: #f0f0f0;
+  background-color: #2d1b00;
+  color: #f4e8c1;
   display: flex;
   justify-content: center;
   align-items: center;
@@ -57,7 +57,7 @@ body {
   left: 0;
   right: 0;
   bottom: 0;
-  background-color: rgba(0, 0, 0, 0.4);
+  background-color: rgba(45, 27, 0, 0.5);
   z-index: 0;
 }
 
@@ -70,13 +70,13 @@ body {
 #intro-screen h1, #lobby-screen h2 {
   font-size: 2.5rem;
   margin-bottom: 2rem;
-  color: #fff;
+  color: #f4e8c1;
   text-shadow:
-    3px 3px 0px #000,
-    -1px -1px 0px #000,
-    1px -1px 0px #000,
-    -1px 1px 0px #000,
-    1px 1px 0px #000;
+    3px 3px 0px #3d2817,
+    -1px -1px 0px #3d2817,
+    1px -1px 0px #3d2817,
+    -1px 1px 0px #3d2817,
+    1px 1px 0px #3d2817;
   font-weight: bold;
   letter-spacing: 2px;
 }
@@ -89,36 +89,49 @@ button {
   padding: 1rem 2rem;
   font-size: 1.2rem;
   margin: 0.5rem;
-  background-color: #4ecdc4;
-  border: 3px solid #000;
-  color: #000;
+  background: linear-gradient(to bottom, #7fb069 0%, #5a8f4f 100%);
+  border: 4px solid #3d2817;
+  border-radius: 8px;
+  color: #f4e8c1;
   cursor: pointer;
   font-weight: bold;
   transition: all 0.1s;
-  text-shadow: none;
-  box-shadow: 4px 4px 0px #000;
+  text-shadow: 2px 2px 0px #2d1b00;
+  box-shadow:
+    inset 0 2px 0 rgba(255, 255, 255, 0.3),
+    inset 0 -2px 0 rgba(0, 0, 0, 0.3),
+    0 4px 0 #2d1b00,
+    0 6px 8px rgba(0, 0, 0, 0.3);
   position: relative;
   font-family: 'Courier New', monospace;
 }
 
 button:hover {
-  background-color: #45b8b0;
-  transform: translate(2px, 2px);
-  box-shadow: 2px 2px 0px #000;
+  background: linear-gradient(to bottom, #8bc474 0%, #65a058 100%);
+  transform: translate(0px, 2px);
+  box-shadow:
+    inset 0 2px 0 rgba(255, 255, 255, 0.3),
+    inset 0 -2px 0 rgba(0, 0, 0, 0.3),
+    0 2px 0 #2d1b00,
+    0 4px 6px rgba(0, 0, 0, 0.3);
 }
 
 button:active {
-  transform: translate(4px, 4px);
-  box-shadow: 0px 0px 0px #000;
+  transform: translate(0px, 4px);
+  box-shadow:
+    inset 0 2px 0 rgba(0, 0, 0, 0.2),
+    inset 0 -2px 0 rgba(255, 255, 255, 0.1),
+    0 0px 0 #2d1b00,
+    0 2px 4px rgba(0, 0, 0, 0.2);
 }
 
 #leave-lobby-btn {
-  background-color: #ff6b6b;
-  color: #fff;
+  background: linear-gradient(to bottom, #c86a5a 0%, #a84a3d 100%);
+  color: #f4e8c1;
 }
 
 #leave-lobby-btn:hover {
-  background-color: #ee5253;
+  background: linear-gradient(to bottom, #d47565 0%, #b85548 100%);
 }
 
 .join-game {
@@ -129,52 +142,70 @@ button:active {
   padding: 0.75rem;
   font-size: 1rem;
   margin-right: 0.5rem;
-  background-color: #fff;
-  border: 3px solid #000;
-  color: #000;
+  background-color: #f4e8c1;
+  border: 4px solid #3d2817;
+  border-radius: 8px;
+  color: #3d2817;
   font-family: 'Courier New', monospace;
   font-weight: bold;
-  box-shadow: 4px 4px 0px #000;
+  box-shadow:
+    inset 2px 2px 4px rgba(0, 0, 0, 0.2),
+    0 4px 0 #2d1b00;
 }
 
 #join-code-input::placeholder {
-  color: #666;
+  color: #8b7355;
 }
 
 #join-code-display {
   margin: 1rem auto;
-  padding: 1rem;
-  background-color: #fff;
-  border: 3px solid #000;
+  padding: 1.5rem;
+  background: linear-gradient(to bottom, #d4a574 0%, #b8865a 100%);
+  border: 5px solid #3d2817;
+  border-radius: 12px;
   max-width: 300px;
-  box-shadow: 6px 6px 0px #000;
+  box-shadow:
+    inset 0 3px 0 rgba(255, 255, 255, 0.3),
+    inset 0 -3px 0 rgba(0, 0, 0, 0.3),
+    0 6px 0 #2d1b00,
+    0 8px 12px rgba(0, 0, 0, 0.4);
 }
 
 #join-code-display p {
-  color: #000;
+  color: #f4e8c1;
   font-weight: bold;
-  margin: 0;
+  margin: 0 0 0.5rem 0;
+  text-shadow: 2px 2px 0px #3d2817;
 }
 
 #join-code-display strong {
-  color: #ff6b6b;
-  font-size: 1.8rem;
-  letter-spacing: 4px;
+  color: #fff5d6;
+  font-size: 2rem;
+  letter-spacing: 6px;
+  text-shadow: 3px 3px 0px #3d2817;
+  display: block;
+  margin-top: 0.5rem;
 }
 
 #player-list-container {
   margin: 2rem auto;
   max-width: 400px;
-  background-color: #fff;
-  padding: 1rem;
-  border: 3px solid #000;
-  box-shadow: 6px 6px 0px #000;
+  background: linear-gradient(to bottom, #d4a574 0%, #b8865a 100%);
+  padding: 1.5rem;
+  border: 5px solid #3d2817;
+  border-radius: 12px;
+  box-shadow:
+    inset 0 3px 0 rgba(255, 255, 255, 0.3),
+    inset 0 -3px 0 rgba(0, 0, 0, 0.3),
+    0 6px 0 #2d1b00,
+    0 8px 12px rgba(0, 0, 0, 0.4);
 }
 
 #player-list-container h3 {
-  color: #000;
+  color: #f4e8c1;
   margin: 0 0 1rem 0;
-  text-shadow: none;
+  text-shadow: 2px 2px 0px #3d2817;
+  font-size: 1.4rem;
 }
 
 #player-list {
@@ -184,58 +215,75 @@ button:active {
 }
 
 #player-list li {
-  padding: 0.5rem;
-  border-bottom: 2px solid #ccc;
-  color: #000;
+  padding: 0.75rem;
+  margin: 0.5rem 0;
+  background-color: rgba(61, 40, 23, 0.3);
+  border: 2px solid #3d2817;
+  border-radius: 6px;
+  color: #f4e8c1;
   font-weight: bold;
+  text-shadow: 1px 1px 0px #2d1b00;
 }
 
 #player-list li:last-child {
-  border-bottom: none;
+  border-bottom: 2px solid #3d2817;
 }
 
 #match-summary-container {
   margin-bottom: 2rem;
-  padding: 1rem;
-  background-color: #fff;
-  border: 3px solid #000;
-  box-shadow: 6px 6px 0px #000;
+  padding: 1.5rem;
+  background: linear-gradient(to bottom, #d4a574 0%, #b8865a 100%);
+  border: 5px solid #3d2817;
+  border-radius: 12px;
+  box-shadow:
+    inset 0 3px 0 rgba(255, 255, 255, 0.3),
+    inset 0 -3px 0 rgba(0, 0, 0, 0.3),
+    0 6px 0 #2d1b00,
+    0 8px 12px rgba(0, 0, 0, 0.4);
 }
 
 #match-summary-container h3 {
-  color: #ff6b6b;
+  color: #ffd700;
   margin: 0 0 1rem 0;
-  text-shadow: none;
+  text-shadow: 2px 2px 0px #3d2817;
 }
 
 #match-summary {
-  color: #000;
+  color: #f4e8c1;
+  text-shadow: 1px 1px 0px #3d2817;
 }
 
 #controls-info {
   margin-top: 2rem;
-  padding: 1rem;
-  background-color: #fff;
-  border: 3px solid #000;
-  box-shadow: 6px 6px 0px #000;
+  padding: 1.5rem;
+  background: linear-gradient(to bottom, #d4a574 0%, #b8865a 100%);
+  border: 5px solid #3d2817;
+  border-radius: 12px;
+  box-shadow:
+    inset 0 3px 0 rgba(255, 255, 255, 0.3),
+    inset 0 -3px 0 rgba(0, 0, 0, 0.3),
+    0 6px 0 #2d1b00,
+    0 8px 12px rgba(0, 0, 0, 0.4);
   max-width: 600px;
   margin-left: auto;
   margin-right: auto;
 }
 
 #controls-info h3 {
-  color: #000;
+  color: #f4e8c1;
   margin-bottom: 1rem;
-  text-shadow: none;
+  text-shadow: 2px 2px 0px #3d2817;
 }
 
 #controls-info p {
   margin: 0.5rem 0;
-  color: #000;
+  color: #f4e8c1;
+  text-shadow: 1px 1px 0px #3d2817;
 }
 
 #controls-info strong {
-  color: #ff6b6b;
+  color: #7fb069;
+  text-shadow: 1px 1px 0px #2d1b00;
 }
 
 /* Game Screen */
@@ -323,11 +371,17 @@ button:active {
 .error-message {
   margin-top: 1rem;
   padding: 1rem;
-  background-color: #ff6b6b;
-  color: #fff;
-  border: 3px solid #000;
-  box-shadow: 6px 6px 0px #000;
+  background: linear-gradient(to bottom, #c86a5a 0%, #a84a3d 100%);
+  color: #f4e8c1;
+  border: 4px solid #3d2817;
+  border-radius: 8px;
+  box-shadow:
+    inset 0 2px 0 rgba(255, 255, 255, 0.2),
+    inset 0 -2px 0 rgba(0, 0, 0, 0.3),
+    0 4px 0 #2d1b00,
+    0 6px 8px rgba(0, 0, 0, 0.4);
   font-weight: bold;
+  text-shadow: 2px 2px 0px #2d1b00;
   animation: slideIn 0.3s ease-out;
   max-width: 400px;
   margin-left: auto;
@@ -357,13 +411,17 @@ button:active {
 
 /* Lobby-specific styles */
 #waiting-msg {
-  color: #fff;
+  color: #f4e8c1;
   font-size: 1.2rem;
   font-weight: bold;
   text-shadow:
-    2px 2px 0px #000,
-    -1px -1px 0px #000,
-    1px -1px 0px #000,
-    -1px 1px 0px #000;
+    2px 2px 0px #3d2817,
+    -1px -1px 0px #3d2817,
+    1px -1px 0px #3d2817,
+    -1px 1px 0px #3d2817;
   padding: 1rem;
+  background-color: rgba(61, 40, 23, 0.6);
+  border-radius: 8px;
+  display: inline-block;
+  margin: 1rem 0;
 }
