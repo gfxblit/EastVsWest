@@ -41,37 +41,116 @@ class App {
   }
 
   async init() {
-    this.supabase = createClient(import.meta.env.VITE_SUPABASE_URL, import.meta.env.VITE_SUPABASE_ANON_KEY);
-
-    // Sign in anonymously to get an auth.uid()
-    const { data: authData, error: authError } = await this.supabase.auth.signInAnonymously();
-    if (authError) {
-      console.error('Failed to sign in anonymously:', authError);
-      return;
-    }
-
-    this.network = new Network();
-    // Use the authenticated user's ID as the player ID
-    this.network.initialize(this.supabase, authData.user.id);
-
-    // Initialize UI
+    console.log('App initializing...');
+    
+    // Initialize UI first so we can show errors/interact
     this.ui = new UI();
     this.ui.init();
-
-    // Set up lobby event handlers
     this.setupLobbyHandlers();
+
+    try {
+      console.log('Creating Supabase client...');
+      let supabaseUrl = import.meta.env.VITE_SUPABASE_URL;
+      let supabaseKey = import.meta.env.VITE_SUPABASE_ANON_KEY;
+      
+      // Dynamic URL construction for development to support Tailscale/LAN/Localhost seamlessly
+      if (import.meta.env.DEV) {
+        const currentHost = window.location.hostname;
+        console.log(`Development mode detected. Current hostname: ${currentHost}`);
+        
+        // If we are on a custom hostname (like Tailscale or LAN IP), try to use that for the backend too
+        // This assumes the backend is running on port 54321 on the same machine
+        if (currentHost !== 'localhost' && currentHost !== '127.0.0.1') {
+            const dynamicUrl = `http://${currentHost}:54321`;
+            console.log(`Overriding VITE_SUPABASE_URL to match hostname: ${dynamicUrl}`);
+            supabaseUrl = dynamicUrl;
+        }
+      }
+
+      // Fallback for local development if env vars are missing
+      if ((!supabaseUrl || !supabaseKey) && import.meta.env.DEV) {
+        console.warn('Supabase credentials missing in env, falling back to local defaults');
+        supabaseUrl = 'http://127.0.0.1:54321';
+        // Default local Supabase Anon Key
+        supabaseKey = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZS1kZW1vIiwicm9sZSI6ImFub24iLCJleHAiOjE5ODM4MTI5OTZ9.CRXP1A7WOeoJeXxjNni43kdQwgnWNReilDMblYTn_I0';
+      }
+      
+      if (!supabaseUrl || !supabaseKey) {
+        const msg = 'Missing Supabase credentials in environment variables';
+        console.error(msg);
+        this.showLobbyError(msg);
+        return;
+      }
+
+      this.supabase = createClient(supabaseUrl, supabaseKey);
+
+      // Diagnostic: Check if we can actually reach the Supabase server
+      console.log(`Testing connectivity to ${supabaseUrl}...`);
+      try {
+        // Shorter timeout for the connectivity check
+        const controller = new AbortController();
+        const id = setTimeout(() => controller.abort(), 5000);
+        
+        // Fetch the root of the REST API to check reachability
+        const response = await fetch(`${supabaseUrl}/rest/v1/`, { 
+          signal: controller.signal,
+          headers: { 'apikey': supabaseKey }
+        });
+        clearTimeout(id);
+        
+        if (!response.ok) {
+           console.warn('Supabase connectivity check returned non-OK status:', response.status);
+        } else {
+           console.log('Supabase is reachable.');
+        }
+      } catch (netErr) {
+        console.error('Failed to reach Supabase server:', netErr);
+        this.showLobbyError(`Cannot reach server at ${supabaseUrl}. Check Firewall/Wi-Fi.`);
+        return;
+      }
+
+      // Sign in anonymously to get an auth.uid()
+      console.log('Signing in anonymously...');
+      const { data: authData, error: authError } = await this.supabase.auth.signInAnonymously();
+      if (authError) {
+        const msg = `Failed to sign in anonymously: ${authError.message}`;
+        console.error(msg, authError);
+        this.showLobbyError(msg);
+        return;
+      }
+      console.log('Signed in anonymously', authData.user.id);
+
+      this.network = new Network();
+      // Use the authenticated user's ID as the player ID
+      this.network.initialize(this.supabase, authData.user.id);
+
+      console.log('App initialization complete');
+    } catch (err) {
+      console.error('Error during app initialization:', err);
+      this.showLobbyError(`Initialization error: ${err.message}`);
+    }
   }
 
   setupLobbyHandlers() {
+    console.log('Setting up lobby handlers...');
     const hostBtn = document.getElementById('host-game-btn');
     const joinBtn = document.getElementById('join-game-btn');
 
     if (hostBtn) {
-      hostBtn.addEventListener('click', () => this.hostGame());
+      console.log('Host button found, attaching listener');
+      hostBtn.addEventListener('click', () => {
+        console.log('Host button clicked');
+        this.hostGame();
+      });
+    } else {
+      console.error('Host button not found');
     }
 
     if (joinBtn) {
+      console.log('Join button found, attaching listener');
       joinBtn.addEventListener('click', () => this.joinGame());
+    } else {
+      console.error('Join button not found');
     }
   }
 
@@ -97,6 +176,12 @@ class App {
   async hostGame() {
     console.log('Hosting game...');
     this.hideLobbyError();
+
+    if (!this.network) {
+      this.showLobbyError('Network not initialized. Please wait or refresh.');
+      return;
+    }
+
     try {
       const playerName = `Host-${Math.random().toString(36).substr(2, 5)}`;
       const { session } = await this.network.hostGame(playerName);
@@ -117,6 +202,11 @@ class App {
 
     if (!joinCode) {
       this.showLobbyError('Please enter a join code');
+      return;
+    }
+
+    if (!this.network) {
+      this.showLobbyError('Network not initialized. Please wait or refresh.');
       return;
     }
 

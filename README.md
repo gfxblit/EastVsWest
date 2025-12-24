@@ -151,6 +151,26 @@ VITE_SUPABASE_ANON_KEY=eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFz
 
 This file will be automatically loaded by Vite during local development (`npm run dev`).
 
+### Remote Development (LAN / Tailscale)
+To test the game on other devices (like mobile phones) connected to your local network or via [Tailscale](https://tailscale.com/):
+
+1.  **Start the Server:**
+    Run the development server with the `--host` flag to expose it to the network:
+    ```bash
+    npm run dev -- --host
+    ```
+
+2.  **Connect:**
+    The terminal will display your Network URLs (e.g., `http://192.168.1.5:3000` or `http://my-machine.tailnet.ts.net:3000`).
+    Open this URL on your mobile device.
+
+3.  **Automatic Backend Configuration:**
+    The application automatically detects the hostname you are using. If you connect via a custom hostname or LAN IP, it will attempt to communicate with the Supabase backend on the **same hostname** at port `54321`.
+    
+    *Example:* If you connect to `http://192.168.1.5:3000`, the app will automatically use `http://192.168.1.5:54321` for the backend API.
+    
+    **Requirement:** Ensure your computer's firewall allows incoming connections on port `54321` (Supabase) and `3000` (Vite).
+
 ### Production Environment
 For the application to connect to Supabase in a production environment, you must provide the necessary credentials via a `.env` file.
 

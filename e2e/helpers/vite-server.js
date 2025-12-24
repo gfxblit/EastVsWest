@@ -23,15 +23,21 @@ export async function startViteServer() {
   return new Promise((resolve, reject) => {
     console.log('Starting Vite dev server...');
 
+    const env = { ...process.env };
+    
+    // Only set VITE_ env vars if they are provided in the process environment.
+    // Otherwise, let Vite load them from .env.local / .env files.
+    if (process.env.SUPABASE_URL) {
+      env.VITE_SUPABASE_URL = process.env.SUPABASE_URL;
+    }
+    if (process.env.SUPABASE_ANON_KEY) {
+      env.VITE_SUPABASE_ANON_KEY = process.env.SUPABASE_ANON_KEY;
+    }
+
     viteProcess = spawn('npm', ['run', 'dev', '--', '--port', String(VITE_PORT), '--strictPort'], {
       cwd: projectRoot,
       stdio: 'pipe',
-      env: {
-        ...process.env,
-        // Set Vite environment variables for testing
-        VITE_SUPABASE_URL: process.env.SUPABASE_URL || 'http://localhost:54321',
-        VITE_SUPABASE_ANON_KEY: process.env.SUPABASE_ANON_KEY || 'test-key'
-      }
+      env
     });
 
     let output = '';

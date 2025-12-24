@@ -155,15 +155,17 @@ export class Network extends EventEmitter {
       },
     });
 
-    return new Promise((resolve) => {
+    return new Promise((resolve, reject) => {
       this.channel
         .on('broadcast', { event: 'message' }, ({ payload }) => {
           this._handleRealtimeMessage(payload);
         })
-        .subscribe((status) => {
+        .subscribe((status, error) => {
           if (status === 'SUBSCRIBED') {
             this.connected = true;
             resolve();
+          } else if (status === 'CHANNEL_ERROR' || status === 'TIMED_OUT') {
+             reject(new Error(`Failed to subscribe to channel: ${status} ${error ? error.message : ''}`));
           }
         });
     });
