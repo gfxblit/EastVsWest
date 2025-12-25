@@ -5,13 +5,14 @@
  * Syncs via database events, ephemeral WebSocket broadcasts, and periodic refreshes.
  */
 export class SessionPlayersSnapshot {
-  constructor(supabaseClient, sessionId, channel) {
+  constructor(supabaseClient, sessionId, channel, options = {}) {
     this.supabaseClient = supabaseClient;
     this.sessionId = sessionId;
     this.channel = channel;
     this.players = new Map(); // Keyed by player_id
     this.refreshInterval = null;
     this.subscriptionReady = null; // Promise that resolves when channel is subscribed and initial fetch is complete
+    this.refreshIntervalMs = options.refreshIntervalMs || 60000; // Default to 60 seconds
 
     // Initialize: fetch snapshot and setup subscriptions
     this.subscriptionReady = this.#initialize();
@@ -165,12 +166,12 @@ export class SessionPlayersSnapshot {
   }
 
   /**
-   * Start periodic snapshot refresh (every 60 seconds)
+   * Start periodic snapshot refresh
    */
   #startPeriodicRefresh() {
     this.refreshInterval = setInterval(() => {
       this.#refreshSnapshot();
-    }, 60000); // 60 seconds
+    }, this.refreshIntervalMs);
   }
 
   /**

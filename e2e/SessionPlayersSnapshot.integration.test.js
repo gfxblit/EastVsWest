@@ -505,10 +505,45 @@ describe('SessionPlayersSnapshot Integration with Supabase', () => {
   });
 
   describe('Periodic Refresh', () => {
-    // Skip this test in integration - periodic refresh is covered by unit tests
-    // E2E tests can't use fake timers to advance time
-    test.skip('should refresh snapshot every 60 seconds and pick up new players', async () => {
-      // This functionality is tested in unit tests with mocked timers
+    test('should refresh snapshot every 5 seconds and pick up new players', async () => {
+      // Create two snapshots with 5-second refresh interval
+      hostSnapshot = new SessionPlayersSnapshot(hostClient, testSessionId, hostChannel, { refreshIntervalMs: 5000 });
+      playerSnapshot = new SessionPlayersSnapshot(playerClient, testSessionId, playerChannel, { refreshIntervalMs: 5000 });
+
+      await Promise.all([hostSnapshot.ready(), playerSnapshot.ready()]);
+
+      // Give the channel subscriptions extra time to fully initialize
+      await new Promise(resolve => setTimeout(resolve, 500));
+
+      // Initially, no players in either snapshot
+      expect(hostSnapshot.getPlayers().size).toBe(0);
+      expect(playerSnapshot.getPlayers().size).toBe(0);
+
+      // Insert a player directly into the database (not using addPlayer)
+      // This simulates an external insertion that both snapshots should pick up via DB events or periodic refresh
+      const { error: insertError } = await playerClient
+        .from('session_players')
+        .insert({
+          session_id: testSessionId,
+          player_id: playerUser.id,
+          player_name: 'NewPlayer',
+          is_host: false,
+        });
+
+      expect(insertError).toBeNull();
+
+      // Wait for either DB event (should be immediate) or periodic refresh (5s) to pick it up
+      // DB events should pick this up within 1 second, but we'll wait longer to also test periodic refresh as a fallback
+      await new Promise(resolve => setTimeout(resolve, 6000));
+
+      // Both snapshots should now have the new player (either from DB event or periodic refresh)
+      expect(hostSnapshot.getPlayers().size).toBe(1);
+      expect(hostSnapshot.getPlayers().has(playerUser.id)).toBe(true);
+      expect(hostSnapshot.getPlayers().get(playerUser.id).player_name).toBe('NewPlayer');
+
+      expect(playerSnapshot.getPlayers().size).toBe(1);
+      expect(playerSnapshot.getPlayers().has(playerUser.id)).toBe(true);
+      expect(playerSnapshot.getPlayers().get(playerUser.id).player_name).toBe('NewPlayer');
     });
   });
 });
