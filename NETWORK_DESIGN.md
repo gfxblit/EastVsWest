@@ -205,21 +205,39 @@ To sync a local copy of the `session_players` Supabase table, we use a **Snapsho
 
 #### Initialization
 - Constructor accepts `supabaseClient`, `sessionId`, and `channel`
-- Auto-fetches initial snapshot **filtered by `sessionId`** on construction
-- Logs warning if initial snapshot fails
+- Initialization is **asynchronous** - both initial snapshot fetch and channel subscription must complete
+- Call `ready()` to wait for initialization to complete before using the snapshot
+- **Important**: Channels must be created with broadcast configuration:
+  ```javascript
+  channel = client.channel('game_session:ABC123', {
+    config: {
+      broadcast: { ack: true }
+    }
+  });
+  ```
 
 #### Public API
+- `ready()` - Returns Promise that resolves when snapshot is initialized and channel is subscribed
 - `getPlayers()` - Returns Map of players **in this session only** (keyed by `player_id`)
 - `addPlayer(playerData)` - Inserts player into DB **with this `sessionId`** and adds to local snapshot
+- `destroy()` - Cleans up resources (clears interval timer, unsubscribes from channel)
 
 #### Synchronization - DB Events (High latency, ~100 ms)
 - **Source:** `session_players` database table (only broadcasted after writing to DB)
 - **Events:** `INSERT`, `DELETE`, `UPDATE`
-- Subscribes to database events **filtered by `session_id`**
+- **IMPORTANT**: Does NOT use Supabase filter parameter - manually filters events in handler
+  - Supabase Realtime filter may not apply correctly to DELETE events
+  - Manual filtering ensures session isolation: `if (sessionId !== this.sessionId) return;`
 - Only processes events for players in this session:
   - `INSERT` → adds player to Map
-  - `DELETE` → removes player from Map
+  - `DELETE` → removes player from Map (see DELETE limitation below)
   - `UPDATE` → updates player in Map
+
+#### DELETE Event Limitation
+**CRITICAL**: Supabase Realtime only sends the primary key (`id`) in DELETE events, not the full record.
+- This is true even with `REPLICA IDENTITY FULL` set on the table
+- DELETE handler must find player by `id` field before deleting from Map by `player_id`
+- Migration `06_set_replica_identity_for_session_players.sql` sets REPLICA IDENTITY FULL for optimal behavior
 
 #### Synchronization - Position Updates (Fast / Ephemeral, ~10 ms)
 - **Source:** WebSocket broadcasts (in memory, not written to disk)
@@ -227,12 +245,19 @@ To sync a local copy of the `session_players` Supabase table, we use a **Snapsho
 - Listens to position update broadcasts on channel
 - Updates player position in Map **only if player exists in this session**
 - Does not write to DB (ephemeral)
+- **Timing**: Allow ~100ms delay after channel subscription before sending position broadcasts
 
 #### Periodic Snapshotting
 - Refreshes snapshot every 60 seconds **querying only this session's players**
 - Query: `SELECT * FROM session_players WHERE session_id = ?`
 - Replaces local Map with fresh results (handles lost broadcasts)
 - Logs error if refresh fails but continues operation
+
+#### Resource Cleanup
+- **CRITICAL**: Call `destroy()` when done to prevent memory leaks and channel conflicts
+- Destroy clears the periodic refresh interval
+- Destroy unsubscribes from the channel (prevents timeout errors in subsequent channel subscriptions)
+- Test cleanup should wait ~100-300ms after destroy before removing channels
 
 #### Error Handling
 - Logs errors for failed operations
@@ -1033,4 +1058,20 @@ CREATE POLICY "Host can evict players"
   );
 
 -- Similar policies for session_items and session_events
+```
+
+### Database Migrations
+
+#### REPLICA IDENTITY for session_players
+**Migration**: `06_set_replica_identity_for_session_players.sql`
+
+Sets `REPLICA IDENTITY FULL` on the `session_players` table to ensure DELETE events include full record data:
+
+```sql
+ALTER TABLE public.session_players REPLICA IDENTITY FULL;
+```
+
+**Note**: Despite this setting, Supabase Realtime still only sends the primary key (`id`) in DELETE events. The `SessionPlayersSnapshot` implementation accounts for this limitation by looking up players by `id` before deleting by `player_id`.
+
+This migration is required for proper DELETE event handling in real-time synchronization.
 ```

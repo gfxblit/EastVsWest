@@ -12,6 +12,7 @@ This directory contains end-to-end (E2E) tests for Conflict Zone: East vs West u
 
 ### Integration Tests (Real Supabase)
 - `network.integration.test.js` - Network communication with real Supabase instance
+- `SessionPlayersSnapshot.integration.test.js` - Real-time snapshot synchronization with Supabase Realtime
 
 ## Running Tests
 
@@ -30,18 +31,37 @@ HEADLESS=false npm run test:e2e e2e/lobby.test.js
 
 ### Integration Tests with Supabase
 
+**Prerequisites:**
+1. Supabase must be running locally
+2. All migrations must be applied (including `06_set_replica_identity_for_session_players.sql`)
+3. Environment variables must be set
+
 ```bash
-# Start Supabase locally
-supabase start
+# Start Supabase locally (first time)
+npx supabase start
+
+# Or restart with latest migrations
+npx supabase db reset
 
 # Get credentials
-supabase status
+npx supabase status
 
-# Run integration tests with credentials
+# Run all integration tests
 SUPABASE_URL="http://127.0.0.1:54321" \
-SUPABASE_ANON_KEY="your-anon-key" \
-npm run test:e2e e2e/network.integration.test.js
+SUPABASE_ANON_KEY="eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9..." \
+npm run test:e2e
+
+# Run specific integration test
+SUPABASE_URL="http://127.0.0.1:54321" \
+SUPABASE_ANON_KEY="eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9..." \
+npm run test:e2e e2e/SessionPlayersSnapshot.integration.test.js
 ```
+
+**Important Notes:**
+- Integration tests create and clean up their own test data
+- Tests may take 7-10 seconds to run due to real-time synchronization delays
+- Supabase Realtime requires ~100-500ms for event propagation
+- Channel cleanup requires ~100-300ms delay between tests
 
 ## Puppeteer Configuration
 
@@ -108,6 +128,50 @@ npm run test:e2e
 ```
 
 ## Troubleshooting
+
+### Integration Test Issues
+
+#### "TIMED_OUT" or channel subscription failures
+**Cause:** Supabase is not running or channels weren't properly cleaned up
+
+**Solutions:**
+1. Ensure Supabase is running: `npx supabase status`
+2. Restart Supabase: `npx supabase stop && npx supabase start`
+3. Check migrations were applied: `npx supabase db reset`
+
+#### Tests pass individually but fail when run together
+**Cause:** Channel cleanup timing issues between tests
+
+**Solution:** The test suite includes automatic cleanup delays. If still failing:
+- Increase `afterEach` cleanup delay to 500ms
+- Run tests individually to isolate the issue
+
+#### DELETE events not removing players
+**Cause:** Missing `REPLICA IDENTITY FULL` migration
+
+**Solution:**
+```bash
+npx supabase db reset  # Re-applies all migrations
+```
+
+Verify migration was applied:
+```bash
+docker exec supabase_db_EastVsWest psql -U postgres \
+  -c "SELECT relreplident FROM pg_class WHERE relname = 'session_players';"
+```
+Should return `f` (for FULL).
+
+#### Position broadcasts not received
+**Cause:** Channels not configured with broadcast settings
+
+**Solution:** Ensure channels are created with:
+```javascript
+channel = client.channel('game_session:CODE', {
+  config: {
+    broadcast: { ack: true }
+  }
+});
+```
 
 ### "Failed to launch browser"
 
