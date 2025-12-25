@@ -65,13 +65,18 @@ Running the end-to-end tests requires a running Supabase instance.
 #### Resetting the Local Database
 If you modify an existing migration file or encounter issues with the local database state, you will need to reset it. This ensures all migrations are re-applied from a clean state.
 
-To reset the database, run the following commands:
+To reset the database, you can run the provided script:
+```bash
+./supabase/reset.sh
+```
+
+Or run the following commands manually:
 ```bash
 # Stop the Supabase instance and delete all local data
-supabase stop --no-backup
+npx supabase stop --no-backup
 
 # Restart the instance to re-apply all migrations
-supabase start
+npx supabase start
 ```
 
 ## Build Workflow
