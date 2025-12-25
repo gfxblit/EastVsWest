@@ -1,9 +1,5 @@
 # Network Layer Technical Design
 
-**Version:** 1.0
-**Date:** December 18, 2025
-**Status:** Design Specification
-
 ## Table of Contents
 
 1. [Overview](#overview)
@@ -167,80 +163,7 @@ CREATE TABLE session_items (
 CREATE INDEX idx_session_items ON session_items(session_id, is_picked_up);
 ```
 
-#### 4. `session_events`
 
-Event log for debugging and replay functionality (optional but recommended).
-
-```sql
-CREATE TABLE session_events (
-  id BIGSERIAL PRIMARY KEY,
-  session_id UUID NOT NULL REFERENCES game_sessions(id) ON DELETE CASCADE,
-  event_type VARCHAR(50) NOT NULL,
-  event_data JSONB NOT NULL,
-  player_id UUID,
-  created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW()
-);
-
--- Index for querying events by session
-CREATE INDEX idx_session_events ON session_events(session_id, created_at);
-```
-
-### Row Level Security (RLS) Policies
-
-Enable RLS to ensure data isolation between sessions:
-
-```sql
--- Enable RLS
-ALTER TABLE game_sessions ENABLE ROW LEVEL SECURITY;
-ALTER TABLE session_players ENABLE ROW LEVEL SECURITY;
-ALTER TABLE session_items ENABLE ROW LEVEL SECURITY;
-ALTER TABLE session_events ENABLE ROW LEVEL SECURITY;
-
--- Policy: Anyone can read sessions (to join via join code)
-CREATE POLICY "Allow read access to game sessions"
-  ON game_sessions FOR SELECT
-  USING (TRUE);
-
--- Policy: Only host can update session
-CREATE POLICY "Host can update session"
-  ON game_sessions FOR UPDATE
-  USING (auth.uid() = host_id);
-
--- Policy: Players can read player data ONLY for sessions they have joined.
--- This prevents players from scanning the entire table for other active sessions.
-CREATE POLICY "Players can read session players"
-  ON session_players FOR SELECT
-  USING (
-    session_id IN (
-      SELECT s.session_id 
-      FROM session_players s 
-      WHERE s.player_id = auth.uid()
-    )
-  );
-
--- Policy: Players can update their own data.
-CREATE POLICY "Players can update own data"
-  ON session_players FOR UPDATE
-  USING (player_id = auth.uid());
-
--- Policy: Players can self-insert into a session.
--- The Host is responsible for evicting players if the session is full or already started.
-CREATE POLICY "Players can insert themselves"
-  ON session_players FOR INSERT
-  WITH CHECK (player_id = auth.uid());
-
--- Policy: Only the host can delete players (eviction).
-CREATE POLICY "Host can evict players"
-  ON session_players FOR DELETE
-  USING (
-    EXISTS (
-      SELECT 1 FROM game_sessions
-      WHERE id = session_players.session_id AND host_id = auth.uid()
-    )
-  );
-
--- Similar policies for session_items and session_events
-```
 
 ---
 
@@ -272,6 +195,26 @@ All messages follow this base structure:
   data: object           // Message-specific payload
 }
 ```
+## State Management Strategy: Registry + Stream
+
+To sync a local copy of the `session_players` Supabase table, we use a **Snapshot + Broadcast** architecture managed by a `SessionPlayersSnapshot`. `SessionPlayersSnapshot` is scoped to only players in the game session `game_session:{join_code}`. The Player object has the same structure as a record in the `session_players` table. The manager stays in sync via broadcasts and periodically refreshing an entire snapshot of the table (in case broadcasts are lost).
+
+### Broadcast event types
+#### 1. DB record updates (High latency, ~100 ms)
+*   **Source:** `session_players` database table. (only broadcasted after writing to the db)
+*   **Events:** `INSERT`, `DELETE`.
+
+#### 2. Player updates (Fast / Ephemeral, ~10 ms)
+Managed by the `Network` layer feeding into the `SessionPlayersManager`.
+*   **Source:** WebSocket broadcasts. (in memory, not written to disk)
+*   **Events:** High-frequency X/Y updates.
+
+### Periodic snapshotting
+On initialization, each client fetches a snapshot of the table. Broadcasts are "best-effort", so updates may not reach clients. Clients periodically refresh their entire snapshot (every 60s).
+
+### 3. Use-cases
+When the lobby or game renders:
+1.  Iterate through the `SessionPlayersManager.players` list.
 
 #### Message Type Catalog
 
@@ -281,7 +224,6 @@ Joining is **Client-Authoritative** via Database Inserts.
 
 1.  **Join:** Client calls `get_session_by_join_code` RPC to get `session_id`.
 2.  **Insert:** Client performs `INSERT` into `session_players` with their metadata.
-3.  **Listen:** Client subscribes to **Postgres Changes** on the `session_players` table (filtered by `session_id`).
 
 **DB INSERT (Client): `session_players`**
 ```javascript
@@ -296,39 +238,23 @@ Joining is **Client-Authoritative** via Database Inserts.
 **TABLE CHANGE (DB → ALL): `INSERT` / `DELETE` events**
 Supabase Realtime sends these events to all subscribed clients in the session. This is the primary way the lobby list is kept in sync.
 
-#### Lobby Consistency & Realtime Synchronization
+#### Lobby Synchronization
 
-Since broadcast messages are not guaranteed, the lobby uses a **Snapshot + Deltas** pattern to ensure every player has a consistent view:
+We keep the lobby in sync by treating the database as the single source of truth.
 
-1.  **The Snapshot (Source of Truth):** Upon joining, every client performs a standard `SELECT * FROM session_players`. This provides the initial ground truth.
-2.  **The Deltas (Live Updates):** Clients listen to Postgres Change events (`INSERT` and `DELETE`). These events update the local UI state.
-3.  **The Reconciliation (Recovery):** If a client's WebSocket connection drops and reconnects, the client MUST re-fetch the Snapshot (Step 1) to ensure they didn't miss any changes while offline.
-4.  **The Janitor (Host Enforcement):** The Host monitors the table. If multiple clients join simultaneously and exceed `max_players`, the Host deletes the `session_players` rows with the latest `joined_at` timestamps. Clients treat a `DELETE` of their own record as an eviction notice.
+1.  **Initial Sync:**
+    - When a player joins, they run `SELECT * FROM session_players` to get the current list.
 
-**CLIENT → HOST: `player_disconnect`**
-```javascript
-{
-  type: 'player_disconnect',
-  from: 'player_uuid',
-  timestamp: 1703001234567,
-  data: {
-    reason: 'user_initiated' // or 'timeout', 'error'
-  }
-}
-```
+2.  **Live Updates (Postgres Changes):**
+    - All clients subscribe to `INSERT`, `UPDATE`, and `DELETE` events on `session_players`.
+    - **On INSERT:** Add the new player to the lobby list.
+    - **On DELETE:** Remove the player from the lobby list.
+    - **On UPDATE:** Update player details (e.g. ready status).
 
-**HOST → ALL: `player_left`**
-```javascript
-{
-  type: 'player_left',
-  from: 'host_uuid',
-  timestamp: 1703001234567,
-  data: {
-    player_id: 'player_uuid',
-    reason: 'disconnected'
-  }
-}
-```
+3.  **Leaving the Lobby:**
+    - **Graceful Leave:** The client deletes their own row from `session_players`. This triggers a `DELETE` event for everyone else.
+    - **Forced Leave (Kick/Timeout):** The Host deletes the row of a disconnected or kicked player. This also triggers a `DELETE` event.
+    - **No separate "player_left" message is needed.** The DB event handles it.
 
 ##### 2. Movement Messages (Client-Authoritative)
 
@@ -885,8 +811,6 @@ HOST (Every 5 seconds)
 
 ---
 
-## Implementation Considerations
-
 ### Latency & Client Prediction
 
 **Movement**: Clients immediately update their own position locally (client prediction) and send updates to the host. The host's broadcast serves as confirmation and sync point. If the host detects a significant deviation (anti-cheat), it can send a corrective `position_correction` message.
@@ -895,9 +819,8 @@ HOST (Every 5 seconds)
 
 ### Message Rate Limiting
 
-- **Position updates**: Maximum 60 Hz per client (every ~16ms)
+- **Position updates**: Maximum 30 Hz per client (every ~33ms)
 - **Heartbeats**: Every 5 seconds
-- **Host broadcasts**: Batched position updates at 60 Hz, other state changes sent immediately
 
 ### Database vs. Realtime Channel
 
@@ -923,15 +846,6 @@ HOST (Every 5 seconds)
 - Consider delta compression (send only changed values)
 - Add regional database replicas for global players
 
-### State Synchronization for Late Joiners
-
-When a player joins mid-game (if allowed) or reconnects after disconnect:
-
-1. Client sends `join_game` request with join code
-2. Host validates player can join
-3. Host sends `full_state_sync` message to the joining client
-4. Client reconstructs game state from sync data
-5. Client enters game and starts normal message flow
 
 ---
 
@@ -960,37 +874,6 @@ When a player joins mid-game (if allowed) or reconnects after disconnect:
    - Combat calculations done server-side (host)
    - Event logging for post-game analysis
 
-### Error Handling
-
-**Network Errors**:
-- Retry failed database operations (3 attempts with exponential backoff)
-- Client timeout detection (no heartbeat for 15 seconds)
-- Auto-reconnect with state sync for temporary disconnects
-- Graceful degradation if host disconnects (end game, notify all)
-
-**State Desyncs**:
-- Clients can request `full_state_sync` if they detect inconsistencies
-- Host periodically sends `heartbeat` to verify client connections
-- Database serves as source of truth for conflict resolution
-
-**Game Flow Errors**:
-- Validate phase transitions (can't start game from 'ended' state)
-- Validate player counts (can't start with <2 players)
-- Handle edge cases (all players disconnect simultaneously)
-
-### Monitoring & Debugging
-
-**Event Logging**: The `session_events` table provides:
-- Full replay capability
-- Debugging tools for reported issues
-- Anti-cheat analysis
-- Performance metrics
-
-**Health Checks**:
-- Track message latency (timestamp comparison)
-- Monitor connection states (heartbeat tracking)
-- Alert on abnormal patterns (excessive disconnects, message spam)
-
 ---
 
 ## Appendix: Message Flow Diagrams
@@ -1005,7 +888,6 @@ When a player joins mid-game (if allowed) or reconnects after disconnect:
 │          │
 │  Events: │  • DB: session_players (INSERT)
 │          │  • DB: session_players (DELETE)
-│          │  • player_left (broadcast/heartbeat)
 └────┬─────┘
      │
      │ host sends: game_start
@@ -1040,44 +922,64 @@ When a player joins mid-game (if allowed) or reconnects after disconnect:
 │          │  Winner declared
 │          │  Stats displayed
 │  Events: │  • game_end
-│          │  • player_left (cleanup)
 └──────────┘
 ```
 
 ---
 
-## Next Steps for Implementation
+### Row Level Security (RLS) Policies
 
-1. **Phase 1.1**: Supabase Project Setup
-   - Create Supabase project
-   - Run schema SQL scripts
-   - Configure RLS policies
-   - Set up anonymous authentication
+Enable RLS to ensure data isolation between sessions:
 
-2. **Phase 1.2**: Network Module Implementation
-   - Install `@supabase/supabase-js` dependency
-   - Implement `network.js` with Supabase client
-   - Create session management (host/join)
-   - Implement channel subscription
+```sql
+-- Enable RLS
+ALTER TABLE game_sessions ENABLE ROW LEVEL SECURITY;
+ALTER TABLE session_players ENABLE ROW LEVEL SECURITY;
+ALTER TABLE session_items ENABLE ROW LEVEL SECURITY;
+ALTER TABLE session_events ENABLE ROW LEVEL SECURITY;
 
-3. **Phase 1.3**: Message Handlers
-   - Implement message sending/receiving
-   - Create message type handlers
-   - Add position update batching (60 Hz)
+-- Policy: Anyone can read sessions (to join via join code)
+CREATE POLICY "Allow read access to game sessions"
+  ON game_sessions FOR SELECT
+  USING (TRUE);
 
-4. **Phase 1.4**: Integration with Game Logic
-   - Connect `game.js` to network events
-   - Implement client-authoritative movement
-   - Implement host-authoritative interactions
+-- Policy: Only host can update session
+CREATE POLICY "Host can update session"
+  ON game_sessions FOR UPDATE
+  USING (auth.uid() = host_id);
 
-5. **Phase 1.5**: Testing & Validation
-   - Unit tests for network module
-   - Integration tests for message flows
-   - End-to-end tests with multiple clients
-   - Latency and performance testing
+-- Policy: Players can read player data ONLY for sessions they have joined.
+-- This prevents players from scanning the entire table for other active sessions.
+CREATE POLICY "Players can read session players"
+  ON session_players FOR SELECT
+  USING (
+    session_id IN (
+      SELECT s.session_id 
+      FROM session_players s 
+      WHERE s.player_id = auth.uid()
+    )
+  );
 
----
+-- Policy: Players can update their own data.
+CREATE POLICY "Players can update own data"
+  ON session_players FOR UPDATE
+  USING (player_id = auth.uid());
 
-**Document Version**: 1.0
-**Last Updated**: December 18, 2025
-**Status**: Ready for Implementation
+-- Policy: Players can self-insert into a session.
+-- The Host is responsible for evicting players if the session is full or already started.
+CREATE POLICY "Players can insert themselves"
+  ON session_players FOR INSERT
+  WITH CHECK (player_id = auth.uid());
+
+-- Policy: Only the host can delete players (eviction).
+CREATE POLICY "Host can evict players"
+  ON session_players FOR DELETE
+  USING (
+    EXISTS (
+      SELECT 1 FROM game_sessions
+      WHERE id = session_players.session_id AND host_id = auth.uid()
+    )
+  );
+
+-- Similar policies for session_items and session_events
+```
