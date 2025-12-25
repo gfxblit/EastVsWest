@@ -109,20 +109,32 @@ class App {
         return;
       }
 
-      // Sign in anonymously to get an auth.uid()
-      console.log('Signing in anonymously...');
-      const { data: authData, error: authError } = await this.supabase.auth.signInAnonymously();
-      if (authError) {
-        const msg = `Failed to sign in anonymously: ${authError.message}`;
-        console.error(msg, authError);
-        this.showError(msg);
-        return;
+      // Check for existing session first to support reconnection
+      console.log('Checking for existing session...');
+      const { data: sessionData, error: sessionError } = await this.supabase.auth.getSession();
+      
+      let userId;
+      
+      if (sessionData?.session?.user) {
+        console.log('Found existing session, reusing user ID:', sessionData.session.user.id);
+        userId = sessionData.session.user.id;
+      } else {
+        // Sign in anonymously to get an auth.uid()
+        console.log('No session found. Signing in anonymously...');
+        const { data: authData, error: authError } = await this.supabase.auth.signInAnonymously();
+        if (authError) {
+          const msg = `Failed to sign in anonymously: ${authError.message}`;
+          console.error(msg, authError);
+          this.showError(msg);
+          return;
+        }
+        console.log('Signed in anonymously', authData.user.id);
+        userId = authData.user.id;
       }
-      console.log('Signed in anonymously', authData.user.id);
 
       this.network = new Network();
       // Use the authenticated user's ID as the player ID
-      this.network.initialize(this.supabase, authData.user.id);
+      this.network.initialize(this.supabase, userId);
       this.setupNetworkHandlers();
 
       console.log('App initialization complete');
@@ -160,6 +172,17 @@ class App {
     this.network.on('player_joined', (payload) => {
       console.log('Player joined:', payload.data.player.player_name);
       this.ui.updatePlayerList(payload.data.allPlayers, this.network.isHost);
+    });
+
+    this.network.on('player_left', (payload) => {
+      console.log('Player left:', payload.data.player_id);
+      this.ui.updatePlayerList(payload.data.allPlayers, this.network.isHost);
+    });
+
+    this.network.on('evicted', (payload) => {
+      console.warn('Evicted from session:', payload.reason);
+      this.showError(`Evicted: ${payload.reason}`);
+      this.ui.showScreen('intro');
     });
 
     this.network.on('game_start', () => {
@@ -207,8 +230,11 @@ class App {
       const { session, player } = await this.network.hostGame(playerName);
       
       this.ui.showJoinCode(session.join_code);
-      this.ui.updatePlayerList([player], true);
       this.ui.showLobby('Game Lobby');
+      
+      // Immediately update UI for host to avoid showing "Waiting for host..."
+      // and to ensure the list is populated even if the self-join event is missed
+      this.ui.updatePlayerList([player], true);
     } catch (error) {
       console.error('Failed to host game:', error);
       this.showError(`Error hosting game: ${error.message}`);
@@ -243,8 +269,11 @@ class App {
       const data = await this.network.joinGame(joinCode, playerName);
       
       this.ui.showJoinCode(joinCode);
-      this.ui.updatePlayerList(data.allPlayers, false);
       this.ui.showLobby('Game Lobby');
+      // Update player list immediately with initial data since we miss our own join event
+      if (data.allPlayers) {
+        this.ui.updatePlayerList(data.allPlayers, this.network.isHost);
+      }
     } catch (error) {
       console.error('Failed to join game:', error);
       this.showError(`Error joining game: ${error.message}`);

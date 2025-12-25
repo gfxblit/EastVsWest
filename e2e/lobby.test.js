@@ -51,7 +51,7 @@ describe('Lobby UI Interactions', () => {
 
   describe('Lobby Screen Elements', () => {
     test('WhenPageLoads_ShouldDisplayLobbyTitle', async () => {
-      const title = await page.$eval('#lobby-screen h1', (el) => el.textContent);
+      const title = await page.$eval('#intro-screen h1', (el) => el.textContent);
       expect(title).toBe('Conflict Zone: East vs West');
     });
 
@@ -86,9 +86,9 @@ describe('Lobby UI Interactions', () => {
     });
 
     test('WhenPageLoads_ShouldHideJoinCodeDisplay', async () => {
-      const isHidden = await page.$eval('#join-code-display', (el) => {
-        return el.classList.contains('hidden') ||
-               window.getComputedStyle(el).display === 'none';
+      // It's hidden because #lobby-screen is not active
+      const isHidden = await page.$eval('#lobby-screen', (el) => {
+        return window.getComputedStyle(el).display === 'none';
       });
       expect(isHidden).toBe(true);
     });
@@ -214,27 +214,19 @@ describe('Lobby UI Interactions', () => {
       await playerPage.type('#join-code-input', joinCode);
       await playerPage.click('#join-game-btn');
 
-      // Wait for the lobby screen to be hidden (indicating game started)
-      await playerPage.waitForFunction(() => {
-        const lobbyScreen = document.getElementById('lobby-screen');
-        return lobbyScreen && (
-          lobbyScreen.classList.contains('hidden') ||
-          window.getComputedStyle(lobbyScreen).display === 'none'
-        );
-      }, { timeout: 5000 });
+      // Wait for the lobby screen to be visible
+      await playerPage.waitForSelector('#lobby-screen.active', { timeout: 10000 });
 
-      // Verify lobby screen is hidden
-      const lobbyHidden = await playerPage.$eval('#lobby-screen', (el) => {
-        return el.classList.contains('hidden') || window.getComputedStyle(el).display === 'none';
+      // Verify lobby screen is visible
+      const lobbyVisible = await playerPage.$eval('#lobby-screen', (el) => {
+        return el.classList.contains('active') && window.getComputedStyle(el).display !== 'none';
       });
-      expect(lobbyHidden).toBe(true);
+      expect(lobbyVisible).toBe(true);
 
-      // Verify game canvas is visible
-      const canvasVisible = await playerPage.$eval('#game-canvas', (el) => {
-        const rect = el.getBoundingClientRect();
-        return rect.width > 0 && rect.height > 0;
-      });
-      expect(canvasVisible).toBe(true);
+      // Verify player name is in the list
+      await playerPage.waitForSelector('#player-list li', { timeout: 5000 });
+      const players = await playerPage.$$eval('#player-list li', (lis) => lis.map(li => li.textContent));
+      expect(players.some(p => p.includes('Player-'))).toBe(true);
 
       // Clean up
       await playerPage.close();

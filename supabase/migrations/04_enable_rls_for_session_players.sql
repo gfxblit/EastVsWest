@@ -3,32 +3,43 @@
 -- Enable RLS for the table
 ALTER TABLE public.session_players ENABLE ROW LEVEL SECURITY;
 
--- 1. Allow read access to all session players
--- Players can query session_players to see who's in sessions
--- Access is controlled by knowing the session_id (which comes from join code)
+-- 1. Allow read access to session players in sessions the user has joined
+-- Players can only query session_players for sessions they are a member of
+-- This prevents players from enumerating all active sessions
 -- Note: Anonymous sign-ins get the 'authenticated' role, not 'anon'
 CREATE POLICY "Allow read access to session players"
   ON public.session_players
   FOR SELECT
   TO authenticated
-  USING (true);
+  USING (
+    EXISTS (
+      SELECT 1 FROM public.session_players sp
+      WHERE sp.session_id = session_players.session_id
+        AND sp.player_id = auth.uid()
+    )
+  );
 
--- 2. Allow only the host to add players to a session.
--- This enforces the host-authority model. The check verifies that the
--- user performing the insert is the host of the session being inserted into.
-CREATE POLICY "Allow host to insert players into their session"
+-- 2. Allow players to self-insert into a session.
+-- The Host is responsible for evicting players if the session is full or already started.
+CREATE POLICY "Allow players to insert themselves"
   ON public.session_players
   FOR INSERT
   TO authenticated
-  WITH CHECK (
+  WITH CHECK (auth.uid() = player_id);
+
+-- 3. Allow host to evict players (delete rows in their own session).
+CREATE POLICY "Allow host to evict players"
+  ON public.session_players
+  FOR DELETE
+  TO authenticated
+  USING (
     EXISTS (
-      SELECT 1
-      FROM public.game_sessions
+      SELECT 1 FROM public.game_sessions
       WHERE id = session_players.session_id AND host_id = auth.uid()
     )
   );
 
--- 3. Allow players to update their own data
+-- 4. Allow players to update their own data
 -- This is for position updates, status changes, etc.
 CREATE POLICY "Allow players to update their own data"
   ON public.session_players
@@ -37,7 +48,7 @@ CREATE POLICY "Allow players to update their own data"
   USING (auth.uid() = player_id)
   WITH CHECK (auth.uid() = player_id);
 
--- 4. Allow players to delete their own session record (for leaving a game)
+-- 5. Allow players to delete their own session record (for leaving a game)
 CREATE POLICY "Allow players to delete their own data"
   ON public.session_players
   FOR DELETE

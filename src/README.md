@@ -10,7 +10,8 @@ This directory contains the source code for **Conflict Zone: East vs West**.
 - **renderer.js**: Canvas rendering system that draws the game state (players, conflict zone, loot)
 - **input.js**: Input handler for keyboard, mouse, and touch controls (supports both desktop and mobile)
 - **ui.js**: UI manager for screen transitions and HUD updates
-- **network.js**: Network manager for multiplayer communication via Supabase (placeholder for future implementation)
+- **network.js**: Network manager for multiplayer communication via Supabase
+- **SessionPlayersSnapshot.js**: Real-time snapshot manager for session player state synchronization via Supabase Realtime
 
 ## Testing
 

@@ -31,14 +31,14 @@ describe('Conflict Zone: East vs West E2E', () => {
     expect(title).toBe('Conflict Zone: East vs West');
   });
 
-  test('should display lobby screen on load', async () => {
+  test('should display intro screen on load', async () => {
     const indexPath = join(__dirname, '..', 'index.html');
     await page.goto('file://' + indexPath);
 
-    const lobbyVisible = await page.$eval('#lobby-screen', (el) =>
+    const introVisible = await page.$eval('#intro-screen', (el) =>
       el.classList.contains('active')
     );
-    expect(lobbyVisible).toBe(true);
+    expect(introVisible).toBe(true);
   });
 
   test('should have host game button', async () => {

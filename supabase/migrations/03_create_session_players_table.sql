@@ -33,3 +33,6 @@ CREATE INDEX idx_session_players ON session_players(session_id);
 
 -- Index for host queries
 CREATE INDEX idx_host_player ON session_players(session_id, is_host) WHERE is_host = TRUE;
+
+-- Enable Realtime for session_players table
+ALTER PUBLICATION supabase_realtime ADD TABLE session_players;
