@@ -11,21 +11,30 @@ export class SessionPlayersSnapshot {
     this.channel = channel;
     this.players = new Map(); // Keyed by player_id
     this.refreshInterval = null;
-    this.subscriptionReady = null; // Promise that resolves when channel is subscribed
+    this.subscriptionReady = null; // Promise that resolves when channel is subscribed and initial fetch is complete
 
-    // Auto-fetch initial snapshot
-    this.#fetchInitialSnapshot();
-
-    // Subscribe to DB events and position updates, then subscribe to channel
-    this.subscriptionReady = this.#setupChannelSubscriptions();
+    // Initialize: fetch snapshot and setup subscriptions
+    this.subscriptionReady = this.#initialize();
 
     // Start periodic refresh
     this.#startPeriodicRefresh();
   }
 
   /**
-   * Wait for the channel subscription to be ready
-   * @returns {Promise} Resolves when subscription is complete
+   * Initialize the snapshot: fetch initial data and setup channel subscriptions
+   * @returns {Promise} Resolves when both fetch and subscription are complete
+   */
+  async #initialize() {
+    // Fetch initial snapshot first
+    await this.#fetchInitialSnapshot();
+
+    // Then setup channel subscriptions
+    await this.#setupChannelSubscriptions();
+  }
+
+  /**
+   * Wait for the initialization to be ready
+   * @returns {Promise} Resolves when subscription and initial fetch are complete
    */
   async ready() {
     return this.subscriptionReady;
@@ -70,9 +79,14 @@ export class SessionPlayersSnapshot {
             event: '*',
             schema: 'public',
             table: 'session_players',
-            filter: `session_id=eq.${this.sessionId}`,
+            // Don't use filter parameter - manually filter in handler to ensure DELETE events work
           },
           (payload) => {
+            // Manually filter events by session_id
+            const sessionId = payload.new?.session_id || payload.old?.session_id;
+            if (sessionId && sessionId !== this.sessionId) {
+              return; // Ignore events for other sessions
+            }
             this.#handleDbEvent(payload);
           }
         )
@@ -108,7 +122,13 @@ export class SessionPlayersSnapshot {
 
       case 'DELETE':
         if (oldRecord) {
-          this.players.delete(oldRecord.player_id);
+          // Supabase Realtime only sends the primary key (id) in DELETE events,
+          // not the full record, even with REPLICA IDENTITY FULL.
+          // We need to find the player by id and then delete by player_id.
+          const playerToDelete = Array.from(this.players.values()).find(p => p.id === oldRecord.id);
+          if (playerToDelete) {
+            this.players.delete(playerToDelete.player_id);
+          }
         }
         break;
 
@@ -222,9 +242,15 @@ export class SessionPlayersSnapshot {
    * Clean up resources
    */
   destroy() {
+    // Clear periodic refresh
     if (this.refreshInterval) {
       clearInterval(this.refreshInterval);
       this.refreshInterval = null;
+    }
+
+    // Unsubscribe from channel
+    if (this.channel) {
+      this.channel.unsubscribe();
     }
   }
 }

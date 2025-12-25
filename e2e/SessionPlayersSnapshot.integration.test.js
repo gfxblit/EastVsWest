@@ -76,13 +76,25 @@ describe('SessionPlayersSnapshot Integration with Supabase', () => {
 
     testSessionId = sessionData.id;
 
-    // Create channels for both clients (SessionPlayersSnapshot will subscribe them)
-    hostChannel = hostClient.channel(channelName);
-    playerChannel = playerClient.channel(channelName);
+    // Create channels for both clients with broadcast enabled (SessionPlayersSnapshot will subscribe them)
+    hostChannel = hostClient.channel(channelName, {
+      config: {
+        broadcast: {
+          ack: true,
+        },
+      },
+    });
+    playerChannel = playerClient.channel(channelName, {
+      config: {
+        broadcast: {
+          ack: true,
+        },
+      },
+    });
   });
 
   afterEach(async () => {
-    // Destroy snapshots first (clears intervals)
+    // Destroy snapshots first (clears intervals and unsubscribes from channels)
     if (hostSnapshot) {
       hostSnapshot.destroy();
       hostSnapshot = null;
@@ -92,7 +104,10 @@ describe('SessionPlayersSnapshot Integration with Supabase', () => {
       playerSnapshot = null;
     }
 
-    // Unsubscribe from channels
+    // Wait for channel unsubscriptions to complete
+    await new Promise(resolve => setTimeout(resolve, 200));
+
+    // Remove channels
     if (hostChannel) {
       await hostClient.removeChannel(hostChannel);
       hostChannel = null;
@@ -101,6 +116,9 @@ describe('SessionPlayersSnapshot Integration with Supabase', () => {
       await playerClient.removeChannel(playerChannel);
       playerChannel = null;
     }
+
+    // Wait for server-side cleanup to complete
+    await new Promise(resolve => setTimeout(resolve, 300));
 
     // Clean up test data
     if (testSessionId) {
@@ -165,8 +183,8 @@ describe('SessionPlayersSnapshot Integration with Supabase', () => {
           is_host: true,
         });
 
-      // Add player to TEST session
-      await hostClient
+      // Add player to TEST session (use playerClient to insert playerUser)
+      await playerClient
         .from('session_players')
         .insert({
           session_id: testSessionId,
@@ -178,7 +196,14 @@ describe('SessionPlayersSnapshot Integration with Supabase', () => {
       // Create snapshot for test session
       hostSnapshot = new SessionPlayersSnapshot(hostClient, testSessionId, hostChannel);
 
-      await (hostSnapshot || playerSnapshot).ready();
+      // Wait for BOTH snapshots to be ready (if both exist)
+      if (hostSnapshot && playerSnapshot) {
+        await Promise.all([hostSnapshot.ready(), playerSnapshot.ready()]);
+      } else if (hostSnapshot) {
+        await hostSnapshot.ready();
+      } else if (playerSnapshot) {
+        await playerSnapshot.ready();
+      }
 
       const players = hostSnapshot.getPlayers();
 
@@ -197,7 +222,14 @@ describe('SessionPlayersSnapshot Integration with Supabase', () => {
     test('should insert player into database with correct session_id', async () => {
       hostSnapshot = new SessionPlayersSnapshot(hostClient, testSessionId, hostChannel);
 
-      await (hostSnapshot || playerSnapshot).ready();
+      // Wait for BOTH snapshots to be ready (if both exist)
+      if (hostSnapshot && playerSnapshot) {
+        await Promise.all([hostSnapshot.ready(), playerSnapshot.ready()]);
+      } else if (hostSnapshot) {
+        await hostSnapshot.ready();
+      } else if (playerSnapshot) {
+        await playerSnapshot.ready();
+      }
 
       await hostSnapshot.addPlayer({
         player_id: hostUser.id,
@@ -223,7 +255,14 @@ describe('SessionPlayersSnapshot Integration with Supabase', () => {
     test('should add player to local map after insertion', async () => {
       hostSnapshot = new SessionPlayersSnapshot(hostClient, testSessionId, hostChannel);
 
-      await (hostSnapshot || playerSnapshot).ready();
+      // Wait for BOTH snapshots to be ready (if both exist)
+      if (hostSnapshot && playerSnapshot) {
+        await Promise.all([hostSnapshot.ready(), playerSnapshot.ready()]);
+      } else if (hostSnapshot) {
+        await hostSnapshot.ready();
+      } else if (playerSnapshot) {
+        await playerSnapshot.ready();
+      }
 
       await hostSnapshot.addPlayer({
         player_id: hostUser.id,
@@ -242,7 +281,14 @@ describe('SessionPlayersSnapshot Integration with Supabase', () => {
       hostSnapshot = new SessionPlayersSnapshot(hostClient, testSessionId, hostChannel);
       playerSnapshot = new SessionPlayersSnapshot(playerClient, testSessionId, playerChannel);
 
-      await (hostSnapshot || playerSnapshot).ready();
+      // Wait for BOTH snapshots to be ready (if both exist)
+      if (hostSnapshot && playerSnapshot) {
+        await Promise.all([hostSnapshot.ready(), playerSnapshot.ready()]);
+      } else if (hostSnapshot) {
+        await hostSnapshot.ready();
+      } else if (playerSnapshot) {
+        await playerSnapshot.ready();
+      }
 
       // Host adds themselves
       await hostSnapshot.addPlayer({
@@ -280,7 +326,14 @@ describe('SessionPlayersSnapshot Integration with Supabase', () => {
       hostSnapshot = new SessionPlayersSnapshot(hostClient, testSessionId, hostChannel);
       playerSnapshot = new SessionPlayersSnapshot(playerClient, testSessionId, playerChannel);
 
-      await (hostSnapshot || playerSnapshot).ready();
+      // Wait for BOTH snapshots to be ready (if both exist)
+      if (hostSnapshot && playerSnapshot) {
+        await Promise.all([hostSnapshot.ready(), playerSnapshot.ready()]);
+      } else if (hostSnapshot) {
+        await hostSnapshot.ready();
+      } else if (playerSnapshot) {
+        await playerSnapshot.ready();
+      }
 
       // Both should have the player
       expect(hostSnapshot.getPlayers().has(hostUser.id)).toBe(true);
@@ -321,7 +374,14 @@ describe('SessionPlayersSnapshot Integration with Supabase', () => {
       hostSnapshot = new SessionPlayersSnapshot(hostClient, testSessionId, hostChannel);
       playerSnapshot = new SessionPlayersSnapshot(playerClient, testSessionId, playerChannel);
 
-      await (hostSnapshot || playerSnapshot).ready();
+      // Wait for BOTH snapshots to be ready (if both exist)
+      if (hostSnapshot && playerSnapshot) {
+        await Promise.all([hostSnapshot.ready(), playerSnapshot.ready()]);
+      } else if (hostSnapshot) {
+        await hostSnapshot.ready();
+      } else if (playerSnapshot) {
+        await playerSnapshot.ready();
+      }
 
       expect(hostSnapshot.getPlayers().get(hostUser.id).kills).toBe(0);
       expect(playerSnapshot.getPlayers().get(hostUser.id).kills).toBe(0);
@@ -359,7 +419,17 @@ describe('SessionPlayersSnapshot Integration with Supabase', () => {
       hostSnapshot = new SessionPlayersSnapshot(hostClient, testSessionId, hostChannel);
       playerSnapshot = new SessionPlayersSnapshot(playerClient, testSessionId, playerChannel);
 
-      await (hostSnapshot || playerSnapshot).ready();
+      // Wait for BOTH snapshots to be ready (if both exist)
+      if (hostSnapshot && playerSnapshot) {
+        await Promise.all([hostSnapshot.ready(), playerSnapshot.ready()]);
+      } else if (hostSnapshot) {
+        await hostSnapshot.ready();
+      } else if (playerSnapshot) {
+        await playerSnapshot.ready();
+      }
+
+      // Give broadcasts time to fully initialize after subscription
+      await new Promise(resolve => setTimeout(resolve, 100));
 
       // Host broadcasts position update
       await hostChannel.send({
@@ -398,7 +468,14 @@ describe('SessionPlayersSnapshot Integration with Supabase', () => {
 
       hostSnapshot = new SessionPlayersSnapshot(hostClient, testSessionId, hostChannel);
 
-      await (hostSnapshot || playerSnapshot).ready();
+      // Wait for BOTH snapshots to be ready (if both exist)
+      if (hostSnapshot && playerSnapshot) {
+        await Promise.all([hostSnapshot.ready(), playerSnapshot.ready()]);
+      } else if (hostSnapshot) {
+        await hostSnapshot.ready();
+      } else if (playerSnapshot) {
+        await playerSnapshot.ready();
+      }
 
       // Broadcast position update
       await hostChannel.send({
