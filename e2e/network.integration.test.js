@@ -218,7 +218,9 @@ describe('Network Module Integration with Supabase', () => {
 
     // Verify host received the player_joined event
     expect(hostPlayerJoinedEvents.length).toBeGreaterThan(0);
-    const joinEvent = hostPlayerJoinedEvents[0];
+    const joinEvent = hostPlayerJoinedEvents.find(e => e.data.player.player_name === playerName);
+    
+    expect(joinEvent).toBeDefined();
     expect(joinEvent.data.player.player_name).toBe(playerName);
     expect(joinEvent.data.allPlayers).toHaveLength(2); // Host + new player
 

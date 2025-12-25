@@ -116,7 +116,9 @@ export class Network extends EventEmitter {
 
     // 2. Client-authoritative join: Self-insert into session_players FIRST
     // This ensures RLS policies allow us to read/listen to other players in this session
-    const { data: playerRecord, error: insertError } = await this.supabase
+    let playerRecord;
+    
+    const { data: newPlayerRecord, error: insertError } = await this.supabase
       .from('session_players')
       .insert({
         session_id: this.sessionId,
@@ -129,9 +131,22 @@ export class Network extends EventEmitter {
 
     if (insertError) {
       if (insertError.code === '23505') { // Unique constraint violation
-        throw new Error('You are already in this session.');
+        console.log('Player already in session. Reconnecting...');
+        // Fetch the existing record
+        const { data: existingPlayer, error: fetchError } = await this.supabase
+          .from('session_players')
+          .select('*')
+          .eq('session_id', this.sessionId)
+          .eq('player_id', this.playerId)
+          .single();
+          
+        if (fetchError) throw fetchError;
+        playerRecord = existingPlayer;
+      } else {
+        throw insertError;
       }
-      throw insertError;
+    } else {
+      playerRecord = newPlayerRecord;
     }
 
     // 3. Subscribe to channel and postgres changes

@@ -109,20 +109,32 @@ class App {
         return;
       }
 
-      // Sign in anonymously to get an auth.uid()
-      console.log('Signing in anonymously...');
-      const { data: authData, error: authError } = await this.supabase.auth.signInAnonymously();
-      if (authError) {
-        const msg = `Failed to sign in anonymously: ${authError.message}`;
-        console.error(msg, authError);
-        this.showError(msg);
-        return;
+      // Check for existing session first to support reconnection
+      console.log('Checking for existing session...');
+      const { data: sessionData, error: sessionError } = await this.supabase.auth.getSession();
+      
+      let userId;
+      
+      if (sessionData?.session?.user) {
+        console.log('Found existing session, reusing user ID:', sessionData.session.user.id);
+        userId = sessionData.session.user.id;
+      } else {
+        // Sign in anonymously to get an auth.uid()
+        console.log('No session found. Signing in anonymously...');
+        const { data: authData, error: authError } = await this.supabase.auth.signInAnonymously();
+        if (authError) {
+          const msg = `Failed to sign in anonymously: ${authError.message}`;
+          console.error(msg, authError);
+          this.showError(msg);
+          return;
+        }
+        console.log('Signed in anonymously', authData.user.id);
+        userId = authData.user.id;
       }
-      console.log('Signed in anonymously', authData.user.id);
 
       this.network = new Network();
       // Use the authenticated user's ID as the player ID
-      this.network.initialize(this.supabase, authData.user.id);
+      this.network.initialize(this.supabase, userId);
       this.setupNetworkHandlers();
 
       console.log('App initialization complete');
@@ -254,8 +266,11 @@ class App {
       const data = await this.network.joinGame(joinCode, playerName);
       
       this.ui.showJoinCode(joinCode);
-      // Player list will be updated via 'player_joined' network event
       this.ui.showLobby('Game Lobby');
+      // Update player list immediately with initial data since we miss our own join event
+      if (data.allPlayers) {
+        this.ui.updatePlayerList(data.allPlayers, this.network.isHost);
+      }
     } catch (error) {
       console.error('Failed to join game:', error);
       this.showError(`Error joining game: ${error.message}`);

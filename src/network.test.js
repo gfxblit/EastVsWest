@@ -191,6 +191,127 @@ describe('Network', () => {
       expect(network.players.get('host-uuid')).toEqual(mockExistingPlayer);
     });
 
+    it('should handle reconnection when player is already in session (Unique Constraint 23505)', async () => {
+      const mockSession = {
+        id: MOCK_SESSION_ID,
+        join_code: MOCK_JOIN_CODE,
+        host_id: 'host-uuid',
+        status: 'lobby',
+        max_players: 12,
+        realtime_channel_name: 'game_session:ABC123',
+      };
+
+      const mockExistingPlayer = {
+        session_id: MOCK_SESSION_ID,
+        player_id: MOCK_PLAYER_ID, // Connecting as this player
+        player_name: MOCK_PLAYER_NAME,
+        is_host: false,
+      };
+
+      const mockHostPlayer = {
+        player_id: 'host-uuid',
+        player_name: 'Host',
+        is_host: true
+      };
+
+      // 1. Mock RPC
+      mockSupabaseClient.rpc.mockResolvedValue({ data: [mockSession], error: null });
+
+      // 2. Mock Channel
+      const mockChannel = {
+        on: jest.fn().mockReturnThis(),
+        subscribe: jest.fn((callback) => {
+          callback('SUBSCRIBED');
+          return mockChannel;
+        }),
+      };
+      mockSupabaseClient.channel.mockReturnValue(mockChannel);
+
+      // 3. Mock table interactions
+      mockSupabaseClient.from = jest.fn((table) => {
+        if (table === 'session_players') {
+          return {
+            // Mock snapshot fetch
+            select: jest.fn().mockImplementation((query) => {
+              // If it's the snapshot fetch (no arguments usually in this mock setup unless chain is inspected)
+              // But here we rely on the chain.
+              // Let's inspect the chain structure carefully.
+              // The logic is: insert -> if err -> select(single) -> then snapshot select(all)
+              
+              const mockChain = {
+                 eq: jest.fn().mockImplementation((field, value) => {
+                    // Check if this is the "fetch existing player" call (session_id AND player_id)
+                    // The test setup is a bit rigid, so we need a flexible mock or just return a chain that can handle both.
+                    
+                    if (field === 'session_id') {
+                       return {
+                         eq: jest.fn().mockImplementation((field2, value2) => {
+                            if (field2 === 'player_id' && value2 === MOCK_PLAYER_ID) {
+                               // This is the "fetch existing player" call
+                               return {
+                                 single: jest.fn().mockResolvedValue({ data: mockExistingPlayer, error: null })
+                               }
+                            }
+                         })
+                       }
+                    }
+                    
+                    // If it's just session_id, it's the snapshot fetch
+                     return {
+                        // The snapshot fetch usually ends with .select('*').eq(...) which returns a promise-like
+                        // But here the chain is .from().select().eq()
+                        // Wait, the code is:
+                        // .from('session_players').select('*').eq('session_id', this.sessionId)
+                        // AND
+                        // .from('session_players').select('*').eq('session_id', ...).eq('player_id', ...).single()
+                        
+                        // We need to support both.
+                     }
+                 })
+              };
+              
+              // Simplification: Return a chain that mocks both paths
+              return {
+                 eq: jest.fn().mockImplementation((col, val) => {
+                    if (col === 'session_id') {
+                        // Return object that handles next .eq or .then (snapshot)
+                        const nextChain = {
+                             eq: jest.fn().mockImplementation((col2, val2) => {
+                                 // Path: fetch existing player
+                                 return {
+                                     single: jest.fn().mockResolvedValue({ data: mockExistingPlayer, error: null })
+                                 }
+                             })
+                        };
+                        // Make nextChain also behave like a promise for the snapshot fetch
+                        nextChain.then = (cb) => Promise.resolve({ data: [mockHostPlayer, mockExistingPlayer], error: null }).then(cb);
+                        return nextChain;
+                    }
+                 })
+              };
+            }),
+            
+            insert: jest.fn().mockReturnValue({
+              select: jest.fn().mockReturnValue({
+                single: jest.fn().mockResolvedValue({ 
+                  data: null, 
+                  error: { code: '23505', message: 'Unique violation' } 
+                })
+              })
+            })
+          };
+        }
+      });
+
+      const result = await network.joinGame(MOCK_JOIN_CODE, MOCK_PLAYER_NAME);
+
+      expect(network.connected).toBe(true);
+      expect(result.player).toEqual(mockExistingPlayer);
+      // Ensure we tried to insert first
+      // Ensure we fetched the existing player
+      expect(mockSupabaseClient.from).toHaveBeenCalledWith('session_players');
+    });
+
     it('should throw an error when the session is not found', async () => {
       mockSupabaseClient.rpc.mockResolvedValue({ data: [], error: null });
 
