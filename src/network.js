@@ -191,12 +191,18 @@ export class Network extends EventEmitter {
         .on('broadcast', { event: 'message' }, ({ payload }) => {
           this._handleRealtimeMessage(payload);
         })
-        .on('postgres_changes', { 
-          event: '*', 
-          schema: 'public', 
+        .on('postgres_changes', {
+          event: '*',
+          schema: 'public',
           table: 'session_players',
-          filter: `session_id=eq.${this.sessionId}` 
+          // Don't use filter parameter - manually filter in handler to ensure DELETE events work
+          // See SessionPlayersSnapshot.js for detailed explanation
         }, (payload) => {
+          // Manually filter events by session_id to ensure DELETE events are received
+          const sessionId = payload.new?.session_id || payload.old?.session_id;
+          if (sessionId && sessionId !== this.sessionId) {
+            return; // Ignore events for other sessions
+          }
           this._handlePostgresChange(payload);
         })
         .subscribe((status, error) => {

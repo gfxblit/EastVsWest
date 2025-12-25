@@ -126,7 +126,8 @@ describe('SessionPlayersSnapshot', () => {
           event: '*',
           schema: 'public',
           table: 'session_players',
-          filter: `session_id=eq.${TEST_SESSION_ID}`,
+          // Note: No filter parameter - implementation manually filters in handler
+          // to ensure DELETE events work correctly (Supabase limitation)
         }),
         expect.any(Function)
       );

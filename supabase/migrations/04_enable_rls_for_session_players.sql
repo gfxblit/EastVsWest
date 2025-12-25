@@ -3,15 +3,21 @@
 -- Enable RLS for the table
 ALTER TABLE public.session_players ENABLE ROW LEVEL SECURITY;
 
--- 1. Allow read access to all session players
--- Players can query session_players to see who's in sessions
--- Access is controlled by knowing the session_id (which comes from join code)
+-- 1. Allow read access to session players in sessions the user has joined
+-- Players can only query session_players for sessions they are a member of
+-- This prevents players from enumerating all active sessions
 -- Note: Anonymous sign-ins get the 'authenticated' role, not 'anon'
 CREATE POLICY "Allow read access to session players"
   ON public.session_players
   FOR SELECT
   TO authenticated
-  USING (true);
+  USING (
+    EXISTS (
+      SELECT 1 FROM public.session_players sp
+      WHERE sp.session_id = session_players.session_id
+        AND sp.player_id = auth.uid()
+    )
+  );
 
 -- 2. Allow players to self-insert into a session.
 -- The Host is responsible for evicting players if the session is full or already started.

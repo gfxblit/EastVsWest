@@ -290,6 +290,16 @@ describe('SessionPlayersSnapshot Integration with Supabase', () => {
         await playerSnapshot.ready();
       }
 
+      // Player joins session first (required by RLS policy to see other players)
+      await playerSnapshot.addPlayer({
+        player_id: playerUser.id,
+        player_name: 'PlayerOne',
+        is_host: false,
+      });
+
+      // Wait for player join to propagate
+      await new Promise(resolve => setTimeout(resolve, 300));
+
       // Host adds themselves
       await hostSnapshot.addPlayer({
         player_id: hostUser.id,
@@ -300,7 +310,7 @@ describe('SessionPlayersSnapshot Integration with Supabase', () => {
       // Wait for DB event to propagate
       await new Promise(resolve => setTimeout(resolve, 500));
 
-      // Player snapshot should have received the INSERT event
+      // Player snapshot should have received the INSERT event for the host
       const playerPlayers = playerSnapshot.getPlayers();
       expect(playerPlayers.has(hostUser.id)).toBe(true);
       expect(playerPlayers.get(hostUser.id).player_name).toBe('HostPlayer');
@@ -309,7 +319,7 @@ describe('SessionPlayersSnapshot Integration with Supabase', () => {
 
   describe('DB Event Synchronization - DELETE', () => {
     test('should receive DELETE event and remove from local map', async () => {
-      // Add a player first
+      // Add host player first
       const { data: insertedPlayer, error: insertError } = await hostClient
         .from('session_players')
         .insert({
@@ -323,6 +333,18 @@ describe('SessionPlayersSnapshot Integration with Supabase', () => {
 
       expect(insertError).toBeNull();
 
+      // Add player to session (required by RLS policy to see other players)
+      const { error: playerInsertError } = await playerClient
+        .from('session_players')
+        .insert({
+          session_id: testSessionId,
+          player_id: playerUser.id,
+          player_name: 'PlayerOne',
+          is_host: false,
+        });
+
+      expect(playerInsertError).toBeNull();
+
       hostSnapshot = new SessionPlayersSnapshot(hostClient, testSessionId, hostChannel);
       playerSnapshot = new SessionPlayersSnapshot(playerClient, testSessionId, playerChannel);
 
@@ -335,11 +357,11 @@ describe('SessionPlayersSnapshot Integration with Supabase', () => {
         await playerSnapshot.ready();
       }
 
-      // Both should have the player
+      // Both should have the host player
       expect(hostSnapshot.getPlayers().has(hostUser.id)).toBe(true);
       expect(playerSnapshot.getPlayers().has(hostUser.id)).toBe(true);
 
-      // Delete the player
+      // Delete the host player
       await hostClient
         .from('session_players')
         .delete()
@@ -348,7 +370,7 @@ describe('SessionPlayersSnapshot Integration with Supabase', () => {
       // Wait for DELETE event to propagate
       await new Promise(resolve => setTimeout(resolve, 500));
 
-      // Both should have removed the player
+      // Both should have removed the host player
       expect(hostSnapshot.getPlayers().has(hostUser.id)).toBe(false);
       expect(playerSnapshot.getPlayers().has(hostUser.id)).toBe(false);
     });
