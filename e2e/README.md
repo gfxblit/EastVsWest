@@ -33,7 +33,7 @@ HEADLESS=false npm run test:e2e e2e/lobby.test.js
 
 **Prerequisites:**
 1. Supabase must be running locally
-2. All migrations must be applied (including `06_set_replica_identity_for_session_players.sql`)
+2. All migrations must be applied
 3. Environment variables must be set
 
 ```bash
@@ -147,19 +147,11 @@ npm run test:e2e
 - Run tests individually to isolate the issue
 
 #### DELETE events not removing players
-**Cause:** Missing `REPLICA IDENTITY FULL` migration
+**Cause:** Supabase Realtime limitation - only sends primary key in DELETE events
 
-**Solution:**
-```bash
-npx supabase db reset  # Re-applies all migrations
-```
-
-Verify migration was applied:
-```bash
-docker exec supabase_db_EastVsWest psql -U postgres \
-  -c "SELECT relreplident FROM pg_class WHERE relname = 'session_players';"
-```
-Should return `f` (for FULL).
+**Solution:** This is handled automatically by SessionPlayersSnapshot. If tests fail:
+1. Verify the player exists in the snapshot before deletion
+2. Check that the player has an `id` field matching the DELETE event
 
 #### Position broadcasts not received
 **Cause:** Channels not configured with broadcast settings

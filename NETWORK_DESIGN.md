@@ -235,9 +235,9 @@ To sync a local copy of the `session_players` Supabase table, we use a **Snapsho
 
 #### DELETE Event Limitation
 **CRITICAL**: Supabase Realtime only sends the primary key (`id`) in DELETE events, not the full record.
-- This is true even with `REPLICA IDENTITY FULL` set on the table
+- This is a Supabase Realtime limitation, not a PostgreSQL limitation
 - DELETE handler must find player by `id` field before deleting from Map by `player_id`
-- Migration `06_set_replica_identity_for_session_players.sql` sets REPLICA IDENTITY FULL for optimal behavior
+- Workaround: Maintain full player records in local Map to lookup by `id`
 
 #### Synchronization - Position Updates (Fast / Ephemeral, ~10 ms)
 - **Source:** WebSocket broadcasts (in memory, not written to disk)
@@ -1058,20 +1058,4 @@ CREATE POLICY "Host can evict players"
   );
 
 -- Similar policies for session_items and session_events
-```
-
-### Database Migrations
-
-#### REPLICA IDENTITY for session_players
-**Migration**: `06_set_replica_identity_for_session_players.sql`
-
-Sets `REPLICA IDENTITY FULL` on the `session_players` table to ensure DELETE events include full record data:
-
-```sql
-ALTER TABLE public.session_players REPLICA IDENTITY FULL;
-```
-
-**Note**: Despite this setting, Supabase Realtime still only sends the primary key (`id`) in DELETE events. The `SessionPlayersSnapshot` implementation accounts for this limitation by looking up players by `id` before deleting by `player_id`.
-
-This migration is required for proper DELETE event handling in real-time synchronization.
 ```
