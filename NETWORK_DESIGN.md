@@ -197,24 +197,75 @@ All messages follow this base structure:
 ```
 ## State Management Strategy: Registry + Stream
 
-To sync a local copy of the `session_players` Supabase table, we use a **Snapshot + Broadcast** architecture managed by a `SessionPlayersSnapshot`. `SessionPlayersSnapshot` is scoped to only players in the game session `game_session:{join_code}`. The Player object has the same structure as a record in the `session_players` table. The manager stays in sync via broadcasts and periodically refreshing an entire snapshot of the table (in case broadcasts are lost).
+To sync a local copy of the `session_players` Supabase table, we use a **Snapshot + Broadcast** architecture managed by a `SessionPlayersSnapshot`.
 
-### Broadcast event types
-#### 1. DB record updates (High latency, ~100 ms)
-*   **Source:** `session_players` database table. (only broadcasted after writing to the db)
-*   **Events:** `INSERT`, `DELETE`.
+### SessionPlayersSnapshot
 
-#### 2. Player updates (Fast / Ephemeral, ~10 ms)
-Managed by the `Network` layer feeding into the `SessionPlayersManager`.
-*   **Source:** WebSocket broadcasts. (in memory, not written to disk)
-*   **Events:** High-frequency X/Y updates.
+`SessionPlayersSnapshot` maintains a local synchronized copy of **only the players in a specific game session**. It uses a Map data structure (keyed by `player_id`) and stays in sync via database events, ephemeral WebSocket broadcasts, and periodic snapshot refreshes.
 
-### Periodic snapshotting
-On initialization, each client fetches a snapshot of the table. Broadcasts are "best-effort", so updates may not reach clients. Clients periodically refresh their entire snapshot (every 60s).
+#### Initialization
+- Constructor accepts `supabaseClient`, `sessionId`, and `channel`
+- Auto-fetches initial snapshot **filtered by `sessionId`** on construction
+- Logs warning if initial snapshot fails
 
-### 3. Use-cases
+#### Public API
+- `getPlayers()` - Returns Map of players **in this session only** (keyed by `player_id`)
+- `addPlayer(playerData)` - Inserts player into DB **with this `sessionId`** and adds to local snapshot
+
+#### Synchronization - DB Events (High latency, ~100 ms)
+- **Source:** `session_players` database table (only broadcasted after writing to DB)
+- **Events:** `INSERT`, `DELETE`, `UPDATE`
+- Subscribes to database events **filtered by `session_id`**
+- Only processes events for players in this session:
+  - `INSERT` → adds player to Map
+  - `DELETE` → removes player from Map
+  - `UPDATE` → updates player in Map
+
+#### Synchronization - Position Updates (Fast / Ephemeral, ~10 ms)
+- **Source:** WebSocket broadcasts (in memory, not written to disk)
+- **Events:** High-frequency X/Y position updates
+- Listens to position update broadcasts on channel
+- Updates player position in Map **only if player exists in this session**
+- Does not write to DB (ephemeral)
+
+#### Periodic Snapshotting
+- Refreshes snapshot every 60 seconds **querying only this session's players**
+- Query: `SELECT * FROM session_players WHERE session_id = ?`
+- Replaces local Map with fresh results (handles lost broadcasts)
+- Logs error if refresh fails but continues operation
+
+#### Error Handling
+- Logs errors for failed operations
+- Warns on snapshot sync failures
+- Continues operation even if periodic refresh fails
+- No handling for race conditions (broadcast during refresh)
+
+#### Player Data Structure
+Each player in the Map has the same structure as a record in the `session_players` table:
+```javascript
+{
+  id: 'uuid',
+  session_id: 'uuid',
+  player_id: 'uuid',
+  player_name: 'string',
+  is_host: boolean,
+  is_connected: boolean,
+  is_alive: boolean,
+  position_x: number,
+  position_y: number,
+  rotation: number,
+  equipped_weapon: string | null,
+  equipped_armor: string | null,
+  kills: number,
+  damage_dealt: number,
+  joined_at: timestamp,
+  last_heartbeat: timestamp
+}
+```
+
+### Use-cases
 When the lobby or game renders:
-1.  Iterate through the `SessionPlayersManager.players` list.
+1.  Call `sessionPlayersSnapshot.getPlayers()` to iterate through the player Map.
 
 #### Message Type Catalog
 
