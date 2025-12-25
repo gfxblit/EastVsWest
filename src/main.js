@@ -230,8 +230,11 @@ class App {
       const { session, player } = await this.network.hostGame(playerName);
       
       this.ui.showJoinCode(session.join_code);
-      // Player list will be updated via 'player_joined' network event
       this.ui.showLobby('Game Lobby');
+      
+      // Immediately update UI for host to avoid showing "Waiting for host..."
+      // and to ensure the list is populated even if the self-join event is missed
+      this.ui.updatePlayerList([player], true);
     } catch (error) {
       console.error('Failed to host game:', error);
       this.showError(`Error hosting game: ${error.message}`);
