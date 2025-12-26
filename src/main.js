@@ -316,7 +316,7 @@ class App {
 
     this.lobbyUpdateInterval = setInterval(() => {
       this.updateLobbyUI();
-    }, 100); // Poll every 100ms for smooth UI updates
+    }, 1000); // Poll every 1s
     console.log('Lobby polling started');
   }
 
