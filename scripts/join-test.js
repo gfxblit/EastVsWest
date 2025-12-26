@@ -33,13 +33,16 @@ console.log(`Supabase URL: ${supabaseUrl}\n`);
 
 let network;
 let snapshot;
+let supabase;
 let playerId;
+let sessionId;
+let playerRecordId;
 
 async function main() {
   try {
     // Create Supabase client
     console.log('🔌 Connecting to Supabase...');
-    const supabase = createClient(supabaseUrl, supabaseAnonKey);
+    supabase = createClient(supabaseUrl, supabaseAnonKey);
 
     // Authenticate anonymously
     console.log('🔐 Authenticating...');
@@ -60,8 +63,12 @@ async function main() {
     network.on('postgres_changes', (payload) => {
       console.log('📡 DB Event:', payload.eventType, payload.table);
       if (payload.table === 'session_players') {
-        if (payload.new) {
-          console.log(`   Player: ${payload.new.player_name} (${payload.new.player_id.substring(0, 8)}...)`);
+        // For INSERT/UPDATE, use payload.new; for DELETE, use payload.old
+        const record = payload.new || payload.old;
+        if (record && record.player_id && record.player_name) {
+          console.log(`   Player: ${record.player_name} (${record.player_id.substring(0, 8)}...)`);
+        } else {
+          console.log('   Payload:', JSON.stringify({ new: payload.new, old: payload.old }, null, 2));
         }
       }
     });
@@ -72,14 +79,19 @@ async function main() {
 
     const result = await network.joinGame(joinCode, playerName);
 
+    // Store session and player info for cleanup
+    sessionId = result.session.id;
+    playerRecordId = result.player.id;
+
     console.log(`✅ Successfully joined session!`);
-    console.log(`   Session ID: ${result.session.id}`);
+    console.log(`   Session ID: ${sessionId}`);
     console.log(`   Player Name: ${playerName}`);
+    console.log(`   Player Record ID: ${playerRecordId}`);
     console.log(`   Status: ${result.session.status}\n`);
 
     // Create SessionPlayersSnapshot to monitor lobby
     console.log('👥 Creating lobby snapshot...');
-    snapshot = new SessionPlayersSnapshot(network, result.session.id);
+    snapshot = new SessionPlayersSnapshot(network, sessionId);
     await snapshot.ready();
 
     console.log('✅ Lobby snapshot ready\n');
@@ -96,12 +108,14 @@ async function main() {
     });
 
     console.log('\n💡 Script is now connected. Check your browser lobby!');
-    console.log('   Press Ctrl+C to disconnect and exit.\n');
+    console.log('   Press Ctrl+C to leave session and exit.\n');
 
     // Keep the script running
     process.on('SIGINT', async () => {
-      console.log('\n\n🛑 Disconnecting...');
+      console.log('\n\n🛑 Leaving session...');
+      await leaveSession();
       await cleanup();
+      console.log('✅ Disconnected and exited');
       process.exit(0);
     });
 
@@ -130,6 +144,33 @@ function displayLobby() {
     });
   }
   console.log('═══════════════════════════════════\n');
+}
+
+async function leaveSession() {
+  if (!supabase || !sessionId || !playerRecordId) {
+    console.log('⚠️  No active session to leave');
+    return;
+  }
+
+  try {
+    console.log('🚪 Removing player from session...');
+    const { error } = await supabase
+      .from('session_players')
+      .delete()
+      .eq('id', playerRecordId);
+
+    if (error) {
+      console.error('Failed to leave session:', error.message);
+    } else {
+      console.log('✅ Player removed from session');
+
+      // Wait for postgres_changes event to propagate to browser
+      console.log('⏳ Waiting for browser to update...');
+      await new Promise(resolve => setTimeout(resolve, 500));
+    }
+  } catch (err) {
+    console.error('Error leaving session:', err.message);
+  }
 }
 
 async function cleanup() {
