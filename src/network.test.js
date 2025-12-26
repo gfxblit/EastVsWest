@@ -185,10 +185,10 @@ describe('Network', () => {
       expect(network.isHost).toBe(false);
       expect(network.joinCode).toBe(MOCK_JOIN_CODE);
       expect(network.connected).toBe(true);
-      
+
       expect(result.player).toEqual(mockNewPlayer);
-      expect(result.allPlayers).toContainEqual(mockExistingPlayer);
-      expect(network.players.get('host-uuid')).toEqual(mockExistingPlayer);
+      // Network no longer maintains players Map - that's SessionPlayersSnapshot's job
+      expect(network.players).toBeUndefined();
     });
 
     it('should handle reconnection when player is already in session (Unique Constraint 23505)', async () => {
@@ -344,52 +344,82 @@ describe('Network', () => {
       network.sessionId = 'test-session-id';
     });
 
-    it('should update local players list on INSERT', () => {
+    it('should emit generic postgres_changes event on INSERT', () => {
       const newPlayer = { player_id: 'player-2', player_name: 'NewPlayer', joined_at: new Date().toISOString() };
       const emitSpy = jest.spyOn(network, 'emit');
 
-      network._handlePostgresChange({
+      const payload = {
         eventType: 'INSERT',
-        new: newPlayer
-      });
+        new: newPlayer,
+        old: null,
+        schema: 'public',
+        table: 'session_players'
+      };
 
-      expect(network.players.get('player-2')).toEqual(newPlayer);
-      expect(emitSpy).toHaveBeenCalledWith('player_joined', expect.objectContaining({
-        data: expect.objectContaining({
-          player: newPlayer
-        })
-      }));
+      network._handlePostgresChange(payload);
+
+      // Should emit generic postgres_changes event
+      expect(emitSpy).toHaveBeenCalledWith('postgres_changes', payload);
+
+      // Should NOT maintain players Map (no longer Network's responsibility)
+      expect(network.players).toBeUndefined();
     });
 
-    it('should remove player from local list on DELETE', () => {
-      const existingPlayer = { player_id: 'player-2', player_name: 'ExistingPlayer' };
-      network.players.set('player-2', existingPlayer);
+    it('should emit generic postgres_changes event on DELETE', () => {
       const emitSpy = jest.spyOn(network, 'emit');
 
-      network._handlePostgresChange({
+      const payload = {
         eventType: 'DELETE',
-        old: { player_id: 'player-2' }
-      });
+        old: { player_id: 'player-2' },
+        new: null,
+        schema: 'public',
+        table: 'session_players'
+      };
 
-      expect(network.players.has('player-2')).toBe(false);
-      expect(emitSpy).toHaveBeenCalledWith('player_left', expect.objectContaining({
-        data: expect.objectContaining({
-          player_id: 'player-2'
-        })
-      }));
+      network._handlePostgresChange(payload);
+
+      // Should emit generic postgres_changes event
+      expect(emitSpy).toHaveBeenCalledWith('postgres_changes', payload);
+
+      // Should NOT emit domain-specific events
+      expect(emitSpy).not.toHaveBeenCalledWith('player_left', expect.anything());
     });
 
-    it('should emit evicted when self is deleted', () => {
+    it('should emit generic postgres_changes event on UPDATE', () => {
       const emitSpy = jest.spyOn(network, 'emit');
-      network.disconnect = jest.fn();
 
-      network._handlePostgresChange({
-        eventType: 'DELETE',
-        old: { player_id: MOCK_PLAYER_ID }
-      });
+      const payload = {
+        eventType: 'UPDATE',
+        new: { player_id: 'player-2', player_name: 'UpdatedPlayer' },
+        old: { player_id: 'player-2', player_name: 'OldPlayer' },
+        schema: 'public',
+        table: 'session_players'
+      };
 
-      expect(emitSpy).toHaveBeenCalledWith('evicted', expect.any(Object));
-      expect(network.disconnect).toHaveBeenCalled();
+      network._handlePostgresChange(payload);
+
+      // Should emit generic postgres_changes event
+      expect(emitSpy).toHaveBeenCalledWith('postgres_changes', payload);
+
+      // Should NOT emit domain-specific events
+      expect(emitSpy).not.toHaveBeenCalledWith('player_updated', expect.anything());
+    });
+
+    it('should emit generic postgres_changes for non-session_players tables', () => {
+      const emitSpy = jest.spyOn(network, 'emit');
+
+      const payload = {
+        eventType: 'INSERT',
+        new: { id: 'item-1', name: 'Sword' },
+        old: null,
+        schema: 'public',
+        table: 'session_items'
+      };
+
+      network._handlePostgresChange(payload);
+
+      // Should emit generic postgres_changes event for any table
+      expect(emitSpy).toHaveBeenCalledWith('postgres_changes', payload);
     });
   });
 

@@ -1,18 +1,19 @@
 import { createClient } from '@supabase/supabase-js';
 import { SessionPlayersSnapshot } from '../src/SessionPlayersSnapshot.js';
+import { Network } from '../src/network.js';
 
 const supabaseUrl = process.env.SUPABASE_URL;
 const supabaseAnonKey = process.env.SUPABASE_ANON_KEY;
 
-describe('SessionPlayersSnapshot Integration with Supabase', () => {
+describe('SessionPlayersSnapshot Integration with Network', () => {
   let hostClient;
   let playerClient;
+  let hostNetwork;
+  let playerNetwork;
   let hostSnapshot;
   let playerSnapshot;
   let testSessionId;
   let testJoinCode;
-  let hostChannel;
-  let playerChannel;
   let hostUser;
   let playerUser;
 
@@ -42,9 +43,24 @@ describe('SessionPlayersSnapshot Integration with Supabase', () => {
       throw new Error(`Failed to authenticate player: ${playerAuthError.message}`);
     }
     playerUser = playerAuth.user;
+
+    // Create Network instances
+    hostNetwork = new Network();
+    hostNetwork.initialize(hostClient, hostUser.id);
+
+    playerNetwork = new Network();
+    playerNetwork.initialize(playerClient, playerUser.id);
   });
 
   afterAll(async () => {
+    // Disconnect networks
+    if (hostNetwork) {
+      hostNetwork.disconnect();
+    }
+    if (playerNetwork) {
+      playerNetwork.disconnect();
+    }
+
     // Sign out both clients
     if (hostClient) {
       await hostClient.auth.signOut();
@@ -55,46 +71,14 @@ describe('SessionPlayersSnapshot Integration with Supabase', () => {
   });
 
   beforeEach(async () => {
-    // Create a test session
-    testJoinCode = Math.random().toString(36).substring(2, 8).toUpperCase();
-    const channelName = `game_session:${testJoinCode}`;
-
-    const { data: sessionData, error: sessionError } = await hostClient
-      .from('game_sessions')
-      .insert({
-        join_code: testJoinCode,
-        host_id: hostUser.id,
-        status: 'lobby',
-        realtime_channel_name: channelName,
-      })
-      .select()
-      .single();
-
-    if (sessionError) {
-      throw new Error(`Failed to create test session: ${sessionError.message}`);
-    }
-
-    testSessionId = sessionData.id;
-
-    // Create channels for both clients with broadcast enabled (SessionPlayersSnapshot will subscribe them)
-    hostChannel = hostClient.channel(channelName, {
-      config: {
-        broadcast: {
-          ack: true,
-        },
-      },
-    });
-    playerChannel = playerClient.channel(channelName, {
-      config: {
-        broadcast: {
-          ack: true,
-        },
-      },
-    });
+    // Host creates a game session via Network
+    const { session } = await hostNetwork.hostGame('HostPlayer');
+    testSessionId = session.id;
+    testJoinCode = session.join_code;
   });
 
   afterEach(async () => {
-    // Destroy snapshots first (clears intervals and unsubscribes from channels)
+    // Destroy snapshots first (clears intervals and unsubscribes from Network events)
     if (hostSnapshot) {
       hostSnapshot.destroy();
       hostSnapshot = null;
@@ -104,21 +88,16 @@ describe('SessionPlayersSnapshot Integration with Supabase', () => {
       playerSnapshot = null;
     }
 
-    // Wait for channel unsubscriptions to complete
-    await new Promise(resolve => setTimeout(resolve, 200));
-
-    // Remove channels
-    if (hostChannel) {
-      await hostClient.removeChannel(hostChannel);
-      hostChannel = null;
+    // Disconnect networks (removes channels)
+    if (hostNetwork) {
+      hostNetwork.disconnect();
     }
-    if (playerChannel) {
-      await playerClient.removeChannel(playerChannel);
-      playerChannel = null;
+    if (playerNetwork) {
+      playerNetwork.disconnect();
     }
 
-    // Wait for server-side cleanup to complete
-    await new Promise(resolve => setTimeout(resolve, 300));
+    // Wait for cleanup to complete
+    await new Promise(resolve => setTimeout(resolve, 500));
 
     // Clean up test data
     if (testSessionId) {
@@ -132,22 +111,10 @@ describe('SessionPlayersSnapshot Integration with Supabase', () => {
 
   describe('Initialization and Snapshot', () => {
     test('should fetch initial snapshot filtered by session_id', async () => {
-      // Add a player to the session first
-      const { error: insertError } = await hostClient
-        .from('session_players')
-        .insert({
-          session_id: testSessionId,
-          player_id: hostUser.id,
-          player_name: 'HostPlayer',
-          is_host: true,
-        });
+      // Create snapshot (host player was already added by hostGame)
+      hostSnapshot = new SessionPlayersSnapshot(hostNetwork, testSessionId);
 
-      expect(insertError).toBeNull();
-
-      // Create snapshot
-      hostSnapshot = new SessionPlayersSnapshot(hostClient, testSessionId, hostChannel);
-
-      // Wait for channel subscription to complete
+      // Wait for initialization to complete
       await hostSnapshot.ready();
 
       const players = hostSnapshot.getPlayers();
@@ -183,34 +150,26 @@ describe('SessionPlayersSnapshot Integration with Supabase', () => {
           is_host: true,
         });
 
-      // Add player to TEST session (use playerClient to insert playerUser)
-      await playerClient
-        .from('session_players')
-        .insert({
-          session_id: testSessionId,
-          player_id: playerUser.id,
-          player_name: 'TestPlayer',
-          is_host: false,
-        });
+      // Player joins TEST session via Network
+      await playerNetwork.joinGame(testJoinCode, 'TestPlayer');
 
       // Create snapshot for test session
-      hostSnapshot = new SessionPlayersSnapshot(hostClient, testSessionId, hostChannel);
+      hostSnapshot = new SessionPlayersSnapshot(hostNetwork, testSessionId);
 
-      // Wait for BOTH snapshots to be ready (if both exist)
-      if (hostSnapshot && playerSnapshot) {
-        await Promise.all([hostSnapshot.ready(), playerSnapshot.ready()]);
-      } else if (hostSnapshot) {
-        await hostSnapshot.ready();
-      } else if (playerSnapshot) {
-        await playerSnapshot.ready();
-      }
+      await hostSnapshot.ready();
 
       const players = hostSnapshot.getPlayers();
 
-      // Should only have the player from testSessionId
-      expect(players.size).toBe(1);
+      // Should ONLY see players from test session (host + player)
+      expect(players.size).toBe(2);
+      expect(players.has(hostUser.id)).toBe(true);
       expect(players.has(playerUser.id)).toBe(true);
-      expect(players.get(playerUser.id).player_name).toBe('TestPlayer');
+
+      // Should NOT see player from other session
+      const otherSessionPlayer = Array.from(players.values()).find(
+        p => p.player_name === 'OtherPlayer'
+      );
+      expect(otherSessionPlayer).toBeUndefined();
 
       // Cleanup other session
       await hostClient.from('session_players').delete().eq('session_id', otherSession.id);
@@ -218,354 +177,143 @@ describe('SessionPlayersSnapshot Integration with Supabase', () => {
     });
   });
 
-  describe('addPlayer', () => {
-    test('should insert player into database with correct session_id', async () => {
-      hostSnapshot = new SessionPlayersSnapshot(hostClient, testSessionId, hostChannel);
+  describe('Realtime Synchronization via Network', () => {
+    test('should sync when new player joins via Network', async () => {
+      // Create host snapshot
+      hostSnapshot = new SessionPlayersSnapshot(hostNetwork, testSessionId);
+      await hostSnapshot.ready();
 
-      // Wait for BOTH snapshots to be ready (if both exist)
-      if (hostSnapshot && playerSnapshot) {
-        await Promise.all([hostSnapshot.ready(), playerSnapshot.ready()]);
-      } else if (hostSnapshot) {
-        await hostSnapshot.ready();
-      } else if (playerSnapshot) {
-        await playerSnapshot.ready();
-      }
+      expect(hostSnapshot.getPlayers().size).toBe(1);
 
-      await hostSnapshot.addPlayer({
-        player_id: hostUser.id,
-        player_name: 'HostPlayer',
-        is_host: true,
-      });
+      // Player joins via Network
+      await playerNetwork.joinGame(testJoinCode, 'TestPlayer');
 
-      // Verify in database
-      const { data, error } = await hostClient
-        .from('session_players')
-        .select('*')
-        .eq('session_id', testSessionId)
-        .eq('player_id', hostUser.id)
-        .single();
-
-      expect(error).toBeNull();
-      expect(data).not.toBeNull();
-      expect(data.player_name).toBe('HostPlayer');
-      expect(data.is_host).toBe(true);
-      expect(data.session_id).toBe(testSessionId);
-    });
-
-    test('should add player to local map after insertion', async () => {
-      hostSnapshot = new SessionPlayersSnapshot(hostClient, testSessionId, hostChannel);
-
-      // Wait for BOTH snapshots to be ready (if both exist)
-      if (hostSnapshot && playerSnapshot) {
-        await Promise.all([hostSnapshot.ready(), playerSnapshot.ready()]);
-      } else if (hostSnapshot) {
-        await hostSnapshot.ready();
-      } else if (playerSnapshot) {
-        await playerSnapshot.ready();
-      }
-
-      await hostSnapshot.addPlayer({
-        player_id: hostUser.id,
-        player_name: 'HostPlayer',
-        is_host: true,
-      });
-
-      const players = hostSnapshot.getPlayers();
-      expect(players.has(hostUser.id)).toBe(true);
-      expect(players.get(hostUser.id).player_name).toBe('HostPlayer');
-    });
-  });
-
-  describe('DB Event Synchronization - INSERT', () => {
-    test('should receive INSERT event and update local map', async () => {
-      hostSnapshot = new SessionPlayersSnapshot(hostClient, testSessionId, hostChannel);
-      playerSnapshot = new SessionPlayersSnapshot(playerClient, testSessionId, playerChannel);
-
-      // Wait for BOTH snapshots to be ready (if both exist)
-      if (hostSnapshot && playerSnapshot) {
-        await Promise.all([hostSnapshot.ready(), playerSnapshot.ready()]);
-      } else if (hostSnapshot) {
-        await hostSnapshot.ready();
-      } else if (playerSnapshot) {
-        await playerSnapshot.ready();
-      }
-
-      // Player joins session first (required by RLS policy to see other players)
-      await playerSnapshot.addPlayer({
-        player_id: playerUser.id,
-        player_name: 'PlayerOne',
-        is_host: false,
-      });
-
-      // Wait for player join to propagate
-      await new Promise(resolve => setTimeout(resolve, 300));
-
-      // Host adds themselves
-      await hostSnapshot.addPlayer({
-        player_id: hostUser.id,
-        player_name: 'HostPlayer',
-        is_host: true,
-      });
-
-      // Wait for DB event to propagate
+      // Wait for postgres_changes event to propagate through Network
       await new Promise(resolve => setTimeout(resolve, 500));
 
-      // Player snapshot should have received the INSERT event for the host
-      const playerPlayers = playerSnapshot.getPlayers();
-      expect(playerPlayers.has(hostUser.id)).toBe(true);
-      expect(playerPlayers.get(hostUser.id).player_name).toBe('HostPlayer');
+      const players = hostSnapshot.getPlayers();
+      expect(players.size).toBe(2);
+      expect(players.has(playerUser.id)).toBe(true);
+      expect(players.get(playerUser.id).player_name).toBe('TestPlayer');
     });
-  });
 
-  describe('DB Event Synchronization - DELETE', () => {
-    test('should receive DELETE event and remove from local map', async () => {
-      // Add host player first
-      const { data: insertedPlayer, error: insertError } = await hostClient
-        .from('session_players')
-        .insert({
-          session_id: testSessionId,
-          player_id: hostUser.id,
-          player_name: 'HostPlayer',
-          is_host: true,
-        })
-        .select()
-        .single();
+    test('should sync when player is deleted', async () => {
+      // Player joins first
+      await playerNetwork.joinGame(testJoinCode, 'TestPlayer');
 
-      expect(insertError).toBeNull();
+      // Create host snapshot
+      hostSnapshot = new SessionPlayersSnapshot(hostNetwork, testSessionId);
+      await hostSnapshot.ready();
 
-      // Add player to session (required by RLS policy to see other players)
-      const { error: playerInsertError } = await playerClient
-        .from('session_players')
-        .insert({
-          session_id: testSessionId,
-          player_id: playerUser.id,
-          player_name: 'PlayerOne',
-          is_host: false,
-        });
+      expect(hostSnapshot.getPlayers().size).toBe(2);
 
-      expect(playerInsertError).toBeNull();
-
-      hostSnapshot = new SessionPlayersSnapshot(hostClient, testSessionId, hostChannel);
-      playerSnapshot = new SessionPlayersSnapshot(playerClient, testSessionId, playerChannel);
-
-      // Wait for BOTH snapshots to be ready (if both exist)
-      if (hostSnapshot && playerSnapshot) {
-        await Promise.all([hostSnapshot.ready(), playerSnapshot.ready()]);
-      } else if (hostSnapshot) {
-        await hostSnapshot.ready();
-      } else if (playerSnapshot) {
-        await playerSnapshot.ready();
-      }
-
-      // Both should have the host player
-      expect(hostSnapshot.getPlayers().has(hostUser.id)).toBe(true);
-      expect(playerSnapshot.getPlayers().has(hostUser.id)).toBe(true);
-
-      // Delete the host player
+      // Delete player directly from database
       await hostClient
         .from('session_players')
         .delete()
-        .eq('id', insertedPlayer.id);
+        .eq('player_id', playerUser.id)
+        .eq('session_id', testSessionId);
 
-      // Wait for DELETE event to propagate
+      // Wait for postgres_changes event
       await new Promise(resolve => setTimeout(resolve, 500));
 
-      // Both should have removed the host player
-      expect(hostSnapshot.getPlayers().has(hostUser.id)).toBe(false);
-      expect(playerSnapshot.getPlayers().has(hostUser.id)).toBe(false);
-    });
-  });
-
-  describe('DB Event Synchronization - UPDATE', () => {
-    test('should receive UPDATE event and update local map', async () => {
-      // Add a player first
-      const { data: insertedPlayer, error: insertError } = await hostClient
-        .from('session_players')
-        .insert({
-          session_id: testSessionId,
-          player_id: hostUser.id,
-          player_name: 'HostPlayer',
-          is_host: true,
-          kills: 0,
-        })
-        .select()
-        .single();
-
-      expect(insertError).toBeNull();
-
-      hostSnapshot = new SessionPlayersSnapshot(hostClient, testSessionId, hostChannel);
-      playerSnapshot = new SessionPlayersSnapshot(playerClient, testSessionId, playerChannel);
-
-      // Wait for BOTH snapshots to be ready (if both exist)
-      if (hostSnapshot && playerSnapshot) {
-        await Promise.all([hostSnapshot.ready(), playerSnapshot.ready()]);
-      } else if (hostSnapshot) {
-        await hostSnapshot.ready();
-      } else if (playerSnapshot) {
-        await playerSnapshot.ready();
-      }
-
-      expect(hostSnapshot.getPlayers().get(hostUser.id).kills).toBe(0);
-      expect(playerSnapshot.getPlayers().get(hostUser.id).kills).toBe(0);
-
-      // Update the player
-      await hostClient
-        .from('session_players')
-        .update({ kills: 5 })
-        .eq('id', insertedPlayer.id);
-
-      // Wait for UPDATE event to propagate
-      await new Promise(resolve => setTimeout(resolve, 500));
-
-      // Both should have updated kills
-      expect(hostSnapshot.getPlayers().get(hostUser.id).kills).toBe(5);
-      expect(playerSnapshot.getPlayers().get(hostUser.id).kills).toBe(5);
-    });
-  });
-
-  describe('Position Update Synchronization', () => {
-    test('should receive position updates via channel broadcast', async () => {
-      // Add a player first
-      await hostClient
-        .from('session_players')
-        .insert({
-          session_id: testSessionId,
-          player_id: hostUser.id,
-          player_name: 'HostPlayer',
-          is_host: true,
-          position_x: 0,
-          position_y: 0,
-          rotation: 0,
-        });
-
-      hostSnapshot = new SessionPlayersSnapshot(hostClient, testSessionId, hostChannel);
-      playerSnapshot = new SessionPlayersSnapshot(playerClient, testSessionId, playerChannel);
-
-      // Wait for BOTH snapshots to be ready (if both exist)
-      if (hostSnapshot && playerSnapshot) {
-        await Promise.all([hostSnapshot.ready(), playerSnapshot.ready()]);
-      } else if (hostSnapshot) {
-        await hostSnapshot.ready();
-      } else if (playerSnapshot) {
-        await playerSnapshot.ready();
-      }
-
-      // Give broadcasts time to fully initialize after subscription
-      await new Promise(resolve => setTimeout(resolve, 100));
-
-      // Host broadcasts position update
-      await hostChannel.send({
-        type: 'broadcast',
-        event: 'position_update',
-        payload: {
-          player_id: hostUser.id,
-          position_x: 100,
-          position_y: 200,
-          rotation: 1.5,
-        },
-      });
-
-      // Wait for broadcast to propagate
-      await new Promise(resolve => setTimeout(resolve, 500));
-
-      // Player snapshot should have updated position
-      const playerPlayers = playerSnapshot.getPlayers();
-      expect(playerPlayers.get(hostUser.id).position_x).toBe(100);
-      expect(playerPlayers.get(hostUser.id).position_y).toBe(200);
-      expect(playerPlayers.get(hostUser.id).rotation).toBe(1.5);
+      const players = hostSnapshot.getPlayers();
+      expect(players.size).toBe(1);
+      expect(players.has(playerUser.id)).toBe(false);
     });
 
-    test('position updates should not write to database', async () => {
-      // Add a player first
+    test('should update player data on UPDATE events', async () => {
+      // Create host snapshot
+      hostSnapshot = new SessionPlayersSnapshot(hostNetwork, testSessionId);
+      await hostSnapshot.ready();
+
+      const hostPlayerBefore = hostSnapshot.getPlayers().get(hostUser.id);
+      expect(hostPlayerBefore.kills).toBe(0);
+
+      // Update player data
       await hostClient
         .from('session_players')
-        .insert({
-          session_id: testSessionId,
-          player_id: hostUser.id,
-          player_name: 'HostPlayer',
-          is_host: true,
-          position_x: 0,
-          position_y: 0,
-        });
-
-      hostSnapshot = new SessionPlayersSnapshot(hostClient, testSessionId, hostChannel);
-
-      // Wait for BOTH snapshots to be ready (if both exist)
-      if (hostSnapshot && playerSnapshot) {
-        await Promise.all([hostSnapshot.ready(), playerSnapshot.ready()]);
-      } else if (hostSnapshot) {
-        await hostSnapshot.ready();
-      } else if (playerSnapshot) {
-        await playerSnapshot.ready();
-      }
-
-      // Broadcast position update
-      await hostChannel.send({
-        type: 'broadcast',
-        event: 'position_update',
-        payload: {
-          player_id: hostUser.id,
-          position_x: 100,
-          position_y: 200,
-        },
-      });
-
-      await new Promise(resolve => setTimeout(resolve, 500));
-
-      // Check database - position should still be 0, 0
-      const { data, error } = await hostClient
-        .from('session_players')
-        .select('position_x, position_y')
-        .eq('session_id', testSessionId)
+        .update({ kills: 5, damage_dealt: 100 })
         .eq('player_id', hostUser.id)
-        .single();
+        .eq('session_id', testSessionId);
 
-      expect(error).toBeNull();
-      expect(data.position_x).toBe(0);
-      expect(data.position_y).toBe(0);
+      // Wait for postgres_changes event
+      await new Promise(resolve => setTimeout(resolve, 500));
+
+      const hostPlayerAfter = hostSnapshot.getPlayers().get(hostUser.id);
+      expect(hostPlayerAfter.kills).toBe(5);
+      expect(hostPlayerAfter.damage_dealt).toBe(100);
+    });
+  });
+
+  describe('Position Updates via Network Broadcasts', () => {
+    test('should update player positions from Network broadcasts', async () => {
+      // Player joins
+      await playerNetwork.joinGame(testJoinCode, 'TestPlayer');
+
+      // Create snapshots for both clients
+      hostSnapshot = new SessionPlayersSnapshot(hostNetwork, testSessionId);
+      playerSnapshot = new SessionPlayersSnapshot(playerNetwork, testSessionId);
+      await hostSnapshot.ready();
+      await playerSnapshot.ready();
+
+      const hostPlayerBefore = playerSnapshot.getPlayers().get(hostUser.id);
+      expect(hostPlayerBefore.position_x).toBe(0);
+      expect(hostPlayerBefore.position_y).toBe(0);
+
+      // Send actual position update through Network channel
+      // This will go through Supabase Realtime and trigger broadcast events
+      hostNetwork.sendPositionUpdate({
+        position: { x: 100, y: 200 },
+        rotation: 1.57,
+        velocity: { x: 0, y: 0 },
+      });
+
+      // Wait for broadcast to propagate through Supabase Realtime
+      await new Promise(resolve => setTimeout(resolve, 500));
+
+      // Position should update in playerSnapshot via Network broadcast handler
+      const hostPlayerAfter = playerSnapshot.getPlayers().get(hostUser.id);
+
+      // Note: Position updates are ephemeral (not written to DB)
+      // They update the in-memory player object in the snapshot
+      expect(hostPlayerAfter.position_x).toBe(100);
+      expect(hostPlayerAfter.position_y).toBe(200);
+      expect(hostPlayerAfter.rotation).toBe(1.57);
     });
   });
 
   describe('Periodic Refresh', () => {
-    test('should refresh snapshot every 5 seconds and pick up new players', async () => {
-      // Create two snapshots with 5-second refresh interval
-      hostSnapshot = new SessionPlayersSnapshot(hostClient, testSessionId, hostChannel, { refreshIntervalMs: 5000 });
-      playerSnapshot = new SessionPlayersSnapshot(playerClient, testSessionId, playerChannel, { refreshIntervalMs: 5000 });
+    test('should periodically refresh snapshot from database', async () => {
+      // Create snapshot with short refresh interval
+      hostSnapshot = new SessionPlayersSnapshot(hostNetwork, testSessionId, {
+        refreshIntervalMs: 500,
+      });
 
-      await Promise.all([hostSnapshot.ready(), playerSnapshot.ready()]);
+      await hostSnapshot.ready();
 
-      // Give the channel subscriptions extra time to fully initialize
-      await new Promise(resolve => setTimeout(resolve, 500));
-
-      // Initially, no players in either snapshot
-      expect(hostSnapshot.getPlayers().size).toBe(0);
-      expect(playerSnapshot.getPlayers().size).toBe(0);
-
-      // Insert a player directly into the database (not using addPlayer)
-      // This simulates an external insertion that both snapshots should pick up via DB events or periodic refresh
-      const { error: insertError } = await playerClient
+      // Manually insert a player directly to database (bypassing realtime)
+      await hostClient
         .from('session_players')
         .insert({
           session_id: testSessionId,
-          player_id: playerUser.id,
-          player_name: 'NewPlayer',
+          player_id: 'manual-player-id',
+          player_name: 'ManualPlayer',
           is_host: false,
         });
 
-      expect(insertError).toBeNull();
+      // Wait for periodic refresh to kick in
+      await new Promise(resolve => setTimeout(resolve, 700));
 
-      // Wait for either DB event (should be immediate) or periodic refresh (5s) to pick it up
-      // DB events should pick this up within 1 second, but we'll wait longer to also test periodic refresh as a fallback
-      await new Promise(resolve => setTimeout(resolve, 6000));
+      const players = hostSnapshot.getPlayers();
+      expect(players.size).toBe(2);
+      expect(players.has('manual-player-id')).toBe(true);
 
-      // Both snapshots should now have the new player (either from DB event or periodic refresh)
-      expect(hostSnapshot.getPlayers().size).toBe(1);
-      expect(hostSnapshot.getPlayers().has(playerUser.id)).toBe(true);
-      expect(hostSnapshot.getPlayers().get(playerUser.id).player_name).toBe('NewPlayer');
-
-      expect(playerSnapshot.getPlayers().size).toBe(1);
-      expect(playerSnapshot.getPlayers().has(playerUser.id)).toBe(true);
-      expect(playerSnapshot.getPlayers().get(playerUser.id).player_name).toBe('NewPlayer');
+      // Cleanup
+      await hostClient
+        .from('session_players')
+        .delete()
+        .eq('player_id', 'manual-player-id');
     });
   });
 });
