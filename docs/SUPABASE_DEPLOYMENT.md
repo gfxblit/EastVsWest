@@ -17,7 +17,13 @@ This document outlines the strategy for local testing and production deployment 
 
 ## 3. Production Deployment
 
-*   **Production Configuratio:** The production environment will be configured with the production Supabase project's URL and anon key.
+*   **Production Configuration:** The production environment will be configured with the production Supabase project's URL and anon key.
+*   **Configuration Sync:** Deploy local configuration to production using the Supabase CLI:
+    ```bash
+    # Push local config.toml to production
+    npx supabase config push --project-ref <your-project-ref>
+    ```
+    This ensures settings like anonymous authentication, JWT expiry, rate limits, and other auth settings are synchronized between local and production environments.
 *   **Security:** The Supabase project will be secured for production by:
     *   Enabling Row Level Security (RLS) on all tables.
     *   Configuring appropriate access policies.
