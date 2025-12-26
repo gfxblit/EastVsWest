@@ -41,7 +41,6 @@ export class Network extends EventEmitter {
     this.supabase = null;
     this.playerId = null;
     this.sessionId = null;
-    this.players = new Map();
     this.channel = null;
     this.positionBuffer = new Map(); // Stores position updates by player_id
     this.playerPositions = new Map(); // Stores last known positions for validation
@@ -152,24 +151,11 @@ export class Network extends EventEmitter {
     // 3. Subscribe to channel and postgres changes
     await this._subscribeToChannel(session.realtime_channel_name);
 
-    // 4. Fetch initial snapshot of players
-    const { data: allPlayers, error: playersError } = await this.supabase
-      .from('session_players')
-      .select('*')
-      .eq('session_id', this.sessionId);
-    
-    if (playersError) throw playersError;
-
-    // Initialize local players map
-    this.players.clear();
-    allPlayers.forEach(p => this.players.set(p.player_id, p));
-
     this.connected = true;
 
-    return { 
-      session, 
-      player: playerRecord, 
-      allPlayers: Array.from(this.players.values()) 
+    return {
+      session,
+      player: playerRecord
     };
   }
 
@@ -231,56 +217,25 @@ export class Network extends EventEmitter {
   }
 
   _handlePostgresChange(payload) {
-    const { eventType, new: newRecord, old: oldRecord } = payload;
-    
-    if (eventType === 'INSERT') {
-      this.players.set(newRecord.player_id, newRecord);
-      this.emit('player_joined', {
-        type: 'player_joined',
-        data: {
-          player: newRecord,
-          allPlayers: Array.from(this.players.values())
-        }
-      });
-
-      if (this.isHost) {
-        this._enforceMaxPlayers();
-      }
-    } else if (eventType === 'DELETE') {
-      const deletedPlayerId = oldRecord.player_id;
-      this.players.delete(deletedPlayerId);
-      
-      this.emit('player_left', {
-        type: 'player_left',
-        data: {
-          player_id: deletedPlayerId,
-          allPlayers: Array.from(this.players.values())
-        }
-      });
-
-      if (deletedPlayerId === this.playerId) {
-        this.emit('evicted', { reason: 'Session full or host evicted you' });
-        this.disconnect();
-      }
-    } else if (eventType === 'UPDATE') {
-      this.players.set(newRecord.player_id, newRecord);
-      this.emit('player_updated', {
-        type: 'player_updated',
-        data: {
-          player: newRecord,
-          allPlayers: Array.from(this.players.values())
-        }
-      });
-    }
+    // Emit generic postgres_changes event for any table
+    // Higher-level components (like SessionPlayersSnapshot) will filter and handle these
+    this.emit('postgres_changes', payload);
   }
 
   async _enforceMaxPlayers() {
     if (!this.isHost || !this.sessionId) return;
 
-    // Get current players sorted by join time
-    const players = Array.from(this.players.values()).sort((a, b) => 
-      new Date(a.joined_at) - new Date(b.joined_at)
-    );
+    // Get current players sorted by join time from database
+    const { data: players, error: playersError } = await this.supabase
+      .from('session_players')
+      .select('*')
+      .eq('session_id', this.sessionId)
+      .order('joined_at', { ascending: true });
+
+    if (playersError) {
+      console.error(`Failed to fetch players for max enforcement: ${playersError.message}`);
+      return;
+    }
 
     const { data: session } = await this.supabase
       .from('game_sessions')

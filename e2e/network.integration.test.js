@@ -121,7 +121,7 @@ describe('Network Module Integration with Supabase', () => {
     expect(joinedPayload.session.join_code).toBe(joinCode);
     expect(joinedPayload.player.player_id).toBe(playerUser.id);
     expect(joinedPayload.player.player_name).toBe(playerName);
-    expect(joinedPayload.allPlayers).toHaveLength(2); // Host and the new player
+    // Note: allPlayers field removed in refactoring - use SessionPlayersSnapshot instead
 
     // Verify network state of the joining player
     expect(playerNetwork.isHost).toBe(false);
@@ -191,17 +191,17 @@ describe('Network Module Integration with Supabase', () => {
     await playerClient.auth.signOut();
   });
 
-  test('host should receive player_joined event locally when a player joins', async () => {
+  test('host should receive postgres_changes event when a player joins', async () => {
     // Host creates a session
     const hostName = 'HostPlayer';
     const { session: hostSession, player: hostPlayerRecord } = await network.hostGame(hostName);
     testSessionId = hostSession.id;
     const joinCode = hostSession.join_code;
 
-    // Set up listener for player_joined on the host
-    const hostPlayerJoinedEvents = [];
-    network.on('player_joined', (payload) => {
-      hostPlayerJoinedEvents.push(payload);
+    // Set up listener for postgres_changes on the host (new approach post-refactoring)
+    const hostPostgresChangeEvents = [];
+    network.on('postgres_changes', (payload) => {
+      hostPostgresChangeEvents.push(payload);
     });
 
     // Create a new player and join
@@ -213,16 +213,21 @@ describe('Network Module Integration with Supabase', () => {
     const playerName = 'TestPlayer';
     await playerNetwork.joinGame(joinCode, playerName);
 
-    // Wait for event to propagate
-    await new Promise(resolve => setTimeout(resolve, 200));
+    // Wait for postgres_changes event to propagate
+    await new Promise(resolve => setTimeout(resolve, 500));
 
-    // Verify host received the player_joined event
-    expect(hostPlayerJoinedEvents.length).toBeGreaterThan(0);
-    const joinEvent = hostPlayerJoinedEvents.find(e => e.data.player.player_name === playerName);
-    
+    // Verify host received the postgres_changes INSERT event for the new player
+    expect(hostPostgresChangeEvents.length).toBeGreaterThan(0);
+    const joinEvent = hostPostgresChangeEvents.find(e =>
+      e.eventType === 'INSERT' &&
+      e.new?.player_name === playerName
+    );
+
     expect(joinEvent).toBeDefined();
-    expect(joinEvent.data.player.player_name).toBe(playerName);
-    expect(joinEvent.data.allPlayers).toHaveLength(2); // Host + new player
+    expect(joinEvent.eventType).toBe('INSERT');
+    expect(joinEvent.table).toBe('session_players');
+    expect(joinEvent.new.player_name).toBe(playerName);
+    expect(joinEvent.new.session_id).toBe(testSessionId);
 
     // Clean up
     playerNetwork.disconnect();

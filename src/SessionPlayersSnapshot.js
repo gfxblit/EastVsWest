@@ -2,17 +2,21 @@
  * SessionPlayersSnapshot
  *
  * Maintains a local synchronized copy of players in a specific game session.
+ * Built on top of Network layer - subscribes to Network events instead of managing channels directly.
  * Syncs via database events, ephemeral WebSocket broadcasts, and periodic refreshes.
  */
 export class SessionPlayersSnapshot {
-  constructor(supabaseClient, sessionId, channel, options = {}) {
-    this.supabaseClient = supabaseClient;
+  constructor(network, sessionId, options = {}) {
+    this.network = network;
     this.sessionId = sessionId;
-    this.channel = channel;
     this.players = new Map(); // Keyed by player_id
     this.refreshInterval = null;
-    this.subscriptionReady = null; // Promise that resolves when channel is subscribed and initial fetch is complete
+    this.subscriptionReady = null; // Promise that resolves when subscriptions are ready and initial fetch is complete
     this.refreshIntervalMs = options.refreshIntervalMs || 60000; // Default to 60 seconds
+
+    // Bound event handlers for cleanup
+    this.postgresChangesHandler = this.#handlePostgresChanges.bind(this);
+    this.broadcastHandler = this.#handleBroadcast.bind(this);
 
     // Initialize: fetch snapshot and setup subscriptions
     this.subscriptionReady = this.#initialize();
@@ -22,15 +26,15 @@ export class SessionPlayersSnapshot {
   }
 
   /**
-   * Initialize the snapshot: fetch initial data and setup channel subscriptions
+   * Initialize the snapshot: fetch initial data and setup Network event subscriptions
    * @returns {Promise} Resolves when both fetch and subscription are complete
    */
   async #initialize() {
     // Fetch initial snapshot first
     await this.#fetchInitialSnapshot();
 
-    // Then setup channel subscriptions
-    await this.#setupChannelSubscriptions();
+    // Then setup Network event subscriptions
+    this.#setupNetworkSubscriptions();
   }
 
   /**
@@ -46,7 +50,7 @@ export class SessionPlayersSnapshot {
    */
   async #fetchInitialSnapshot() {
     try {
-      const { data, error } = await this.supabaseClient
+      const { data, error } = await this.network.supabase
         .from('session_players')
         .select('*')
         .eq('session_id', this.sessionId);
@@ -68,44 +72,58 @@ export class SessionPlayersSnapshot {
   }
 
   /**
-   * Setup channel subscriptions for DB events and position updates
-   * @returns {Promise} Resolves when channel is subscribed
+   * Setup Network event subscriptions for DB changes and broadcasts
    */
-  #setupChannelSubscriptions() {
-    return new Promise((resolve, reject) => {
-      this.channel
-        .on(
-          'postgres_changes',
-          {
-            event: '*',
-            schema: 'public',
-            table: 'session_players',
-            // Don't use filter parameter - manually filter in handler to ensure DELETE events work
-          },
-          (payload) => {
-            // Manually filter events by session_id
-            const sessionId = payload.new?.session_id || payload.old?.session_id;
-            if (sessionId && sessionId !== this.sessionId) {
-              return; // Ignore events for other sessions
-            }
-            this.#handleDbEvent(payload);
-          }
-        )
-        .on(
-          'broadcast',
-          { event: 'position_update' },
-          (message) => {
-            this.#handlePositionUpdate(message.payload);
-          }
-        )
-        .subscribe((status, error) => {
-          if (status === 'SUBSCRIBED') {
-            resolve();
-          } else if (status === 'CHANNEL_ERROR' || status === 'TIMED_OUT') {
-            reject(new Error(`Failed to subscribe to channel: ${status} ${error ? error.message : ''}`));
-          }
+  #setupNetworkSubscriptions() {
+    // Subscribe to Network's generic postgres_changes events
+    this.network.on('postgres_changes', this.postgresChangesHandler);
+
+    // Subscribe to Network's position_update broadcast events
+    // Network emits events with payload.type as the event name
+    this.network.on('position_update', this.broadcastHandler);
+    this.network.on('position_broadcast', this.broadcastHandler);
+  }
+
+  /**
+   * Handle postgres_changes events from Network
+   * Filters for session_players table and this session_id
+   */
+  #handlePostgresChanges(payload) {
+    const { table, new: newRecord, old: oldRecord } = payload;
+
+    // Filter: only handle session_players table
+    if (table !== 'session_players') {
+      return;
+    }
+
+    // Filter: only handle events for this session
+    const sessionId = newRecord?.session_id || oldRecord?.session_id;
+    if (sessionId && sessionId !== this.sessionId) {
+      return;
+    }
+
+    // Delegate to existing handler
+    this.#handleDbEvent(payload);
+  }
+
+  /**
+   * Handle broadcast events from Network
+   * Processes position_update and position_broadcast messages
+   */
+  #handleBroadcast(message) {
+    // Handle position_update (individual player update)
+    if (message.type === 'position_update') {
+      this.#handlePositionUpdate(message.data);
+    }
+    // Handle position_broadcast (batched updates from host)
+    else if (message.type === 'position_broadcast') {
+      const { updates } = message.data;
+      if (updates && Array.isArray(updates)) {
+        updates.forEach(update => {
+          this.#handlePositionUpdate(update);
         });
-    });
+      }
+    }
   }
 
   /**
@@ -143,25 +161,41 @@ export class SessionPlayersSnapshot {
 
   /**
    * Handle position update broadcasts
+   * Handles both formats:
+   * - Direct format: { player_id, position_x, position_y, rotation }
+   * - Nested format: { player_id, position: {x, y}, rotation, velocity }
    */
   #handlePositionUpdate(payload) {
-    const { player_id, position_x, position_y, rotation } = payload;
+    const player_id = payload.player_id || payload.from;
+    const player = this.players.get(player_id);
 
     // Only update if player exists in this session
-    const player = this.players.get(player_id);
     if (!player) {
       return;
     }
 
-    // Update position in-memory (ephemeral, not written to DB)
-    if (position_x !== undefined) {
-      player.position_x = position_x;
+    // Handle nested position format (from position_update/position_broadcast)
+    if (payload.position) {
+      if (payload.position.x !== undefined) {
+        player.position_x = payload.position.x;
+      }
+      if (payload.position.y !== undefined) {
+        player.position_y = payload.position.y;
+      }
     }
-    if (position_y !== undefined) {
-      player.position_y = position_y;
+    // Handle direct format (for backwards compatibility)
+    else {
+      if (payload.position_x !== undefined) {
+        player.position_x = payload.position_x;
+      }
+      if (payload.position_y !== undefined) {
+        player.position_y = payload.position_y;
+      }
     }
-    if (rotation !== undefined) {
-      player.rotation = rotation;
+
+    // Update rotation (works for both formats)
+    if (payload.rotation !== undefined) {
+      player.rotation = payload.rotation;
     }
   }
 
@@ -179,7 +213,7 @@ export class SessionPlayersSnapshot {
    */
   async #refreshSnapshot() {
     try {
-      const { data, error } = await this.supabaseClient
+      const { data, error } = await this.network.supabase
         .from('session_players')
         .select('*')
         .eq('session_id', this.sessionId);
@@ -216,7 +250,7 @@ export class SessionPlayersSnapshot {
   async addPlayer(playerData) {
     try {
       // Insert with session_id
-      const { data, error } = await this.supabaseClient
+      const { data, error } = await this.network.supabase
         .from('session_players')
         .insert({
           session_id: this.sessionId,
@@ -249,9 +283,11 @@ export class SessionPlayersSnapshot {
       this.refreshInterval = null;
     }
 
-    // Unsubscribe from channel
-    if (this.channel) {
-      this.channel.unsubscribe();
+    // Unsubscribe from Network events
+    if (this.network) {
+      this.network.off('postgres_changes', this.postgresChangesHandler);
+      this.network.off('position_update', this.broadcastHandler);
+      this.network.off('position_broadcast', this.broadcastHandler);
     }
   }
 }

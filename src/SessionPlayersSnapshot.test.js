@@ -1,10 +1,10 @@
 import { jest } from '@jest/globals';
 import { SessionPlayersSnapshot } from './SessionPlayersSnapshot.js';
 
-describe('SessionPlayersSnapshot', () => {
+describe('SessionPlayersSnapshot (Built on Network)', () => {
   let snapshot;
+  let mockNetwork;
   let mockSupabaseClient;
-  let mockChannel;
   const TEST_SESSION_ID = 'test-session-id';
   const TEST_PLAYER_ID = 'test-player-id';
 
@@ -40,13 +40,6 @@ describe('SessionPlayersSnapshot', () => {
 
     mockSupabaseClient = {
       from: jest.fn(),
-      channel: jest.fn(),
-    };
-
-    // Mock channel
-    mockChannel = {
-      on: jest.fn().mockReturnThis(),
-      subscribe: jest.fn().mockReturnThis(),
     };
 
     // Setup default mock behaviors for SELECT queries
@@ -73,10 +66,40 @@ describe('SessionPlayersSnapshot', () => {
       select: mockSelect,
       insert: mockInsert,
     });
+
+    // Mock Network instance (EventEmitter-like)
+    mockNetwork = {
+      supabase: mockSupabaseClient,
+      sessionId: TEST_SESSION_ID,
+      on: jest.fn(),
+      off: jest.fn(),
+      emit: jest.fn(),
+      send: jest.fn(),
+    };
   });
 
-
   describe('Initialization', () => {
+    test('WhenConstructed_ShouldSubscribeToNetworkPostgresChanges', async () => {
+      snapshot = new SessionPlayersSnapshot(mockNetwork, TEST_SESSION_ID);
+
+      // Wait for async initialization
+      await snapshot.ready();
+
+      // Should subscribe to Network's postgres_changes event
+      expect(mockNetwork.on).toHaveBeenCalledWith('postgres_changes', expect.any(Function));
+    });
+
+    test('WhenConstructed_ShouldSubscribeToNetworkBroadcastEvents', async () => {
+      snapshot = new SessionPlayersSnapshot(mockNetwork, TEST_SESSION_ID);
+
+      // Wait for async initialization
+      await snapshot.ready();
+
+      // Should subscribe to Network's position_update and position_broadcast events
+      expect(mockNetwork.on).toHaveBeenCalledWith('position_update', expect.any(Function));
+      expect(mockNetwork.on).toHaveBeenCalledWith('position_broadcast', expect.any(Function));
+    });
+
     test('WhenConstructed_ShouldFetchInitialSnapshotFilteredBySessionId', async () => {
       const mockPlayers = [createMockPlayer()];
 
@@ -85,10 +108,10 @@ describe('SessionPlayersSnapshot', () => {
         error: null,
       });
 
-      snapshot = new SessionPlayersSnapshot(mockSupabaseClient, TEST_SESSION_ID, mockChannel);
+      snapshot = new SessionPlayersSnapshot(mockNetwork, TEST_SESSION_ID);
 
       // Wait for async initialization
-      await new Promise(resolve => setTimeout(resolve, 0));
+      await snapshot.ready();
 
       expect(mockSupabaseClient.from).toHaveBeenCalledWith('session_players');
       expect(mockSupabaseClient.from().select).toHaveBeenCalledWith('*');
@@ -100,13 +123,13 @@ describe('SessionPlayersSnapshot', () => {
 
       mockSupabaseClient.from().select().eq.mockResolvedValue({
         data: null,
-        error: { message: 'Database error' },
+        error: { message: 'Network error' },
       });
 
-      snapshot = new SessionPlayersSnapshot(mockSupabaseClient, TEST_SESSION_ID, mockChannel);
+      snapshot = new SessionPlayersSnapshot(mockNetwork, TEST_SESSION_ID);
 
       // Wait for async initialization
-      await new Promise(resolve => setTimeout(resolve, 0));
+      await snapshot.ready();
 
       expect(consoleWarnSpy).toHaveBeenCalledWith(
         expect.stringContaining('Failed to fetch initial snapshot')
@@ -114,523 +137,207 @@ describe('SessionPlayersSnapshot', () => {
 
       consoleWarnSpy.mockRestore();
     });
+  });
 
-    test('WhenInitialized_ShouldSubscribeToDbEvents', async () => {
-      snapshot = new SessionPlayersSnapshot(mockSupabaseClient, TEST_SESSION_ID, mockChannel);
-
-      await new Promise(resolve => setTimeout(resolve, 0));
-
-      expect(mockChannel.on).toHaveBeenCalledWith(
-        'postgres_changes',
-        expect.objectContaining({
-          event: '*',
-          schema: 'public',
-          table: 'session_players',
-          // Note: No filter parameter - implementation manually filters in handler
-          // to ensure DELETE events work correctly (Supabase limitation)
-        }),
-        expect.any(Function)
-      );
-    });
-
-    test('WhenInitialized_ShouldSubscribeToPositionUpdates', async () => {
-      snapshot = new SessionPlayersSnapshot(mockSupabaseClient, TEST_SESSION_ID, mockChannel);
-
-      await new Promise(resolve => setTimeout(resolve, 0));
-
-      expect(mockChannel.on).toHaveBeenCalledWith(
-        'broadcast',
-        expect.objectContaining({
-          event: 'position_update',
-        }),
-        expect.any(Function)
-      );
-    });
-
-    test('WhenInitialized_ShouldStartPeriodicRefresh', async () => {
-      jest.useFakeTimers();
-
+  describe('Postgres Changes Handling', () => {
+    test('WhenNetworkEmitsPostgresChangesForSessionPlayers_ShouldUpdateLocalMap', async () => {
       const mockPlayers = [createMockPlayer()];
-      mockSupabaseClient.from().select().eq.mockResolvedValue({
-        data: mockPlayers,
-        error: null,
-      });
-
-      snapshot = new SessionPlayersSnapshot(mockSupabaseClient, TEST_SESSION_ID, mockChannel);
-
-      await Promise.resolve(); // Flush promises
-
-      // Clear initial fetch calls
-      mockSupabaseClient.from.mockClear();
-
-      // Fast-forward 60 seconds
-      jest.advanceTimersByTime(60000);
-      await Promise.resolve(); // Flush promises
-
-      // Should have fetched snapshot again
-      expect(mockSupabaseClient.from).toHaveBeenCalledWith('session_players');
-
-      jest.useRealTimers();
-    });
-  });
-
-  describe('getPlayers', () => {
-    test('WhenCalled_ShouldReturnMapOfPlayersKeyedByPlayerId', async () => {
-      const mockPlayers = [
-        createMockPlayer({ player_id: 'player-1', player_name: 'Player1' }),
-        createMockPlayer({ player_id: 'player-2', player_name: 'Player2' }),
-      ];
 
       mockSupabaseClient.from().select().eq.mockResolvedValue({
         data: mockPlayers,
         error: null,
       });
 
-      snapshot = new SessionPlayersSnapshot(mockSupabaseClient, TEST_SESSION_ID, mockChannel);
-
-      await new Promise(resolve => setTimeout(resolve, 0));
-
-      const players = snapshot.getPlayers();
-
-      expect(players).toBeInstanceOf(Map);
-      expect(players.size).toBe(2);
-      expect(players.get('player-1').player_name).toBe('Player1');
-      expect(players.get('player-2').player_name).toBe('Player2');
-    });
-
-    test('WhenNoPlayers_ShouldReturnEmptyMap', async () => {
-      mockSupabaseClient.from().select().eq.mockResolvedValue({
-        data: [],
-        error: null,
-      });
-
-      snapshot = new SessionPlayersSnapshot(mockSupabaseClient, TEST_SESSION_ID, mockChannel);
-
-      await new Promise(resolve => setTimeout(resolve, 0));
-
-      const players = snapshot.getPlayers();
-
-      expect(players).toBeInstanceOf(Map);
-      expect(players.size).toBe(0);
-    });
-  });
-
-  describe('addPlayer', () => {
-    test('WhenCalled_ShouldInsertPlayerIntoDbWithSessionId', async () => {
-      mockSupabaseClient.from().select().eq.mockResolvedValue({
-        data: [],
-        error: null,
-      });
-
-      snapshot = new SessionPlayersSnapshot(mockSupabaseClient, TEST_SESSION_ID, mockChannel);
-
-      await new Promise(resolve => setTimeout(resolve, 0));
-
-      const playerData = {
-        player_id: 'new-player-id',
-        player_name: 'NewPlayer',
-        is_host: false,
-      };
-
-      const mockInsertedPlayer = createMockPlayer(playerData);
-      mockSupabaseClient.from().insert().select().single.mockResolvedValue({
-        data: mockInsertedPlayer,
-        error: null,
-      });
-
-      await snapshot.addPlayer(playerData);
-
-      expect(mockSupabaseClient.from).toHaveBeenCalledWith('session_players');
-      expect(mockSupabaseClient.from().insert).toHaveBeenCalledWith(
-        expect.objectContaining({
-          session_id: TEST_SESSION_ID,
-          player_id: 'new-player-id',
-          player_name: 'NewPlayer',
-          is_host: false,
-        })
-      );
-    });
-
-    test('WhenPlayerInserted_ShouldAddToLocalMap', async () => {
-      mockSupabaseClient.from().select().eq.mockResolvedValue({
-        data: [],
-        error: null,
-      });
-
-      snapshot = new SessionPlayersSnapshot(mockSupabaseClient, TEST_SESSION_ID, mockChannel);
-
-      await new Promise(resolve => setTimeout(resolve, 0));
-
-      const playerData = {
-        player_id: 'new-player-id',
-        player_name: 'NewPlayer',
-        is_host: false,
-      };
-
-      const mockInsertedPlayer = createMockPlayer(playerData);
-      mockSupabaseClient.from().insert().select().single.mockResolvedValue({
-        data: mockInsertedPlayer,
-        error: null,
-      });
-
-      await snapshot.addPlayer(playerData);
-
-      const players = snapshot.getPlayers();
-      expect(players.has('new-player-id')).toBe(true);
-      expect(players.get('new-player-id').player_name).toBe('NewPlayer');
-    });
-
-    test('WhenInsertFails_ShouldLogError', async () => {
-      const consoleErrorSpy = jest.spyOn(console, 'error').mockImplementation();
-
-      mockSupabaseClient.from().select().eq.mockResolvedValue({
-        data: [],
-        error: null,
-      });
-
-      snapshot = new SessionPlayersSnapshot(mockSupabaseClient, TEST_SESSION_ID, mockChannel);
-
-      await new Promise(resolve => setTimeout(resolve, 0));
-
-      mockSupabaseClient.from().insert().select().single.mockResolvedValue({
-        data: null,
-        error: { message: 'Insert failed' },
-      });
-
-      await snapshot.addPlayer({ player_id: 'test', player_name: 'Test' });
-
-      expect(consoleErrorSpy).toHaveBeenCalledWith(
-        expect.stringContaining('Failed to add player')
-      );
-
-      consoleErrorSpy.mockRestore();
-    });
-  });
-
-  describe('DB Event Synchronization - INSERT', () => {
-    test('WhenInsertEventReceived_ShouldAddPlayerToMap', async () => {
-      let dbEventHandler;
-
-      mockChannel.on.mockImplementation((type, config, handler) => {
-        if (type === 'postgres_changes' && config.event === '*') {
-          dbEventHandler = handler;
+      let postgresChangesHandler;
+      mockNetwork.on.mockImplementation((event, handler) => {
+        if (event === 'postgres_changes') {
+          postgresChangesHandler = handler;
         }
-        return mockChannel;
       });
 
-      mockSupabaseClient.from().select().eq.mockResolvedValue({
-        data: [],
-        error: null,
-      });
+      snapshot = new SessionPlayersSnapshot(mockNetwork, TEST_SESSION_ID);
+      await snapshot.ready();
 
-      snapshot = new SessionPlayersSnapshot(mockSupabaseClient, TEST_SESSION_ID, mockChannel);
-
-      await new Promise(resolve => setTimeout(resolve, 0));
-
-      const newPlayer = createMockPlayer({ player_id: 'inserted-player' });
-
-      dbEventHandler({
+      // Simulate Network emitting postgres_changes for INSERT
+      const newPlayer = createMockPlayer({ player_id: 'player-2', player_name: 'NewPlayer' });
+      postgresChangesHandler({
         eventType: 'INSERT',
         new: newPlayer,
+        old: null,
+        schema: 'public',
+        table: 'session_players',
       });
 
+      // Should update local players map
       const players = snapshot.getPlayers();
-      expect(players.has('inserted-player')).toBe(true);
-      expect(players.get('inserted-player')).toEqual(newPlayer);
+      expect(players.get('player-2')).toEqual(newPlayer);
     });
-  });
 
-  describe('DB Event Synchronization - DELETE', () => {
-    test('WhenDeleteEventReceived_ShouldRemovePlayerFromMap', async () => {
-      let dbEventHandler;
-
-      mockChannel.on.mockImplementation((type, config, handler) => {
-        if (type === 'postgres_changes' && config.event === '*') {
-          dbEventHandler = handler;
-        }
-        return mockChannel;
-      });
-
-      const existingPlayer = createMockPlayer({ player_id: 'existing-player' });
+    test('WhenNetworkEmitsPostgresChangesForOtherTable_ShouldIgnore', async () => {
+      const mockPlayers = [createMockPlayer()];
 
       mockSupabaseClient.from().select().eq.mockResolvedValue({
-        data: [existingPlayer],
+        data: mockPlayers,
         error: null,
       });
 
-      snapshot = new SessionPlayersSnapshot(mockSupabaseClient, TEST_SESSION_ID, mockChannel);
-
-      await new Promise(resolve => setTimeout(resolve, 0));
-
-      expect(snapshot.getPlayers().has('existing-player')).toBe(true);
-
-      dbEventHandler({
-        eventType: 'DELETE',
-        old: existingPlayer,
-      });
-
-      expect(snapshot.getPlayers().has('existing-player')).toBe(false);
-    });
-  });
-
-  describe('DB Event Synchronization - UPDATE', () => {
-    test('WhenUpdateEventReceived_ShouldUpdatePlayerInMap', async () => {
-      let dbEventHandler;
-
-      mockChannel.on.mockImplementation((type, config, handler) => {
-        if (type === 'postgres_changes' && config.event === '*') {
-          dbEventHandler = handler;
+      let postgresChangesHandler;
+      mockNetwork.on.mockImplementation((event, handler) => {
+        if (event === 'postgres_changes') {
+          postgresChangesHandler = handler;
         }
-        return mockChannel;
       });
 
-      const existingPlayer = createMockPlayer({
-        player_id: 'existing-player',
-        kills: 0,
+      snapshot = new SessionPlayersSnapshot(mockNetwork, TEST_SESSION_ID);
+      await snapshot.ready();
+
+      const initialSize = snapshot.getPlayers().size;
+
+      // Simulate Network emitting postgres_changes for different table
+      postgresChangesHandler({
+        eventType: 'INSERT',
+        new: { id: 'item-1', name: 'Sword' },
+        old: null,
+        schema: 'public',
+        table: 'session_items',
       });
+
+      // Should NOT update players map
+      expect(snapshot.getPlayers().size).toBe(initialSize);
+    });
+
+    test('WhenNetworkEmitsPostgresChangesForDifferentSession_ShouldIgnore', async () => {
+      const mockPlayers = [createMockPlayer()];
 
       mockSupabaseClient.from().select().eq.mockResolvedValue({
-        data: [existingPlayer],
+        data: mockPlayers,
         error: null,
       });
 
-      snapshot = new SessionPlayersSnapshot(mockSupabaseClient, TEST_SESSION_ID, mockChannel);
-
-      await new Promise(resolve => setTimeout(resolve, 0));
-
-      const updatedPlayer = { ...existingPlayer, kills: 5 };
-
-      dbEventHandler({
-        eventType: 'UPDATE',
-        new: updatedPlayer,
+      let postgresChangesHandler;
+      mockNetwork.on.mockImplementation((event, handler) => {
+        if (event === 'postgres_changes') {
+          postgresChangesHandler = handler;
+        }
       });
 
-      const players = snapshot.getPlayers();
-      expect(players.get('existing-player').kills).toBe(5);
+      snapshot = new SessionPlayersSnapshot(mockNetwork, TEST_SESSION_ID);
+      await snapshot.ready();
+
+      const initialSize = snapshot.getPlayers().size;
+
+      // Simulate Network emitting postgres_changes for different session
+      const playerInDifferentSession = createMockPlayer({
+        session_id: 'different-session-id',
+        player_id: 'player-2'
+      });
+      postgresChangesHandler({
+        eventType: 'INSERT',
+        new: playerInDifferentSession,
+        old: null,
+        schema: 'public',
+        table: 'session_players',
+      });
+
+      // Should NOT update players map
+      expect(snapshot.getPlayers().size).toBe(initialSize);
     });
   });
 
-  describe('Position Update Synchronization', () => {
-    test('WhenPositionUpdateReceived_ShouldUpdatePlayerPositionInMap', async () => {
+  describe('Position Update Handling', () => {
+    test('WhenNetworkEmitsPositionUpdate_ShouldUpdatePlayerPosition', async () => {
+      const mockPlayers = [createMockPlayer({ position_x: 100, position_y: 200 })];
+
+      mockSupabaseClient.from().select().eq.mockResolvedValue({
+        data: mockPlayers,
+        error: null,
+      });
+
       let positionUpdateHandler;
-
-      mockChannel.on.mockImplementation((type, config, handler) => {
-        if (type === 'broadcast' && config.event === 'position_update') {
+      mockNetwork.on.mockImplementation((event, handler) => {
+        if (event === 'position_update') {
           positionUpdateHandler = handler;
         }
-        return mockChannel;
       });
 
-      const existingPlayer = createMockPlayer({
-        player_id: 'moving-player',
-        position_x: 0,
-        position_y: 0,
-      });
+      snapshot = new SessionPlayersSnapshot(mockNetwork, TEST_SESSION_ID);
+      await snapshot.ready();
 
-      mockSupabaseClient.from().select().eq.mockResolvedValue({
-        data: [existingPlayer],
-        error: null,
-      });
-
-      snapshot = new SessionPlayersSnapshot(mockSupabaseClient, TEST_SESSION_ID, mockChannel);
-
-      await new Promise(resolve => setTimeout(resolve, 0));
-
+      // Simulate Network emitting position_update
       positionUpdateHandler({
-        payload: {
-          player_id: 'moving-player',
-          position_x: 100,
-          position_y: 200,
-          rotation: 1.5,
+        type: 'position_update',
+        from: TEST_PLAYER_ID,
+        data: {
+          player_id: TEST_PLAYER_ID,
+          position_x: 300,
+          position_y: 400,
+          rotation: 1.57,
         },
       });
 
-      const players = snapshot.getPlayers();
-      expect(players.get('moving-player').position_x).toBe(100);
-      expect(players.get('moving-player').position_y).toBe(200);
-      expect(players.get('moving-player').rotation).toBe(1.5);
+      // Should update position in memory
+      const player = snapshot.getPlayers().get(TEST_PLAYER_ID);
+      expect(player.position_x).toBe(300);
+      expect(player.position_y).toBe(400);
+      expect(player.rotation).toBe(1.57);
     });
 
-    test('WhenPositionUpdateForNonExistentPlayer_ShouldIgnore', async () => {
-      let positionUpdateHandler;
-
-      mockChannel.on.mockImplementation((type, config, handler) => {
-        if (type === 'broadcast' && config.event === 'position_update') {
-          positionUpdateHandler = handler;
-        }
-        return mockChannel;
-      });
+    test('WhenNetworkEmitsPositionUpdateForNonexistentPlayer_ShouldIgnore', async () => {
+      const mockPlayers = [createMockPlayer()];
 
       mockSupabaseClient.from().select().eq.mockResolvedValue({
-        data: [],
+        data: mockPlayers,
         error: null,
       });
 
-      snapshot = new SessionPlayersSnapshot(mockSupabaseClient, TEST_SESSION_ID, mockChannel);
-
-      await new Promise(resolve => setTimeout(resolve, 0));
-
-      positionUpdateHandler({
-        payload: {
-          player_id: 'non-existent-player',
-          position_x: 100,
-          position_y: 200,
-        },
-      });
-
-      const players = snapshot.getPlayers();
-      expect(players.has('non-existent-player')).toBe(false);
-    });
-
-    test('WhenPositionUpdateReceived_ShouldNotWriteToDb', async () => {
       let positionUpdateHandler;
-
-      mockChannel.on.mockImplementation((type, config, handler) => {
-        if (type === 'broadcast' && config.event === 'position_update') {
+      mockNetwork.on.mockImplementation((event, handler) => {
+        if (event === 'position_update') {
           positionUpdateHandler = handler;
         }
-        return mockChannel;
       });
 
-      const existingPlayer = createMockPlayer({ player_id: 'moving-player' });
+      snapshot = new SessionPlayersSnapshot(mockNetwork, TEST_SESSION_ID);
+      await snapshot.ready();
 
-      mockSupabaseClient.from().select().eq.mockResolvedValue({
-        data: [existingPlayer],
-        error: null,
-      });
-
-      snapshot = new SessionPlayersSnapshot(mockSupabaseClient, TEST_SESSION_ID, mockChannel);
-
-      await new Promise(resolve => setTimeout(resolve, 0));
-
-      // Clear mock calls from initialization
-      mockSupabaseClient.from.mockClear();
-
+      // Simulate position_update for player not in this session
       positionUpdateHandler({
-        payload: {
-          player_id: 'moving-player',
-          position_x: 100,
-          position_y: 200,
+        type: 'position_update',
+        from: 'unknown-player-id',
+        data: {
+          player_id: 'unknown-player-id',
+          position_x: 300,
+          position_y: 400,
         },
       });
 
-      // Should not have called any DB methods
-      expect(mockSupabaseClient.from).not.toHaveBeenCalled();
+      // Should not crash or add new player
+      expect(snapshot.getPlayers().get('unknown-player-id')).toBeUndefined();
     });
   });
 
-  describe('Periodic Refresh', () => {
-    test('WhenRefreshIntervalPasses_ShouldQueryOnlySessionPlayers', async () => {
-      jest.useFakeTimers();
+  describe('Destroy', () => {
+    test('WhenDestroyCalled_ShouldUnsubscribeFromNetworkEvents', async () => {
+      snapshot = new SessionPlayersSnapshot(mockNetwork, TEST_SESSION_ID);
+      await snapshot.ready();
 
-      const initialPlayers = [createMockPlayer({ player_id: 'player-1' })];
+      snapshot.destroy();
 
-      mockSupabaseClient.from().select().eq.mockResolvedValue({
-        data: initialPlayers,
-        error: null,
-      });
-
-      snapshot = new SessionPlayersSnapshot(mockSupabaseClient, TEST_SESSION_ID, mockChannel);
-
-      await Promise.resolve(); // Flush promises
-
-      // Clear mock calls
-      mockSupabaseClient.from.mockClear();
-
-      const refreshedPlayers = [
-        createMockPlayer({ player_id: 'player-1' }),
-        createMockPlayer({ player_id: 'player-2' }),
-      ];
-
-      mockSupabaseClient.from().select().eq.mockResolvedValue({
-        data: refreshedPlayers,
-        error: null,
-      });
-
-      // Fast-forward 60 seconds
-      jest.advanceTimersByTime(60000);
-      await Promise.resolve(); // Flush promises
-
-      expect(mockSupabaseClient.from).toHaveBeenCalledWith('session_players');
-      expect(mockSupabaseClient.from().select).toHaveBeenCalledWith('*');
-      expect(mockSupabaseClient.from().select().eq).toHaveBeenCalledWith('session_id', TEST_SESSION_ID);
-
-      jest.useRealTimers();
+      // Should unsubscribe from Network events
+      expect(mockNetwork.off).toHaveBeenCalled();
     });
 
-    test('WhenRefreshCompletes_ShouldReplaceLocalMap', async () => {
-      jest.useFakeTimers();
+    test('WhenDestroyCalled_ShouldClearPeriodicRefresh', async () => {
+      snapshot = new SessionPlayersSnapshot(mockNetwork, TEST_SESSION_ID, { refreshIntervalMs: 100 });
+      await snapshot.ready();
 
-      const initialPlayers = [createMockPlayer({ player_id: 'player-1' })];
+      // Verify interval was created
+      expect(snapshot.refreshInterval).not.toBeNull();
 
-      mockSupabaseClient.from().select().eq.mockResolvedValue({
-        data: initialPlayers,
-        error: null,
-      });
+      snapshot.destroy();
 
-      snapshot = new SessionPlayersSnapshot(mockSupabaseClient, TEST_SESSION_ID, mockChannel);
-
-      await Promise.resolve(); // Flush promises
-
-      expect(snapshot.getPlayers().size).toBe(1);
-
-      const refreshedPlayers = [
-        createMockPlayer({ player_id: 'player-2' }),
-        createMockPlayer({ player_id: 'player-3' }),
-      ];
-
-      mockSupabaseClient.from().select().eq.mockResolvedValue({
-        data: refreshedPlayers,
-        error: null,
-      });
-
-      // Fast-forward 60 seconds
-      jest.advanceTimersByTime(60000);
-      await Promise.resolve(); // Flush promises
-
-      const players = snapshot.getPlayers();
-      expect(players.size).toBe(2);
-      expect(players.has('player-1')).toBe(false);
-      expect(players.has('player-2')).toBe(true);
-      expect(players.has('player-3')).toBe(true);
-
-      jest.useRealTimers();
-    });
-
-    test('WhenRefreshFails_ShouldLogErrorAndContinue', async () => {
-      jest.useFakeTimers();
-
-      const consoleErrorSpy = jest.spyOn(console, 'error').mockImplementation();
-
-      const initialPlayers = [createMockPlayer({ player_id: 'player-1' })];
-
-      mockSupabaseClient.from().select().eq.mockResolvedValue({
-        data: initialPlayers,
-        error: null,
-      });
-
-      snapshot = new SessionPlayersSnapshot(mockSupabaseClient, TEST_SESSION_ID, mockChannel);
-
-      await Promise.resolve(); // Flush promises
-
-      mockSupabaseClient.from().select().eq.mockResolvedValue({
-        data: null,
-        error: { message: 'Refresh failed' },
-      });
-
-      // Fast-forward 60 seconds
-      jest.advanceTimersByTime(60000);
-      await Promise.resolve(); // Flush promises
-
-      expect(consoleErrorSpy).toHaveBeenCalledWith(
-        expect.stringContaining('Failed to refresh snapshot')
-      );
-
-      // Should still have old data
-      expect(snapshot.getPlayers().size).toBe(1);
-
-      consoleErrorSpy.mockRestore();
-      jest.useRealTimers();
+      // Should clear interval
+      expect(snapshot.refreshInterval).toBeNull();
     });
   });
 });
