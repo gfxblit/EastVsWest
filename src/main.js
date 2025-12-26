@@ -9,6 +9,7 @@ import { Renderer } from './renderer.js';
 import { Input } from './input.js';
 import { UI } from './ui.js';
 import { Network } from './network.js';
+import { SessionPlayersSnapshot } from './SessionPlayersSnapshot.js';
 import { createClient } from '@supabase/supabase-js';
 
 // Initialize Eruda for mobile debugging (console, network, elements inspector)
@@ -35,6 +36,8 @@ class App {
     this.ui = null;
     this.network = null;
     this.supabase = null;
+    this.playersSnapshot = null;
+    this.lobbyUpdateInterval = null;
     this.running = false;
     this.lastTimestamp = 0;
     this.animationFrameId = null;
@@ -169,21 +172,8 @@ class App {
   }
 
   setupNetworkHandlers() {
-    this.network.on('player_joined', (payload) => {
-      console.log('Player joined:', payload.data.player.player_name);
-      this.ui.updatePlayerList(payload.data.allPlayers, this.network.isHost);
-    });
-
-    this.network.on('player_left', (payload) => {
-      console.log('Player left:', payload.data.player_id);
-      this.ui.updatePlayerList(payload.data.allPlayers, this.network.isHost);
-    });
-
-    this.network.on('evicted', (payload) => {
-      console.warn('Evicted from session:', payload.reason);
-      this.showError(`Evicted: ${payload.reason}`);
-      this.ui.showScreen('intro');
-    });
+    // Note: player_joined/player_left events removed from Network
+    // Lobby updates now come from polling SessionPlayersSnapshot
 
     this.network.on('game_start', () => {
       console.log('Game starting signal received');
@@ -228,13 +218,20 @@ class App {
     try {
       const playerName = `Host-${Math.random().toString(36).substr(2, 5)}`;
       const { session, player } = await this.network.hostGame(playerName);
-      
+
+      // Create SessionPlayersSnapshot for lobby synchronization
+      this.playersSnapshot = new SessionPlayersSnapshot(this.network, session.id);
+      await this.playersSnapshot.ready();
+      console.log('SessionPlayersSnapshot ready');
+
+      // Start polling for lobby updates
+      this.startLobbyPolling();
+
       this.ui.showJoinCode(session.join_code);
       this.ui.showLobby('Game Lobby');
-      
-      // Immediately update UI for host to avoid showing "Waiting for host..."
-      // and to ensure the list is populated even if the self-join event is missed
-      this.ui.updatePlayerList([player], true);
+
+      // Initial UI update
+      this.updateLobbyUI();
     } catch (error) {
       console.error('Failed to host game:', error);
       this.showError(`Error hosting game: ${error.message}`);
@@ -266,14 +263,21 @@ class App {
     console.log('Joining game with code:', joinCode);
     try {
       const playerName = `Player-${Math.random().toString(36).substr(2, 5)}`;
-      const data = await this.network.joinGame(joinCode, playerName);
-      
+      const { session, player } = await this.network.joinGame(joinCode, playerName);
+
+      // Create SessionPlayersSnapshot for lobby synchronization
+      this.playersSnapshot = new SessionPlayersSnapshot(this.network, session.id);
+      await this.playersSnapshot.ready();
+      console.log('SessionPlayersSnapshot ready');
+
+      // Start polling for lobby updates
+      this.startLobbyPolling();
+
       this.ui.showJoinCode(joinCode);
       this.ui.showLobby('Game Lobby');
-      // Update player list immediately with initial data since we miss our own join event
-      if (data.allPlayers) {
-        this.ui.updatePlayerList(data.allPlayers, this.network.isHost);
-      }
+
+      // Initial UI update
+      this.updateLobbyUI();
     } catch (error) {
       console.error('Failed to join game:', error);
       this.showError(`Error joining game: ${error.message}`);
@@ -290,8 +294,51 @@ class App {
 
   leaveGame() {
     console.log('Leaving game...');
+
+    // Stop lobby polling
+    this.stopLobbyPolling();
+
+    // Clean up SessionPlayersSnapshot
+    if (this.playersSnapshot) {
+      this.playersSnapshot.destroy();
+      this.playersSnapshot = null;
+    }
+
     this.stopGame();
     this.ui.showScreen('intro');
+  }
+
+  /**
+   * Start polling SessionPlayersSnapshot for lobby updates
+   */
+  startLobbyPolling() {
+    if (this.lobbyUpdateInterval) return; // Already polling
+
+    this.lobbyUpdateInterval = setInterval(() => {
+      this.updateLobbyUI();
+    }, 100); // Poll every 100ms for smooth UI updates
+    console.log('Lobby polling started');
+  }
+
+  /**
+   * Update lobby UI from SessionPlayersSnapshot
+   */
+  updateLobbyUI() {
+    if (!this.playersSnapshot) return;
+
+    const players = Array.from(this.playersSnapshot.getPlayers().values());
+    this.ui.updatePlayerList(players, this.network.isHost);
+  }
+
+  /**
+   * Stop polling SessionPlayersSnapshot
+   */
+  stopLobbyPolling() {
+    if (this.lobbyUpdateInterval) {
+      clearInterval(this.lobbyUpdateInterval);
+      this.lobbyUpdateInterval = null;
+      console.log('Lobby polling stopped');
+    }
   }
 
   startGame() {
