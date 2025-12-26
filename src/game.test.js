@@ -365,6 +365,18 @@ describe('Game', () => {
       expect(mockNetwork.sendPositionUpdate).not.toHaveBeenCalled();
     });
 
+    test('WhenLocalPlayerPositionChangesTinyAmount_ShouldNotSendUpdate', () => {
+      game.init(mockPlayersSnapshot, mockNetwork);
+
+      // Simulate tiny floating point error
+      game.localPlayer.x += Number.EPSILON * 0.5;
+      
+      game.update(0.016);
+
+      // Should not send position update since change is negligible
+      expect(mockNetwork.sendPositionUpdate).not.toHaveBeenCalled();
+    });
+
     test('WhenSnapshotUpdated_ShouldNotAffectLocalPlayer', () => {
       game.init(mockPlayersSnapshot, mockNetwork);
       expect(game.localPlayer.x).toBe(100);

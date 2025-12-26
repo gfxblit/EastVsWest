@@ -130,9 +130,9 @@ export class Game {
     // Only send if position/rotation changed
     const currentPos = { x: this.localPlayer.x, y: this.localPlayer.y, rotation: this.localPlayer.rotation };
     if (this.lastSentPosition &&
-        this.lastSentPosition.x === currentPos.x &&
-        this.lastSentPosition.y === currentPos.y &&
-        this.lastSentPosition.rotation === currentPos.rotation) {
+        Math.abs(this.lastSentPosition.x - currentPos.x) < Number.EPSILON &&
+        Math.abs(this.lastSentPosition.y - currentPos.y) < Number.EPSILON &&
+        Math.abs(this.lastSentPosition.rotation - currentPos.rotation) < Number.EPSILON) {
       return; // No change, don't send
     }
 

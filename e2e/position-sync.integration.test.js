@@ -35,11 +35,11 @@ describe('Position Synchronization Integration', () => {
   });
 
   afterEach(async () => {
+    network.stopPeriodicPositionWrite();
     if (testSessionId) {
       await supabaseClient.from('game_sessions').delete().match({ id: testSessionId });
       testSessionId = null;
     }
-    network.stopPeriodicPositionWrite();
   });
 
   test('writePositionToDB() should update player position and health in database', async () => {

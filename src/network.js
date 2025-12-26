@@ -412,14 +412,18 @@ export class Network extends EventEmitter {
     const position = typeof positionGetter === 'function' ? positionGetter() : positionGetter;
     const rotation = typeof rotationGetter === 'function' ? rotationGetter() : rotationGetter;
     const health = typeof healthGetter === 'function' ? healthGetter() : healthGetter;
-    this.writePositionToDB(position, rotation, health);
+    this.writePositionToDB(position, rotation, health).catch(err => {
+      console.error('Failed to perform immediate position write:', err);
+    });
 
     // Then write periodically at the same rate as snapshot refresh (60 seconds)
     this.positionWriteInterval = setInterval(() => {
       const position = typeof positionGetter === 'function' ? positionGetter() : positionGetter;
       const rotation = typeof rotationGetter === 'function' ? rotationGetter() : rotationGetter;
       const health = typeof healthGetter === 'function' ? healthGetter() : healthGetter;
-      this.writePositionToDB(position, rotation, health);
+      this.writePositionToDB(position, rotation, health).catch(err => {
+        console.error('Failed to perform periodic position write:', err);
+      });
     }, 60000); // 60 seconds
   }
 
