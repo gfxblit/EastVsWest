@@ -13,6 +13,7 @@ CREATE TABLE session_players (
   position_x REAL DEFAULT 0,
   position_y REAL DEFAULT 0,
   rotation REAL DEFAULT 0,
+  health REAL DEFAULT 100,
 
   -- Equipment (nullable - players start with no equipment)
   equipped_weapon VARCHAR(50),

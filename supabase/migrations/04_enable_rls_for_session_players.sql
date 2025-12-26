@@ -3,20 +3,31 @@
 -- Enable RLS for the table
 ALTER TABLE public.session_players ENABLE ROW LEVEL SECURITY;
 
+-- Helper function to check if a user is a member of a session
+-- Uses SECURITY DEFINER to bypass RLS and avoid recursion
+CREATE OR REPLACE FUNCTION is_session_member(p_session_id UUID, p_user_id UUID)
+RETURNS BOOLEAN
+LANGUAGE plpgsql
+SECURITY DEFINER
+AS $$
+BEGIN
+  RETURN EXISTS (
+    SELECT 1 FROM public.session_players
+    WHERE session_id = p_session_id AND player_id = p_user_id
+  );
+END;
+$$;
+
 -- 1. Allow read access to session players in sessions the user has joined
--- Players can only query session_players for sessions they are a member of
--- This prevents players from enumerating all active sessions
+-- Uses helper function to avoid infinite recursion
+-- Also allows reading own records directly to handle INSERT...RETURNING
 -- Note: Anonymous sign-ins get the 'authenticated' role, not 'anon'
 CREATE POLICY "Allow read access to session players"
   ON public.session_players
   FOR SELECT
   TO authenticated
   USING (
-    EXISTS (
-      SELECT 1 FROM public.session_players sp
-      WHERE sp.session_id = session_players.session_id
-        AND sp.player_id = auth.uid()
-    )
+    player_id = auth.uid() OR is_session_member(session_id, auth.uid())
   );
 
 -- 2. Allow players to self-insert into a session.

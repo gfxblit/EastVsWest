@@ -36,7 +36,7 @@ A core pattern for **Host-Authoritative** actions (combat, item pickups, game st
 
 ### Authority Distribution
 
-- **Client-Authoritative**: Player movement, session joining (lobby phase)
+- **Client-Authoritative**: Player movement, session joining (lobby phase), player position/health DB writes
 - **Host-Authoritative**: Item pickups, combat interactions, game state changes, zone progression, player eviction (max count enforcement)
 
 ### Technology Stack
@@ -904,10 +904,25 @@ HOST (Every 5 seconds)
 |------|---------|-----------|
 | Session metadata | Database | Persistent, required for join code lookups |
 | Player list | Database + Channel | Database for persistence, Channel for real-time |
-| Player positions | Channel only | High-frequency, ephemeral data |
+| Player positions | Database + Channel | Database written periodically (60s) by each client, Channel for real-time broadcasts (20Hz) |
 | Item states | Database + Channel | Database for authority, Channel for sync |
 | Combat events | Channel + Events log | Real-time sync, optional event log for debugging |
 | Game state changes | Database + Channel | Database for authority, Channel for sync |
+
+### Client Position DB Writes
+
+Each client writes their own position, rotation, and health to the database periodically to ensure data persistence:
+
+- **Frequency**: Every 60 seconds (same as SessionPlayersSnapshot refresh rate)
+- **Authority**: Client-authoritative (each client writes their own position)
+- **Data Written**: `position_x`, `position_y`, `rotation`, `health`
+- **Purpose**:
+  - Persist player state for reconnection scenarios
+  - Provide snapshot data for late-joining players
+  - Enable post-game analytics and replay
+  - Keep DB state synchronized with game state
+- **Implementation**: `Network.startPeriodicPositionWrite()` method with getter functions for position, rotation, and health
+- **Note**: Real-time position updates continue to use the broadcast system (20Hz) for smooth gameplay. DB writes are for persistence only.
 
 ### Scalability Considerations
 

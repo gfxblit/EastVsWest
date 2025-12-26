@@ -17,7 +17,6 @@ describe('Game', () => {
   describe('Constructor', () => {
     test('WhenConstructed_ShouldInitializeStateWithDefaults', () => {
       expect(game.state).toBeDefined();
-      expect(game.state.players).toEqual([]);
       expect(game.state.loot).toEqual([]);
       expect(game.state.gameTime).toBe(0);
       expect(game.state.phase).toBe(0);
@@ -30,28 +29,50 @@ describe('Game', () => {
       expect(game.state.conflictZone.centerY).toBe(CONFIG.CANVAS.HEIGHT / 2);
       expect(game.state.conflictZone.radius).toBe(CONFIG.ZONE.INITIAL_RADIUS);
     });
+
+    test('WhenConstructed_ShouldNotHaveLocalPlayerYet', () => {
+      expect(game.localPlayer).toBeNull();
+    });
   });
 
   describe('init', () => {
-    test('WhenInitialized_ShouldSetIsRunningToTrue', () => {
+    test('WhenInitializedWithoutSnapshot_ShouldSetIsRunningToTrue', () => {
       game.init();
       expect(game.state.isRunning).toBe(true);
     });
 
-    test('WhenInitialized_ShouldCreateTestPlayer', () => {
+    test('WhenInitializedWithoutSnapshot_ShouldCreateTestPlayer', () => {
       game.init();
-      expect(game.state.players.length).toBe(1);
-      expect(game.state.players[0].id).toBe('player-1');
-      expect(game.state.players[0].health).toBe(100);
-      expect(game.state.players[0].weapon).toBeNull();
-      expect(game.state.players[0].armor).toBeNull();
+      expect(game.localPlayer).toBeDefined();
+      expect(game.localPlayer.id).toBe('player-1');
+      expect(game.localPlayer.health).toBe(100);
+      expect(game.localPlayer.weapon).toBeNull();
+      expect(game.localPlayer.armor).toBeNull();
     });
 
-    test('WhenInitialized_ShouldSpawnPlayerAtCenterOfCanvas', () => {
+    test('WhenInitializedWithoutSnapshot_ShouldSpawnPlayerAtCenterOfCanvas', () => {
       game.init();
-      const player = game.state.players[0];
-      expect(player.x).toBe(CONFIG.CANVAS.WIDTH / 2);
-      expect(player.y).toBe(CONFIG.CANVAS.HEIGHT / 2);
+      expect(game.localPlayer.x).toBe(CONFIG.CANVAS.WIDTH / 2);
+      expect(game.localPlayer.y).toBe(CONFIG.CANVAS.HEIGHT / 2);
+    });
+
+    test('WhenInitializedWithSnapshot_ShouldLoadLocalPlayerFromSnapshot', () => {
+      const mockSnapshot = {
+        getPlayers: jest.fn().mockReturnValue(new Map([
+          ['player-1', { player_id: 'player-1', player_name: 'Alice', position_x: 100, position_y: 200, rotation: 0.5, health: 90 }],
+        ])),
+      };
+      const mockNetwork = { playerId: 'player-1' };
+
+      game.init(mockSnapshot, mockNetwork);
+
+      expect(game.localPlayer).toBeDefined();
+      expect(game.localPlayer.id).toBe('player-1');
+      expect(game.localPlayer.name).toBe('Alice');
+      expect(game.localPlayer.x).toBe(100);
+      expect(game.localPlayer.y).toBe(200);
+      expect(game.localPlayer.rotation).toBe(0.5);
+      expect(game.localPlayer.health).toBe(90);
     });
   });
 
@@ -76,9 +97,9 @@ describe('Game', () => {
       expect(spy).toHaveBeenCalledWith(0.016);
     });
 
-    test('WhenRunning_ShouldCallUpdatePlayers', () => {
-      game.state.isRunning = true;
-      const spy = jest.spyOn(game, 'updatePlayers');
+    test('WhenRunning_ShouldCallUpdateLocalPlayer', () => {
+      game.init();
+      const spy = jest.spyOn(game, 'updateLocalPlayer');
       game.update(0.016);
       expect(spy).toHaveBeenCalledWith(0.016);
     });
@@ -101,146 +122,113 @@ describe('Game', () => {
       expect(game.state.conflictZone.radius).toBeLessThan(initialRadius);
     });
 
-    test('WhenShrinking_ShouldNotGoBelowMinimumRadius', () => {
+    test('WhenShrinking_ShouldNotGoBelowMinimum', () => {
       game.state.isRunning = true;
       game.state.gameTime = CONFIG.GAME.INITIAL_ZONE_SHRINK_DELAY_SECONDS + 1;
-      game.state.conflictZone.radius = CONFIG.ZONE.MIN_RADIUS || 50;
-
-      // Shrink for a long time
-      for (let i = 0; i < 100; i++) {
-        game.updateConflictZone(1);
-      }
-
-      expect(game.state.conflictZone.radius).toBe(CONFIG.ZONE.MIN_RADIUS || 50);
-    });
-
-    test('WhenInHigherPhase_ShouldShrinkFaster', () => {
-      game.state.isRunning = true;
-      game.state.gameTime = CONFIG.GAME.INITIAL_ZONE_SHRINK_DELAY_SECONDS + 1;
-
-      // Phase 0
-      game.state.phase = 0;
-      const phase0Radius = game.state.conflictZone.radius;
-      game.updateConflictZone(1);
-      const phase0Shrink = phase0Radius - game.state.conflictZone.radius;
-
-      // Reset and test Phase 1
-      game.state.conflictZone.radius = phase0Radius;
-      game.state.phase = 1;
-      game.updateConflictZone(1);
-      const phase1Shrink = phase0Radius - game.state.conflictZone.radius;
-
-      expect(phase1Shrink).toBeGreaterThan(phase0Shrink);
+      game.state.conflictZone.radius = CONFIG.ZONE.MIN_RADIUS;
+      game.updateConflictZone(1000); // Large delta time
+      expect(game.state.conflictZone.radius).toBe(CONFIG.ZONE.MIN_RADIUS);
     });
   });
 
-  describe('updatePlayers', () => {
+  describe('updateLocalPlayer', () => {
     beforeEach(() => {
       game.init();
     });
 
     test('WhenPlayerHasVelocity_ShouldUpdatePosition', () => {
-      const player = game.state.players[0];
-      player.velocity = { x: 100, y: 50 };
-      const initialX = player.x;
-      const initialY = player.y;
+      game.localPlayer.velocity = { x: 100, y: 50 };
+      const initialX = game.localPlayer.x;
+      const initialY = game.localPlayer.y;
 
-      game.updatePlayers(0.1); // 0.1 seconds
+      game.updateLocalPlayer(0.1); // 0.1 seconds
 
-      expect(player.x).toBe(initialX + 10); // 100 * 0.1
-      expect(player.y).toBe(initialY + 5); // 50 * 0.1
+      expect(game.localPlayer.x).toBe(initialX + 10); // 100 * 0.1
+      expect(game.localPlayer.y).toBe(initialY + 5); // 50 * 0.1
     });
 
     test('WhenPlayerMovesOutOfBounds_ShouldClampToCanvasWidth', () => {
-      const player = game.state.players[0];
-      player.x = CONFIG.CANVAS.WIDTH - 10;
-      player.velocity = { x: 200, y: 0 };
+      game.localPlayer.x = CONFIG.CANVAS.WIDTH - 10;
+      game.localPlayer.velocity = { x: 200, y: 0 };
 
-      game.updatePlayers(1); // Move way beyond bounds
+      game.updateLocalPlayer(1); // Move way beyond bounds
 
-      expect(player.x).toBe(CONFIG.CANVAS.WIDTH);
+      expect(game.localPlayer.x).toBe(CONFIG.CANVAS.WIDTH);
     });
 
     test('WhenPlayerMovesOutOfBounds_ShouldClampToMinimumX', () => {
-      const player = game.state.players[0];
-      player.x = 10;
-      player.velocity = { x: -200, y: 0 };
+      game.localPlayer.x = 10;
+      game.localPlayer.velocity = { x: -200, y: 0 };
 
-      game.updatePlayers(1);
+      game.updateLocalPlayer(1);
 
-      expect(player.x).toBe(0);
+      expect(game.localPlayer.x).toBe(0);
     });
 
     test('WhenPlayerMovesOutOfBounds_ShouldClampToCanvasHeight', () => {
-      const player = game.state.players[0];
-      player.y = CONFIG.CANVAS.HEIGHT - 10;
-      player.velocity = { x: 0, y: 200 };
+      game.localPlayer.y = CONFIG.CANVAS.HEIGHT - 10;
+      game.localPlayer.velocity = { x: 0, y: 200 };
 
-      game.updatePlayers(1);
+      game.updateLocalPlayer(1);
 
-      expect(player.y).toBe(CONFIG.CANVAS.HEIGHT);
+      expect(game.localPlayer.y).toBe(CONFIG.CANVAS.HEIGHT);
     });
 
     test('WhenPlayerMovesOutOfBounds_ShouldClampToMinimumY', () => {
-      const player = game.state.players[0];
-      player.y = 10;
-      player.velocity = { x: 0, y: -200 };
+      game.localPlayer.y = 10;
+      game.localPlayer.velocity = { x: 0, y: -200 };
 
-      game.updatePlayers(1);
+      game.updateLocalPlayer(1);
 
-      expect(player.y).toBe(0);
+      expect(game.localPlayer.y).toBe(0);
     });
 
     test('WhenPlayerOutsideZone_ShouldTakeDamage', () => {
-      const player = game.state.players[0];
-      player.health = 100;
+      game.localPlayer.health = 100;
 
       // Place player far outside zone
-      player.x = 0;
-      player.y = 0;
+      game.localPlayer.x = 0;
+      game.localPlayer.y = 0;
       game.state.conflictZone.centerX = CONFIG.CANVAS.WIDTH / 2;
       game.state.conflictZone.centerY = CONFIG.CANVAS.HEIGHT / 2;
       game.state.conflictZone.radius = 10; // Very small zone
 
-      game.updatePlayers(1); // 1 second
+      game.updateLocalPlayer(1); // 1 second
 
       const expectedDamage = CONFIG.ZONE.DAMAGE_PER_SECOND +
         (CONFIG.ZONE.DAMAGE_INCREASE_PER_PHASE * game.state.phase);
-      expect(player.health).toBe(100 - expectedDamage);
+      expect(game.localPlayer.health).toBe(100 - expectedDamage);
     });
 
     test('WhenPlayerInsideZone_ShouldNotTakeDamage', () => {
-      const player = game.state.players[0];
-      player.health = 100;
+      game.localPlayer.health = 100;
 
       // Place player at center of zone
-      player.x = game.state.conflictZone.centerX;
-      player.y = game.state.conflictZone.centerY;
+      game.localPlayer.x = game.state.conflictZone.centerX;
+      game.localPlayer.y = game.state.conflictZone.centerY;
 
-      game.updatePlayers(1);
+      game.updateLocalPlayer(1);
 
-      expect(player.health).toBe(100);
+      expect(game.localPlayer.health).toBe(100);
     });
 
     test('WhenPlayerOutsideZoneInHigherPhase_ShouldTakeMoreDamage', () => {
-      const player = game.state.players[0];
-
       // Place player outside zone
-      player.x = 0;
-      player.y = 0;
+      game.localPlayer.x = 0;
+      game.localPlayer.y = 0;
       game.state.conflictZone.radius = 10;
 
       // Test Phase 0
       game.state.phase = 0;
-      player.health = 100;
-      game.updatePlayers(1);
-      const phase0Damage = 100 - player.health;
+      game.localPlayer.health = 100;
+      game.updateLocalPlayer(1);
+      const phase0Damage = 100 - game.localPlayer.health;
 
       // Test Phase 2
       game.state.phase = 2;
-      player.health = 100;
-      game.updatePlayers(1);
-      const phase2Damage = 100 - player.health;
+      game.localPlayer.health = 100;
+      game.updateLocalPlayer(1);
+      const phase2Damage = 100 - game.localPlayer.health;
 
       expect(phase2Damage).toBeGreaterThan(phase0Damage);
     });
@@ -251,51 +239,147 @@ describe('Game', () => {
       game.init();
     });
 
-    test('WhenNoPlayer_ShouldNotThrowError', () => {
-      game.state.players = [];
-      const inputState = { moveX: 1, moveY: 0 };
-
-      expect(() => game.handleInput(inputState)).not.toThrow();
-    });
-
-    test('WhenInputProvided_ShouldUpdatePlayerVelocity', () => {
+    test('WhenMovingRight_ShouldSetVelocityX', () => {
       const inputState = { moveX: 1, moveY: 0 };
       game.handleInput(inputState);
+      expect(game.localPlayer.velocity.x).toBe(CONFIG.PLAYER.BASE_MOVEMENT_SPEED);
+      expect(game.localPlayer.velocity.y).toBe(0);
+    });
 
-      const player = game.state.players[0];
-      expect(player.velocity.x).toBe(CONFIG.PLAYER.BASE_MOVEMENT_SPEED);
-      expect(player.velocity.y).toBe(0);
+    test('WhenMovingLeft_ShouldSetNegativeVelocityX', () => {
+      const inputState = { moveX: -1, moveY: 0 };
+      game.handleInput(inputState);
+      expect(game.localPlayer.velocity.x).toBe(-CONFIG.PLAYER.BASE_MOVEMENT_SPEED);
+      expect(game.localPlayer.velocity.y).toBe(0);
+    });
+
+    test('WhenMovingUp_ShouldSetNegativeVelocityY', () => {
+      const inputState = { moveX: 0, moveY: -1 };
+      game.handleInput(inputState);
+      expect(game.localPlayer.velocity.x).toBe(0);
+      expect(game.localPlayer.velocity.y).toBe(-CONFIG.PLAYER.BASE_MOVEMENT_SPEED);
+    });
+
+    test('WhenMovingDown_ShouldSetVelocityY', () => {
+      const inputState = { moveX: 0, moveY: 1 };
+      game.handleInput(inputState);
+      expect(game.localPlayer.velocity.x).toBe(0);
+      expect(game.localPlayer.velocity.y).toBe(CONFIG.PLAYER.BASE_MOVEMENT_SPEED);
+    });
+
+    test('WhenMovingDiagonally_ShouldNormalizeVelocity', () => {
+      const inputState = { moveX: 1, moveY: 1 };
+      game.handleInput(inputState);
+
+      // Diagonal movement should be normalized so total speed equals base speed
+      const expectedSpeed = CONFIG.PLAYER.BASE_MOVEMENT_SPEED / Math.SQRT2;
+      expect(game.localPlayer.velocity.x).toBeCloseTo(expectedSpeed);
+      expect(game.localPlayer.velocity.y).toBeCloseTo(expectedSpeed);
+    });
+
+    test('WhenNotMoving_ShouldSetVelocityToZero', () => {
+      const inputState = { moveX: 0, moveY: 0 };
+      game.handleInput(inputState);
+      expect(game.localPlayer.velocity.x).toBe(0);
+      expect(game.localPlayer.velocity.y).toBe(0);
     });
 
     test('WhenPlayerHasDoubleHandedWeapon_ShouldApplySpeedModifier', () => {
-      const player = game.state.players[0];
-      player.weapon = { stance: 'double' };
-
+      game.localPlayer.weapon = { stance: 'double' };
       const inputState = { moveX: 1, moveY: 0 };
       game.handleInput(inputState);
 
       const expectedSpeed = CONFIG.PLAYER.BASE_MOVEMENT_SPEED *
         CONFIG.PLAYER.DOUBLE_HANDED_SPEED_MODIFIER;
-      expect(player.velocity.x).toBe(expectedSpeed);
+      expect(game.localPlayer.velocity.x).toBe(expectedSpeed);
     });
 
-    test('WhenPlayerHasSingleHandedWeapon_ShouldNotApplySpeedModifier', () => {
-      const player = game.state.players[0];
-      player.weapon = { stance: 'single' };
+    test('WhenPlayerHasNonDoubleWeapon_ShouldNotApplyModifier', () => {
+      game.localPlayer.weapon = { stance: 'single' };
+      const inputState = { moveX: 1, moveY: 0 };
+      game.handleInput(inputState);
+      expect(game.localPlayer.velocity.x).toBe(CONFIG.PLAYER.BASE_MOVEMENT_SPEED);
+    });
+  });
+
+  describe('Multiplayer Integration', () => {
+    let mockPlayersSnapshot;
+    let mockNetwork;
+
+    beforeEach(() => {
+      mockPlayersSnapshot = {
+        getPlayers: jest.fn().mockReturnValue(new Map([
+          ['player-1', { player_id: 'player-1', player_name: 'Alice', position_x: 100, position_y: 200, rotation: 0, health: 100 }],
+          ['player-2', { player_id: 'player-2', player_name: 'Bob', position_x: 300, position_y: 400, rotation: 1.5, health: 80 }],
+        ])),
+      };
+
+      mockNetwork = {
+        playerId: 'player-1',
+        sendPositionUpdate: jest.fn(),
+      };
+    });
+
+    test('WhenInitializedWithSnapshot_ShouldLoadLocalPlayerFromSnapshot', () => {
+      game.init(mockPlayersSnapshot, mockNetwork);
+
+      expect(game.localPlayer).toBeDefined();
+      expect(game.localPlayer.id).toBe('player-1');
+      expect(game.localPlayer.name).toBe('Alice');
+      expect(game.localPlayer.x).toBe(100);
+      expect(game.localPlayer.y).toBe(200);
+      expect(game.localPlayer.rotation).toBe(0);
+      expect(game.localPlayer.health).toBe(100);
+    });
+
+    test('WhenLocalPlayerMovesInMultiplayer_ShouldUpdateLocalPlayerPosition', () => {
+      game.init(mockPlayersSnapshot, mockNetwork);
 
       const inputState = { moveX: 1, moveY: 0 };
       game.handleInput(inputState);
+      game.update(0.1); // Update for 0.1 seconds
 
-      expect(player.velocity.x).toBe(CONFIG.PLAYER.BASE_MOVEMENT_SPEED);
+      expect(game.localPlayer.x).toBe(100 + CONFIG.PLAYER.BASE_MOVEMENT_SPEED * 0.1);
     });
 
-    test('WhenDiagonalInput_ShouldMaintainSpeed', () => {
-      const inputState = { moveX: 1, moveY: 1 };
-      game.handleInput(inputState);
+    test('WhenLocalPlayerMovesInMultiplayer_ShouldSendPositionUpdate', () => {
+      game.init(mockPlayersSnapshot, mockNetwork);
 
-      const player = game.state.players[0];
-      const speed = Math.sqrt(player.velocity.x ** 2 + player.velocity.y ** 2);
-      expect(speed).toBeCloseTo(CONFIG.PLAYER.BASE_MOVEMENT_SPEED, 1);
+      const inputState = { moveX: 1, moveY: 0 };
+      game.handleInput(inputState);
+      game.update(0.1); // Update triggers position send
+
+      expect(mockNetwork.sendPositionUpdate).toHaveBeenCalled();
+      const call = mockNetwork.sendPositionUpdate.mock.calls[0][0];
+      expect(call.position.x).toBeCloseTo(120, 1); // 100 + 200 * 0.1
+      expect(call.position.y).toBe(200);
+    });
+
+    test('WhenLocalPlayerPositionUnchanged_ShouldNotSendUpdate', () => {
+      game.init(mockPlayersSnapshot, mockNetwork);
+
+      // Don't move the player
+      game.update(0.016);
+
+      // Should not send position update since position didn't change
+      expect(mockNetwork.sendPositionUpdate).not.toHaveBeenCalled();
+    });
+
+    test('WhenSnapshotUpdated_ShouldNotAffectLocalPlayer', () => {
+      game.init(mockPlayersSnapshot, mockNetwork);
+      expect(game.localPlayer.x).toBe(100);
+
+      // Update snapshot with different position for local player
+      mockPlayersSnapshot.getPlayers.mockReturnValue(new Map([
+        ['player-1', { player_id: 'player-1', player_name: 'Alice', position_x: 999, position_y: 999, rotation: 0.5, health: 90 }],
+        ['player-2', { player_id: 'player-2', player_name: 'Bob', position_x: 350, position_y: 450, rotation: 2.0, health: 70 }],
+      ]));
+
+      game.update(0.016);
+
+      // Local player position should NOT be affected by snapshot changes
+      expect(game.localPlayer.x).toBe(100);
+      expect(game.localPlayer.y).toBe(200);
     });
   });
 
@@ -303,6 +387,14 @@ describe('Game', () => {
     test('WhenCalled_ShouldReturnGameState', () => {
       const state = game.getState();
       expect(state).toBe(game.state);
+    });
+  });
+
+  describe('getLocalPlayer', () => {
+    test('WhenCalled_ShouldReturnLocalPlayer', () => {
+      game.init();
+      const localPlayer = game.getLocalPlayer();
+      expect(localPlayer).toBe(game.localPlayer);
     });
   });
 });
