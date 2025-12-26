@@ -18,24 +18,21 @@ async function checkURL(url) {
 async function main() {
   console.log('\n=== Checking GitHub Pages Deployment ===\n');
 
-  // Check main page
+  // Check production deployment
+  console.log('Production deployment:');
   await checkURL('https://gfxblit.github.io/EastVsWest/');
-
-  // Check assets with wrong path (what browser tries with current build)
-  console.log('\nAssets with absolute paths (current broken behavior):');
-  await checkURL('https://gfxblit.github.io/assets/index-JUj4HII0.js');
-  await checkURL('https://gfxblit.github.io/assets/index-BxCAtCat.css');
-
-  // Check assets with correct path
-  console.log('\nAssets with repo-prefixed paths (correct location):');
   await checkURL('https://gfxblit.github.io/EastVsWest/assets/index-JUj4HII0.js');
-  await checkURL('https://gfxblit.github.io/EastVsWest/assets/index-BxCAtCat.css');
+
+  // Check preview deployment (example PR #38)
+  console.log('\nPreview deployment (PR #38):');
+  await checkURL('https://gfxblit.github.io/EastVsWest/pr-38/');
+  await checkURL('https://gfxblit.github.io/EastVsWest/pr-38/assets/index-JUj4HII0.js');
 
   console.log('\n=== Analysis ===');
-  console.log('GitHub Pages serves your site at: /EastVsWest/');
-  console.log('But Vite builds with asset paths: /assets/...');
-  console.log('This causes 404s because browser looks at domain root, not repo subpath.');
-  console.log('\nFix: Add base: "/EastVsWest/" to vite.config.js');
+  console.log('With base: "./" (relative paths), assets work for both:');
+  console.log('- Production: ./assets/... resolves relative to /EastVsWest/');
+  console.log('- Preview: ./assets/... resolves relative to /EastVsWest/pr-XX/');
+  console.log('\nThis allows a single build to work for both deployments.');
 }
 
 main();
