@@ -63,9 +63,9 @@ jobs:
           version: latest
 
       - name: Start Supabase
-        # Use optimized CI config to reduce startup time by disabling unused services
-        # (Studio, Storage, Inbucket, Edge Functions, Analytics)
-        run: supabase start --config supabase/config.ci.toml
+        # Exclude unused services to reduce startup time (Studio, Storage, Edge Functions, Analytics)
+        # Required: postgres, gotrue (auth), realtime, postgrest (API), kong (gateway)
+        run: supabase start --exclude studio,storage-api,imgproxy,mailpit,edge-runtime,logflare,vector,supavisor,postgres-meta
 
       - name: Run integration tests
         run: |
