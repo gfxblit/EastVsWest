@@ -96,10 +96,7 @@ describe('SessionPlayersSnapshot Integration with Network', () => {
       playerNetwork.disconnect();
     }
 
-    // Wait for cleanup to complete
-    await new Promise(resolve => setTimeout(resolve, 500));
-
-    // Clean up test data
+    // Clean up test data FIRST (before waiting)
     if (testSessionId) {
       // Delete players first (due to foreign key constraint)
       await hostClient.from('session_players').delete().eq('session_id', testSessionId);
@@ -107,6 +104,9 @@ describe('SessionPlayersSnapshot Integration with Network', () => {
       await hostClient.from('game_sessions').delete().eq('id', testSessionId);
       testSessionId = null;
     }
+
+    // Wait for cleanup to complete and channels to fully unsubscribe
+    await new Promise(resolve => setTimeout(resolve, 1000));
   });
 
   describe('Initialization and Snapshot', () => {
@@ -269,7 +269,13 @@ describe('SessionPlayersSnapshot Integration with Network', () => {
         velocity: { x: 0, y: 0 },
       });
 
-      // Wait for broadcast to propagate through Supabase Realtime
+      // Wait for position_update to be received by host
+      await new Promise(resolve => setTimeout(resolve, 200));
+
+      // Host broadcasts the batched positions (this is what the game loop does)
+      hostNetwork.broadcastPositionUpdates();
+
+      // Wait for position_broadcast to propagate through Supabase Realtime
       await new Promise(resolve => setTimeout(resolve, 500));
 
       // Position should update in playerSnapshot via Network broadcast handler
@@ -285,35 +291,32 @@ describe('SessionPlayersSnapshot Integration with Network', () => {
 
   describe('Periodic Refresh', () => {
     test('should periodically refresh snapshot from database', async () => {
+      // Player joins first to have a second player in session
+      await playerNetwork.joinGame(testJoinCode, 'TestPlayer');
+
       // Create snapshot with short refresh interval
       hostSnapshot = new SessionPlayersSnapshot(hostNetwork, testSessionId, {
         refreshIntervalMs: 500,
       });
 
       await hostSnapshot.ready();
+      expect(hostSnapshot.getPlayers().size).toBe(2);
 
-      // Manually insert a player directly to database (bypassing realtime)
-      await hostClient
+      // Update player data directly in database (simulating data change that might be missed)
+      await playerClient
         .from('session_players')
-        .insert({
-          session_id: testSessionId,
-          player_id: 'manual-player-id',
-          player_name: 'ManualPlayer',
-          is_host: false,
-        });
+        .update({ kills: 10, damage_dealt: 500 })
+        .eq('player_id', playerUser.id)
+        .eq('session_id', testSessionId);
 
-      // Wait for periodic refresh to kick in
+      // Wait for periodic refresh to pick up the changes
       await new Promise(resolve => setTimeout(resolve, 700));
 
-      const players = hostSnapshot.getPlayers();
-      expect(players.size).toBe(2);
-      expect(players.has('manual-player-id')).toBe(true);
-
-      // Cleanup
-      await hostClient
-        .from('session_players')
-        .delete()
-        .eq('player_id', 'manual-player-id');
+      // Verify the snapshot was refreshed with updated data
+      const playerData = hostSnapshot.getPlayers().get(playerUser.id);
+      expect(playerData).toBeDefined();
+      expect(playerData.kills).toBe(10);
+      expect(playerData.damage_dealt).toBe(500);
     });
   });
 });
