@@ -11,7 +11,8 @@
     "test": "node --experimental-vm-modules node_modules/jest/bin/jest.js",
     "test:e2e": "node --experimental-vm-modules node_modules/jest/bin/jest.js --config=jest.e2e.config.js",
     "test:watch": "node --experimental-vm-modules node_modules/jest/bin/jest.js --watch",
-    "test:join": "node scripts/join-test.js"
+    "test:join": "node scripts/join-test.js",
+    "repl": "node scripts/player-repl.js"
   },
   "keywords": [
     "game",
