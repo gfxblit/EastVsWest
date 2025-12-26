@@ -63,13 +63,21 @@ jobs:
       - name: Export Supabase credentials
         run: |
           STATUS=$(supabase status --output json)
-          echo "VITE_SUPABASE_URL=$(echo $STATUS | jq -r '.API_URL')" >> $GITHUB_ENV
-          echo "VITE_SUPABASE_ANON_KEY=$(echo $STATUS | jq -r '.ANON_KEY')" >> $GITHUB_ENV
+          API_URL=$(echo $STATUS | jq -r '.API_URL')
+          ANON_KEY=$(echo $STATUS | jq -r '.ANON_KEY')
+
+          # Set both VITE_ prefixed (for frontend builds) and non-prefixed (for integration tests)
+          echo "SUPABASE_URL=$API_URL" >> $GITHUB_ENV
+          echo "SUPABASE_ANON_KEY=$ANON_KEY" >> $GITHUB_ENV
+          echo "VITE_SUPABASE_URL=$API_URL" >> $GITHUB_ENV
+          echo "VITE_SUPABASE_ANON_KEY=$ANON_KEY" >> $GITHUB_ENV
 
       - name: Run Claude Code
         id: claude
         uses: anthropics/claude-code-action@v1
         env:
+          SUPABASE_URL: ${{ env.SUPABASE_URL }}
+          SUPABASE_ANON_KEY: ${{ env.SUPABASE_ANON_KEY }}
           VITE_SUPABASE_URL: ${{ env.VITE_SUPABASE_URL }}
           VITE_SUPABASE_ANON_KEY: ${{ env.VITE_SUPABASE_ANON_KEY }}
         with:
