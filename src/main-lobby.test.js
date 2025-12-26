@@ -1,11 +1,12 @@
 /**
- * Main.js Lobby Integration Tests
+ * Main.js Lobby Unit Tests
  * Tests that main.js uses SessionPlayersSnapshot for lobby synchronization
+ * Uses mocked dependencies (Network, SessionPlayersSnapshot, UI)
  */
 
 import { jest } from '@jest/globals';
 
-describe('Main.js SessionPlayersSnapshot Integration', () => {
+describe('Main.js Lobby Unit Tests', () => {
   let mockNetwork;
   let mockSessionPlayersSnapshot;
   let mockUI;
