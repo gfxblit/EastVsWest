@@ -19,8 +19,9 @@ export class Renderer {
       console.error('Failed to get 2D context from canvas');
       return;
     }
-    this.canvas.width = CONFIG.CANVAS.WIDTH;
-    this.canvas.height = CONFIG.CANVAS.HEIGHT;
+
+    // Size canvas to fill viewport (for responsive mobile support)
+    this.resizeCanvas();
 
     // Load background image
     this.bgImage.onload = () => {
@@ -29,6 +30,18 @@ export class Renderer {
     this.bgImage.src = '/game-background.png';
 
     console.log('Renderer initialized');
+  }
+
+  resizeCanvas() {
+    // Set canvas internal resolution to match display size
+    // Use window.innerWidth/Height for accurate viewport dimensions
+    const width = window.innerWidth;
+    const height = window.innerHeight;
+
+    this.canvas.width = width;
+    this.canvas.height = height;
+
+    console.log(`Canvas resized to ${width}x${height}`);
   }
 
   render(gameState, localPlayer = null, playersSnapshot = null, camera = null) {

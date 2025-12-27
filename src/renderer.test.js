@@ -14,6 +14,18 @@ describe('Renderer', () => {
   let mockImage;
 
   beforeEach(() => {
+    // Mock window dimensions for responsive canvas sizing
+    Object.defineProperty(window, 'innerWidth', {
+      writable: true,
+      configurable: true,
+      value: CONFIG.CANVAS.WIDTH,
+    });
+    Object.defineProperty(window, 'innerHeight', {
+      writable: true,
+      configurable: true,
+      value: CONFIG.CANVAS.HEIGHT,
+    });
+
     // Mock Image
     mockImage = {
       onload: null,
