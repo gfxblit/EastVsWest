@@ -1,6 +1,6 @@
 import { createClient } from '@supabase/supabase-js';
 import { Network } from '../src/network';
-import { waitFor } from './helpers/wait-utils.js';
+import { waitFor, waitForSilence } from './helpers/wait-utils.js';
 
 // Ensure your local Supabase URL and anon key are set as environment variables
 // before running this test.
@@ -469,11 +469,8 @@ describe('Network Module Integration with Supabase', () => {
       expect(receivedBroadcasts.length).toBe(1);
       expect(receivedBroadcasts[0].data.updates[0].player_id).toBe(hostUser.id);
 
-      // Wait for another broadcast interval
-      await new Promise(resolve => setTimeout(resolve, 50));
-      
-      // another broadcast should not have been sent because buffer is empty
-      expect(receivedBroadcasts.length).toBe(1);
+      // Verify no more broadcasts are sent because buffer is empty
+      await waitForSilence(() => receivedBroadcasts.length === 1, 50);
 
       // Host stops broadcasting
       network.stopPositionBroadcasting();
@@ -485,9 +482,8 @@ describe('Network Module Integration with Supabase', () => {
         velocity: { x: 0, y: 0 },
       });
 
-      // Wait and verify no new broadcast is received
-      await new Promise(resolve => setTimeout(resolve, 60));
-      expect(receivedBroadcasts.length).toBe(1);
+      // Verify no new broadcast is received
+      await waitForSilence(() => receivedBroadcasts.length === 1, 60);
 
       // Clean up
       playerNetwork.off('position_broadcast', handler);

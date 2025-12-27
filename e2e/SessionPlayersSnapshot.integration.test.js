@@ -283,8 +283,8 @@ describe('SessionPlayersSnapshot Integration with Network', () => {
         velocity: { x: 0, y: 0 },
       });
 
-      // Small delay to ensure the fire-and-forget sendPositionUpdate has been processed into the buffer
-      await new Promise(resolve => setTimeout(resolve, 100));
+      // Give enough time for the channel event loop to process the broadcast
+      await new Promise(resolve => setTimeout(resolve, 200));
 
       // Host broadcasts the batched positions (this is what the game loop does)
       hostNetwork.broadcastPositionUpdates();

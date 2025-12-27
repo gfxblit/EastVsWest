@@ -7,7 +7,7 @@
 import { createClient } from '@supabase/supabase-js';
 import { SessionPlayersSnapshot } from '../src/SessionPlayersSnapshot.js';
 import { Network } from '../src/network.js';
-import { waitFor } from './helpers/wait-utils.js';
+import { waitFor, waitForSilence } from './helpers/wait-utils.js';
 
 const supabaseUrl = process.env.SUPABASE_URL;
 const supabaseAnonKey = process.env.SUPABASE_ANON_KEY;
@@ -269,25 +269,10 @@ describe('Main.js Lobby Integration with Real Supabase', () => {
       hostSnapshot.destroy();
       hostSnapshot = null;
 
-      // Wait - ensure no more polls happen (wait for 2 intervals approx)
-      const waitTime = 300;
-      await new Promise(resolve => setTimeout(resolve, waitTime));
-
-      // Assert - Poll count should not increase significantly (or at all if clear interval worked)
-      // Since we cleared interval, it should stop immediately.
-      // But we captured pollsBeforeCleanup BEFORE clearing?
-      // Wait, the logic was:
-      // pollCount > 0
-      // pollsBeforeCleanup = pollCount
-      // clearInterval
-      // destroy
-      // wait
-      // check pollCount == pollsBeforeCleanup
-
-      // If we wait, pollCount should stay same.
-      // So this setTimeout is actually verifying that NO more polls happen.
-      // We can't really replace this with waitFor because we are waiting for something NOT to happen.
-      // So I will keep this setTimeout as it's checking for absence of action over time.
+      // Assert - Poll count should not increase after cleanup
+      // Use waitForSilence to verify that pollCount stays equal to pollsBeforeCleanup
+      await waitForSilence(() => pollCount === pollsBeforeCleanup, 300);
+      
       expect(pollCount).toBe(pollsBeforeCleanup);
     });
   });
