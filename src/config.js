@@ -12,9 +12,10 @@ export const CONFIG = {
   },
 
   // Canvas Settings
+  // Note: These are default/reference dimensions. Canvas will resize to fill viewport.
   CANVAS: {
-    WIDTH: 1200,
-    HEIGHT: 800,
+    WIDTH: 1920,
+    HEIGHT: 1080,
     BACKGROUND_COLOR: '#2a2a2a',
   },
 

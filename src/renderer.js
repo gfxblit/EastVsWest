@@ -9,6 +9,8 @@ export class Renderer {
   constructor(canvas) {
     this.canvas = canvas;
     this.ctx = null;
+    this.bgImage = new Image();
+    this.bgPattern = null;
   }
 
   init() {
@@ -17,10 +19,24 @@ export class Renderer {
       console.error('Failed to get 2D context from canvas');
       return;
     }
-    this.canvas.width = CONFIG.CANVAS.WIDTH;
-    this.canvas.height = CONFIG.CANVAS.HEIGHT;
+
+    // Size canvas to fill viewport (for responsive mobile support)
+    this.resizeCanvas();
+
+    // Load background image
+    this.bgImage.onload = () => {
+      this.bgPattern = this.ctx.createPattern(this.bgImage, 'repeat');
+    };
+    this.bgImage.src = '/game-background.png';
 
     console.log('Renderer initialized');
+  }
+
+  resizeCanvas() {
+    // Use full viewport dimensions, adapting to device aspect ratio
+    // Works in both portrait and landscape orientations
+    this.canvas.width = window.innerWidth;
+    this.canvas.height = window.innerHeight;
   }
 
   render(gameState, localPlayer = null, playersSnapshot = null, camera = null) {
@@ -39,6 +55,17 @@ export class Renderer {
         this.canvas.width / 2 - camera.x,
         this.canvas.height / 2 - camera.y
       );
+    }
+
+    // Draw background in world coordinates (after camera transform)
+    if (camera) {
+      if (this.bgPattern) {
+        this.ctx.fillStyle = this.bgPattern;
+        this.ctx.fillRect(0, 0, CONFIG.WORLD.WIDTH, CONFIG.WORLD.HEIGHT);
+      } else {
+        this.ctx.fillStyle = CONFIG.CANVAS.BACKGROUND_COLOR;
+        this.ctx.fillRect(0, 0, CONFIG.WORLD.WIDTH, CONFIG.WORLD.HEIGHT);
+      }
     }
 
     // Render conflict zone (in world coordinates)
@@ -86,13 +113,6 @@ export class Renderer {
   }
 
   renderConflictZone(zone) {
-    // Draw zone boundary
-    this.ctx.strokeStyle = '#ff6b6b';
-    this.ctx.lineWidth = 3;
-    this.ctx.beginPath();
-    this.ctx.arc(zone.centerX, zone.centerY, zone.radius, 0, Math.PI * 2);
-    this.ctx.stroke();
-
     // Draw danger area outside zone (in world coordinates)
     this.ctx.fillStyle = 'rgba(255, 107, 107, 0.2)';
     this.ctx.fillRect(0, 0, CONFIG.WORLD.WIDTH, CONFIG.WORLD.HEIGHT);
@@ -103,6 +123,13 @@ export class Renderer {
     this.ctx.arc(zone.centerX, zone.centerY, zone.radius, 0, Math.PI * 2);
     this.ctx.fill();
     this.ctx.globalCompositeOperation = 'source-over';
+
+    // Draw zone boundary stroke
+    this.ctx.strokeStyle = '#ff6b6b';
+    this.ctx.lineWidth = 3;
+    this.ctx.beginPath();
+    this.ctx.arc(zone.centerX, zone.centerY, zone.radius, 0, Math.PI * 2);
+    this.ctx.stroke();
   }
 
   renderPlayer(player, isLocal = false) {

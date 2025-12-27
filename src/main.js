@@ -363,16 +363,18 @@ class App {
     this.renderer = new Renderer(canvas);
     this.game = new Game();
     this.input = new Input();
-    this.camera = new Camera(
-      CONFIG.WORLD.WIDTH,
-      CONFIG.WORLD.HEIGHT,
-      CONFIG.CANVAS.WIDTH,
-      CONFIG.CANVAS.HEIGHT
-    );
 
     // Initialize components
     this.renderer.init();
     this.game.init(this.playersSnapshot, this.network);
+
+    // Initialize camera with actual canvas dimensions (after renderer.init)
+    this.camera = new Camera(
+      CONFIG.WORLD.WIDTH,
+      CONFIG.WORLD.HEIGHT,
+      canvas.width,
+      canvas.height
+    );
 
     // Initialize camera to local player position
     const localPlayer = this.game.getLocalPlayer();
@@ -380,6 +382,29 @@ class App {
       this.camera.x = localPlayer.x;
       this.camera.y = localPlayer.y;
     }
+
+    // Handle window resize and orientation changes with debouncing
+    this.resizeTimeout = null;
+    this.handleResize = () => {
+      // Debounce resize events to avoid excessive calls
+      if (this.resizeTimeout) {
+        clearTimeout(this.resizeTimeout);
+      }
+
+      this.resizeTimeout = setTimeout(() => {
+        if (this.renderer && this.camera && canvas) {
+          // Resize canvas to match new viewport
+          this.renderer.resizeCanvas();
+
+          // Update camera viewport to match new canvas dimensions
+          this.camera.updateViewport(canvas.width, canvas.height);
+        }
+        this.resizeTimeout = null;
+      }, 150); // 150ms debounce delay
+    };
+
+    // Listen to resize (covers most cases including orientation change)
+    window.addEventListener('resize', this.handleResize);
 
     // Start periodic position DB writes if we have a session
     if (this.playersSnapshot && this.network) {
@@ -455,6 +480,16 @@ class App {
     }
     if (this.network) {
       this.network.stopPositionBroadcasting();
+    }
+    // Clean up resize handlers
+    if (this.handleResize) {
+      window.removeEventListener('resize', this.handleResize);
+      this.handleResize = null;
+    }
+    // Clear any pending resize timeout
+    if (this.resizeTimeout) {
+      clearTimeout(this.resizeTimeout);
+      this.resizeTimeout = null;
     }
   }
 

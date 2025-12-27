@@ -11,11 +11,13 @@ body {
   display: flex;
   justify-content: center;
   align-items: center;
-  min-height: 100vh;
+  min-height: 100dvh;
   /* Pixel-perfect rendering for crisp pixel art */
   image-rendering: pixelated;
   image-rendering: -moz-crisp-edges;
   image-rendering: crisp-edges;
+  margin: 0;
+  padding: 0;
 }
 
 #app {
@@ -36,7 +38,7 @@ body {
 /* Intro & Lobby Screens */
 #intro-screen, #lobby-screen {
   padding: 2rem;
-  min-height: 100vh;
+  min-height: 100dvh;
   background-image: url('/lobby-background.png');
   background-size: cover;
   background-position: center;
@@ -287,15 +289,27 @@ button:active {
 }
 
 /* Game Screen */
-#game-screen {
-  position: relative;
+#game-screen.active {
+  position: fixed;
+  top: 0;
+  left: 0;
+  width: 100dvw;
+  height: 100dvh;
+  overflow: hidden;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background-color: #000;
+  touch-action: none;
 }
 
 #game-canvas {
-  border: 2px solid #4ecdc4;
+  display: block;
   background-color: #2a2a2a;
   image-rendering: pixelated;
   image-rendering: crisp-edges;
+  /* Canvas maintains aspect ratio, may not fill entire viewport */
+  touch-action: none;
 }
 
 #game-ui {

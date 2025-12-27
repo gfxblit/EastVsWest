@@ -12,13 +12,17 @@ export class Camera {
     this.viewportWidth = viewportWidth;
     this.viewportHeight = viewportHeight;
 
-    // Calculate camera bounds
+    // Calculate initial camera bounds
+    this._calculateBounds();
+  }
+
+  _calculateBounds() {
     // Camera should be clamped so that the viewport doesn't show empty space
     // Min: viewportWidth/2, Max: worldWidth - viewportWidth/2
-    this.minX = viewportWidth / 2;
-    this.maxX = worldWidth - viewportWidth / 2;
-    this.minY = viewportHeight / 2;
-    this.maxY = worldHeight - viewportHeight / 2;
+    this.minX = this.viewportWidth / 2;
+    this.maxX = this.worldWidth - this.viewportWidth / 2;
+    this.minY = this.viewportHeight / 2;
+    this.maxY = this.worldHeight - this.viewportHeight / 2;
   }
 
   update(targetX, targetY, lerpFactor) {
@@ -73,5 +77,14 @@ export class Camera {
       y: clampedY,
       angle: angle,
     };
+  }
+
+  updateViewport(newViewportWidth, newViewportHeight) {
+    // Update viewport dimensions
+    this.viewportWidth = newViewportWidth;
+    this.viewportHeight = newViewportHeight;
+
+    // Recalculate camera bounds
+    this._calculateBounds();
   }
 }

@@ -272,4 +272,96 @@ describe('Camera', () => {
       expect(indicator).toBeNull();
     });
   });
+
+  describe('updateViewport', () => {
+    test('WhenViewportDimensionsChange_ShouldUpdateViewportSize', () => {
+      // Arrange
+      const camera = new Camera(2400, 1600, 1200, 800);
+
+      // Act
+      camera.updateViewport(800, 600);
+
+      // Assert
+      expect(camera.viewportWidth).toBe(800);
+      expect(camera.viewportHeight).toBe(600);
+    });
+
+    test('WhenViewportDimensionsChange_ShouldRecalculateCameraBounds', () => {
+      // Arrange
+      const camera = new Camera(2400, 1600, 1200, 800);
+      // Original bounds: minX=600, maxX=1800, minY=400, maxY=1200
+
+      // Act
+      camera.updateViewport(800, 600);
+
+      // Assert
+      // New bounds should be: minX=400, maxX=2000, minY=300, maxY=1300
+      expect(camera.minX).toBe(400); // 800/2
+      expect(camera.maxX).toBe(2000); // 2400 - 800/2
+      expect(camera.minY).toBe(300); // 600/2
+      expect(camera.maxY).toBe(1300); // 1600 - 600/2
+    });
+
+    test('WhenViewportUpdated_ShouldMaintainCameraPosition', () => {
+      // Arrange
+      const camera = new Camera(2400, 1600, 1200, 800);
+      camera.x = 1200;
+      camera.y = 800;
+
+      // Act
+      camera.updateViewport(800, 600);
+
+      // Assert
+      // Camera position should remain the same
+      expect(camera.x).toBe(1200);
+      expect(camera.y).toBe(800);
+    });
+
+    test('WhenViewportUpdated_ShouldClampCameraPositionToNewBounds', () => {
+      // Arrange
+      const camera = new Camera(2400, 1600, 1200, 800);
+      camera.x = 1800; // At max bound for 1200x800 viewport
+      camera.y = 1200;
+
+      // Act
+      // Smaller viewport means tighter bounds
+      camera.updateViewport(400, 300);
+
+      // Assert
+      // Camera should be clamped to new bounds: maxX=2200, maxY=1450
+      expect(camera.x).toBe(1800); // Still within new maxX (2200)
+      expect(camera.y).toBe(1200); // Still within new maxY (1450)
+    });
+
+    test('WhenViewportUpdatedToLargerSize_ShouldAllowWiderMovement', () => {
+      // Arrange
+      const camera = new Camera(2400, 1600, 1200, 800);
+      // Original bounds: minX=600, maxX=1800
+
+      // Act
+      camera.updateViewport(2000, 1400);
+
+      // Assert
+      // New bounds should be tighter (less room to move)
+      expect(camera.minX).toBe(1000); // 2000/2
+      expect(camera.maxX).toBe(1400); // 2400 - 2000/2
+    });
+
+    test('WhenViewportUpdated_WorldToScreenShouldUseNewDimensions', () => {
+      // Arrange
+      const camera = new Camera(2400, 1600, 1200, 800);
+      camera.x = 1200;
+      camera.y = 800;
+
+      // Act
+      camera.updateViewport(800, 600);
+
+      // Player at camera position should be at new screen center
+      const screenPos = camera.worldToScreen(1200, 800);
+
+      // Assert
+      expect(screenPos.x).toBe(400); // 800/2
+      expect(screenPos.y).toBe(300); // 600/2
+    });
+  });
 });
