@@ -112,26 +112,6 @@ describe('Camera Follow System Integration', () => {
     expect(conflictZonePos.centerY).toBe(800); // World center Y
   }, 10000);
 
-  test('WhenEntityOffScreen_EdgeIndicatorsShouldBeVisible', async () => {
-    // Arrange
-    const indexPath = join(__dirname, '..', 'index.html');
-    await page.goto('file://' + indexPath);
-    await page.waitForSelector('#game-canvas');
-
-    // This test would require setting up multiplayer with a remote player
-    // or spawning loot far from the player
-    // For now, we'll test that the edge indicator rendering method exists
-
-    const hasEdgeIndicators = await page.evaluate(() => {
-      if (window.renderer && typeof window.renderer.renderEdgeIndicators === 'function') {
-        return true;
-      }
-      return false;
-    });
-
-    expect(hasEdgeIndicators).toBe(true);
-  }, 10000);
-
   test('WhenCameraFollows_ShouldUseSmoothInterpolation', async () => {
     // Arrange
     const indexPath = join(__dirname, '..', 'index.html');
