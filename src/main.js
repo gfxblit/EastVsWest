@@ -383,18 +383,28 @@ class App {
       this.camera.y = localPlayer.y;
     }
 
-    // Handle window resize and orientation changes
+    // Handle window resize and orientation changes with debouncing
+    this.resizeTimeout = null;
     this.handleResize = () => {
-      if (this.renderer && this.camera && canvas) {
-        // Resize canvas to match new viewport
-        this.renderer.resizeCanvas();
-
-        // Update camera viewport to match new canvas dimensions
-        this.camera.updateViewport(canvas.width, canvas.height);
+      // Debounce resize events to avoid excessive calls
+      if (this.resizeTimeout) {
+        clearTimeout(this.resizeTimeout);
       }
+
+      this.resizeTimeout = setTimeout(() => {
+        if (this.renderer && this.camera && canvas) {
+          // Resize canvas to match new viewport
+          this.renderer.resizeCanvas();
+
+          // Update camera viewport to match new canvas dimensions
+          this.camera.updateViewport(canvas.width, canvas.height);
+        }
+        this.resizeTimeout = null;
+      }, 150); // 150ms debounce delay
     };
+
+    // Listen to resize (covers most cases including orientation change)
     window.addEventListener('resize', this.handleResize);
-    window.addEventListener('orientationchange', this.handleResize);
 
     // Start periodic position DB writes if we have a session
     if (this.playersSnapshot && this.network) {
@@ -474,8 +484,12 @@ class App {
     // Clean up resize handlers
     if (this.handleResize) {
       window.removeEventListener('resize', this.handleResize);
-      window.removeEventListener('orientationchange', this.handleResize);
       this.handleResize = null;
+    }
+    // Clear any pending resize timeout
+    if (this.resizeTimeout) {
+      clearTimeout(this.resizeTimeout);
+      this.resizeTimeout = null;
     }
   }
 
