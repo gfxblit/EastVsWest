@@ -99,15 +99,25 @@ describe('SessionPlayersSnapshot Integration with Network', () => {
 
     // Clean up test data FIRST (before waiting)
     if (testSessionId) {
-      // Delete players first (due to foreign key constraint)
-      await hostClient.from('session_players').delete().eq('session_id', testSessionId);
-      // Delete session
-      await hostClient.from('game_sessions').delete().eq('id', testSessionId);
+      const sessionIdToDelete = testSessionId;
       testSessionId = null;
+      // Delete players first (due to foreign key constraint)
+      await hostClient.from('session_players').delete().eq('session_id', sessionIdToDelete);
+      // Delete session
+      await hostClient.from('game_sessions').delete().eq('id', sessionIdToDelete);
+      
+      // Wait for cleanup to be reflected in DB
+      await waitFor(async () => {
+        const { count } = await hostClient
+          .from('game_sessions')
+          .select('*', { count: 'exact', head: true })
+          .eq('id', sessionIdToDelete);
+        return count === 0;
+      });
     }
 
-    // Wait for cleanup to complete and channels to fully unsubscribe
-    await new Promise(resolve => setTimeout(resolve, 1000));
+    // Small delay to allow Realtime to stabilize between tests (removals are async)
+    await new Promise(resolve => setTimeout(resolve, 500));
   });
 
   describe('Initialization and Snapshot', () => {
@@ -273,31 +283,9 @@ describe('SessionPlayersSnapshot Integration with Network', () => {
         velocity: { x: 0, y: 0 },
       });
 
-      // Wait for position_update to be received by host
-      // Since sendPositionUpdate is fire-and-forget, we need to wait for host to process it?
-      // Actually, hostNetwork.sendPositionUpdate updates local state immediately?
-      // No, it sends to broadcast.
-      // But wait, the test says "Host broadcasts the batched positions".
-      // `hostNetwork.sendPositionUpdate` pushes to `this.positionUpdates`.
-      // `hostNetwork.broadcastPositionUpdates` sends them.
-      
-      // So we don't need to wait here if we assume `sendPositionUpdate` is synchronous in queuing.
-      // But let's look at the original test:
-      // await new Promise(resolve => setTimeout(resolve, 200));
-      // This wait was probably to ensure some internal state update or throttle?
-      
-      // Actually, `hostNetwork.sendPositionUpdate` -> pushes to queue.
-      // `hostNetwork.broadcastPositionUpdates` -> sends via channel.
-      
-      // The wait might be irrelevant here if `broadcastPositionUpdates` is called manually.
-      // However, let's keep a small wait if we are unsure, OR better, since we can't observe internal state easily:
-      // We can just proceed.
-      await new Promise(resolve => setTimeout(resolve, 200)); 
-      // I kept this one as setTimeout because it's not waiting for an observable condition on *snapshot*.
-      // It's waiting for "time to pass" for some reason?
-      // Actually, looking at the code, `hostNetwork.sendPositionUpdate` is just `this.positionUpdates.set(...)`. Synchronous.
-      // Maybe the 200ms wait was just superstition or ensuring no throttle limits?
-      
+      // Small delay to ensure the fire-and-forget sendPositionUpdate has been processed into the buffer
+      await new Promise(resolve => setTimeout(resolve, 100));
+
       // Host broadcasts the batched positions (this is what the game loop does)
       hostNetwork.broadcastPositionUpdates();
 
