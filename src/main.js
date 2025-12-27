@@ -385,7 +385,10 @@ class App {
 
     // Handle window resize and orientation changes
     this.handleResize = () => {
-      if (this.camera && canvas) {
+      if (this.renderer && this.camera && canvas) {
+        // Resize canvas to match new viewport
+        this.renderer.resizeCanvas();
+
         // Update camera viewport to match new canvas dimensions
         this.camera.updateViewport(canvas.width, canvas.height);
       }
