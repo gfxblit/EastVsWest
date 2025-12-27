@@ -363,16 +363,18 @@ class App {
     this.renderer = new Renderer(canvas);
     this.game = new Game();
     this.input = new Input();
-    this.camera = new Camera(
-      CONFIG.WORLD.WIDTH,
-      CONFIG.WORLD.HEIGHT,
-      CONFIG.CANVAS.WIDTH,
-      CONFIG.CANVAS.HEIGHT
-    );
 
     // Initialize components
     this.renderer.init();
     this.game.init(this.playersSnapshot, this.network);
+
+    // Initialize camera with actual canvas dimensions (after renderer.init)
+    this.camera = new Camera(
+      CONFIG.WORLD.WIDTH,
+      CONFIG.WORLD.HEIGHT,
+      canvas.width,
+      canvas.height
+    );
 
     // Initialize camera to local player position
     const localPlayer = this.game.getLocalPlayer();
@@ -380,6 +382,16 @@ class App {
       this.camera.x = localPlayer.x;
       this.camera.y = localPlayer.y;
     }
+
+    // Handle window resize and orientation changes
+    this.handleResize = () => {
+      if (this.camera && canvas) {
+        // Update camera viewport to match new canvas dimensions
+        this.camera.updateViewport(canvas.width, canvas.height);
+      }
+    };
+    window.addEventListener('resize', this.handleResize);
+    window.addEventListener('orientationchange', this.handleResize);
 
     // Start periodic position DB writes if we have a session
     if (this.playersSnapshot && this.network) {
@@ -455,6 +467,12 @@ class App {
     }
     if (this.network) {
       this.network.stopPositionBroadcasting();
+    }
+    // Clean up resize handlers
+    if (this.handleResize) {
+      window.removeEventListener('resize', this.handleResize);
+      window.removeEventListener('orientationchange', this.handleResize);
+      this.handleResize = null;
     }
   }
 

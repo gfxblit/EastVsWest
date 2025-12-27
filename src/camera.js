@@ -74,4 +74,16 @@ export class Camera {
       angle: angle,
     };
   }
+
+  updateViewport(newViewportWidth, newViewportHeight) {
+    // Update viewport dimensions
+    this.viewportWidth = newViewportWidth;
+    this.viewportHeight = newViewportHeight;
+
+    // Recalculate camera bounds
+    this.minX = newViewportWidth / 2;
+    this.maxX = this.worldWidth - newViewportWidth / 2;
+    this.minY = newViewportHeight / 2;
+    this.maxY = this.worldHeight - newViewportHeight / 2;
+  }
 }
