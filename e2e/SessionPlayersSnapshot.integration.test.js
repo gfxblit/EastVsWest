@@ -1,6 +1,7 @@
 import { createClient } from '@supabase/supabase-js';
 import { SessionPlayersSnapshot } from '../src/SessionPlayersSnapshot.js';
 import { Network } from '../src/network.js';
+import { waitFor } from './helpers/wait-utils.js';
 
 const supabaseUrl = process.env.SUPABASE_URL;
 const supabaseAnonKey = process.env.SUPABASE_ANON_KEY;
@@ -189,7 +190,7 @@ describe('SessionPlayersSnapshot Integration with Network', () => {
       await playerNetwork.joinGame(testJoinCode, 'TestPlayer');
 
       // Wait for postgres_changes event to propagate through Network
-      await new Promise(resolve => setTimeout(resolve, 500));
+      await waitFor(() => hostSnapshot.getPlayers().size === 2);
 
       const players = hostSnapshot.getPlayers();
       expect(players.size).toBe(2);
@@ -215,7 +216,7 @@ describe('SessionPlayersSnapshot Integration with Network', () => {
         .eq('session_id', testSessionId);
 
       // Wait for postgres_changes event
-      await new Promise(resolve => setTimeout(resolve, 500));
+      await waitFor(() => hostSnapshot.getPlayers().size === 1);
 
       const players = hostSnapshot.getPlayers();
       expect(players.size).toBe(1);
@@ -238,7 +239,10 @@ describe('SessionPlayersSnapshot Integration with Network', () => {
         .eq('session_id', testSessionId);
 
       // Wait for postgres_changes event
-      await new Promise(resolve => setTimeout(resolve, 500));
+      await waitFor(() => {
+        const p = hostSnapshot.getPlayers().get(hostUser.id);
+        return p.kills === 5;
+      });
 
       const hostPlayerAfter = hostSnapshot.getPlayers().get(hostUser.id);
       expect(hostPlayerAfter.kills).toBe(5);
@@ -270,13 +274,38 @@ describe('SessionPlayersSnapshot Integration with Network', () => {
       });
 
       // Wait for position_update to be received by host
-      await new Promise(resolve => setTimeout(resolve, 200));
-
+      // Since sendPositionUpdate is fire-and-forget, we need to wait for host to process it?
+      // Actually, hostNetwork.sendPositionUpdate updates local state immediately?
+      // No, it sends to broadcast.
+      // But wait, the test says "Host broadcasts the batched positions".
+      // `hostNetwork.sendPositionUpdate` pushes to `this.positionUpdates`.
+      // `hostNetwork.broadcastPositionUpdates` sends them.
+      
+      // So we don't need to wait here if we assume `sendPositionUpdate` is synchronous in queuing.
+      // But let's look at the original test:
+      // await new Promise(resolve => setTimeout(resolve, 200));
+      // This wait was probably to ensure some internal state update or throttle?
+      
+      // Actually, `hostNetwork.sendPositionUpdate` -> pushes to queue.
+      // `hostNetwork.broadcastPositionUpdates` -> sends via channel.
+      
+      // The wait might be irrelevant here if `broadcastPositionUpdates` is called manually.
+      // However, let's keep a small wait if we are unsure, OR better, since we can't observe internal state easily:
+      // We can just proceed.
+      await new Promise(resolve => setTimeout(resolve, 200)); 
+      // I kept this one as setTimeout because it's not waiting for an observable condition on *snapshot*.
+      // It's waiting for "time to pass" for some reason?
+      // Actually, looking at the code, `hostNetwork.sendPositionUpdate` is just `this.positionUpdates.set(...)`. Synchronous.
+      // Maybe the 200ms wait was just superstition or ensuring no throttle limits?
+      
       // Host broadcasts the batched positions (this is what the game loop does)
       hostNetwork.broadcastPositionUpdates();
 
       // Wait for position_broadcast to propagate through Supabase Realtime
-      await new Promise(resolve => setTimeout(resolve, 500));
+      await waitFor(() => {
+        const p = playerSnapshot.getPlayers().get(hostUser.id);
+        return p.position_x === 100 && p.position_y === 200;
+      });
 
       // Position should update in playerSnapshot via Network broadcast handler
       const hostPlayerAfter = playerSnapshot.getPlayers().get(hostUser.id);
@@ -310,7 +339,10 @@ describe('SessionPlayersSnapshot Integration with Network', () => {
         .eq('session_id', testSessionId);
 
       // Wait for periodic refresh to pick up the changes
-      await new Promise(resolve => setTimeout(resolve, 700));
+      await waitFor(() => {
+        const p = hostSnapshot.getPlayers().get(playerUser.id);
+        return p.kills === 10;
+      });
 
       // Verify the snapshot was refreshed with updated data
       const playerData = hostSnapshot.getPlayers().get(playerUser.id);

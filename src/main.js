@@ -141,6 +141,7 @@ class App {
       this.setupNetworkHandlers();
 
       console.log('App initialization complete');
+      document.body.classList.add('loaded');
     } catch (err) {
       console.error('Error during app initialization:', err);
       this.showError(`Initialization error: ${err.message}`);

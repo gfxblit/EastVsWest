@@ -89,12 +89,7 @@ PUPPETEER_EXECUTABLE_PATH="" npm run test:e2e
 
 ### Debug Configuration
 
-To see the detected Puppeteer configuration:
-
-```javascript
-import { logPuppeteerConfig } from './helpers/puppeteer-config.js';
-logPuppeteerConfig();
-```
+To see the detected Puppeteer configuration, you can use `console.log(getPuppeteerConfig())`.
 
 ## GitHub Actions Setup
 
@@ -186,8 +181,8 @@ If tests fail to launch the browser, try:
 3. **Check configuration:**
    Add logging to your test:
    ```javascript
-   import { logPuppeteerConfig } from './helpers/puppeteer-config.js';
-   logPuppeteerConfig();
+   import { getPuppeteerConfig } from './helpers/puppeteer-config.js';
+   console.log(getPuppeteerConfig());
    ```
 
 ### "Browser crashed" or "Page timeout"

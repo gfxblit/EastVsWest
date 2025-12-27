@@ -80,18 +80,3 @@ export function getPuppeteerConfig(customOptions = {}) {
     args: [...(baseConfig.args || []), ...(customOptions.args || [])],
   };
 }
-
-/**
- * Logs the detected configuration for debugging
- */
-export function logPuppeteerConfig() {
-  const config = getPuppeteerConfig();
-  console.log('Puppeteer Configuration:');
-  console.log('  Platform:', process.platform);
-  console.log('  Architecture:', process.arch);
-  console.log('  Executable:', config.executablePath || 'Bundled Chromium');
-  console.log('  Headless:', config.headless);
-  console.log('  CI:', process.env.CI || 'false');
-  console.log('  GitHub Actions:', process.env.GITHUB_ACTIONS || 'false');
-  console.log('  Cloud Shell:', process.env.DEVSHELL_PROJECT_ID || 'false');
-}
