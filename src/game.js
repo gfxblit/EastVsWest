@@ -127,6 +127,13 @@ export class Game {
   sendLocalPlayerPosition() {
     if (!this.localPlayer) return;
 
+    // Throttle to configured rate
+    const now = Date.now();
+    const minInterval = 1000 / CONFIG.NETWORK.POSITION_UPDATE_RATE;
+    if (now - this.lastPositionSendTime < minInterval) {
+      return;
+    }
+
     // Only send if position/rotation changed
     const currentPos = { x: this.localPlayer.x, y: this.localPlayer.y, rotation: this.localPlayer.rotation };
     if (this.lastSentPosition &&
@@ -143,8 +150,9 @@ export class Game {
       velocity: this.localPlayer.velocity,
     });
 
-    // Remember last sent position
+    // Remember last sent position and time
     this.lastSentPosition = currentPos;
+    this.lastPositionSendTime = now;
   }
 
   handleInput(inputState) {
