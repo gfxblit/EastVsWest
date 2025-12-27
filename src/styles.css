@@ -425,3 +425,113 @@ button:active {
   display: inline-block;
   margin: 1rem 0;
 }
+
+/* Touch Controls */
+.touch-controls {
+  display: none;
+  position: fixed;
+  z-index: 1000;
+  opacity: 0;
+  transition: opacity 0.1s;
+  pointer-events: none;
+}
+
+.joystick-base {
+  width: 120px;
+  height: 120px;
+  background: radial-gradient(circle, rgba(78, 205, 196, 0.3) 0%, rgba(78, 205, 196, 0.1) 100%);
+  border: 3px solid rgba(78, 205, 196, 0.5);
+  border-radius: 50%;
+  position: absolute;
+  top: 50%;
+  left: 50%;
+  transform: translate(-50%, -50%);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  pointer-events: auto;
+}
+
+.joystick-stick {
+  width: 50px;
+  height: 50px;
+  background: radial-gradient(circle, rgba(78, 205, 196, 0.8) 0%, rgba(78, 205, 196, 0.5) 100%);
+  border: 2px solid rgba(78, 205, 196, 0.9);
+  border-radius: 50%;
+  position: absolute;
+  top: 50%;
+  left: 50%;
+  transform: translate(-50%, -50%);
+  pointer-events: none;
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.3);
+}
+
+.touch-buttons {
+  display: none;
+  position: fixed;
+  bottom: 40px;
+  right: 30px;
+  z-index: 1000;
+  flex-direction: column;
+  gap: 15px;
+}
+
+.touch-btn {
+  width: 70px;
+  height: 70px;
+  border-radius: 50%;
+  border: 4px solid #3d2817;
+  font-size: 1.2rem;
+  font-weight: bold;
+  color: #f4e8c1;
+  text-shadow: 2px 2px 0px #2d1b00;
+  box-shadow:
+    inset 0 2px 0 rgba(255, 255, 255, 0.3),
+    inset 0 -2px 0 rgba(0, 0, 0, 0.3),
+    0 4px 0 #2d1b00,
+    0 6px 8px rgba(0, 0, 0, 0.3);
+  cursor: pointer;
+  touch-action: none;
+  user-select: none;
+  -webkit-user-select: none;
+  -webkit-tap-highlight-color: transparent;
+}
+
+.attack-btn {
+  background: linear-gradient(to bottom, #c86a5a 0%, #a84a3d 100%);
+}
+
+.attack-btn:active {
+  background: linear-gradient(to bottom, #a84a3d 0%, #8b3a2f 100%);
+  transform: scale(0.95);
+  box-shadow:
+    inset 0 2px 0 rgba(0, 0, 0, 0.2),
+    inset 0 -2px 0 rgba(255, 255, 255, 0.1),
+    0 2px 0 #2d1b00,
+    0 3px 4px rgba(0, 0, 0, 0.3);
+}
+
+.ability-btn {
+  background: linear-gradient(to bottom, #7fb069 0%, #5a8f4f 100%);
+}
+
+.ability-btn:active {
+  background: linear-gradient(to bottom, #5a8f4f 0%, #47723d 100%);
+  transform: scale(0.95);
+  box-shadow:
+    inset 0 2px 0 rgba(0, 0, 0, 0.2),
+    inset 0 -2px 0 rgba(255, 255, 255, 0.1),
+    0 2px 0 #2d1b00,
+    0 3px 4px rgba(0, 0, 0, 0.3);
+}
+
+/* Show touch controls on touch devices or small screens */
+@media (hover: none) and (pointer: coarse), (max-width: 850px) {
+  .touch-controls {
+    display: block;
+  }
+
+  .touch-buttons {
+    display: flex;
+  }
+}

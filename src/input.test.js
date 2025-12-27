@@ -393,4 +393,476 @@ describe('Input', () => {
       }).not.toThrow();
     });
   });
+
+  describe('Touch Controls - Initialization', () => {
+    test('WhenConstructed_ShouldInitializeTouchState', () => {
+      expect(input.touchState).toBeDefined();
+      expect(input.touchState.active).toBe(false);
+      expect(input.touchState.startX).toBe(0);
+      expect(input.touchState.startY).toBe(0);
+      expect(input.touchState.currentX).toBe(0);
+      expect(input.touchState.currentY).toBe(0);
+    });
+
+    test('WhenInitialized_ShouldSetupTouchElements', () => {
+      // Mock touch control elements
+      const mockJoystickBase = document.createElement('div');
+      mockJoystickBase.id = 'joystick-base';
+      const mockJoystickStick = document.createElement('div');
+      mockJoystickStick.id = 'joystick-stick';
+      const mockTouchControls = document.createElement('div');
+      mockTouchControls.id = 'touch-controls';
+      const mockAttackButton = document.createElement('button');
+      mockAttackButton.id = 'attack-button';
+      const mockAbilityButton = document.createElement('button');
+      mockAbilityButton.id = 'ability-button';
+
+      document.body.appendChild(mockJoystickBase);
+      document.body.appendChild(mockJoystickStick);
+      document.body.appendChild(mockTouchControls);
+      document.body.appendChild(mockAttackButton);
+      document.body.appendChild(mockAbilityButton);
+
+      input.init(mockCallback);
+
+      expect(input.joystickBase).toBe(mockJoystickBase);
+      expect(input.joystickStick).toBe(mockJoystickStick);
+      expect(input.touchControls).toBe(mockTouchControls);
+      expect(input.attackButton).toBe(mockAttackButton);
+      expect(input.abilityButton).toBe(mockAbilityButton);
+
+      // Cleanup
+      mockJoystickBase.remove();
+      mockJoystickStick.remove();
+      mockTouchControls.remove();
+      mockAttackButton.remove();
+      mockAbilityButton.remove();
+    });
+  });
+
+  describe('Touch Controls - Joystick Movement', () => {
+    let mockCanvas;
+    let mockTouchControls;
+    let mockJoystickBase;
+    let mockJoystickStick;
+
+    beforeEach(() => {
+      // Setup DOM elements
+      mockCanvas = document.createElement('canvas');
+      mockCanvas.id = 'game-canvas';
+      mockCanvas.getBoundingClientRect = jest.fn(() => ({
+        left: 0,
+        top: 0,
+        right: 800,
+        bottom: 600,
+        width: 800,
+        height: 600,
+      }));
+
+      mockTouchControls = document.createElement('div');
+      mockTouchControls.id = 'touch-controls';
+      mockTouchControls.style.opacity = '0';
+      mockTouchControls.style.left = '0px';
+      mockTouchControls.style.top = '0px';
+
+      mockJoystickBase = document.createElement('div');
+      mockJoystickBase.id = 'joystick-base';
+
+      mockJoystickStick = document.createElement('div');
+      mockJoystickStick.id = 'joystick-stick';
+
+      document.body.appendChild(mockCanvas);
+      document.body.appendChild(mockTouchControls);
+      document.body.appendChild(mockJoystickBase);
+      document.body.appendChild(mockJoystickStick);
+
+      input.init(mockCallback);
+    });
+
+    afterEach(() => {
+      mockCanvas.remove();
+      mockTouchControls.remove();
+      mockJoystickBase.remove();
+      mockJoystickStick.remove();
+    });
+
+    test('WhenTouchStart_ShouldActivateTouchState', () => {
+      const touch = new Touch({
+        identifier: 0,
+        target: mockCanvas,
+        clientX: 100,
+        clientY: 200,
+      });
+      const event = new TouchEvent('touchstart', {
+        touches: [touch],
+        cancelable: true,
+      });
+
+      input.handleTouchStart(event);
+
+      expect(input.touchState.active).toBe(true);
+      expect(input.touchState.startX).toBe(100);
+      expect(input.touchState.startY).toBe(200);
+    });
+
+    test('WhenTouchStart_ShouldPositionJoystickAtTouchLocation', () => {
+      const touch = new Touch({
+        identifier: 0,
+        target: mockCanvas,
+        clientX: 100,
+        clientY: 200,
+      });
+      const event = new TouchEvent('touchstart', {
+        touches: [touch],
+        cancelable: true,
+      });
+
+      input.handleTouchStart(event);
+
+      expect(mockTouchControls.style.left).toBe('100px');
+      expect(mockTouchControls.style.top).toBe('200px');
+      expect(mockTouchControls.style.opacity).toBe('1');
+    });
+
+    test('WhenTouchMove_ShouldUpdateTouchState', () => {
+      // Start touch
+      const startTouch = new Touch({
+        identifier: 0,
+        target: mockCanvas,
+        clientX: 100,
+        clientY: 200,
+      });
+      const startEvent = new TouchEvent('touchstart', {
+        touches: [startTouch],
+        cancelable: true,
+      });
+      input.handleTouchStart(startEvent);
+
+      // Move touch
+      const moveTouch = new Touch({
+        identifier: 0,
+        target: mockCanvas,
+        clientX: 120,
+        clientY: 230,
+      });
+      const moveEvent = new TouchEvent('touchmove', {
+        touches: [moveTouch],
+        cancelable: true,
+      });
+      input.handleTouchMove(moveEvent);
+
+      expect(input.touchState.currentX).toBe(120);
+      expect(input.touchState.currentY).toBe(230);
+    });
+
+    test('WhenTouchMoveWithinMaxDistance_ShouldUpdateInputState', () => {
+      // Start touch at (100, 200)
+      const startTouch = new Touch({
+        identifier: 0,
+        target: mockCanvas,
+        clientX: 100,
+        clientY: 200,
+      });
+      const startEvent = new TouchEvent('touchstart', {
+        touches: [startTouch],
+        cancelable: true,
+      });
+      input.handleTouchStart(startEvent);
+
+      // Move 30px right, 20px down
+      const moveTouch = new Touch({
+        identifier: 0,
+        target: mockCanvas,
+        clientX: 130,
+        clientY: 220,
+      });
+      const moveEvent = new TouchEvent('touchmove', {
+        touches: [moveTouch],
+        cancelable: true,
+      });
+      input.handleTouchMove(moveEvent);
+
+      // Movement should be normalized to -1 to 1 range
+      expect(input.inputState.moveX).toBeGreaterThan(0);
+      expect(input.inputState.moveY).toBeGreaterThan(0);
+      expect(Math.abs(input.inputState.moveX)).toBeLessThanOrEqual(1);
+      expect(Math.abs(input.inputState.moveY)).toBeLessThanOrEqual(1);
+    });
+
+    test('WhenTouchMoveBeyondMaxDistance_ShouldClampToMaxDistance', () => {
+      const MAX_JOYSTICK_DISTANCE = 45;
+
+      // Start touch
+      const startTouch = new Touch({
+        identifier: 0,
+        target: mockCanvas,
+        clientX: 100,
+        clientY: 200,
+      });
+      const startEvent = new TouchEvent('touchstart', {
+        touches: [startTouch],
+        cancelable: true,
+      });
+      input.handleTouchStart(startEvent);
+
+      // Move 100px right (beyond max distance)
+      const moveTouch = new Touch({
+        identifier: 0,
+        target: mockCanvas,
+        clientX: 200,
+        clientY: 200,
+      });
+      const moveEvent = new TouchEvent('touchmove', {
+        touches: [moveTouch],
+        cancelable: true,
+      });
+      input.handleTouchMove(moveEvent);
+
+      // Movement should be clamped to max values (-1 or 1)
+      expect(Math.abs(input.inputState.moveX)).toBe(1);
+    });
+
+    test('WhenTouchEnd_ShouldDeactivateTouchState', () => {
+      // Start touch
+      const startTouch = new Touch({
+        identifier: 0,
+        target: mockCanvas,
+        clientX: 100,
+        clientY: 200,
+      });
+      const startEvent = new TouchEvent('touchstart', {
+        touches: [startTouch],
+        cancelable: true,
+      });
+      input.handleTouchStart(startEvent);
+
+      // End touch
+      const endEvent = new TouchEvent('touchend', {
+        cancelable: true,
+      });
+      input.handleTouchEnd(endEvent);
+
+      expect(input.touchState.active).toBe(false);
+      expect(input.inputState.moveX).toBe(0);
+      expect(input.inputState.moveY).toBe(0);
+    });
+
+    test('WhenTouchEnd_ShouldHideJoystick', () => {
+      // Start touch
+      const startTouch = new Touch({
+        identifier: 0,
+        target: mockCanvas,
+        clientX: 100,
+        clientY: 200,
+      });
+      const startEvent = new TouchEvent('touchstart', {
+        touches: [startTouch],
+        cancelable: true,
+      });
+      input.handleTouchStart(startEvent);
+
+      // End touch
+      const endEvent = new TouchEvent('touchend', {
+        cancelable: true,
+      });
+      input.handleTouchEnd(endEvent);
+
+      expect(mockTouchControls.style.opacity).toBe('0');
+    });
+  });
+
+  describe('Touch Controls - Attack and Ability Buttons', () => {
+    let mockAttackButton;
+    let mockAbilityButton;
+
+    beforeEach(() => {
+      mockAttackButton = document.createElement('button');
+      mockAttackButton.id = 'attack-button';
+      mockAbilityButton = document.createElement('button');
+      mockAbilityButton.id = 'ability-button';
+
+      document.body.appendChild(mockAttackButton);
+      document.body.appendChild(mockAbilityButton);
+
+      input.init(mockCallback);
+    });
+
+    afterEach(() => {
+      mockAttackButton.remove();
+      mockAbilityButton.remove();
+    });
+
+    test('WhenAttackButtonTouchStart_ShouldSetAttackTrue', () => {
+      const touch = new Touch({
+        identifier: 0,
+        target: mockAttackButton,
+        clientX: 0,
+        clientY: 0,
+      });
+      const event = new TouchEvent('touchstart', {
+        touches: [touch],
+        cancelable: true,
+      });
+
+      input.handleAttackButtonTouchStart(event);
+
+      expect(input.inputState.attack).toBe(true);
+    });
+
+    test('WhenAttackButtonTouchEnd_ShouldSetAttackFalse', () => {
+      input.inputState.attack = true;
+
+      const event = new TouchEvent('touchend', {
+        cancelable: true,
+      });
+
+      input.handleAttackButtonTouchEnd(event);
+
+      expect(input.inputState.attack).toBe(false);
+    });
+
+    test('WhenAbilityButtonTouchStart_ShouldSetSpecialAbilityTrue', () => {
+      const touch = new Touch({
+        identifier: 0,
+        target: mockAbilityButton,
+        clientX: 0,
+        clientY: 0,
+      });
+      const event = new TouchEvent('touchstart', {
+        touches: [touch],
+        cancelable: true,
+      });
+
+      input.handleAbilityButtonTouchStart(event);
+
+      expect(input.inputState.specialAbility).toBe(true);
+    });
+
+    test('WhenAbilityButtonTouchEnd_ShouldSetSpecialAbilityFalse', () => {
+      input.inputState.specialAbility = true;
+
+      const event = new TouchEvent('touchend', {
+        cancelable: true,
+      });
+
+      input.handleAbilityButtonTouchEnd(event);
+
+      expect(input.inputState.specialAbility).toBe(false);
+    });
+  });
+
+  describe('Touch Controls - Touch Priority Over Keyboard', () => {
+    let mockCanvas;
+    let mockTouchControls;
+    let mockJoystickBase;
+    let mockJoystickStick;
+
+    beforeEach(() => {
+      mockCanvas = document.createElement('canvas');
+      mockCanvas.id = 'game-canvas';
+      mockCanvas.getBoundingClientRect = jest.fn(() => ({
+        left: 0,
+        top: 0,
+        right: 800,
+        bottom: 600,
+        width: 800,
+        height: 600,
+      }));
+
+      mockTouchControls = document.createElement('div');
+      mockTouchControls.id = 'touch-controls';
+      mockTouchControls.style.opacity = '0';
+
+      mockJoystickBase = document.createElement('div');
+      mockJoystickBase.id = 'joystick-base';
+
+      mockJoystickStick = document.createElement('div');
+      mockJoystickStick.id = 'joystick-stick';
+
+      document.body.appendChild(mockCanvas);
+      document.body.appendChild(mockTouchControls);
+      document.body.appendChild(mockJoystickBase);
+      document.body.appendChild(mockJoystickStick);
+
+      input.init(mockCallback);
+    });
+
+    afterEach(() => {
+      mockCanvas.remove();
+      mockTouchControls.remove();
+      mockJoystickBase.remove();
+      mockJoystickStick.remove();
+    });
+
+    test('WhenTouchActive_ShouldOverrideKeyboardInput', () => {
+      // Press keyboard keys
+      const keyEvent = new KeyboardEvent('keydown', { key: 'w' });
+      input.handleKeyDown(keyEvent);
+
+      // Verify keyboard sets movement
+      expect(input.inputState.moveY).toBe(-1);
+
+      // Start touch
+      const touch = new Touch({
+        identifier: 0,
+        target: mockCanvas,
+        clientX: 100,
+        clientY: 200,
+      });
+      const touchStartEvent = new TouchEvent('touchstart', {
+        touches: [touch],
+        cancelable: true,
+      });
+      input.handleTouchStart(touchStartEvent);
+
+      // Move touch to the right (positive X)
+      const moveTouch = new Touch({
+        identifier: 0,
+        target: mockCanvas,
+        clientX: 130,
+        clientY: 200,
+      });
+      const touchMoveEvent = new TouchEvent('touchmove', {
+        touches: [moveTouch],
+        cancelable: true,
+      });
+      input.handleTouchMove(touchMoveEvent);
+
+      // Touch should override keyboard - moveX should be positive from touch
+      expect(input.inputState.moveX).toBeGreaterThan(0);
+    });
+  });
+
+  describe('Touch Controls - Device Detection', () => {
+    test('WhenDetectTouchDevice_ShouldCheckForTouchCapability', () => {
+      const result = input.detectTouchDevice();
+
+      // Result should be a boolean
+      expect(typeof result).toBe('boolean');
+    });
+
+    test('WhenTouchDeviceDetected_ShouldShowTouchControls', () => {
+      const mockTouchControls = document.createElement('div');
+      mockTouchControls.id = 'touch-controls';
+      mockTouchControls.style.display = 'none';
+
+      document.body.appendChild(mockTouchControls);
+
+      // Mock touch device
+      Object.defineProperty(window, 'ontouchstart', {
+        writable: true,
+        value: true,
+      });
+
+      input.init(mockCallback);
+      input.detectTouchDevice();
+
+      // Touch controls should be displayed
+      expect(mockTouchControls.style.display).not.toBe('none');
+
+      // Cleanup
+      mockTouchControls.remove();
+      delete window.ontouchstart;
+    });
+  });
 });
