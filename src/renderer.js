@@ -23,17 +23,28 @@ export class Renderer {
     console.log('Renderer initialized');
   }
 
-  render(gameState, localPlayer = null, playersSnapshot = null) {
+  render(gameState, localPlayer = null, playersSnapshot = null, camera = null) {
     if (!this.ctx) return;
 
     // Clear canvas
     this.ctx.fillStyle = CONFIG.CANVAS.BACKGROUND_COLOR;
     this.ctx.fillRect(0, 0, this.canvas.width, this.canvas.height);
 
-    // Render conflict zone
+    // Apply camera transform if provided
+    if (camera) {
+      this.ctx.save();
+      // Transform: translate screen center to camera position
+      // This makes the camera position appear at the center of the viewport
+      this.ctx.translate(
+        this.canvas.width / 2 - camera.x,
+        this.canvas.height / 2 - camera.y
+      );
+    }
+
+    // Render conflict zone (in world coordinates)
     this.renderConflictZone(gameState.conflictZone);
 
-    // Render all players
+    // Render all players (in world coordinates)
     if (playersSnapshot) {
       // Multiplayer mode: render remote players from snapshot
       const snapshotPlayers = playersSnapshot.getPlayers();
@@ -58,9 +69,19 @@ export class Renderer {
       this.renderPlayer(localPlayer, true);
     }
 
-    // Render loot
+    // Render loot (in world coordinates)
     for (const loot of gameState.loot) {
       this.renderLoot(loot);
+    }
+
+    // Restore transform
+    if (camera) {
+      this.ctx.restore();
+    }
+
+    // Render edge indicators (in screen space, after camera transform)
+    if (camera) {
+      this.renderEdgeIndicators(playersSnapshot, localPlayer, camera, gameState.loot);
     }
   }
 
@@ -72,9 +93,9 @@ export class Renderer {
     this.ctx.arc(zone.centerX, zone.centerY, zone.radius, 0, Math.PI * 2);
     this.ctx.stroke();
 
-    // Draw danger area outside zone
+    // Draw danger area outside zone (in world coordinates)
     this.ctx.fillStyle = 'rgba(255, 107, 107, 0.2)';
-    this.ctx.fillRect(0, 0, this.canvas.width, this.canvas.height);
+    this.ctx.fillRect(0, 0, CONFIG.WORLD.WIDTH, CONFIG.WORLD.HEIGHT);
 
     // Clear the safe zone
     this.ctx.globalCompositeOperation = 'destination-out';
@@ -120,5 +141,52 @@ export class Renderer {
     // Simple loot representation as a square
     this.ctx.fillStyle = '#f9ca24';
     this.ctx.fillRect(loot.x - 5, loot.y - 5, 10, 10);
+  }
+
+  renderEdgeIndicators(playersSnapshot, localPlayer, camera, loot = []) {
+    // Render indicators for off-screen players
+    if (playersSnapshot) {
+      const snapshotPlayers = playersSnapshot.getPlayers();
+      snapshotPlayers.forEach((playerData, playerId) => {
+        // Skip local player
+        if (localPlayer && playerId === localPlayer.id) return;
+
+        const worldX = playerData.position_x;
+        const worldY = playerData.position_y;
+
+        const indicator = camera.getEdgeIndicatorPosition(worldX, worldY);
+        if (indicator) {
+          this.renderEdgeIndicator(indicator, '#4ecdc4'); // Blue for players
+        }
+      });
+    }
+
+    // Render indicators for off-screen loot
+    for (const lootItem of loot) {
+      const indicator = camera.getEdgeIndicatorPosition(lootItem.x, lootItem.y);
+      if (indicator) {
+        this.renderEdgeIndicator(indicator, '#f9ca24'); // Yellow for loot
+      }
+    }
+  }
+
+  renderEdgeIndicator(indicator, color) {
+    const { x, y, angle } = indicator;
+    const size = 10;
+
+    this.ctx.save();
+    this.ctx.translate(x, y);
+    this.ctx.rotate(angle);
+
+    // Draw arrow
+    this.ctx.fillStyle = color;
+    this.ctx.beginPath();
+    this.ctx.moveTo(size, 0);
+    this.ctx.lineTo(-size / 2, size / 2);
+    this.ctx.lineTo(-size / 2, -size / 2);
+    this.ctx.closePath();
+    this.ctx.fill();
+
+    this.ctx.restore();
   }
 }
