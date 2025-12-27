@@ -7,20 +7,18 @@
  */
 export async function waitFor(predicate, timeout = 5000, interval = 100) {
   const startTime = Date.now();
+  let lastError = null;
   while (Date.now() - startTime < timeout) {
     try {
       if (await predicate()) {
         return;
       }
     } catch (error) {
-      // Ignore errors in predicate and keep polling (unless desired otherwise)
-      // For now, let's allow errors to bubble up if we want strict checks, 
-      // but usually for 'wait' we might want to ignore transient errors?
-      // Actually, standard waitFor usually expects predicate to return false or throw.
-      // But let's keep it simple: if predicate throws, we bubble it up.
-      // If predicate returns falsey, we wait.
+      lastError = error;
+      // Keep polling until timeout
     }
     await new Promise(resolve => setTimeout(resolve, interval));
   }
-  throw new Error(`Timeout waiting for condition after ${timeout}ms`);
+  const errorMessage = lastError ? `. Last error: ${lastError.message}` : '';
+  throw new Error(`Timeout waiting for condition after ${timeout}ms${errorMessage}`);
 }
