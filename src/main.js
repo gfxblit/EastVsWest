@@ -344,6 +344,9 @@ class App {
   startGame() {
     console.log('Entering game screen...');
 
+    // Stop lobby polling
+    this.stopLobbyPolling();
+
     // Switch to game screen
     this.ui.showScreen('game');
 
@@ -360,7 +363,26 @@ class App {
 
     // Initialize components
     this.renderer.init();
-    this.game.init();
+    this.game.init(this.playersSnapshot, this.network);
+
+    // Start periodic position DB writes if we have a session
+    if (this.playersSnapshot && this.network) {
+      this.network.startPeriodicPositionWrite(
+        () => {
+          const localPlayer = this.game.getLocalPlayer();
+          return localPlayer ? { x: localPlayer.x, y: localPlayer.y } : { x: 0, y: 0 };
+        },
+        () => {
+          const localPlayer = this.game.getLocalPlayer();
+          return localPlayer ? localPlayer.rotation : 0;
+        },
+        () => {
+          const localPlayer = this.game.getLocalPlayer();
+          return localPlayer ? localPlayer.health : 100;
+        }
+      );
+    }
+
     this.input.init((inputState) => {
       // Pass input to game
       if (this.game) {
@@ -368,7 +390,7 @@ class App {
       }
     });
 
-    if (this.network.isHost) {
+    if (this.network && this.network.isHost) {
       this.network.startPositionBroadcasting();
     }
 
@@ -389,7 +411,7 @@ class App {
     this.game.update(deltaTime);
 
     // Render
-    this.renderer.render(this.game.getState());
+    this.renderer.render(this.game.getState(), this.game.getLocalPlayer(), this.playersSnapshot);
 
     // Continue loop
     this.animationFrameId = requestAnimationFrame((timestamp) => this.gameLoop(timestamp));

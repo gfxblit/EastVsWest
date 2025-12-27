@@ -45,6 +45,7 @@ export class Network extends EventEmitter {
     this.positionBuffer = new Map(); // Stores position updates by player_id
     this.playerPositions = new Map(); // Stores last known positions for validation
     this.broadcastInterval = null;
+    this.positionWriteInterval = null; // Interval for periodic DB writes
   }
 
   initialize(supabaseClient, playerId) {
@@ -382,8 +383,60 @@ export class Network extends EventEmitter {
     }
   }
 
+  async writePositionToDB(position, rotation, health) {
+    if (!this.supabase || !this.sessionId || !this.playerId) {
+      console.error('Cannot write position to DB: missing supabase, sessionId, or playerId');
+      return;
+    }
+
+    const { error } = await this.supabase
+      .from('session_players')
+      .update({
+        position_x: position.x,
+        position_y: position.y,
+        rotation: rotation,
+        health: health,
+      })
+      .eq('session_id', this.sessionId)
+      .eq('player_id', this.playerId);
+
+    if (error) {
+      console.error('Failed to write position to DB:', error.message);
+    }
+  }
+
+  startPeriodicPositionWrite(positionGetter, rotationGetter, healthGetter) {
+    if (this.positionWriteInterval) return; // Already running
+
+    // Write immediately
+    const position = typeof positionGetter === 'function' ? positionGetter() : positionGetter;
+    const rotation = typeof rotationGetter === 'function' ? rotationGetter() : rotationGetter;
+    const health = typeof healthGetter === 'function' ? healthGetter() : healthGetter;
+    this.writePositionToDB(position, rotation, health).catch(err => {
+      console.error('Failed to perform immediate position write:', err);
+    });
+
+    // Then write periodically at the same rate as snapshot refresh (60 seconds)
+    this.positionWriteInterval = setInterval(() => {
+      const position = typeof positionGetter === 'function' ? positionGetter() : positionGetter;
+      const rotation = typeof rotationGetter === 'function' ? rotationGetter() : rotationGetter;
+      const health = typeof healthGetter === 'function' ? healthGetter() : healthGetter;
+      this.writePositionToDB(position, rotation, health).catch(err => {
+        console.error('Failed to perform periodic position write:', err);
+      });
+    }, 60000); // 60 seconds
+  }
+
+  stopPeriodicPositionWrite() {
+    if (this.positionWriteInterval) {
+      clearInterval(this.positionWriteInterval);
+      this.positionWriteInterval = null;
+    }
+  }
+
   disconnect() {
     this.stopPositionBroadcasting();
+    this.stopPeriodicPositionWrite();
     if (this.channel) {
       this.supabase.removeChannel(this.channel);
       this.channel = null;

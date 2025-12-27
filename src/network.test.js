@@ -846,4 +846,154 @@ describe('Network', () => {
       expect(network._isValidPositionUpdate(payload)).toBe(true);
     });
   });
+
+  describe('writePositionToDB', () => {
+    beforeEach(() => {
+      network.sessionId = 'test-session-id';
+    });
+
+    it('should write position to database when called', async () => {
+      const mockUpdate = jest.fn().mockReturnValue({
+        eq: jest.fn().mockReturnValue({
+          eq: jest.fn().mockResolvedValue({ error: null })
+        })
+      });
+
+      mockSupabaseClient.from = jest.fn(() => ({
+        update: mockUpdate
+      }));
+
+      const position = { x: 100, y: 200 };
+      const rotation = 1.5;
+      const health = 85;
+
+      await network.writePositionToDB(position, rotation, health);
+
+      expect(mockSupabaseClient.from).toHaveBeenCalledWith('session_players');
+      expect(mockUpdate).toHaveBeenCalledWith({
+        position_x: 100,
+        position_y: 200,
+        rotation: 1.5,
+        health: 85,
+      });
+    });
+
+    it('should update the correct player record by session_id and player_id', async () => {
+      const mockEq2 = jest.fn();
+      const mockEq1 = jest.fn();
+
+      mockEq1.mockReturnValue({
+        eq: mockEq2.mockResolvedValue({ error: null })
+      });
+
+      const mockUpdate = jest.fn().mockReturnValue({
+        eq: mockEq1
+      });
+
+      mockSupabaseClient.from = jest.fn(() => ({
+        update: mockUpdate
+      }));
+
+      await network.writePositionToDB({ x: 50, y: 75 }, 0.5, 90);
+
+      expect(mockEq1).toHaveBeenCalledWith('session_id', 'test-session-id');
+      expect(mockEq2).toHaveBeenCalledWith('player_id', MOCK_HOST_ID);
+    });
+
+    it('should log error if database write fails', async () => {
+      const mockError = new Error('DB write failed');
+      const consoleErrorSpy = jest.spyOn(console, 'error').mockImplementation();
+
+      mockSupabaseClient.from = jest.fn(() => ({
+        update: jest.fn().mockReturnValue({
+          eq: jest.fn().mockReturnValue({
+            eq: jest.fn().mockResolvedValue({ error: mockError })
+          })
+        })
+      }));
+
+      await network.writePositionToDB({ x: 100, y: 200 }, 0, 100);
+
+      expect(consoleErrorSpy).toHaveBeenCalledWith(
+        'Failed to write position to DB:',
+        mockError.message
+      );
+
+      consoleErrorSpy.mockRestore();
+    });
+  });
+
+  describe('startPeriodicPositionWrite', () => {
+    beforeEach(() => {
+      jest.useFakeTimers();
+      network.sessionId = 'test-session-id';
+    });
+
+    afterEach(() => {
+      jest.useRealTimers();
+      if (network.positionWriteInterval) {
+        clearInterval(network.positionWriteInterval);
+        network.positionWriteInterval = null;
+      }
+    });
+
+    it('should start interval for periodic position writes', () => {
+      network.startPeriodicPositionWrite({ x: 100, y: 200 }, 0, 100);
+
+      expect(network.positionWriteInterval).toBeDefined();
+    });
+
+    it('should call writePositionToDB periodically', async () => {
+      const writePositionSpy = jest.spyOn(network, 'writePositionToDB').mockResolvedValue();
+
+      const positionGetter = () => ({ x: 100, y: 200 });
+      const rotationGetter = () => 0;
+      const healthGetter = () => 100;
+
+      network.startPeriodicPositionWrite(positionGetter, rotationGetter, healthGetter);
+
+      // Fast-forward time by 60 seconds
+      jest.advanceTimersByTime(60000);
+
+      await Promise.resolve(); // Allow promises to resolve
+
+      expect(writePositionSpy).toHaveBeenCalled();
+
+      writePositionSpy.mockRestore();
+    });
+
+    it('should not start multiple intervals if already running', () => {
+      network.startPeriodicPositionWrite(() => ({ x: 100, y: 200 }), () => 0, () => 100);
+      const firstInterval = network.positionWriteInterval;
+
+      network.startPeriodicPositionWrite(() => ({ x: 100, y: 200 }), () => 0, () => 100);
+      const secondInterval = network.positionWriteInterval;
+
+      expect(firstInterval).toBe(secondInterval);
+    });
+  });
+
+  describe('stopPeriodicPositionWrite', () => {
+    beforeEach(() => {
+      jest.useFakeTimers();
+      network.sessionId = 'test-session-id';
+    });
+
+    afterEach(() => {
+      jest.useRealTimers();
+    });
+
+    it('should stop periodic position write interval', () => {
+      network.startPeriodicPositionWrite(() => ({ x: 100, y: 200 }), () => 0, () => 100);
+      expect(network.positionWriteInterval).toBeDefined();
+
+      network.stopPeriodicPositionWrite();
+
+      expect(network.positionWriteInterval).toBeNull();
+    });
+
+    it('should not throw if called when no interval is running', () => {
+      expect(() => network.stopPeriodicPositionWrite()).not.toThrow();
+    });
+  });
 });

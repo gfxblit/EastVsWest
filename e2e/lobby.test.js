@@ -184,6 +184,13 @@ describe('Lobby UI Interactions', () => {
       // First, create a host session to get a valid join code
       await page.click('#host-game-btn');
       await page.waitForSelector('#join-code-display:not(.hidden)', { timeout: 5000 });
+
+      // Wait for the join code text to be populated
+      await page.waitForFunction(() => {
+        const joinCodeEl = document.getElementById('join-code');
+        return joinCodeEl && joinCodeEl.textContent && joinCodeEl.textContent.trim().length === 6;
+      }, { timeout: 5000 });
+
       const joinCode = await page.$eval('#join-code', (el) => el.textContent);
 
       // Create a new incognito browser context for the joining player
@@ -204,14 +211,19 @@ describe('Lobby UI Interactions', () => {
       });
 
       await playerPage.goto(serverUrl);
-      await playerPage.waitForSelector('#lobby-screen');
 
-      // Wait a bit for the async initialization (auth) to complete
-      // The app needs to sign in anonymously before it can join
-      await new Promise(resolve => setTimeout(resolve, 1000));
+      // Wait for the intro screen to be active (indicates app is initialized)
+      await playerPage.waitForSelector('#intro-screen.active', { timeout: 5000 });
 
-      // Enter the join code and click join
-      await playerPage.type('#join-code-input', joinCode);
+      // Wait for the join code input to be visible and ready
+      await playerPage.waitForSelector('#join-code-input', { timeout: 5000 });
+
+      // Enter the join code using evaluate to set value directly
+      // (more reliable than type() in some cases)
+      await playerPage.evaluate((code) => {
+        document.getElementById('join-code-input').value = code;
+      }, joinCode);
+
       await playerPage.click('#join-game-btn');
 
       // Wait for the lobby screen to be visible
@@ -254,6 +266,12 @@ describe('Lobby UI Interactions', () => {
         return !el.classList.contains('hidden');
       });
       expect(isVisible).toBe(true);
+
+      // Wait for the join code text to be populated
+      await page.waitForFunction(() => {
+        const joinCodeEl = document.getElementById('join-code');
+        return joinCodeEl && joinCodeEl.textContent && joinCodeEl.textContent.trim().length === 6;
+      }, { timeout: 5000 });
 
       // Get the displayed join code
       const joinCode = await page.$eval('#join-code', (el) => el.textContent);

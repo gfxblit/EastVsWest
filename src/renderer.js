@@ -23,7 +23,7 @@ export class Renderer {
     console.log('Renderer initialized');
   }
 
-  render(gameState) {
+  render(gameState, localPlayer = null, playersSnapshot = null) {
     if (!this.ctx) return;
 
     // Clear canvas
@@ -33,9 +33,29 @@ export class Renderer {
     // Render conflict zone
     this.renderConflictZone(gameState.conflictZone);
 
-    // Render players
-    for (const player of gameState.players) {
-      this.renderPlayer(player);
+    // Render all players
+    if (playersSnapshot) {
+      // Multiplayer mode: render remote players from snapshot
+      const snapshotPlayers = playersSnapshot.getPlayers();
+      snapshotPlayers.forEach((playerData, playerId) => {
+        // Skip local player, we'll render it separately
+        if (localPlayer && playerId === localPlayer.id) return;
+
+        const player = {
+          id: playerId,
+          name: playerData.player_name,
+          x: playerData.position_x,
+          y: playerData.position_y,
+          rotation: playerData.rotation,
+          health: playerData.health,
+        };
+        this.renderPlayer(player, false);
+      });
+    }
+
+    // Render local player last (on top, with visual distinction)
+    if (localPlayer) {
+      this.renderPlayer(localPlayer, true);
     }
 
     // Render loot
@@ -64,12 +84,22 @@ export class Renderer {
     this.ctx.globalCompositeOperation = 'source-over';
   }
 
-  renderPlayer(player) {
+  renderPlayer(player, isLocal = false) {
     // Simple player representation as a circle
-    this.ctx.fillStyle = '#4ecdc4';
+    // Local player has a different color and a white outline (inspired by Stardew Valley)
+    this.ctx.fillStyle = isLocal ? '#6ee7b7' : '#4ecdc4'; // Lighter green for local player
     this.ctx.beginPath();
     this.ctx.arc(player.x, player.y, CONFIG.RENDER.PLAYER_RADIUS, 0, Math.PI * 2);
     this.ctx.fill();
+
+    // Add white outline for local player
+    if (isLocal) {
+      this.ctx.strokeStyle = '#ffffff';
+      this.ctx.lineWidth = 2;
+      this.ctx.beginPath();
+      this.ctx.arc(player.x, player.y, CONFIG.RENDER.PLAYER_RADIUS, 0, Math.PI * 2);
+      this.ctx.stroke();
+    }
 
     // Health bar above player
     const barWidth = CONFIG.RENDER.HEALTH_BAR_WIDTH;
