@@ -34,14 +34,9 @@ export class Renderer {
   render(gameState, localPlayer = null, playersSnapshot = null, camera = null) {
     if (!this.ctx) return;
 
-    // Clear canvas and draw background
-    if (this.bgPattern) {
-      this.ctx.fillStyle = this.bgPattern;
-      this.ctx.fillRect(0, 0, this.canvas.width, this.canvas.height);
-    } else {
-      this.ctx.fillStyle = CONFIG.CANVAS.BACKGROUND_COLOR;
-      this.ctx.fillRect(0, 0, this.canvas.width, this.canvas.height);
-    }
+    // Clear canvas
+    this.ctx.fillStyle = CONFIG.CANVAS.BACKGROUND_COLOR;
+    this.ctx.fillRect(0, 0, this.canvas.width, this.canvas.height);
 
     // Apply camera transform if provided
     if (camera) {
@@ -52,6 +47,17 @@ export class Renderer {
         this.canvas.width / 2 - camera.x,
         this.canvas.height / 2 - camera.y
       );
+    }
+
+    // Draw background in world coordinates (after camera transform)
+    if (camera) {
+      if (this.bgPattern) {
+        this.ctx.fillStyle = this.bgPattern;
+        this.ctx.fillRect(0, 0, CONFIG.WORLD.WIDTH, CONFIG.WORLD.HEIGHT);
+      } else {
+        this.ctx.fillStyle = CONFIG.CANVAS.BACKGROUND_COLOR;
+        this.ctx.fillRect(0, 0, CONFIG.WORLD.WIDTH, CONFIG.WORLD.HEIGHT);
+      }
     }
 
     // Render conflict zone (in world coordinates)

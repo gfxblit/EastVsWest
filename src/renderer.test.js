@@ -79,12 +79,9 @@ describe('Renderer', () => {
   });
 
   describe('render', () => {
-    test('WhenBackgroundLoaded_ShouldDrawPattern', () => {
-      // Setup pattern
-      mockImage.onload();
-
+    test('WhenRenderingWithoutCamera_ShouldClearCanvasWithBackgroundColor', () => {
       const gameState = {
-        conflictZone: { centerX: 1200, centerY: 800, radius: 600 },
+        conflictZone: { centerX: 600, centerY: 400, radius: 300 },
         loot: []
       };
 
@@ -99,39 +96,12 @@ describe('Renderer', () => {
         configurable: true
       });
 
-      renderer.render(gameState);
+      renderer.render(gameState, null, null, null);
 
-      // Check that fillRect was called with canvas dimensions (for background)
+      // Should clear canvas with background color (canvas dimensions)
       expect(ctx.fillRect).toHaveBeenCalledWith(0, 0, CONFIG.CANVAS.WIDTH, CONFIG.CANVAS.HEIGHT);
-      // Pattern should have been used (first fillStyle assignment)
-      expect(fillStyleHistory[0]).toBe('mock-pattern');
-    });
-
-    test('WhenBackgroundNotLoaded_ShouldDrawBackgroundColor', () => {
-      // Pattern not loaded yet
-      renderer.bgPattern = null;
-
-      const gameState = {
-        conflictZone: { centerX: 1200, centerY: 800, radius: 600 },
-        loot: []
-      };
-
-      // Track fillStyle assignments
-      let fillStyleHistory = [];
-      Object.defineProperty(ctx, 'fillStyle', {
-        get: function() { return this._fillStyle; },
-        set: function(val) {
-          this._fillStyle = val;
-          fillStyleHistory.push(val);
-        },
-        configurable: true
-      });
-
-      renderer.render(gameState);
-
-      // Check that background color was used (first fillStyle assignment)
+      // First fillStyle should be background color (for canvas clear)
       expect(fillStyleHistory[0]).toBe(CONFIG.CANVAS.BACKGROUND_COLOR);
-      expect(ctx.fillRect).toHaveBeenCalledWith(0, 0, CONFIG.CANVAS.WIDTH, CONFIG.CANVAS.HEIGHT);
     });
   });
 
@@ -180,6 +150,64 @@ describe('Renderer', () => {
       expect(ctx.save).not.toHaveBeenCalled();
       expect(ctx.translate).not.toHaveBeenCalled();
       expect(ctx.restore).not.toHaveBeenCalled();
+    });
+
+    test('WhenRenderingWithCamera_ShouldDrawBackgroundInWorldCoordinates', () => {
+      // Arrange
+      mockImage.onload();
+
+      const gameState = {
+        conflictZone: { centerX: 1200, centerY: 800, radius: 600 },
+        loot: [],
+      };
+      const camera = {
+        x: 1200,
+        y: 800,
+        isInView: jest.fn(() => true),
+        getEdgeIndicatorPosition: jest.fn(() => null),
+      };
+
+      // Track the order of operations with fillStyle to distinguish background from other fills
+      const fillRectCalls = [];
+      let currentFillStyle = null;
+      Object.defineProperty(ctx, 'fillStyle', {
+        get: function() { return currentFillStyle; },
+        set: function(val) { currentFillStyle = val; },
+        configurable: true
+      });
+
+      const callOrder = [];
+      ctx.save.mockImplementation(() => callOrder.push('save'));
+      ctx.translate.mockImplementation(() => callOrder.push('translate'));
+      ctx.fillRect.mockImplementation((x, y, w, h) => {
+        const call = {
+          operation: 'fillRect',
+          args: [x, y, w, h],
+          fillStyle: currentFillStyle,
+          order: callOrder.length
+        };
+        fillRectCalls.push(call);
+        callOrder.push(`fillRect(${x}, ${y}, ${w}, ${h})`);
+      });
+
+      // Act
+      renderer.render(gameState, null, null, camera);
+
+      // Assert
+      // Find background fill (uses pattern, not color)
+      const backgroundFill = fillRectCalls.find(call => call.fillStyle === 'mock-pattern');
+
+      expect(backgroundFill).toBeDefined();
+
+      // Background should fill entire world, not just viewport
+      expect(backgroundFill.args).toEqual([0, 0, CONFIG.WORLD.WIDTH, CONFIG.WORLD.HEIGHT]);
+
+      // Background should be drawn AFTER camera transform
+      const saveIndex = callOrder.indexOf('save');
+      const translateIndex = callOrder.indexOf('translate');
+      expect(saveIndex).toBeGreaterThanOrEqual(0);
+      expect(translateIndex).toBeGreaterThan(saveIndex);
+      expect(backgroundFill.order).toBeGreaterThan(translateIndex);
     });
   });
 
