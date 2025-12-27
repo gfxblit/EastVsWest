@@ -9,6 +9,8 @@ export class Renderer {
   constructor(canvas) {
     this.canvas = canvas;
     this.ctx = null;
+    this.bgImage = new Image();
+    this.bgPattern = null;
   }
 
   init() {
@@ -20,15 +22,26 @@ export class Renderer {
     this.canvas.width = CONFIG.CANVAS.WIDTH;
     this.canvas.height = CONFIG.CANVAS.HEIGHT;
 
+    // Load background image
+    this.bgImage.onload = () => {
+      this.bgPattern = this.ctx.createPattern(this.bgImage, 'repeat');
+    };
+    this.bgImage.src = '/game-background.png';
+
     console.log('Renderer initialized');
   }
 
   render(gameState, localPlayer = null, playersSnapshot = null) {
     if (!this.ctx) return;
 
-    // Clear canvas
-    this.ctx.fillStyle = CONFIG.CANVAS.BACKGROUND_COLOR;
-    this.ctx.fillRect(0, 0, this.canvas.width, this.canvas.height);
+    // Clear canvas and draw background
+    if (this.bgPattern) {
+      this.ctx.fillStyle = this.bgPattern;
+      this.ctx.fillRect(0, 0, this.canvas.width, this.canvas.height);
+    } else {
+      this.ctx.fillStyle = CONFIG.CANVAS.BACKGROUND_COLOR;
+      this.ctx.fillRect(0, 0, this.canvas.width, this.canvas.height);
+    }
 
     // Render conflict zone
     this.renderConflictZone(gameState.conflictZone);
@@ -65,23 +78,21 @@ export class Renderer {
   }
 
   renderConflictZone(zone) {
-    // Draw zone boundary
+    // Draw danger area with a hole for the safe zone
+    this.ctx.fillStyle = 'rgba(255, 107, 107, 0.2)';
+    this.ctx.beginPath();
+    // Outer rectangle (canvas size)
+    this.ctx.rect(0, 0, this.canvas.width, this.canvas.height);
+    // Inner circle (safe zone)
+    this.ctx.arc(zone.centerX, zone.centerY, zone.radius, 0, Math.PI * 2, true);
+    this.ctx.fill('evenodd');
+
+    // Draw zone boundary stroke
     this.ctx.strokeStyle = '#ff6b6b';
     this.ctx.lineWidth = 3;
     this.ctx.beginPath();
     this.ctx.arc(zone.centerX, zone.centerY, zone.radius, 0, Math.PI * 2);
     this.ctx.stroke();
-
-    // Draw danger area outside zone
-    this.ctx.fillStyle = 'rgba(255, 107, 107, 0.2)';
-    this.ctx.fillRect(0, 0, this.canvas.width, this.canvas.height);
-
-    // Clear the safe zone
-    this.ctx.globalCompositeOperation = 'destination-out';
-    this.ctx.beginPath();
-    this.ctx.arc(zone.centerX, zone.centerY, zone.radius, 0, Math.PI * 2);
-    this.ctx.fill();
-    this.ctx.globalCompositeOperation = 'source-over';
   }
 
   renderPlayer(player, isLocal = false) {
