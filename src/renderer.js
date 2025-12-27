@@ -40,8 +40,6 @@ export class Renderer {
 
     this.canvas.width = width;
     this.canvas.height = height;
-
-    console.log(`Canvas resized to ${width}x${height}`);
   }
 
   render(gameState, localPlayer = null, playersSnapshot = null, camera = null) {
