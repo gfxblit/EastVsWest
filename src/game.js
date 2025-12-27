@@ -9,8 +9,8 @@ export class Game {
   constructor() {
     this.state = {
       conflictZone: {
-        centerX: CONFIG.CANVAS.WIDTH / 2,
-        centerY: CONFIG.CANVAS.HEIGHT / 2,
+        centerX: CONFIG.WORLD.WIDTH / 2,
+        centerY: CONFIG.WORLD.HEIGHT / 2,
         radius: CONFIG.ZONE.INITIAL_RADIUS,
       },
       loot: [],
@@ -60,8 +60,8 @@ export class Game {
       // Single player test mode
       this.localPlayer = {
         id: 'player-1',
-        x: CONFIG.CANVAS.WIDTH / 2,
-        y: CONFIG.CANVAS.HEIGHT / 2,
+        x: CONFIG.WORLD.WIDTH / 2,
+        y: CONFIG.WORLD.HEIGHT / 2,
         health: 100,
         weapon: null,
         armor: null,
@@ -106,9 +106,9 @@ export class Game {
     this.localPlayer.x += this.localPlayer.velocity.x * deltaTime;
     this.localPlayer.y += this.localPlayer.velocity.y * deltaTime;
 
-    // Keep player within canvas bounds
-    this.localPlayer.x = Math.max(0, Math.min(CONFIG.CANVAS.WIDTH, this.localPlayer.x));
-    this.localPlayer.y = Math.max(0, Math.min(CONFIG.CANVAS.HEIGHT, this.localPlayer.y));
+    // Keep player within world bounds
+    this.localPlayer.x = Math.max(0, Math.min(CONFIG.WORLD.WIDTH, this.localPlayer.x));
+    this.localPlayer.y = Math.max(0, Math.min(CONFIG.WORLD.HEIGHT, this.localPlayer.y));
 
     // Check if player is outside conflict zone and apply damage
     const distanceFromCenter = Math.sqrt(
