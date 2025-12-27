@@ -160,6 +160,7 @@ export const CONFIG = {
     },
     SPECIAL_ABILITY_KEY: 'q',
     INTERACT_KEY: 'f',
+    MAX_JOYSTICK_DISTANCE: 45, // Maximum distance for virtual joystick movement
   },
 
   // Network Settings
