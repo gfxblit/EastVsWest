@@ -196,7 +196,7 @@ export class Network extends EventEmitter {
           if (status === 'SUBSCRIBED') {
             this.connected = true;
             resolve();
-          } else if (status === 'CHANNEL_ERROR' || status === 'TIMED_OUT') {
+          } else if (status === 'CHANNEL_ERROR' || status === 'TIMED_OUT' || status === 'CLOSED') {
              reject(new Error(`Failed to subscribe to channel: ${status} ${error ? error.message : ''}`));
           }
         });

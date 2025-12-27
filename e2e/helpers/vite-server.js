@@ -21,8 +21,6 @@ const VITE_URL = `http://localhost:${VITE_PORT}`;
  */
 export async function startViteServer() {
   return new Promise((resolve, reject) => {
-    console.log('Starting Vite dev server...');
-
     const env = { ...process.env };
     
     // Only set VITE_ env vars if they are provided in the process environment.
@@ -46,7 +44,6 @@ export async function startViteServer() {
       output += data.toString();
       // Look for the server ready message
       if (output.includes('Local:') || output.includes(`localhost:${VITE_PORT}`)) {
-        console.log(`Vite server ready at ${VITE_URL}`);
         // Give it a moment to fully start
         setTimeout(() => resolve(VITE_URL), 1000);
       }
@@ -81,11 +78,8 @@ export async function startViteServer() {
 export async function stopViteServer() {
   return new Promise((resolve) => {
     if (viteProcess) {
-      console.log('Stopping Vite dev server...');
-
       const onExit = () => {
         viteProcess = null;
-        console.log('Vite server stopped');
         resolve();
       };
 

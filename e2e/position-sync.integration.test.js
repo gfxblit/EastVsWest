@@ -1,5 +1,6 @@
 import { createClient } from '@supabase/supabase-js';
 import { Network } from '../src/network';
+import { waitFor } from './helpers/wait-utils.js';
 
 // Ensure your local Supabase URL and anon key are set as environment variables
 const supabaseUrl = process.env.SUPABASE_URL;
@@ -83,11 +84,18 @@ describe('Position Synchronization Integration', () => {
     // 3. Start periodic write
     network.startPeriodicPositionWrite(getPosition, getRotation, getHealth);
 
-    // 4. Wait a small amount of time for the async DB write to complete
-    // network.writePositionToDB is async but startPeriodicPositionWrite doesn't await it
-    await new Promise(resolve => setTimeout(resolve, 500));
+    // 4. Wait for the async DB write to complete by checking for the updated value
+    await waitFor(async () => {
+      const { data } = await supabaseClient
+        .from('session_players')
+        .select('position_x')
+        .eq('session_id', hostSession.id)
+        .eq('player_id', hostUser.id)
+        .single();
+      return data && Math.abs(data.position_x - 500.1) < 0.1;
+    });
 
-    // 5. Verify in Database
+    // 5. Verify in Database (full verification)
     const { data: playerDbData, error: playerDbError } = await supabaseClient
       .from('session_players')
       .select('*')
@@ -126,7 +134,10 @@ describe('Position Synchronization Integration', () => {
     await network.writePositionToDB(newPos, 0, 100);
 
     // 5. Wait for Snapshot B to refresh
-    await new Promise(resolve => setTimeout(resolve, 1000));
+    await waitFor(() => {
+      const p = snapshotB.getPlayers().get(hostUser.id);
+      return p && p.position_x === newPos.x;
+    }, 5000);
 
     // 6. Verify Player B sees Player A's new position
     const players = snapshotB.getPlayers();

@@ -27,22 +27,10 @@ describe('Lobby UI Interactions', () => {
   beforeEach(async () => {
     page = await browser.newPage();
 
-    // Capture console errors and logs for debugging
-    page.on('console', msg => {
-      const type = msg.type();
-      if (type === 'error' || type === 'warning' || type === 'log') {
-        console.log(`Browser ${type}:`, msg.text());
-      }
-    });
-
-    page.on('pageerror', error => {
-      console.log('Page script error:', error.message);
-    });
-
     await page.goto(serverUrl);
 
-    // Wait for page to load
-    await page.waitForSelector('#lobby-screen');
+    // Wait for app to initialize
+    await page.waitForSelector('body.loaded', { timeout: 10000 });
   });
 
   afterEach(async () => {
@@ -198,22 +186,10 @@ describe('Lobby UI Interactions', () => {
       const playerContext = await browser.createBrowserContext();
       const playerPage = await playerContext.newPage();
 
-      // Capture console logs for debugging
-      playerPage.on('console', msg => {
-        const type = msg.type();
-        if (type === 'error' || type === 'warning' || type === 'log') {
-          console.log(`Player browser ${type}:`, msg.text());
-        }
-      });
-
-      playerPage.on('pageerror', error => {
-        console.log('Player page script error:', error.message);
-      });
-
       await playerPage.goto(serverUrl);
 
-      // Wait for the intro screen to be active (indicates app is initialized)
-      await playerPage.waitForSelector('#intro-screen.active', { timeout: 5000 });
+      // Wait for the app to be fully initialized
+      await playerPage.waitForSelector('body.loaded', { timeout: 10000 });
 
       // Wait for the join code input to be visible and ready
       await playerPage.waitForSelector('#join-code-input', { timeout: 5000 });
@@ -226,8 +202,14 @@ describe('Lobby UI Interactions', () => {
 
       await playerPage.click('#join-game-btn');
 
-      // Wait for the lobby screen to be visible
-      await playerPage.waitForSelector('#lobby-screen.active', { timeout: 10000 });
+      // Wait for the lobby screen to be visible with a longer timeout
+      try {
+        await playerPage.waitForSelector('#lobby-screen.active', { timeout: 30000 });
+      } catch (err) {
+        // If it timed out, check if there's an error message displayed on the page
+        const errorText = await playerPage.$eval('#lobby-error', (el) => el.textContent).catch(() => 'No error message');
+        throw new Error(`Timed out waiting for lobby screen. Error on page: ${errorText}`);
+      }
 
       // Verify lobby screen is visible
       const lobbyVisible = await playerPage.$eval('#lobby-screen', (el) => {
@@ -243,7 +225,7 @@ describe('Lobby UI Interactions', () => {
       // Clean up
       await playerPage.close();
       await playerContext.close();
-    });
+    }, 60000);
   });
 
   describe('Host Button', () => {

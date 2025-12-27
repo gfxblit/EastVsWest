@@ -1,5 +1,6 @@
 import { createClient } from '@supabase/supabase-js';
 import { Network } from '../src/network';
+import { waitFor, waitForSilence } from './helpers/wait-utils.js';
 
 // Ensure your local Supabase URL and anon key are set as environment variables
 // before running this test.
@@ -200,9 +201,10 @@ describe('Network Module Integration with Supabase', () => {
 
     // Set up listener for postgres_changes on the host (new approach post-refactoring)
     const hostPostgresChangeEvents = [];
-    network.on('postgres_changes', (payload) => {
+    const handler = (payload) => {
       hostPostgresChangeEvents.push(payload);
-    });
+    };
+    network.on('postgres_changes', handler);
 
     // Create a new player and join
     const playerClient = createClient(supabaseUrl, supabaseAnonKey);
@@ -213,15 +215,19 @@ describe('Network Module Integration with Supabase', () => {
     const playerName = 'TestPlayer';
     await playerNetwork.joinGame(joinCode, playerName);
 
-    // Wait for postgres_changes event to propagate
-    await new Promise(resolve => setTimeout(resolve, 500));
+    // Wait specifically for the new player's join event to propagate
+    await waitFor(() => hostPostgresChangeEvents.some(e => 
+      e.eventType === 'INSERT' && e.new?.player_name === playerName
+    ), 10000);
 
     // Verify host received the postgres_changes INSERT event for the new player
-    expect(hostPostgresChangeEvents.length).toBeGreaterThan(0);
     const joinEvent = hostPostgresChangeEvents.find(e =>
       e.eventType === 'INSERT' &&
       e.new?.player_name === playerName
     );
+
+    // Clean up listener
+    network.off('postgres_changes', handler);
 
     expect(joinEvent).toBeDefined();
     expect(joinEvent.eventType).toBe('INSERT');
@@ -259,9 +265,10 @@ describe('Network Module Integration with Supabase', () => {
 
       // Set up a listener for position broadcasts on player2
       const player2Broadcasts = [];
-      player2Network.on('position_broadcast', (payload) => {
+      const p2Handler = (payload) => {
         player2Broadcasts.push(payload);
-      });
+      };
+      player2Network.on('position_broadcast', p2Handler);
 
       // Host sends its own position update
       const hostPositionData = {
@@ -280,15 +287,19 @@ describe('Network Module Integration with Supabase', () => {
       player1Network.sendPositionUpdate(positionData);
 
       // Host collects the position updates and broadcasts
-      await new Promise(resolve => setTimeout(resolve, 100)); // Wait for messages to arrive
+      await waitFor(() => network.positionBuffer.size >= 2); // Wait for messages to arrive (Host + Player1)
       network.broadcastPositionUpdates();
 
       // Wait for broadcast to reach player2
-      await new Promise(resolve => setTimeout(resolve, 100));
+      await waitFor(() => player2Broadcasts.length > 0);
 
       // Verify player2 received the position broadcast
       expect(player2Broadcasts.length).toBeGreaterThan(0);
       const latestBroadcast = player2Broadcasts[player2Broadcasts.length - 1];
+
+      // Clean up
+      player2Network.off('position_broadcast', p2Handler);
+
       expect(latestBroadcast.type).toBe('position_broadcast');
       expect(latestBroadcast.data.updates).toBeDefined();
 
@@ -341,9 +352,10 @@ describe('Network Module Integration with Supabase', () => {
 
       // Set up listener on player1 for broadcasts
       const receivedBroadcasts = [];
-      player1Network.on('position_broadcast', (payload) => {
+      const p1Handler = (payload) => {
         receivedBroadcasts.push(payload);
-      });
+      };
+      player1Network.on('position_broadcast', p1Handler);
 
       // Both players send position updates
       player1Network.sendPositionUpdate({
@@ -359,17 +371,21 @@ describe('Network Module Integration with Supabase', () => {
       });
 
       // Wait for messages to arrive at host
-      await new Promise(resolve => setTimeout(resolve, 100));
+      await waitFor(() => network.positionBuffer.size >= 2);
 
       // Host broadcasts batched updates
       network.broadcastPositionUpdates();
 
       // Wait for broadcast to reach clients
-      await new Promise(resolve => setTimeout(resolve, 100));
+      await waitFor(() => receivedBroadcasts.length > 0);
 
       // Verify player1 received the batched broadcast
       expect(receivedBroadcasts.length).toBeGreaterThan(0);
       const latestBroadcast = receivedBroadcasts[receivedBroadcasts.length - 1];
+
+      // Clean up
+      player1Network.off('position_broadcast', p1Handler);
+
       expect(latestBroadcast.type).toBe('position_broadcast');
       expect(latestBroadcast.data.updates).toHaveLength(2);
 
@@ -406,7 +422,7 @@ describe('Network Module Integration with Supabase', () => {
       });
 
       // Wait for message to arrive and broadcast
-      await new Promise(resolve => setTimeout(resolve, 100));
+      await waitFor(() => network.positionBuffer.size > 0);
       network.broadcastPositionUpdates();
 
       // Verify buffer was cleared
@@ -432,9 +448,10 @@ describe('Network Module Integration with Supabase', () => {
 
       // Listen for broadcasts on the client
       const receivedBroadcasts = [];
-      playerNetwork.on('position_broadcast', (payload) => {
+      const handler = (payload) => {
         receivedBroadcasts.push(payload);
-      });
+      };
+      playerNetwork.on('position_broadcast', handler);
 
       // Host starts broadcasting
       network.startPositionBroadcasting();
@@ -447,16 +464,13 @@ describe('Network Module Integration with Supabase', () => {
       });
 
       // Wait for at least one broadcast interval
-      await new Promise(resolve => setTimeout(resolve, 60)); // Interval is 50ms
+      await waitFor(() => receivedBroadcasts.length >= 1);
 
       expect(receivedBroadcasts.length).toBe(1);
       expect(receivedBroadcasts[0].data.updates[0].player_id).toBe(hostUser.id);
 
-      // Wait for another broadcast interval
-      await new Promise(resolve => setTimeout(resolve, 50));
-      
-      // another broadcast should not have been sent because buffer is empty
-      expect(receivedBroadcasts.length).toBe(1);
+      // Verify no more broadcasts are sent because buffer is empty
+      await waitForSilence(() => receivedBroadcasts.length === 1, 50);
 
       // Host stops broadcasting
       network.stopPositionBroadcasting();
@@ -468,11 +482,11 @@ describe('Network Module Integration with Supabase', () => {
         velocity: { x: 0, y: 0 },
       });
 
-      // Wait and verify no new broadcast is received
-      await new Promise(resolve => setTimeout(resolve, 60));
-      expect(receivedBroadcasts.length).toBe(1);
+      // Verify no new broadcast is received
+      await waitForSilence(() => receivedBroadcasts.length === 1, 60);
 
       // Clean up
+      playerNetwork.off('position_broadcast', handler);
       playerNetwork.disconnect();
       await playerClient.auth.signOut();
     }, 10000);

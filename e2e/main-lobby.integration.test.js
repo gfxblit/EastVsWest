@@ -7,6 +7,7 @@
 import { createClient } from '@supabase/supabase-js';
 import { SessionPlayersSnapshot } from '../src/SessionPlayersSnapshot.js';
 import { Network } from '../src/network.js';
+import { waitFor, waitForSilence } from './helpers/wait-utils.js';
 
 const supabaseUrl = process.env.SUPABASE_URL;
 const supabaseAnonKey = process.env.SUPABASE_ANON_KEY;
@@ -151,7 +152,7 @@ describe('Main.js Lobby Integration with Real Supabase', () => {
       }, 100);
 
       // Wait for first poll
-      await new Promise(resolve => setTimeout(resolve, 150));
+      await waitFor(() => hostPlayersList.length > 0);
 
       // Assert
       expect(hostPlayersList.length).toBeGreaterThan(0);
@@ -182,13 +183,16 @@ describe('Main.js Lobby Integration with Real Supabase', () => {
       }, 100);
 
       // Wait for initial poll
-      await new Promise(resolve => setTimeout(resolve, 150));
+      await waitFor(() => hostPlayersList.length > 0);
 
       // Act - Player joins game (like main.js line 270-288)
       await playerNetwork.joinGame(testJoinCode, 'Player1');
 
       // Wait for postgres_changes event to propagate and polling to capture it
-      await new Promise(resolve => setTimeout(resolve, 1500));
+      await waitFor(() => {
+        const latestPoll = hostPlayersList[hostPlayersList.length - 1];
+        return latestPoll && latestPoll.length === 2;
+      });
 
       // Assert
       const latestPoll = hostPlayersList[hostPlayersList.length - 1];
@@ -224,7 +228,7 @@ describe('Main.js Lobby Integration with Real Supabase', () => {
       }, 100);
 
       // Wait for polling to capture data
-      await new Promise(resolve => setTimeout(resolve, 500));
+      await waitFor(() => playerPlayersList.length > 0);
 
       // Assert - Player should see both host and themselves
       const latestPoll = playerPlayersList[playerPlayersList.length - 1];
@@ -255,7 +259,7 @@ describe('Main.js Lobby Integration with Real Supabase', () => {
       }, 100);
 
       // Wait for a few polls
-      await new Promise(resolve => setTimeout(resolve, 350));
+      await waitFor(() => pollCount > 0);
       const pollsBeforeCleanup = pollCount;
       expect(pollsBeforeCleanup).toBeGreaterThan(0);
 
@@ -265,10 +269,10 @@ describe('Main.js Lobby Integration with Real Supabase', () => {
       hostSnapshot.destroy();
       hostSnapshot = null;
 
-      // Wait
-      await new Promise(resolve => setTimeout(resolve, 300));
-
-      // Assert - Poll count should not increase
+      // Assert - Poll count should not increase after cleanup
+      // Use waitForSilence to verify that pollCount stays equal to pollsBeforeCleanup
+      await waitForSilence(() => pollCount === pollsBeforeCleanup, 300);
+      
       expect(pollCount).toBe(pollsBeforeCleanup);
     });
   });
@@ -288,7 +292,7 @@ describe('Main.js Lobby Integration with Real Supabase', () => {
       await playerSnapshot.ready();
 
       // Wait for both players to be visible
-      await new Promise(resolve => setTimeout(resolve, 1000));
+      await waitFor(() => hostSnapshot.getPlayers().size === 2);
 
       const hostPlayersList = [];
       hostLobbyInterval = setInterval(() => {
@@ -297,7 +301,7 @@ describe('Main.js Lobby Integration with Real Supabase', () => {
       }, 100);
 
       // Wait for initial polls to capture both players
-      await new Promise(resolve => setTimeout(resolve, 500));
+      await waitFor(() => hostPlayersList.length > 0 && hostPlayersList[hostPlayersList.length - 1].length === 2);
       expect(hostPlayersList[hostPlayersList.length - 1].length).toBe(2);
 
       // Act - Player leaves (manually delete from database to simulate leaving)
@@ -314,7 +318,10 @@ describe('Main.js Lobby Integration with Real Supabase', () => {
       playerNetwork.disconnect();
 
       // Wait for DELETE event to propagate
-      await new Promise(resolve => setTimeout(resolve, 1000));
+      await waitFor(() => {
+         const latestPoll = hostPlayersList[hostPlayersList.length - 1];
+         return latestPoll && latestPoll.length === 1;
+      });
 
       // Assert - Host should only see themselves
       const latestPoll = hostPlayersList[hostPlayersList.length - 1];
@@ -352,7 +359,12 @@ describe('Main.js Lobby Integration with Real Supabase', () => {
       await player2Snapshot.ready();
 
       // Wait for postgres_changes to propagate
-      await new Promise(resolve => setTimeout(resolve, 1500));
+      await waitFor(() => {
+        const hostPlayers = Array.from(hostSnapshot.getPlayers().values());
+        const player1Players = Array.from(playerSnapshot.getPlayers().values());
+        const player2Players = Array.from(player2Snapshot.getPlayers().values());
+        return hostPlayers.length === 3 && player1Players.length === 3 && player2Players.length === 3;
+      });
 
       // Simulate polling for all clients
       const hostPlayers = Array.from(hostSnapshot.getPlayers().values());
