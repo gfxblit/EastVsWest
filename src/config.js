@@ -18,6 +18,17 @@ export const CONFIG = {
     BACKGROUND_COLOR: '#2a2a2a',
   },
 
+  // World Settings
+  WORLD: {
+    WIDTH: 2400,
+    HEIGHT: 1600,
+  },
+
+  // Camera Settings
+  CAMERA: {
+    LERP_FACTOR: 0.15, // Smooth interpolation
+  },
+
   // Player Settings
   PLAYER: {
     BASE_MOVEMENT_SPEED: 200, // pixels per second
@@ -37,10 +48,10 @@ export const CONFIG = {
 
   // Rendering Settings
   RENDER: {
-    PLAYER_RADIUS: 20,
+    PLAYER_RADIUS: 30, // Updated from 20 to 30 for better visibility
     HEALTH_BAR_WIDTH: 40,
     HEALTH_BAR_HEIGHT: 5,
-    HEALTH_BAR_OFFSET_Y: 30,
+    HEALTH_BAR_OFFSET_Y: 40, // Increased from 30 to accommodate larger player
   },
 
   // Weapon Types

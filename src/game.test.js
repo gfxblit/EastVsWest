@@ -25,8 +25,8 @@ describe('Game', () => {
 
     test('WhenConstructed_ShouldInitializeConflictZoneWithCenterAndRadius', () => {
       expect(game.state.conflictZone).toBeDefined();
-      expect(game.state.conflictZone.centerX).toBe(CONFIG.CANVAS.WIDTH / 2);
-      expect(game.state.conflictZone.centerY).toBe(CONFIG.CANVAS.HEIGHT / 2);
+      expect(game.state.conflictZone.centerX).toBe(CONFIG.WORLD.WIDTH / 2);
+      expect(game.state.conflictZone.centerY).toBe(CONFIG.WORLD.HEIGHT / 2);
       expect(game.state.conflictZone.radius).toBe(CONFIG.ZONE.INITIAL_RADIUS);
     });
 
@@ -50,10 +50,10 @@ describe('Game', () => {
       expect(game.localPlayer.armor).toBeNull();
     });
 
-    test('WhenInitializedWithoutSnapshot_ShouldSpawnPlayerAtCenterOfCanvas', () => {
+    test('WhenInitializedWithoutSnapshot_ShouldSpawnPlayerAtCenterOfWorld', () => {
       game.init();
-      expect(game.localPlayer.x).toBe(CONFIG.CANVAS.WIDTH / 2);
-      expect(game.localPlayer.y).toBe(CONFIG.CANVAS.HEIGHT / 2);
+      expect(game.localPlayer.x).toBe(CONFIG.WORLD.WIDTH / 2);
+      expect(game.localPlayer.y).toBe(CONFIG.WORLD.HEIGHT / 2);
     });
 
     test('WhenInitializedWithSnapshot_ShouldLoadLocalPlayerFromSnapshot', () => {
@@ -147,13 +147,13 @@ describe('Game', () => {
       expect(game.localPlayer.y).toBe(initialY + 5); // 50 * 0.1
     });
 
-    test('WhenPlayerMovesOutOfBounds_ShouldClampToCanvasWidth', () => {
-      game.localPlayer.x = CONFIG.CANVAS.WIDTH - 10;
+    test('WhenPlayerMovesOutOfBounds_ShouldClampToWorldWidth', () => {
+      game.localPlayer.x = CONFIG.WORLD.WIDTH - 10;
       game.localPlayer.velocity = { x: 200, y: 0 };
 
       game.updateLocalPlayer(1); // Move way beyond bounds
 
-      expect(game.localPlayer.x).toBe(CONFIG.CANVAS.WIDTH);
+      expect(game.localPlayer.x).toBe(CONFIG.WORLD.WIDTH);
     });
 
     test('WhenPlayerMovesOutOfBounds_ShouldClampToMinimumX', () => {
@@ -165,13 +165,13 @@ describe('Game', () => {
       expect(game.localPlayer.x).toBe(0);
     });
 
-    test('WhenPlayerMovesOutOfBounds_ShouldClampToCanvasHeight', () => {
-      game.localPlayer.y = CONFIG.CANVAS.HEIGHT - 10;
+    test('WhenPlayerMovesOutOfBounds_ShouldClampToWorldHeight', () => {
+      game.localPlayer.y = CONFIG.WORLD.HEIGHT - 10;
       game.localPlayer.velocity = { x: 0, y: 200 };
 
       game.updateLocalPlayer(1);
 
-      expect(game.localPlayer.y).toBe(CONFIG.CANVAS.HEIGHT);
+      expect(game.localPlayer.y).toBe(CONFIG.WORLD.HEIGHT);
     });
 
     test('WhenPlayerMovesOutOfBounds_ShouldClampToMinimumY', () => {
@@ -189,8 +189,8 @@ describe('Game', () => {
       // Place player far outside zone
       game.localPlayer.x = 0;
       game.localPlayer.y = 0;
-      game.state.conflictZone.centerX = CONFIG.CANVAS.WIDTH / 2;
-      game.state.conflictZone.centerY = CONFIG.CANVAS.HEIGHT / 2;
+      game.state.conflictZone.centerX = CONFIG.WORLD.WIDTH / 2;
+      game.state.conflictZone.centerY = CONFIG.WORLD.HEIGHT / 2;
       game.state.conflictZone.radius = 10; // Very small zone
 
       game.updateLocalPlayer(1); // 1 second

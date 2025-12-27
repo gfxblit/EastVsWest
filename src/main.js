@@ -10,6 +10,7 @@ import { Input } from './input.js';
 import { UI } from './ui.js';
 import { Network } from './network.js';
 import { SessionPlayersSnapshot } from './SessionPlayersSnapshot.js';
+import { Camera } from './camera.js';
 import { createClient } from '@supabase/supabase-js';
 
 // Initialize Eruda for mobile debugging (console, network, elements inspector)
@@ -37,6 +38,7 @@ class App {
     this.network = null;
     this.supabase = null;
     this.playersSnapshot = null;
+    this.camera = null;
     this.lobbyUpdateInterval = null;
     this.running = false;
     this.lastTimestamp = 0;
@@ -361,10 +363,23 @@ class App {
     this.renderer = new Renderer(canvas);
     this.game = new Game();
     this.input = new Input();
+    this.camera = new Camera(
+      CONFIG.WORLD.WIDTH,
+      CONFIG.WORLD.HEIGHT,
+      CONFIG.CANVAS.WIDTH,
+      CONFIG.CANVAS.HEIGHT
+    );
 
     // Initialize components
     this.renderer.init();
     this.game.init(this.playersSnapshot, this.network);
+
+    // Initialize camera to local player position
+    const localPlayer = this.game.getLocalPlayer();
+    if (localPlayer) {
+      this.camera.x = localPlayer.x;
+      this.camera.y = localPlayer.y;
+    }
 
     // Start periodic position DB writes if we have a session
     if (this.playersSnapshot && this.network) {
@@ -395,6 +410,11 @@ class App {
       this.network.startPositionBroadcasting();
     }
 
+    // Expose game, camera, and renderer on window for integration tests
+    window.game = this.game;
+    window.camera = this.camera;
+    window.renderer = this.renderer;
+
     // Start game loop
     this.running = true;
     this.lastTimestamp = performance.now();
@@ -411,8 +431,14 @@ class App {
     // Update game state
     this.game.update(deltaTime);
 
+    // Update camera to follow local player
+    const localPlayer = this.game.getLocalPlayer();
+    if (localPlayer && this.camera) {
+      this.camera.update(localPlayer.x, localPlayer.y, CONFIG.CAMERA.LERP_FACTOR);
+    }
+
     // Render
-    this.renderer.render(this.game.getState(), this.game.getLocalPlayer(), this.playersSnapshot);
+    this.renderer.render(this.game.getState(), this.game.getLocalPlayer(), this.playersSnapshot, this.camera);
 
     // Continue loop
     this.animationFrameId = requestAnimationFrame((timestamp) => this.gameLoop(timestamp));

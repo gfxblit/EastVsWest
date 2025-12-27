@@ -1,46 +1,19 @@
 import { jest } from '@jest/globals';
+/**
+ * Renderer Tests
+ * Unit tests for the Renderer class with camera support and background rendering
+ */
+
 import { Renderer } from './renderer.js';
 import { CONFIG } from './config.js';
 
 describe('Renderer', () => {
+  let canvas;
+  let ctx;
   let renderer;
-  let mockCanvas;
-  let mockCtx;
   let mockImage;
-  let drawCalls;
 
   beforeEach(() => {
-    drawCalls = [];
-
-    // Mock Canvas and Context
-    mockCtx = {
-      _fillStyle: null,
-      set fillStyle(val) { this._fillStyle = val; },
-      get fillStyle() { return this._fillStyle; },
-      
-      strokeStyle: null,
-      lineWidth: 0,
-      globalCompositeOperation: 'source-over',
-      
-      fillRect: jest.fn(function(x, y, w, h) {
-        drawCalls.push({ type: 'fillRect', style: this.fillStyle, args: [x, y, w, h] });
-      }),
-      beginPath: jest.fn(),
-      arc: jest.fn(),
-      stroke: jest.fn(),
-      fill: jest.fn(function(rule) {
-        drawCalls.push({ type: 'fill', style: this.fillStyle, rule });
-      }),
-      createPattern: jest.fn(() => 'mock-pattern'),
-      rect: jest.fn(),
-    };
-
-    mockCanvas = {
-      getContext: jest.fn(() => mockCtx),
-      width: 0,
-      height: 0,
-    };
-
     // Mock Image
     mockImage = {
       onload: null,
@@ -48,7 +21,33 @@ describe('Renderer', () => {
     };
     global.Image = jest.fn(() => mockImage);
 
-    renderer = new Renderer(mockCanvas);
+    // Create a mock canvas and context
+    canvas = document.createElement('canvas');
+    ctx = {
+      fillStyle: '',
+      strokeStyle: '',
+      lineWidth: 0,
+      globalCompositeOperation: '',
+      fillRect: jest.fn(),
+      strokeRect: jest.fn(),
+      beginPath: jest.fn(),
+      arc: jest.fn(),
+      fill: jest.fn(),
+      stroke: jest.fn(),
+      save: jest.fn(),
+      restore: jest.fn(),
+      translate: jest.fn(),
+      rotate: jest.fn(),
+      clearRect: jest.fn(),
+      moveTo: jest.fn(),
+      lineTo: jest.fn(),
+      closePath: jest.fn(),
+      createPattern: jest.fn(() => 'mock-pattern'),
+      rect: jest.fn(),
+    };
+    canvas.getContext = jest.fn(() => ctx);
+    renderer = new Renderer(canvas);
+    renderer.init();
   });
 
   afterEach(() => {
@@ -57,89 +56,293 @@ describe('Renderer', () => {
 
   describe('init', () => {
     test('ShouldInitializeContextAndLoadBackground', () => {
-      renderer.init();
+      const newRenderer = new Renderer(canvas);
+      newRenderer.init();
 
-      expect(mockCanvas.getContext).toHaveBeenCalledWith('2d');
-      expect(mockCanvas.width).toBe(CONFIG.CANVAS.WIDTH);
-      expect(mockCanvas.height).toBe(CONFIG.CANVAS.HEIGHT);
+      expect(canvas.getContext).toHaveBeenCalledWith('2d');
+      expect(canvas.width).toBe(CONFIG.CANVAS.WIDTH);
+      expect(canvas.height).toBe(CONFIG.CANVAS.HEIGHT);
       expect(global.Image).toHaveBeenCalled();
       expect(mockImage.src).toBe('/game-background.png');
     });
 
     test('WhenImageLoads_ShouldCreatePattern', () => {
-      renderer.init();
-      
+      const newRenderer = new Renderer(canvas);
+      newRenderer.init();
+
       // Simulate image load
       mockImage.onload();
 
-      expect(mockCtx.createPattern).toHaveBeenCalledWith(mockImage, 'repeat');
-      expect(renderer.bgPattern).toBe('mock-pattern');
+      expect(ctx.createPattern).toHaveBeenCalledWith(mockImage, 'repeat');
+      expect(newRenderer.bgPattern).toBe('mock-pattern');
     });
   });
 
   describe('render', () => {
-    beforeEach(() => {
-      renderer.init();
-    });
-
     test('WhenBackgroundLoaded_ShouldDrawPattern', () => {
       // Setup pattern
       mockImage.onload();
 
       const gameState = {
-        conflictZone: { centerX: 100, centerY: 100, radius: 50 },
+        conflictZone: { centerX: 1200, centerY: 800, radius: 600 },
         loot: []
       };
 
+      // Track fillStyle assignments
+      let fillStyleHistory = [];
+      Object.defineProperty(ctx, 'fillStyle', {
+        get: function() { return this._fillStyle; },
+        set: function(val) {
+          this._fillStyle = val;
+          fillStyleHistory.push(val);
+        },
+        configurable: true
+      });
+
       renderer.render(gameState);
 
-      // Check first draw call (background)
-      const bgCall = drawCalls.find(call => call.type === 'fillRect');
-      expect(bgCall).toBeDefined();
-      expect(bgCall.style).toBe('mock-pattern');
-      expect(bgCall.args).toEqual([0, 0, CONFIG.CANVAS.WIDTH, CONFIG.CANVAS.HEIGHT]);
+      // Check that fillRect was called with canvas dimensions (for background)
+      expect(ctx.fillRect).toHaveBeenCalledWith(0, 0, CONFIG.CANVAS.WIDTH, CONFIG.CANVAS.HEIGHT);
+      // Pattern should have been used (first fillStyle assignment)
+      expect(fillStyleHistory[0]).toBe('mock-pattern');
     });
 
     test('WhenBackgroundNotLoaded_ShouldDrawBackgroundColor', () => {
       // Pattern not loaded yet
+      renderer.bgPattern = null;
 
       const gameState = {
-        conflictZone: { centerX: 100, centerY: 100, radius: 50 },
+        conflictZone: { centerX: 1200, centerY: 800, radius: 600 },
         loot: []
       };
 
+      // Track fillStyle assignments
+      let fillStyleHistory = [];
+      Object.defineProperty(ctx, 'fillStyle', {
+        get: function() { return this._fillStyle; },
+        set: function(val) {
+          this._fillStyle = val;
+          fillStyleHistory.push(val);
+        },
+        configurable: true
+      });
+
       renderer.render(gameState);
 
-      // Check first draw call (background)
-      const bgCall = drawCalls.find(call => call.type === 'fillRect');
-      expect(bgCall).toBeDefined();
-      expect(bgCall.style).toBe(CONFIG.CANVAS.BACKGROUND_COLOR);
-      expect(bgCall.args).toEqual([0, 0, CONFIG.CANVAS.WIDTH, CONFIG.CANVAS.HEIGHT]);
+      // Check that background color was used (first fillStyle assignment)
+      expect(fillStyleHistory[0]).toBe(CONFIG.CANVAS.BACKGROUND_COLOR);
+      expect(ctx.fillRect).toHaveBeenCalledWith(0, 0, CONFIG.CANVAS.WIDTH, CONFIG.CANVAS.HEIGHT);
     });
   });
 
-  describe('renderConflictZone', () => {
-    beforeEach(() => {
-      renderer.init();
+  describe('render with camera', () => {
+    test('WhenRenderingWithCamera_ShouldApplyCameraTransform', () => {
+      // Arrange
+      const gameState = {
+        conflictZone: { centerX: 1200, centerY: 800, radius: 600 },
+        loot: [],
+      };
+      const camera = {
+        x: 1200,
+        y: 800,
+        isInView: jest.fn(() => true),
+        getEdgeIndicatorPosition: jest.fn(() => null),
+      };
+
+      // Act
+      renderer.render(gameState, null, null, camera);
+
+      // Assert
+      // Should call save before transform
+      expect(ctx.save).toHaveBeenCalled();
+
+      // Should apply camera transform
+      // Transform: ctx.translate(viewportWidth/2 - camera.x, viewportHeight/2 - camera.y)
+      // Expected: (1200/2 - 1200, 800/2 - 800) = (600 - 1200, 400 - 800) = (-600, -400)
+      expect(ctx.translate).toHaveBeenCalledWith(-600, -400);
+
+      // Should call restore after rendering world entities
+      expect(ctx.restore).toHaveBeenCalled();
     });
 
-    test('ShouldUseEvenOddFillRule', () => {
-      const zone = { centerX: 500, centerY: 400, radius: 300 };
-      
-      renderer.renderConflictZone(zone);
+    test('WhenRenderingWithoutCamera_ShouldNotApplyTransform', () => {
+      // Arrange
+      const gameState = {
+        conflictZone: { centerX: 600, centerY: 400, radius: 600 },
+        loot: [],
+      };
 
-      // Check for danger zone drawing (rectangle + hole)
-      expect(mockCtx.beginPath).toHaveBeenCalled();
-      expect(mockCtx.rect).toHaveBeenCalledWith(0, 0, CONFIG.CANVAS.WIDTH, CONFIG.CANVAS.HEIGHT);
-      expect(mockCtx.arc).toHaveBeenCalledWith(zone.centerX, zone.centerY, zone.radius, 0, Math.PI * 2, true);
-      
-      const fillCall = drawCalls.find(call => call.type === 'fill');
-      expect(fillCall).toBeDefined();
-      expect(fillCall.rule).toBe('evenodd');
-      expect(fillCall.style).toBe('rgba(255, 107, 107, 0.2)');
-      
-      // Check for border drawing
-      expect(mockCtx.stroke).toHaveBeenCalled();
+      // Act
+      renderer.render(gameState, null, null, null);
+
+      // Assert
+      // Should not call transform methods
+      expect(ctx.save).not.toHaveBeenCalled();
+      expect(ctx.translate).not.toHaveBeenCalled();
+      expect(ctx.restore).not.toHaveBeenCalled();
+    });
+  });
+
+  describe('renderEdgeIndicators', () => {
+    test('WhenEntityOffScreen_ShouldRenderEdgeIndicator', () => {
+      // Arrange
+      const playersSnapshot = {
+        getPlayers: () => new Map([
+          ['remote-player', {
+            player_id: 'remote-player',
+            player_name: 'RemotePlayer',
+            position_x: 2000, // Off-screen to the right
+            position_y: 800,
+            health: 100,
+          }]
+        ])
+      };
+
+      const camera = {
+        x: 1200,
+        y: 800,
+        isInView: (x, y) => x >= 600 && x <= 1800 && y >= 400 && y <= 1200,
+        getEdgeIndicatorPosition: (x, y) => {
+          if (x > 1800) {
+            return { x: 1200, y: 400, angle: 0 };
+          }
+          return null;
+        },
+      };
+
+      // Act
+      renderer.renderEdgeIndicators(playersSnapshot, null, camera);
+
+      // Assert
+      // Should render indicator (checking that drawing methods were called)
+      expect(ctx.beginPath).toHaveBeenCalled();
+    });
+
+    test('WhenAllEntitiesInView_ShouldNotRenderIndicators', () => {
+      // Arrange
+      const playersSnapshot = {
+        getPlayers: () => new Map([
+          ['remote-player', {
+            player_id: 'remote-player',
+            player_name: 'RemotePlayer',
+            position_x: 1200, // In view
+            position_y: 800,
+            health: 100,
+          }]
+        ])
+      };
+
+      const camera = {
+        x: 1200,
+        y: 800,
+        isInView: () => true,
+        getEdgeIndicatorPosition: () => null,
+      };
+
+      // Reset mocks
+      ctx.beginPath.mockClear();
+
+      // Act
+      renderer.renderEdgeIndicators(playersSnapshot, null, camera);
+
+      // Assert
+      // Should not call drawing methods (no indicators to render)
+      expect(ctx.beginPath).not.toHaveBeenCalled();
+    });
+
+    test('WhenLootOffScreen_ShouldRenderEdgeIndicator', () => {
+      // Arrange
+      const gameState = {
+        loot: [
+          { id: 'loot-1', x: 2000, y: 800 } // Off-screen to the right
+        ]
+      };
+
+      const camera = {
+        x: 1200,
+        y: 800,
+        isInView: (x, y) => x >= 600 && x <= 1800 && y >= 400 && y <= 1200,
+        getEdgeIndicatorPosition: (x, y) => {
+          if (x > 1800) {
+            return { x: 1200, y: 400, angle: 0 };
+          }
+          return null;
+        },
+      };
+
+      // Act
+      renderer.renderEdgeIndicators(null, null, camera, gameState.loot);
+
+      // Assert
+      // Should render indicator
+      expect(ctx.beginPath).toHaveBeenCalled();
+    });
+  });
+
+  describe('world coordinate rendering', () => {
+    test('WhenRenderingConflictZone_ShouldUseWorldCoordinates', () => {
+      // Arrange
+      const conflictZone = {
+        centerX: 1200, // World center
+        centerY: 800,
+        radius: 600,
+      };
+
+      // Act
+      renderer.renderConflictZone(conflictZone);
+
+      // Assert
+      // Should render zone at world coordinates (1200, 800)
+      expect(ctx.arc).toHaveBeenCalledWith(1200, 800, 600, 0, Math.PI * 2);
+    });
+
+    test('WhenRenderingConflictZoneDangerOverlay_ShouldCoverEntireWorld', () => {
+      // Arrange
+      const conflictZone = {
+        centerX: 1200,
+        centerY: 800,
+        radius: 600,
+      };
+
+      // Act
+      renderer.renderConflictZone(conflictZone);
+
+      // Assert
+      // Danger overlay should cover entire world, not just viewport
+      // Find the fillRect call that draws the danger overlay
+      const fillRectCalls = ctx.fillRect.mock.calls;
+      const dangerOverlayCall = fillRectCalls.find(
+        call => call[0] === 0 && call[1] === 0 && call[2] > 1200 && call[3] > 800
+      );
+
+      expect(dangerOverlayCall).toBeDefined();
+      expect(dangerOverlayCall[2]).toBe(CONFIG.WORLD.WIDTH); // Should fill world width
+      expect(dangerOverlayCall[3]).toBe(CONFIG.WORLD.HEIGHT); // Should fill world height
+    });
+
+    test('WhenRenderingPlayer_ShouldUseWorldCoordinates', () => {
+      // Arrange
+      const player = {
+        id: 'player-1',
+        name: 'Player1',
+        x: 1500, // World coordinates
+        y: 900,
+        health: 100,
+        rotation: 0,
+      };
+
+      // Act
+      renderer.renderPlayer(player, false);
+
+      // Assert
+      // Should render player at world coordinates (1500, 900)
+      expect(ctx.arc).toHaveBeenCalledWith(
+        1500,
+        900,
+        CONFIG.RENDER.PLAYER_RADIUS,
+        0,
+        Math.PI * 2
+      );
     });
   });
 });
