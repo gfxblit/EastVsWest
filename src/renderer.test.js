@@ -210,6 +210,30 @@ describe('Renderer', () => {
       expect(ctx.arc).toHaveBeenCalledWith(1200, 800, 600, 0, Math.PI * 2);
     });
 
+    test('WhenRenderingConflictZoneDangerOverlay_ShouldCoverEntireWorld', () => {
+      // Arrange
+      const conflictZone = {
+        centerX: 1200,
+        centerY: 800,
+        radius: 600,
+      };
+
+      // Act
+      renderer.renderConflictZone(conflictZone);
+
+      // Assert
+      // Danger overlay should cover entire world, not just viewport
+      // Find the fillRect call that draws the danger overlay
+      const fillRectCalls = ctx.fillRect.mock.calls;
+      const dangerOverlayCall = fillRectCalls.find(
+        call => call[0] === 0 && call[1] === 0 && call[2] > 1200 && call[3] > 800
+      );
+
+      expect(dangerOverlayCall).toBeDefined();
+      expect(dangerOverlayCall[2]).toBe(CONFIG.WORLD.WIDTH); // Should fill world width
+      expect(dangerOverlayCall[3]).toBe(CONFIG.WORLD.HEIGHT); // Should fill world height
+    });
+
     test('WhenRenderingPlayer_ShouldUseWorldCoordinates', () => {
       // Arrange
       const player = {

@@ -93,9 +93,9 @@ export class Renderer {
     this.ctx.arc(zone.centerX, zone.centerY, zone.radius, 0, Math.PI * 2);
     this.ctx.stroke();
 
-    // Draw danger area outside zone
+    // Draw danger area outside zone (in world coordinates)
     this.ctx.fillStyle = 'rgba(255, 107, 107, 0.2)';
-    this.ctx.fillRect(0, 0, this.canvas.width, this.canvas.height);
+    this.ctx.fillRect(0, 0, CONFIG.WORLD.WIDTH, CONFIG.WORLD.HEIGHT);
 
     // Clear the safe zone
     this.ctx.globalCompositeOperation = 'destination-out';
