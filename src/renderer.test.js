@@ -90,6 +90,70 @@ describe('Renderer', () => {
     });
   });
 
+  describe('resizeCanvas', () => {
+    test('WhenResizing_ShouldFillEntireViewport', () => {
+      // Arrange - Desktop viewport
+      window.innerWidth = 1920;
+      window.innerHeight = 1080;
+
+      // Act
+      renderer.resizeCanvas();
+
+      // Assert - Canvas should fill entire viewport
+      expect(canvas.width).toBe(1920);
+      expect(canvas.height).toBe(1080);
+    });
+
+    test('WhenPortraitOrientation_ShouldAdaptToPortraitViewport', () => {
+      // Arrange - Portrait iPhone
+      window.innerWidth = 390;
+      window.innerHeight = 844;
+
+      // Act
+      renderer.resizeCanvas();
+
+      // Assert - Canvas should use full portrait viewport
+      expect(canvas.width).toBe(390);
+      expect(canvas.height).toBe(844);
+    });
+
+    test('WhenLandscapeOrientation_ShouldAdaptToLandscapeViewport', () => {
+      // Arrange - Landscape iPhone
+      window.innerWidth = 844;
+      window.innerHeight = 390;
+
+      // Act
+      renderer.resizeCanvas();
+
+      // Assert - Canvas should use full landscape viewport
+      expect(canvas.width).toBe(844);
+      expect(canvas.height).toBe(390);
+    });
+
+    test('WhenResizing_ShouldAdaptToAnyAspectRatio', () => {
+      // Arrange - Various viewport sizes with different aspect ratios
+      const testCases = [
+        { width: 1920, height: 1080 }, // 16:9 desktop
+        { width: 768, height: 1024 },  // 3:4 iPad portrait
+        { width: 1024, height: 768 },  // 4:3 iPad landscape
+        { width: 375, height: 667 },   // ~9:16 iPhone portrait
+        { width: 667, height: 375 },   // ~16:9 iPhone landscape
+        { width: 1440, height: 900 },  // 16:10 laptop
+      ];
+
+      testCases.forEach(({ width, height }) => {
+        // Act
+        window.innerWidth = width;
+        window.innerHeight = height;
+        renderer.resizeCanvas();
+
+        // Assert - Canvas should exactly match viewport
+        expect(canvas.width).toBe(width);
+        expect(canvas.height).toBe(height);
+      });
+    });
+  });
+
   describe('render', () => {
     test('WhenRenderingWithoutCamera_ShouldClearCanvasWithBackgroundColor', () => {
       const gameState = {
@@ -140,8 +204,8 @@ describe('Renderer', () => {
 
       // Should apply camera transform
       // Transform: ctx.translate(viewportWidth/2 - camera.x, viewportHeight/2 - camera.y)
-      // Expected: (1200/2 - 1200, 800/2 - 800) = (600 - 1200, 400 - 800) = (-600, -400)
-      expect(ctx.translate).toHaveBeenCalledWith(-600, -400);
+      // Expected: (1920/2 - 1200, 1080/2 - 800) = (960 - 1200, 540 - 800) = (-240, -260)
+      expect(ctx.translate).toHaveBeenCalledWith(-240, -260);
 
       // Should call restore after rendering world entities
       expect(ctx.restore).toHaveBeenCalled();

@@ -3,6 +3,7 @@
  * Unit tests for ui.js following TDD workflow
  */
 
+import { jest } from '@jest/globals';
 import { UI } from './ui.js';
 
 describe('UI', () => {

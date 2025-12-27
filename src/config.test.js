@@ -13,8 +13,9 @@ describe('CONFIG', () => {
 
   test('should have canvas settings defined', () => {
     expect(CONFIG.CANVAS).toBeDefined();
-    expect(CONFIG.CANVAS.WIDTH).toBe(1200);
-    expect(CONFIG.CANVAS.HEIGHT).toBe(800);
+    expect(CONFIG.CANVAS.WIDTH).toBe(1920);
+    expect(CONFIG.CANVAS.HEIGHT).toBe(1080);
+    expect(CONFIG.CANVAS.BACKGROUND_COLOR).toBeDefined();
   });
 
   test('should have player settings defined', () => {

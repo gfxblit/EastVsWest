@@ -33,13 +33,10 @@ export class Renderer {
   }
 
   resizeCanvas() {
-    // Set canvas internal resolution to match display size
-    // Use window.innerWidth/Height for accurate viewport dimensions
-    const width = window.innerWidth;
-    const height = window.innerHeight;
-
-    this.canvas.width = width;
-    this.canvas.height = height;
+    // Use full viewport dimensions, adapting to device aspect ratio
+    // Works in both portrait and landscape orientations
+    this.canvas.width = window.innerWidth;
+    this.canvas.height = window.innerHeight;
   }
 
   render(gameState, localPlayer = null, playersSnapshot = null, camera = null) {
