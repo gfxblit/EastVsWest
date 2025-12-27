@@ -224,7 +224,7 @@ export class Renderer {
     const barWidth = CONFIG.RENDER.HEALTH_BAR_WIDTH;
     const barHeight = CONFIG.RENDER.HEALTH_BAR_HEIGHT;
     const barX = player.x - barWidth / 2;
-    const barY = player.y - CONFIG.RENDER.HEALTH_BAR_OFFSET_Y;
+    const barY = player.y - (CONFIG.RENDER.PLAYER_RADIUS + CONFIG.RENDER.HEALTH_BAR_OFFSET_FROM_PLAYER);
 
     // Background
     this.ctx.fillStyle = '#333';
