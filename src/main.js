@@ -427,10 +427,6 @@ class App {
       }
     });
 
-    if (this.network && this.network.isHost) {
-      this.network.startPositionBroadcasting();
-    }
-
     // Expose game, camera, and renderer on window for integration tests
     window.game = this.game;
     window.camera = this.camera;
@@ -473,9 +469,6 @@ class App {
     }
     if (this.input) {
       this.input.destroy();
-    }
-    if (this.network) {
-      this.network.stopPositionBroadcasting();
     }
     // Clean up resize handlers
     if (this.handleResize) {

@@ -82,10 +82,9 @@ export class SessionPlayersSnapshot {
     // Subscribe to Network's generic postgres_changes events
     this.network.on('postgres_changes', this.postgresChangesHandler);
 
-    // Subscribe to Network's position_update broadcast events
-    // Network emits events with payload.type as the event name
+    // Subscribe to Network's position_update events
+    // All clients broadcast directly, no host rebroadcasting
     this.network.on('position_update', this.broadcastHandler);
-    this.network.on('position_broadcast', this.broadcastHandler);
   }
 
   /**
@@ -111,22 +110,11 @@ export class SessionPlayersSnapshot {
   }
 
   /**
-   * Handle broadcast events from Network
-   * Processes position_update and position_broadcast messages
+   * Handle position_update events from Network
    */
   #handleBroadcast(message) {
-    // Handle position_update (individual player update)
     if (message.type === 'position_update') {
       this.#handlePositionUpdate(message.data);
-    }
-    // Handle position_broadcast (batched updates from host)
-    else if (message.type === 'position_broadcast') {
-      const { updates } = message.data;
-      if (updates && Array.isArray(updates)) {
-        updates.forEach(update => {
-          this.#handlePositionUpdate(update);
-        });
-      }
     }
   }
 
@@ -267,7 +255,6 @@ export class SessionPlayersSnapshot {
     if (this.network) {
       this.network.off('postgres_changes', this.postgresChangesHandler);
       this.network.off('position_update', this.broadcastHandler);
-      this.network.off('position_broadcast', this.broadcastHandler);
     }
   }
 }

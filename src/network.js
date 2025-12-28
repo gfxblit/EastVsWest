@@ -42,9 +42,6 @@ export class Network extends EventEmitter {
     this.playerId = null;
     this.sessionId = null;
     this.channel = null;
-    this.positionBuffer = new Map(); // Stores position updates by player_id
-    this.playerPositions = new Map(); // Stores last known positions for validation
-    this.broadcastInterval = null;
     this.positionWriteInterval = null; // Interval for periodic DB writes
   }
 
@@ -204,17 +201,8 @@ export class Network extends EventEmitter {
   }
 
   _handleRealtimeMessage(payload) {
+    // Emit all messages for listeners (like SessionPlayersSnapshot)
     this.emit(payload.type, payload);
-
-    if (this.isHost && payload.type === 'position_update') {
-      if (this._isValidPositionUpdate(payload)) {
-        // Store position update in buffer for batching
-        this.positionBuffer.set(payload.from, payload.data);
-        this.playerPositions.set(payload.from, payload.data.position);
-      } else {
-        console.warn(`Host: Received invalid position update from ${payload.from}`, payload.data);
-      }
-    }
   }
 
   _handlePostgresChange(payload) {
@@ -256,55 +244,6 @@ export class Network extends EventEmitter {
     }
   }
 
-  _isValidPositionUpdate(payload) {
-    const { from, data } = payload;
-    const { position, rotation, velocity, health } = data;
-
-    // 1. Type and structure validation
-    if (
-      typeof position?.x !== 'number' ||
-      typeof position?.y !== 'number' ||
-      typeof rotation !== 'number' ||
-      typeof velocity?.x !== 'number' ||
-      typeof velocity?.y !== 'number'
-    ) {
-      return false;
-    }
-
-    // Optional health validation
-    if (health !== undefined) {
-      if (typeof health !== 'number' || health < 0 || health > CONFIG.PLAYER.MAX_HEALTH) {
-        return false;
-      }
-    }
-
-    // 2. Bounds checking
-    if (
-      position.x < 0 || position.x > CONFIG.WORLD.WIDTH ||
-      position.y < 0 || position.y > CONFIG.WORLD.HEIGHT
-    ) {
-      return false;
-    }
-
-    // 3. Anti-teleport check
-    const lastPosition = this.playerPositions.get(from);
-    if (lastPosition) {
-      const distance = Math.sqrt(
-        Math.pow(position.x - lastPosition.x, 2) +
-        Math.pow(position.y - lastPosition.y, 2)
-      );
-
-      // Allow for some buffer, e.g., 2x the normal movement distance in one interval
-      const maxDistance = (CONFIG.PLAYER.BASE_MOVEMENT_SPEED / CONFIG.NETWORK.POSITION_UPDATE_RATE) * 2;
-      if (distance > maxDistance) {
-        console.warn(`Host: Received invalid position update from ${from}`, payload.data);
-        return false; // Position changed too much
-      }
-    }
-
-    return true;
-  }
-
   send(type, data) {
     if (!this.channel || !this.connected) {
       console.warn('Cannot send message, channel not connected.');
@@ -335,62 +274,15 @@ export class Network extends EventEmitter {
       data: positionData,
     };
 
-    // If host, add own position to buffer immediately since Supabase
-    // Realtime doesn't echo messages back to the sender
-    if (this.isHost) {
-      this.positionBuffer.set(this.playerId, positionData);
-    }
-
-    this.channel.send({
-      type: 'broadcast',
-      event: 'message',
-      payload: message,
-    });
-  }
-
-  broadcastPositionUpdates() {
-    if (!this.isHost) return;
-    if (this.positionBuffer.size === 0) return;
-    if (!this.channel || !this.connected) return;
-
-    const updates = Array.from(this.positionBuffer.entries()).map(([player_id, data]) => ({
-      player_id,
-      ...data,
-    }));
-
-    const message = {
-      type: 'position_broadcast',
-      from: this.playerId,
-      timestamp: Date.now(),
-      data: { updates },
-    };
-
+    // Broadcast to all other clients
     this.channel.send({
       type: 'broadcast',
       event: 'message',
       payload: message,
     });
 
-    // Emit locally for host's own components (like SessionPlayersSnapshot)
-    this.emit('position_broadcast', message);
-
-    // Clear the buffer after broadcasting
-    this.positionBuffer.clear();
-  }
-
-  startPositionBroadcasting() {
-    if (!this.isHost || this.broadcastInterval) return;
-
-    this.broadcastInterval = setInterval(() => {
-      this.broadcastPositionUpdates();
-    }, CONFIG.NETWORK.POSITION_UPDATE_INTERVAL_MS);
-  }
-
-  stopPositionBroadcasting() {
-    if (this.broadcastInterval) {
-      clearInterval(this.broadcastInterval);
-      this.broadcastInterval = null;
-    }
+    // Emit locally since Supabase Realtime doesn't echo messages back to sender
+    this.emit('position_update', message);
   }
 
   async writePositionToDB(position, rotation) {

@@ -95,9 +95,8 @@ describe('SessionPlayersSnapshot (Built on Network)', () => {
       // Wait for async initialization
       await snapshot.ready();
 
-      // Should subscribe to Network's position_update and position_broadcast events
+      // Should subscribe to Network's position_update events
       expect(mockNetwork.on).toHaveBeenCalledWith('position_update', expect.any(Function));
-      expect(mockNetwork.on).toHaveBeenCalledWith('position_broadcast', expect.any(Function));
     });
 
     test('WhenConstructed_ShouldFetchInitialSnapshotFilteredBySessionId', async () => {
