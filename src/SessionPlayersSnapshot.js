@@ -1,9 +1,13 @@
 /**
  * SessionPlayersSnapshot
  *
- * Maintains a local synchronized copy of players in a specific game session.
- * Built on top of Network layer - subscribes to Network events instead of managing channels directly.
- * Syncs via database events, ephemeral WebSocket broadcasts, and periodic refreshes.
+ * READ-ONLY: Maintains a local synchronized copy of players in a game session.
+ * Syncs via database events, WebSocket broadcasts, and periodic refreshes.
+ *
+ * IMPORTANT: This class does NOT write to the database. All database writes
+ * are handled by Network.js according to the authority model:
+ * - Client-authoritative: position, rotation
+ * - Host-authoritative: health, combat, game state
  */
 export class SessionPlayersSnapshot {
   constructor(network, sessionId, options = {}) {
@@ -78,10 +82,9 @@ export class SessionPlayersSnapshot {
     // Subscribe to Network's generic postgres_changes events
     this.network.on('postgres_changes', this.postgresChangesHandler);
 
-    // Subscribe to Network's position_update broadcast events
-    // Network emits events with payload.type as the event name
+    // Subscribe to Network's position_update events
+    // All clients broadcast directly, no host rebroadcasting
     this.network.on('position_update', this.broadcastHandler);
-    this.network.on('position_broadcast', this.broadcastHandler);
   }
 
   /**
@@ -107,11 +110,9 @@ export class SessionPlayersSnapshot {
   }
 
   /**
-   * Handle broadcast events from Network
-   * Processes position_update and position_broadcast messages
+   * Handle position_update events from Network
    */
   #handleBroadcast(message) {
-    // Handle position_update (individual player update)
     if (message.type === 'position_update') {
       this.#handlePositionUpdate({
         ...message.data,
@@ -200,6 +201,12 @@ export class SessionPlayersSnapshot {
     if (payload.rotation !== undefined) {
       player.rotation = payload.rotation;
     }
+
+    // Update health (in-memory only)
+    // NOTE: Health persistence is handled by Network.js (host authority)
+    if (payload.health !== undefined) {
+      player.health = payload.health;
+    }
   }
 
   /**
@@ -247,36 +254,6 @@ export class SessionPlayersSnapshot {
   }
 
   /**
-   * Add a player to the session
-   * @param {Object} playerData - Player data (player_id, player_name, is_host, etc.)
-   */
-  async addPlayer(playerData) {
-    try {
-      // Insert with session_id
-      const { data, error } = await this.network.supabase
-        .from('session_players')
-        .insert({
-          session_id: this.sessionId,
-          ...playerData,
-        })
-        .select()
-        .single();
-
-      if (error) {
-        console.error(`Failed to add player: ${error.message}`);
-        return;
-      }
-
-      // Add to local map
-      if (data) {
-        this.players.set(data.player_id, data);
-      }
-    } catch (err) {
-      console.error(`Failed to add player: ${err.message}`);
-    }
-  }
-
-  /**
    * Clean up resources
    */
   destroy() {
@@ -290,7 +267,6 @@ export class SessionPlayersSnapshot {
     if (this.network) {
       this.network.off('postgres_changes', this.postgresChangesHandler);
       this.network.off('position_update', this.broadcastHandler);
-      this.network.off('position_broadcast', this.broadcastHandler);
     }
   }
 }

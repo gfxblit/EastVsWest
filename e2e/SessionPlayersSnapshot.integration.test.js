@@ -265,35 +265,47 @@ describe('SessionPlayersSnapshot Integration with Network', () => {
       // Player joins
       await playerNetwork.joinGame(testJoinCode, 'TestPlayer');
 
-      // Create snapshots for both clients
-      hostSnapshot = new SessionPlayersSnapshot(hostNetwork, testSessionId);
+      // Create snapshot on player side
       playerSnapshot = new SessionPlayersSnapshot(playerNetwork, testSessionId);
-      await hostSnapshot.ready();
       await playerSnapshot.ready();
 
+      // Give delay for subscriptions to fully establish
+      await new Promise(resolve => setTimeout(resolve, 200));
+
       const hostPlayerBefore = playerSnapshot.getPlayers().get(hostUser.id);
+      expect(hostPlayerBefore).toBeDefined();
       expect(hostPlayerBefore.position_x).toBe(0);
       expect(hostPlayerBefore.position_y).toBe(0);
 
+      // Track position_update events received by playerNetwork
+      const receivedEvents = [];
+      const eventHandler = (msg) => {
+        receivedEvents.push(msg);
+      };
+      playerNetwork.on('position_update', eventHandler);
+
       // Send actual position update through Network channel
-      // This will go through Supabase Realtime and trigger broadcast events
+      // This broadcasts directly to all peers
       hostNetwork.sendPositionUpdate({
         position: { x: 100, y: 200 },
         rotation: 1.57,
         velocity: { x: 0, y: 0 },
       });
 
-      // Give enough time for the channel event loop to process the broadcast
-      await new Promise(resolve => setTimeout(resolve, 200));
+      // First, verify that the position_update event reaches playerNetwork
+      await waitFor(() => receivedEvents.length > 0, 5000);
+      expect(receivedEvents.length).toBeGreaterThan(0);
+      expect(receivedEvents[0].type).toBe('position_update');
+      expect(receivedEvents[0].from).toBe(hostUser.id);
 
-      // Host broadcasts the batched positions (this is what the game loop does)
-      hostNetwork.broadcastPositionUpdates();
-
-      // Wait for position_broadcast to propagate through Supabase Realtime
+      // Then verify it propagates to playerSnapshot
       await waitFor(() => {
         const p = playerSnapshot.getPlayers().get(hostUser.id);
-        return p.position_x === 100 && p.position_y === 200;
-      });
+        return p && p.position_x === 100 && p.position_y === 200;
+      }, 5000);
+
+      // Clean up event handler
+      playerNetwork.off('position_update', eventHandler);
 
       // Position should update in playerSnapshot via Network broadcast handler
       const hostPlayerAfter = playerSnapshot.getPlayers().get(hostUser.id);
@@ -303,7 +315,7 @@ describe('SessionPlayersSnapshot Integration with Network', () => {
       expect(hostPlayerAfter.position_x).toBe(100);
       expect(hostPlayerAfter.position_y).toBe(200);
       expect(hostPlayerAfter.rotation).toBe(1.57);
-    });
+    }, 15000); // Increase test timeout to 15s
   });
 
   describe('Periodic Refresh', () => {

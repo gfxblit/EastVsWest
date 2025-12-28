@@ -43,18 +43,17 @@ describe('Position Synchronization Integration', () => {
     }
   });
 
-  test('writePositionToDB() should update player position and health in database', async () => {
+  test('writePositionToDB() should update player position in database', async () => {
     // 1. Host a game
     const { session: hostSession } = await network.hostGame('HostPlayer');
     testSessionId = hostSession.id;
 
-    // 2. Define new position/health data
+    // 2. Define new position data
     const newPosition = { x: 123.45, y: 678.90 };
     const newRotation = 1.57; // 90 degrees
-    const newHealth = 85.5;
 
     // 3. Call writePositionToDB
-    await network.writePositionToDB(newPosition, newRotation, newHealth);
+    await network.writePositionToDB(newPosition, newRotation);
 
     // 4. Verify in Database
     const { data: playerDbData, error: playerDbError } = await supabaseClient
@@ -68,7 +67,6 @@ describe('Position Synchronization Integration', () => {
     expect(playerDbData.position_x).toBeCloseTo(newPosition.x);
     expect(playerDbData.position_y).toBeCloseTo(newPosition.y);
     expect(playerDbData.rotation).toBeCloseTo(newRotation);
-    expect(playerDbData.health).toBeCloseTo(newHealth);
   });
 
   test('startPeriodicPositionWrite() should perform an immediate write to DB', async () => {
@@ -79,10 +77,9 @@ describe('Position Synchronization Integration', () => {
     // 2. Define getters
     const getPosition = () => ({ x: 500.1, y: 300.2 });
     const getRotation = () => 3.14;
-    const getHealth = () => 50.0;
 
     // 3. Start periodic write
-    network.startPeriodicPositionWrite(getPosition, getRotation, getHealth);
+    network.startPeriodicPositionWrite(getPosition, getRotation);
 
     // 4. Wait for the async DB write to complete by checking for the updated value
     await waitFor(async () => {
@@ -107,7 +104,6 @@ describe('Position Synchronization Integration', () => {
     expect(playerDbData.position_x).toBeCloseTo(500.1);
     expect(playerDbData.position_y).toBeCloseTo(300.2);
     expect(playerDbData.rotation).toBeCloseTo(3.14);
-    expect(playerDbData.health).toBeCloseTo(50.0);
   });
 
   test('SessionPlayersSnapshot should pick up DB position updates', async () => {

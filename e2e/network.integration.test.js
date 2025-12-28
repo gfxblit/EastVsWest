@@ -240,8 +240,8 @@ describe('Network Module Integration with Supabase', () => {
     await playerClient.auth.signOut();
   });
 
-  describe('Position Updates (Client-Authoritative Movement)', () => {
-    test('should send position updates from client to host and broadcast to all clients', async () => {
+  describe('Position Updates (Direct Client Broadcasting)', () => {
+    test('should send position updates directly from client to all peers', async () => {
       // Host creates a session
       const hostName = 'HostPlayer';
       const { session: hostSession } = await network.hostGame(hostName);
@@ -263,22 +263,20 @@ describe('Network Module Integration with Supabase', () => {
       await player1Network.joinGame(joinCode, 'Player1');
       await player2Network.joinGame(joinCode, 'Player2');
 
-      // Set up a listener for position broadcasts on player2
-      const player2Broadcasts = [];
+      // Set up listeners for position updates
+      const player2Updates = [];
       const p2Handler = (payload) => {
-        player2Broadcasts.push(payload);
+        player2Updates.push(payload);
       };
-      player2Network.on('position_broadcast', p2Handler);
+      player2Network.on('position_update', p2Handler);
 
-      // Host sends its own position update
-      const hostPositionData = {
-        position: { x: 50, y: 100 },
-        rotation: 0.5,
-        velocity: { x: 0.5, y: 0.5 },
+      const hostUpdates = [];
+      const hostHandler = (payload) => {
+        hostUpdates.push(payload);
       };
-      network.sendPositionUpdate(hostPositionData);
+      network.on('position_update', hostHandler);
 
-      // Player 1 sends a position update
+      // Player 1 sends a position update (broadcasts to all peers)
       const positionData = {
         position: { x: 100, y: 200 },
         rotation: 1.57,
@@ -286,50 +284,32 @@ describe('Network Module Integration with Supabase', () => {
       };
       player1Network.sendPositionUpdate(positionData);
 
-      // Host collects the position updates and broadcasts
-      await waitFor(() => network.positionBuffer.size >= 2); // Wait for messages to arrive (Host + Player1)
-      network.broadcastPositionUpdates();
+      // Wait for updates to reach other clients
+      await waitFor(() => player2Updates.length > 0 && hostUpdates.length > 0);
 
-      // Wait for broadcast to reach player2
-      await waitFor(() => player2Broadcasts.length > 0);
+      // Verify player2 received player1's position update
+      const player2ReceivedUpdate = player2Updates.find(u => u.from === player1Auth.user.id);
+      expect(player2ReceivedUpdate).toBeDefined();
+      expect(player2ReceivedUpdate.type).toBe('position_update');
+      expect(player2ReceivedUpdate.data.position).toEqual({ x: 100, y: 200 });
+      expect(player2ReceivedUpdate.data.rotation).toBe(1.57);
 
-      // Verify player2 received the position broadcast
-      expect(player2Broadcasts.length).toBeGreaterThan(0);
-      const latestBroadcast = player2Broadcasts[player2Broadcasts.length - 1];
-
-      // Clean up
-      player2Network.off('position_broadcast', p2Handler);
-
-      expect(latestBroadcast.type).toBe('position_broadcast');
-      expect(latestBroadcast.data.updates).toBeDefined();
-
-      // Verify broadcast contains positions from BOTH host and player1
-      expect(latestBroadcast.data.updates.length).toBe(2);
-
-      // Find host's update in the broadcast
-      const hostUpdate = latestBroadcast.data.updates.find(
-        u => u.player_id === hostUser.id
-      );
-      expect(hostUpdate).toBeDefined();
-      expect(hostUpdate.position).toEqual({ x: 50, y: 100 });
-      expect(hostUpdate.rotation).toBe(0.5);
-
-      // Find player1's update in the broadcast
-      const player1Update = latestBroadcast.data.updates.find(
-        u => u.player_id === player1Auth.user.id
-      );
-      expect(player1Update).toBeDefined();
-      expect(player1Update.position).toEqual({ x: 100, y: 200 });
-      expect(player1Update.rotation).toBe(1.57);
+      // Verify host received player1's position update
+      const hostReceivedUpdate = hostUpdates.find(u => u.from === player1Auth.user.id);
+      expect(hostReceivedUpdate).toBeDefined();
+      expect(hostReceivedUpdate.type).toBe('position_update');
+      expect(hostReceivedUpdate.data.position).toEqual({ x: 100, y: 200 });
 
       // Clean up
+      player2Network.off('position_update', p2Handler);
+      network.off('position_update', hostHandler);
       player1Network.disconnect();
       player2Network.disconnect();
       await player1Client.auth.signOut();
       await player2Client.auth.signOut();
     });
 
-    test('should batch multiple position updates from different clients', async () => {
+    test('should allow multiple clients to send position updates simultaneously', async () => {
       // Host creates a session
       const { session: hostSession } = await network.hostGame('HostPlayer');
       testSessionId = hostSession.id;
@@ -350,12 +330,12 @@ describe('Network Module Integration with Supabase', () => {
       await player1Network.joinGame(joinCode, 'Player1');
       await player2Network.joinGame(joinCode, 'Player2');
 
-      // Set up listener on player1 for broadcasts
-      const receivedBroadcasts = [];
-      const p1Handler = (payload) => {
-        receivedBroadcasts.push(payload);
+      // Set up listener on host to receive updates from both players
+      const receivedUpdates = [];
+      const hostHandler = (payload) => {
+        receivedUpdates.push(payload);
       };
-      player1Network.on('position_broadcast', p1Handler);
+      network.on('position_update', hostHandler);
 
       // Both players send position updates
       player1Network.sendPositionUpdate({
@@ -370,125 +350,59 @@ describe('Network Module Integration with Supabase', () => {
         velocity: { x: 0, y: 1 },
       });
 
-      // Wait for messages to arrive at host
-      await waitFor(() => network.positionBuffer.size >= 2);
+      // Wait for both updates to reach host
+      await waitFor(() => receivedUpdates.length >= 2);
 
-      // Host broadcasts batched updates
-      network.broadcastPositionUpdates();
+      // Verify host received both position updates
+      expect(receivedUpdates.length).toBeGreaterThanOrEqual(2);
 
-      // Wait for broadcast to reach clients
-      await waitFor(() => receivedBroadcasts.length > 0);
+      const player1Update = receivedUpdates.find(u => u.from === player1Auth.user.id);
+      expect(player1Update).toBeDefined();
+      expect(player1Update.data.position).toEqual({ x: 100, y: 200 });
 
-      // Verify player1 received the batched broadcast
-      expect(receivedBroadcasts.length).toBeGreaterThan(0);
-      const latestBroadcast = receivedBroadcasts[receivedBroadcasts.length - 1];
-
-      // Clean up
-      player1Network.off('position_broadcast', p1Handler);
-
-      expect(latestBroadcast.type).toBe('position_broadcast');
-      expect(latestBroadcast.data.updates).toHaveLength(2);
-
-      // Verify both players' positions are in the batch
-      const updates = latestBroadcast.data.updates;
-      expect(updates.some(u => u.player_id === player1Auth.user.id)).toBe(true);
-      expect(updates.some(u => u.player_id === player2Auth.user.id)).toBe(true);
+      const player2Update = receivedUpdates.find(u => u.from === player2Auth.user.id);
+      expect(player2Update).toBeDefined();
+      expect(player2Update.data.position).toEqual({ x: 300, y: 400 });
 
       // Clean up
+      network.off('position_update', hostHandler);
       player1Network.disconnect();
       player2Network.disconnect();
       await player1Client.auth.signOut();
       await player2Client.auth.signOut();
     });
 
-    test('should clear position buffer after broadcasting', async () => {
+    test('should emit position updates locally for sender', async () => {
       // Host creates a session
       const { session: hostSession } = await network.hostGame('HostPlayer');
       testSessionId = hostSession.id;
-      const joinCode = hostSession.join_code;
 
-      // Create a player
-      const playerClient = createClient(supabaseUrl, supabaseAnonKey);
-      const { data: playerAuth } = await playerClient.auth.signInAnonymously();
-      const playerNetwork = new Network();
-      playerNetwork.initialize(playerClient, playerAuth.user.id);
-      await playerNetwork.joinGame(joinCode, 'Player1');
-
-      // Player sends position update
-      playerNetwork.sendPositionUpdate({
-        position: { x: 100, y: 200 },
-        rotation: 0,
-        velocity: { x: 1, y: 0 },
-      });
-
-      // Wait for message to arrive and broadcast
-      await waitFor(() => network.positionBuffer.size > 0);
-      network.broadcastPositionUpdates();
-
-      // Verify buffer was cleared
-      expect(network.positionBuffer.size).toBe(0);
-
-      // Clean up
-      playerNetwork.disconnect();
-      await playerClient.auth.signOut();
-    });
-
-    test('should periodically broadcast positions when broadcasting is started', async () => {
-      // Host creates a session
-      const { session: hostSession } = await network.hostGame('HostPlayer');
-      testSessionId = hostSession.id;
-      const joinCode = hostSession.join_code;
-
-      // Create a player
-      const playerClient = createClient(supabaseUrl, supabaseAnonKey);
-      const { data: playerAuth } = await playerClient.auth.signInAnonymously();
-      const playerNetwork = new Network();
-      playerNetwork.initialize(playerClient, playerAuth.user.id);
-      await playerNetwork.joinGame(joinCode, 'Player1');
-
-      // Listen for broadcasts on the client
-      const receivedBroadcasts = [];
-      const handler = (payload) => {
-        receivedBroadcasts.push(payload);
+      // Set up listener on host for its own position updates
+      const hostLocalUpdates = [];
+      const hostHandler = (payload) => {
+        hostLocalUpdates.push(payload);
       };
-      playerNetwork.on('position_broadcast', handler);
+      network.on('position_update', hostHandler);
 
-      // Host starts broadcasting
-      network.startPositionBroadcasting();
-
-      // Host sends its own position update
-      network.sendPositionUpdate({
+      // Host sends position update
+      const positionData = {
         position: { x: 10, y: 10 },
         rotation: 0,
         velocity: { x: 0, y: 0 },
-      });
+      };
+      network.sendPositionUpdate(positionData);
 
-      // Wait for at least one broadcast interval
-      await waitFor(() => receivedBroadcasts.length >= 1);
+      // Wait for local emission
+      await waitFor(() => hostLocalUpdates.length > 0);
 
-      expect(receivedBroadcasts.length).toBe(1);
-      expect(receivedBroadcasts[0].data.updates[0].player_id).toBe(hostUser.id);
-
-      // Verify no more broadcasts are sent because buffer is empty
-      await waitForSilence(() => receivedBroadcasts.length === 1, 50);
-
-      // Host stops broadcasting
-      network.stopPositionBroadcasting();
-
-      // Host sends another update
-       network.sendPositionUpdate({
-        position: { x: 20, y: 20 },
-        rotation: 0,
-        velocity: { x: 0, y: 0 },
-      });
-
-      // Verify no new broadcast is received
-      await waitForSilence(() => receivedBroadcasts.length === 1, 60);
+      // Verify host received its own update locally
+      expect(hostLocalUpdates.length).toBe(1);
+      expect(hostLocalUpdates[0].from).toBe(hostUser.id);
+      expect(hostLocalUpdates[0].type).toBe('position_update');
+      expect(hostLocalUpdates[0].data.position).toEqual({ x: 10, y: 10 });
 
       // Clean up
-      playerNetwork.off('position_broadcast', handler);
-      playerNetwork.disconnect();
-      await playerClient.auth.signOut();
-    }, 10000);
+      network.off('position_update', hostHandler);
+    });
   });
 });

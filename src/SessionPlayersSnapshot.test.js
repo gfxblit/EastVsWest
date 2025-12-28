@@ -95,9 +95,8 @@ describe('SessionPlayersSnapshot (Built on Network)', () => {
       // Wait for async initialization
       await snapshot.ready();
 
-      // Should subscribe to Network's position_update and position_broadcast events
+      // Should subscribe to Network's position_update events
       expect(mockNetwork.on).toHaveBeenCalledWith('position_update', expect.any(Function));
-      expect(mockNetwork.on).toHaveBeenCalledWith('position_broadcast', expect.any(Function));
     });
 
     test('WhenConstructed_ShouldFetchInitialSnapshotFilteredBySessionId', async () => {
@@ -279,6 +278,39 @@ describe('SessionPlayersSnapshot (Built on Network)', () => {
       expect(player.position_x).toBe(300);
       expect(player.position_y).toBe(400);
       expect(player.rotation).toBe(1.57);
+    });
+
+    test('WhenNetworkEmitsPositionUpdateWithHealth_ShouldUpdatePlayerHealth', async () => {
+      const mockPlayers = [createMockPlayer({ health: 100 })];
+
+      mockSupabaseClient.from().select().eq.mockResolvedValue({
+        data: mockPlayers,
+        error: null,
+      });
+
+      let positionUpdateHandler;
+      mockNetwork.on.mockImplementation((event, handler) => {
+        if (event === 'position_update') {
+          positionUpdateHandler = handler;
+        }
+      });
+
+      snapshot = new SessionPlayersSnapshot(mockNetwork, TEST_SESSION_ID);
+      await snapshot.ready();
+
+      // Simulate Network emitting position_update with health
+      positionUpdateHandler({
+        type: 'position_update',
+        from: TEST_PLAYER_ID,
+        data: {
+          player_id: TEST_PLAYER_ID,
+          health: 80.5
+        },
+      });
+
+      // Should update health in memory
+      const player = snapshot.getPlayers().get(TEST_PLAYER_ID);
+      expect(player.health).toBe(80.5);
     });
 
     test('WhenNetworkEmitsPositionUpdateForNonexistentPlayer_ShouldIgnore', async () => {

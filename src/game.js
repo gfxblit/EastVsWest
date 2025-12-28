@@ -22,7 +22,7 @@ export class Game {
     this.playersSnapshot = null;
     this.network = null;
     this.lastPositionSendTime = 0;
-    this.lastSentPosition = null;
+    this.lastSentState = null;
   }
 
   init(playersSnapshot = null, network = null) {
@@ -49,11 +49,12 @@ export class Game {
           velocity: { x: 0, y: 0 },
         };
 
-        // Initialize lastSentPosition to prevent unnecessary initial send
-        this.lastSentPosition = {
+        // Initialize lastSentState to prevent unnecessary initial send
+        this.lastSentState = {
           x: localPlayerData.position_x,
           y: localPlayerData.position_y,
           rotation: localPlayerData.rotation,
+          health: localPlayerData.health,
         };
       }
     } else {
@@ -147,24 +148,32 @@ export class Game {
       return;
     }
 
-    // Only send if position/rotation changed
-    const currentPos = { x: this.localPlayer.x, y: this.localPlayer.y, rotation: this.localPlayer.rotation };
-    if (this.lastSentPosition &&
-        Math.abs(this.lastSentPosition.x - currentPos.x) < Number.EPSILON &&
-        Math.abs(this.lastSentPosition.y - currentPos.y) < Number.EPSILON &&
-        Math.abs(this.lastSentPosition.rotation - currentPos.rotation) < Number.EPSILON) {
+    // Only send if position/rotation/health changed
+    const currentState = {
+      x: this.localPlayer.x,
+      y: this.localPlayer.y,
+      rotation: this.localPlayer.rotation,
+      health: this.localPlayer.health
+    };
+
+    if (this.lastSentState &&
+        Math.abs(this.lastSentState.x - currentState.x) < Number.EPSILON &&
+        Math.abs(this.lastSentState.y - currentState.y) < Number.EPSILON &&
+        Math.abs(this.lastSentState.rotation - currentState.rotation) < Number.EPSILON &&
+        Math.abs(this.lastSentState.health - currentState.health) < Number.EPSILON) {
       return; // No change, don't send
     }
 
-    // Send position update
+    // Send position update (including health)
     this.network.sendPositionUpdate({
       position: { x: this.localPlayer.x, y: this.localPlayer.y },
       rotation: this.localPlayer.rotation,
       velocity: this.localPlayer.velocity,
+      health: this.localPlayer.health,
     });
 
-    // Remember last sent position and time
-    this.lastSentPosition = currentPos;
+    // Remember last sent state and time
+    this.lastSentState = currentState;
     this.lastPositionSendTime = now;
   }
 

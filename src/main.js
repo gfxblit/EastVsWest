@@ -416,10 +416,6 @@ class App {
         () => {
           const localPlayer = this.game.getLocalPlayer();
           return localPlayer ? localPlayer.rotation : 0;
-        },
-        () => {
-          const localPlayer = this.game.getLocalPlayer();
-          return localPlayer ? localPlayer.health : 100;
         }
       );
     }
@@ -430,10 +426,6 @@ class App {
         this.game.handleInput(inputState);
       }
     });
-
-    if (this.network && this.network.isHost) {
-      this.network.startPositionBroadcasting();
-    }
 
     // Expose game, camera, and renderer on window for integration tests
     window.game = this.game;
@@ -477,9 +469,6 @@ class App {
     }
     if (this.input) {
       this.input.destroy();
-    }
-    if (this.network) {
-      this.network.stopPositionBroadcasting();
     }
     // Clean up resize handlers
     if (this.handleResize) {

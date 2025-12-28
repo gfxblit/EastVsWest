@@ -502,177 +502,6 @@ describe('Network', () => {
       });
     });
 
-    describe('Host Position Broadcast', () => {
-      describe('WhenHostReceivesPositionUpdates_ShouldBatchAndBroadcast', () => {
-        it('should collect position updates from multiple clients', () => {
-          network.isHost = true;
-          const mockChannel = {
-            send: jest.fn().mockResolvedValue({ status: 'ok' }),
-          };
-          network.channel = mockChannel;
-
-          const update1 = {
-            type: 'position_update',
-            from: 'player-1',
-            timestamp: Date.now(),
-            data: {
-              position: { x: 100, y: 200 },
-              rotation: 0,
-              velocity: { x: 1, y: 0 },
-            },
-          };
-
-          const update2 = {
-            type: 'position_update',
-            from: 'player-2',
-            timestamp: Date.now(),
-            data: {
-              position: { x: 300, y: 400 },
-              rotation: 1.57,
-              velocity: { x: 0, y: 1 },
-            },
-          };
-
-          network._handleRealtimeMessage(update1);
-          network._handleRealtimeMessage(update2);
-
-          // Manually call the batch broadcast method
-          network.broadcastPositionUpdates();
-
-          expect(mockChannel.send).toHaveBeenCalledWith({
-            type: 'broadcast',
-            event: 'message',
-            payload: {
-              type: 'position_broadcast',
-              from: MOCK_PLAYER_ID,
-              timestamp: expect.any(Number),
-              data: {
-                updates: [
-                  {
-                    player_id: 'player-1',
-                    position: { x: 100, y: 200 },
-                    rotation: 0,
-                    velocity: { x: 1, y: 0 },
-                  },
-                  {
-                    player_id: 'player-2',
-                    position: { x: 300, y: 400 },
-                    rotation: 1.57,
-                    velocity: { x: 0, y: 1 },
-                  },
-                ],
-              },
-            },
-          });
-        });
-
-        it('should include host own position when host calls sendPositionUpdate on itself', () => {
-          network.isHost = true;
-          const mockChannel = {
-            send: jest.fn().mockResolvedValue({ status: 'ok' }),
-          };
-          network.channel = mockChannel;
-
-          // Host sends its own position update
-          // This should immediately add to buffer since Supabase doesn't echo back
-          const hostPositionData = {
-            position: { x: 50, y: 100 },
-            rotation: 0.5,
-            velocity: { x: 0.5, y: 0.5 },
-          };
-          network.sendPositionUpdate(hostPositionData);
-
-          // Receive position update from another client
-          const clientUpdate = {
-            type: 'position_update',
-            from: 'player-1',
-            timestamp: Date.now(),
-            data: {
-              position: { x: 100, y: 200 },
-              rotation: 0,
-              velocity: { x: 1, y: 0 },
-            },
-          };
-          network._handleRealtimeMessage(clientUpdate);
-
-          // Clear previous send calls
-          mockChannel.send.mockClear();
-
-          // Host broadcasts all position updates
-          network.broadcastPositionUpdates();
-
-          // Verify broadcast includes BOTH host and client positions
-          expect(mockChannel.send).toHaveBeenCalledWith({
-            type: 'broadcast',
-            event: 'message',
-            payload: {
-              type: 'position_broadcast',
-              from: MOCK_PLAYER_ID,
-              timestamp: expect.any(Number),
-              data: {
-                updates: expect.arrayContaining([
-                  {
-                    player_id: MOCK_PLAYER_ID,
-                    position: { x: 50, y: 100 },
-                    rotation: 0.5,
-                    velocity: { x: 0.5, y: 0.5 },
-                  },
-                  {
-                    player_id: 'player-1',
-                    position: { x: 100, y: 200 },
-                    rotation: 0,
-                    velocity: { x: 1, y: 0 },
-                  },
-                ]),
-              },
-            },
-          });
-        });
-
-        it('should clear position buffer after broadcasting', () => {
-          network.isHost = true;
-          const mockChannel = {
-            send: jest.fn().mockResolvedValue({ status: 'ok' }),
-          };
-          network.channel = mockChannel;
-
-          const update1 = {
-            type: 'position_update',
-            from: 'player-1',
-            timestamp: Date.now(),
-            data: {
-              position: { x: 100, y: 200 },
-              rotation: 0,
-              velocity: { x: 1, y: 0 },
-            },
-          };
-
-          network._handleRealtimeMessage(update1);
-          network.broadcastPositionUpdates();
-
-          // Clear the mock to verify the second call
-          mockChannel.send.mockClear();
-
-          // Call again - should not broadcast anything
-          network.broadcastPositionUpdates();
-
-          expect(mockChannel.send).not.toHaveBeenCalled();
-        });
-
-        it('should not broadcast if no position updates are pending', () => {
-          network.isHost = true;
-          const mockChannel = {
-            send: jest.fn().mockResolvedValue({ status: 'ok' }),
-          };
-          network.channel = mockChannel;
-
-          network.broadcastPositionUpdates();
-
-          expect(mockChannel.send).not.toHaveBeenCalled();
-        });
-      });
-    });
-
     describe('Client Position Broadcast Reception', () => {
       describe('WhenClientReceivesPositionBroadcast_ShouldEmitEvent', () => {
         it('should emit position_broadcast event with all player positions', () => {
@@ -710,143 +539,6 @@ describe('Network', () => {
     });
   });
 
-  describe('Position Broadcasting Timer', () => {
-    beforeEach(() => {
-      jest.useFakeTimers();
-    });
-
-    afterEach(() => {
-      jest.useRealTimers();
-    });
-
-    it('should call broadcastPositionUpdates periodically when started by host', () => {
-      network.isHost = true;
-      network.broadcastPositionUpdates = jest.fn();
-
-      network.startPositionBroadcasting();
-
-      // Advance time by one interval
-      jest.advanceTimersByTime(50);
-      expect(network.broadcastPositionUpdates).toHaveBeenCalledTimes(1);
-
-      // Advance time by another interval
-      jest.advanceTimersByTime(50);
-      expect(network.broadcastPositionUpdates).toHaveBeenCalledTimes(2);
-    });
-
-    it('should stop calling broadcastPositionUpdates when stopped', () => {
-      network.isHost = true;
-      network.broadcastPositionUpdates = jest.fn();
-
-      network.startPositionBroadcasting();
-      jest.advanceTimersByTime(50);
-      expect(network.broadcastPositionUpdates).toHaveBeenCalledTimes(1);
-
-      network.stopPositionBroadcasting();
-
-      // Advance time again, but broadcast should not be called
-      jest.advanceTimersByTime(50);
-      expect(network.broadcastPositionUpdates).toHaveBeenCalledTimes(1);
-    });
-
-    it('should not start broadcasting if not the host', () => {
-      network.isHost = false;
-      network.startPositionBroadcasting();
-      expect(network.broadcastInterval).toBeNull();
-    });
-
-    it('should not start a new interval if one is already running', () => {
-      network.isHost = true;
-      network.startPositionBroadcasting();
-      const firstIntervalId = network.broadcastInterval;
-
-      network.startPositionBroadcasting();
-      expect(network.broadcastInterval).toBe(firstIntervalId);
-    });
-  });
-
-  describe('Position Update Validation', () => {
-    beforeEach(() => {
-      network.isHost = true;
-    });
-
-    it('should accept a valid position update', () => {
-      const payload = {
-        from: 'player-1',
-        data: {
-          position: { x: 100, y: 100 },
-          rotation: 0,
-          velocity: { x: 10, y: 10 },
-        },
-      };
-      expect(network._isValidPositionUpdate(payload)).toBe(true);
-    });
-
-    it('should reject an update with invalid data types', () => {
-      const payload = {
-        from: 'player-1',
-        data: {
-          position: { x: '100', y: 100 }, // x is a string
-          rotation: 0,
-          velocity: { x: 10, y: 10 },
-        },
-      };
-      expect(network._isValidPositionUpdate(payload)).toBe(false);
-    });
-
-    it('should reject an update with out-of-bounds position', () => {
-      const payload = {
-        from: 'player-1',
-        data: {
-          position: { x: 2000, y: 100 }, // x is out of bounds
-          rotation: 0,
-          velocity: { x: 10, y: 10 },
-        },
-      };
-      expect(network._isValidPositionUpdate(payload)).toBe(false);
-    });
-
-    it('should reject an update that teleports the player', () => {
-      const player1Id = 'player-1';
-      network.playerPositions.set(player1Id, { x: 100, y: 100 });
-      const payload = {
-        from: player1Id,
-        data: {
-          position: { x: 500, y: 500 }, // large jump
-          rotation: 0,
-          velocity: { x: 10, y: 10 },
-        },
-      };
-      expect(network._isValidPositionUpdate(payload)).toBe(false);
-    });
-
-    it('should accept the first position update from a player', () => {
-      const payload = {
-        from: 'new-player',
-        data: {
-          position: { x: 100, y: 100 },
-          rotation: 0,
-          velocity: { x: 10, y: 10 },
-        },
-      };
-      expect(network._isValidPositionUpdate(payload)).toBe(true);
-    });
-
-    it('should accept a subsequent valid position update', () => {
-      const player1Id = 'player-1';
-      network.playerPositions.set(player1Id, { x: 100, y: 100 });
-      const payload = {
-        from: player1Id,
-        data: {
-          position: { x: 105, y: 105 }, // small move
-          rotation: 0,
-          velocity: { x: 10, y: 10 },
-        },
-      };
-      expect(network._isValidPositionUpdate(payload)).toBe(true);
-    });
-  });
-
   describe('writePositionToDB', () => {
     beforeEach(() => {
       network.sessionId = 'test-session-id';
@@ -865,16 +557,14 @@ describe('Network', () => {
 
       const position = { x: 100, y: 200 };
       const rotation = 1.5;
-      const health = 85;
 
-      await network.writePositionToDB(position, rotation, health);
+      await network.writePositionToDB(position, rotation);
 
       expect(mockSupabaseClient.from).toHaveBeenCalledWith('session_players');
       expect(mockUpdate).toHaveBeenCalledWith({
         position_x: 100,
         position_y: 200,
         rotation: 1.5,
-        health: 85,
       });
     });
 
@@ -894,7 +584,7 @@ describe('Network', () => {
         update: mockUpdate
       }));
 
-      await network.writePositionToDB({ x: 50, y: 75 }, 0.5, 90);
+      await network.writePositionToDB({ x: 50, y: 75 }, 0.5);
 
       expect(mockEq1).toHaveBeenCalledWith('session_id', 'test-session-id');
       expect(mockEq2).toHaveBeenCalledWith('player_id', MOCK_HOST_ID);
@@ -912,7 +602,7 @@ describe('Network', () => {
         })
       }));
 
-      await network.writePositionToDB({ x: 100, y: 200 }, 0, 100);
+      await network.writePositionToDB({ x: 100, y: 200 }, 0);
 
       expect(consoleErrorSpy).toHaveBeenCalledWith(
         'Failed to write position to DB:',
@@ -938,7 +628,7 @@ describe('Network', () => {
     });
 
     it('should start interval for periodic position writes', () => {
-      network.startPeriodicPositionWrite({ x: 100, y: 200 }, 0, 100);
+      network.startPeriodicPositionWrite({ x: 100, y: 200 }, 0);
 
       expect(network.positionWriteInterval).toBeDefined();
     });
@@ -948,9 +638,8 @@ describe('Network', () => {
 
       const positionGetter = () => ({ x: 100, y: 200 });
       const rotationGetter = () => 0;
-      const healthGetter = () => 100;
 
-      network.startPeriodicPositionWrite(positionGetter, rotationGetter, healthGetter);
+      network.startPeriodicPositionWrite(positionGetter, rotationGetter);
 
       // Fast-forward time by 60 seconds
       jest.advanceTimersByTime(60000);
@@ -963,10 +652,10 @@ describe('Network', () => {
     });
 
     it('should not start multiple intervals if already running', () => {
-      network.startPeriodicPositionWrite(() => ({ x: 100, y: 200 }), () => 0, () => 100);
+      network.startPeriodicPositionWrite(() => ({ x: 100, y: 200 }), () => 0);
       const firstInterval = network.positionWriteInterval;
 
-      network.startPeriodicPositionWrite(() => ({ x: 100, y: 200 }), () => 0, () => 100);
+      network.startPeriodicPositionWrite(() => ({ x: 100, y: 200 }), () => 0);
       const secondInterval = network.positionWriteInterval;
 
       expect(firstInterval).toBe(secondInterval);
@@ -984,7 +673,7 @@ describe('Network', () => {
     });
 
     it('should stop periodic position write interval', () => {
-      network.startPeriodicPositionWrite(() => ({ x: 100, y: 200 }), () => 0, () => 100);
+      network.startPeriodicPositionWrite(() => ({ x: 100, y: 200 }), () => 0);
       expect(network.positionWriteInterval).toBeDefined();
 
       network.stopPeriodicPositionWrite();

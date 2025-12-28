@@ -35,6 +35,7 @@ export const CONFIG = {
     BASE_MOVEMENT_SPEED: 200, // pixels per second
     DOUBLE_HANDED_SPEED_MODIFIER: 0.85, // -15% speed for double-handed weapons
     SPAWN_INVULNERABILITY_MS: 3000, // 3 seconds of invulnerability after spawn
+    MAX_HEALTH: 100,
   },
 
   // Conflict Zone Settings
