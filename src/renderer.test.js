@@ -26,12 +26,20 @@ describe('Renderer', () => {
       value: CONFIG.CANVAS.HEIGHT,
     });
 
-    // Mock Image
+    // Mock Image - create a new object for each call
+    global.Image = jest.fn(() => {
+      return {
+        onload: null,
+        src: '',
+        complete: false,
+      };
+    });
+
+    // Keep reference to first image for compatibility with existing tests
     mockImage = {
       onload: null,
       src: '',
     };
-    global.Image = jest.fn(() => mockImage);
 
     // Create a mock canvas and context
     canvas = document.createElement('canvas');
@@ -68,24 +76,29 @@ describe('Renderer', () => {
 
   describe('init', () => {
     test('ShouldInitializeContextAndLoadBackground', () => {
+      // Clear Image mock to count only this test's calls
+      global.Image.mockClear();
+
       const newRenderer = new Renderer(canvas);
       newRenderer.init();
 
       expect(canvas.getContext).toHaveBeenCalledWith('2d');
       expect(canvas.width).toBe(CONFIG.CANVAS.WIDTH);
       expect(canvas.height).toBe(CONFIG.CANVAS.HEIGHT);
-      expect(global.Image).toHaveBeenCalled();
-      expect(mockImage.src).toBe('/game-background.png');
+      // Should load background image + 8 directional images = 9 total
+      expect(global.Image).toHaveBeenCalledTimes(9);
+      expect(newRenderer.bgImage.src).toBe('/game-background.png');
+      expect(newRenderer.directionalImages.length).toBe(8);
     });
 
     test('WhenImageLoads_ShouldCreatePattern', () => {
       const newRenderer = new Renderer(canvas);
       newRenderer.init();
 
-      // Simulate image load
-      mockImage.onload();
+      // Simulate background image load
+      newRenderer.bgImage.onload();
 
-      expect(ctx.createPattern).toHaveBeenCalledWith(mockImage, 'repeat');
+      expect(ctx.createPattern).toHaveBeenCalledWith(newRenderer.bgImage, 'repeat');
       expect(newRenderer.bgPattern).toBe('mock-pattern');
     });
   });
@@ -230,7 +243,10 @@ describe('Renderer', () => {
 
     test('WhenRenderingWithCamera_ShouldDrawBackgroundInWorldCoordinates', () => {
       // Arrange
-      mockImage.onload();
+      // Trigger background image load
+      if (renderer.bgImage && renderer.bgImage.onload) {
+        renderer.bgImage.onload();
+      }
 
       const gameState = {
         conflictZone: { centerX: 1200, centerY: 800, radius: 600 },
@@ -426,27 +442,242 @@ describe('Renderer', () => {
 
     test('WhenRenderingPlayer_ShouldUseWorldCoordinates', () => {
       // Arrange
+      // Mock directional images as loaded
+      renderer.directionalImages = [];
+      for (let i = 0; i < 8; i++) {
+        renderer.directionalImages[i] = {
+          complete: true,
+          width: 96,
+          height: 96,
+          src: `/white-male-${i}.png`,
+        };
+      }
+
+      // Add drawImage to context
+      ctx.drawImage = jest.fn();
+
       const player = {
         id: 'player-1',
         name: 'Player1',
         x: 1500, // World coordinates
         y: 900,
         health: 100,
-        rotation: 0,
+        rotation: 0, // North
       };
 
       // Act
       renderer.renderPlayer(player, false);
 
       // Assert
-      // Should render player at world coordinates (1500, 900)
-      expect(ctx.arc).toHaveBeenCalledWith(
-        1500,
-        900,
-        CONFIG.RENDER.PLAYER_RADIUS,
-        0,
-        Math.PI * 2
+      // Should render player image centered at world coordinates (1500, 900)
+      const expectedX = 1500 - CONFIG.RENDER.PLAYER_RADIUS;
+      const expectedY = 900 - CONFIG.RENDER.PLAYER_RADIUS;
+      expect(ctx.drawImage).toHaveBeenCalledWith(
+        renderer.directionalImages[4], // North frame
+        expectedX,
+        expectedY,
+        CONFIG.RENDER.PLAYER_RADIUS * 2,
+        CONFIG.RENDER.PLAYER_RADIUS * 2
       );
+    });
+  });
+
+  describe('Directional Player Rendering', () => {
+    beforeEach(() => {
+      // Add drawImage method to mock context
+      ctx.drawImage = jest.fn();
+    });
+
+    describe('Frame Selection', () => {
+      test('WhenRotationIsSouth_ShouldSelectFrame0', () => {
+        const frame = renderer.getFrameFromRotation(Math.PI); // 180 degrees
+        expect(frame).toBe(0);
+      });
+
+      test('WhenRotationIsSouthEast_ShouldSelectFrame1', () => {
+        const frame = renderer.getFrameFromRotation(3 * Math.PI / 4); // 135 degrees
+        expect(frame).toBe(1);
+      });
+
+      test('WhenRotationIsEast_ShouldSelectFrame2', () => {
+        const frame = renderer.getFrameFromRotation(Math.PI / 2); // 90 degrees
+        expect(frame).toBe(2);
+      });
+
+      test('WhenRotationIsNorthEast_ShouldSelectFrame3', () => {
+        const frame = renderer.getFrameFromRotation(Math.PI / 4); // 45 degrees
+        expect(frame).toBe(3);
+      });
+
+      test('WhenRotationIsNorth_ShouldSelectFrame4', () => {
+        const frame = renderer.getFrameFromRotation(0); // 0 degrees
+        expect(frame).toBe(4);
+      });
+
+      test('WhenRotationIsNorthWest_ShouldSelectFrame5', () => {
+        const frame = renderer.getFrameFromRotation(7 * Math.PI / 4); // 315 degrees
+        expect(frame).toBe(5);
+      });
+
+      test('WhenRotationIsWest_ShouldSelectFrame6', () => {
+        const frame = renderer.getFrameFromRotation(3 * Math.PI / 2); // 270 degrees
+        expect(frame).toBe(6);
+      });
+
+      test('WhenRotationIsSouthWest_ShouldSelectFrame7', () => {
+        const frame = renderer.getFrameFromRotation(5 * Math.PI / 4); // 225 degrees
+        expect(frame).toBe(7);
+      });
+
+      test('WhenRotationIsBetweenDirections_ShouldSelectNearestFrame', () => {
+        // Test rotation slightly past north (5 degrees)
+        const frame = renderer.getFrameFromRotation(5 * Math.PI / 180);
+        expect(frame).toBe(4); // Should round to North
+
+        // Test rotation between North and NE (20 degrees)
+        const frame2 = renderer.getFrameFromRotation(20 * Math.PI / 180);
+        expect(frame2).toBe(4); // Should round to North (closer than NE at 45)
+
+        // Test rotation between North and NE (30 degrees)
+        const frame3 = renderer.getFrameFromRotation(30 * Math.PI / 180);
+        expect(frame3).toBe(3); // Should round to NE (closer than North)
+      });
+    });
+
+    describe('Image Loading', () => {
+      test('WhenInitialized_ShouldLoadAllDirectionalImages', () => {
+        // Create new renderer to test initialization
+        const newRenderer = new Renderer(canvas);
+
+        // Clear existing Image mock calls
+        global.Image.mockClear();
+
+        newRenderer.init();
+
+        // Should create 8 directional images + 1 background image = 9 total
+        expect(global.Image).toHaveBeenCalledTimes(9);
+      });
+
+      test('WhenImagesLoaded_ShouldHaveAllFramesAvailable', () => {
+        // Simulate all images loaded
+        renderer.directionalImages = [
+          { complete: true },
+          { complete: true },
+          { complete: true },
+          { complete: true },
+          { complete: true },
+          { complete: true },
+          { complete: true },
+          { complete: true },
+        ];
+
+        expect(renderer.directionalImages.length).toBe(8);
+        expect(renderer.directionalImages.every(img => img.complete)).toBe(true);
+      });
+    });
+
+    describe('Player Rendering with Directional Images', () => {
+      beforeEach(() => {
+        // Mock directional images as loaded
+        renderer.directionalImages = [];
+        for (let i = 0; i < 8; i++) {
+          renderer.directionalImages[i] = {
+            complete: true,
+            width: 96,
+            height: 96,
+            src: `/white-male-${i}.png`,
+          };
+        }
+      });
+
+      test('WhenRenderingPlayerFacingSouth_ShouldDrawFrame0', () => {
+        const player = {
+          id: 'player-1',
+          name: 'Player1',
+          x: 1500,
+          y: 900,
+          health: 100,
+          rotation: Math.PI, // South
+        };
+
+        renderer.renderPlayer(player, false);
+
+        // Should draw the south-facing image (frame 0)
+        expect(ctx.drawImage).toHaveBeenCalledWith(
+          renderer.directionalImages[0],
+          expect.any(Number), // x position
+          expect.any(Number), // y position
+          CONFIG.RENDER.PLAYER_RADIUS * 2, // width
+          CONFIG.RENDER.PLAYER_RADIUS * 2  // height
+        );
+      });
+
+      test('WhenRenderingPlayerFacingEast_ShouldDrawFrame2', () => {
+        const player = {
+          id: 'player-1',
+          name: 'Player1',
+          x: 1500,
+          y: 900,
+          health: 100,
+          rotation: Math.PI / 2, // East
+        };
+
+        renderer.renderPlayer(player, false);
+
+        // Should draw the east-facing image (frame 2)
+        expect(ctx.drawImage).toHaveBeenCalledWith(
+          renderer.directionalImages[2],
+          expect.any(Number),
+          expect.any(Number),
+          CONFIG.RENDER.PLAYER_RADIUS * 2,
+          CONFIG.RENDER.PLAYER_RADIUS * 2
+        );
+      });
+
+      test('WhenRenderingPlayer_ShouldCenterImageOnPlayerPosition', () => {
+        const player = {
+          id: 'player-1',
+          name: 'Player1',
+          x: 1500,
+          y: 900,
+          health: 100,
+          rotation: 0, // North
+        };
+
+        renderer.renderPlayer(player, false);
+
+        // Image should be centered on player position
+        const expectedX = 1500 - CONFIG.RENDER.PLAYER_RADIUS;
+        const expectedY = 900 - CONFIG.RENDER.PLAYER_RADIUS;
+
+        expect(ctx.drawImage).toHaveBeenCalledWith(
+          expect.any(Object),
+          expectedX,
+          expectedY,
+          CONFIG.RENDER.PLAYER_RADIUS * 2,
+          CONFIG.RENDER.PLAYER_RADIUS * 2
+        );
+      });
+
+      test('WhenRenderingLocalPlayer_ShouldDrawImageAndWhiteOutline', () => {
+        const player = {
+          id: 'player-1',
+          name: 'Player1',
+          x: 1500,
+          y: 900,
+          health: 100,
+          rotation: 0,
+        };
+
+        renderer.renderPlayer(player, true); // isLocal = true
+
+        // Should draw the directional image
+        expect(ctx.drawImage).toHaveBeenCalled();
+
+        // Should also draw white outline for local player
+        expect(ctx.stroke).toHaveBeenCalled();
+        expect(ctx.strokeStyle).toBe('#ffffff');
+      });
     });
   });
 });

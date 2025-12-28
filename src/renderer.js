@@ -9,8 +9,9 @@ export class Renderer {
   constructor(canvas) {
     this.canvas = canvas;
     this.ctx = null;
-    this.bgImage = new Image();
+    this.bgImage = null;
     this.bgPattern = null;
+    this.directionalImages = [];
   }
 
   init() {
@@ -24,10 +25,18 @@ export class Renderer {
     this.resizeCanvas();
 
     // Load background image
+    this.bgImage = new Image();
     this.bgImage.onload = () => {
       this.bgPattern = this.ctx.createPattern(this.bgImage, 'repeat');
     };
     this.bgImage.src = '/game-background.png';
+
+    // Load directional player images (8 frames)
+    for (let i = 0; i < 8; i++) {
+      const img = new Image();
+      img.src = `/white-male-${i}.png`;
+      this.directionalImages[i] = img;
+    }
 
     console.log('Renderer initialized');
   }
@@ -132,13 +141,75 @@ export class Renderer {
     this.ctx.stroke();
   }
 
+  getFrameFromRotation(rotation) {
+    // Map rotation (0-2π) to frame (0-7)
+    // Frame 0: South (π)
+    // Frame 1: South-East (3π/4)
+    // Frame 2: East (π/2)
+    // Frame 3: North-East (π/4)
+    // Frame 4: North (0)
+    // Frame 5: North-West (7π/4 or -π/4)
+    // Frame 6: West (3π/2 or -π/2)
+    // Frame 7: South-West (5π/4 or -3π/4)
+
+    // Each frame covers π/4 radians (45 degrees)
+    // Frame boundaries: [North-22.5°, North+22.5°), [NE-22.5°, NE+22.5°), etc.
+
+    // Normalize rotation to 0-2π
+    let normalizedRotation = rotation % (2 * Math.PI);
+    if (normalizedRotation < 0) {
+      normalizedRotation += 2 * Math.PI;
+    }
+
+    // Convert rotation to degrees for easier calculation
+    const degrees = (normalizedRotation * 180) / Math.PI;
+
+    // Map degrees to frame
+    // North (0°) ± 22.5° = [-22.5°, 22.5°] → frame 4
+    // NE (45°) ± 22.5° = [22.5°, 67.5°] → frame 3
+    // East (90°) ± 22.5° = [67.5°, 112.5°] → frame 2
+    // SE (135°) ± 22.5° = [112.5°, 157.5°] → frame 1
+    // South (180°) ± 22.5° = [157.5°, 202.5°] → frame 0
+    // SW (225°) ± 22.5° = [202.5°, 247.5°] → frame 7
+    // West (270°) ± 22.5° = [247.5°, 292.5°] → frame 6
+    // NW (315°) ± 22.5° = [292.5°, 337.5°] → frame 5
+    // North wrap-around [337.5°, 360°] → frame 4
+
+    if (degrees >= 337.5 || degrees < 22.5) {
+      return 4; // North
+    } else if (degrees >= 22.5 && degrees < 67.5) {
+      return 3; // North-East
+    } else if (degrees >= 67.5 && degrees < 112.5) {
+      return 2; // East
+    } else if (degrees >= 112.5 && degrees < 157.5) {
+      return 1; // South-East
+    } else if (degrees >= 157.5 && degrees < 202.5) {
+      return 0; // South
+    } else if (degrees >= 202.5 && degrees < 247.5) {
+      return 7; // South-West
+    } else if (degrees >= 247.5 && degrees < 292.5) {
+      return 6; // West
+    } else { // degrees >= 292.5 && degrees < 337.5
+      return 5; // North-West
+    }
+  }
+
   renderPlayer(player, isLocal = false) {
-    // Simple player representation as a circle
-    // Local player has a different color and a white outline (inspired by Stardew Valley)
-    this.ctx.fillStyle = isLocal ? '#6ee7b7' : '#4ecdc4'; // Lighter green for local player
-    this.ctx.beginPath();
-    this.ctx.arc(player.x, player.y, CONFIG.RENDER.PLAYER_RADIUS, 0, Math.PI * 2);
-    this.ctx.fill();
+    // Render player with directional sprite
+    const frame = this.getFrameFromRotation(player.rotation || 0);
+    const img = this.directionalImages[frame];
+
+    if (img && img.complete) {
+      // Draw the directional image centered on player position
+      const size = CONFIG.RENDER.PLAYER_RADIUS * 2;
+      this.ctx.drawImage(
+        img,
+        player.x - CONFIG.RENDER.PLAYER_RADIUS,
+        player.y - CONFIG.RENDER.PLAYER_RADIUS,
+        size,
+        size
+      );
+    }
 
     // Add white outline for local player
     if (isLocal) {
@@ -153,7 +224,7 @@ export class Renderer {
     const barWidth = CONFIG.RENDER.HEALTH_BAR_WIDTH;
     const barHeight = CONFIG.RENDER.HEALTH_BAR_HEIGHT;
     const barX = player.x - barWidth / 2;
-    const barY = player.y - CONFIG.RENDER.HEALTH_BAR_OFFSET_Y;
+    const barY = player.y - (CONFIG.RENDER.PLAYER_RADIUS + CONFIG.RENDER.HEALTH_BAR_OFFSET_FROM_PLAYER);
 
     // Background
     this.ctx.fillStyle = '#333';

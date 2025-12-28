@@ -106,6 +106,19 @@ export class Game {
     this.localPlayer.x += this.localPlayer.velocity.x * deltaTime;
     this.localPlayer.y += this.localPlayer.velocity.y * deltaTime;
 
+    // Update rotation based on velocity (if moving)
+    if (this.localPlayer.velocity.x !== 0 || this.localPlayer.velocity.y !== 0) {
+      // atan2 gives angle in standard math convention (0 = east, counter-clockwise)
+      // Convert to game convention (0 = north, clockwise) by adding π/2
+      this.localPlayer.rotation = Math.atan2(this.localPlayer.velocity.y, this.localPlayer.velocity.x) + Math.PI / 2;
+      // Normalize to 0-2π range
+      if (this.localPlayer.rotation < 0) {
+        this.localPlayer.rotation += 2 * Math.PI;
+      } else if (this.localPlayer.rotation >= 2 * Math.PI) {
+        this.localPlayer.rotation -= 2 * Math.PI;
+      }
+    }
+
     // Keep player within world bounds
     this.localPlayer.x = Math.max(0, Math.min(CONFIG.WORLD.WIDTH, this.localPlayer.x));
     this.localPlayer.y = Math.max(0, Math.min(CONFIG.WORLD.HEIGHT, this.localPlayer.y));
@@ -178,6 +191,28 @@ export class Game {
       x: velocityX,
       y: velocityY,
     };
+
+    // Update rotation based on aim direction (if aiming)
+    if (inputState.aimX !== undefined && inputState.aimY !== undefined) {
+      // Calculate aim direction relative to player's world position
+      // Note: aimX and aimY are in screen coordinates, need to convert to world coordinates
+      // For now, we'll assume they're already in the same coordinate space as player position
+      const aimDeltaX = inputState.aimX - this.localPlayer.x;
+      const aimDeltaY = inputState.aimY - this.localPlayer.y;
+
+      // Only update rotation if aiming at a different position (not at player itself)
+      if (Math.abs(aimDeltaX) > 0.01 || Math.abs(aimDeltaY) > 0.01) {
+        // atan2 gives angle in standard math convention (0 = east, counter-clockwise)
+        // Convert to game convention (0 = north, clockwise) by adding π/2
+        this.localPlayer.rotation = Math.atan2(aimDeltaY, aimDeltaX) + Math.PI / 2;
+        // Normalize to 0-2π range
+        if (this.localPlayer.rotation < 0) {
+          this.localPlayer.rotation += 2 * Math.PI;
+        } else if (this.localPlayer.rotation >= 2 * Math.PI) {
+          this.localPlayer.rotation -= 2 * Math.PI;
+        }
+      }
+    }
   }
 
   getState() {

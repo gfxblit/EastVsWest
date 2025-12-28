@@ -49,10 +49,10 @@ export const CONFIG = {
 
   // Rendering Settings
   RENDER: {
-    PLAYER_RADIUS: 30, // Updated from 20 to 30 for better visibility
+    PLAYER_RADIUS: 60,
     HEALTH_BAR_WIDTH: 40,
     HEALTH_BAR_HEIGHT: 5,
-    HEALTH_BAR_OFFSET_Y: 40, // Increased from 30 to accommodate larger player
+    HEALTH_BAR_OFFSET_FROM_PLAYER: 10, // Distance above player sprite (added to PLAYER_RADIUS)
   },
 
   // Weapon Types
