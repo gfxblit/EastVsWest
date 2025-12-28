@@ -113,7 +113,10 @@ export class SessionPlayersSnapshot {
   #handleBroadcast(message) {
     // Handle position_update (individual player update)
     if (message.type === 'position_update') {
-      this.#handlePositionUpdate(message.data);
+      this.#handlePositionUpdate({
+        ...message.data,
+        player_id: message.from,
+      });
     }
     // Handle position_broadcast (batched updates from host)
     else if (message.type === 'position_broadcast') {
