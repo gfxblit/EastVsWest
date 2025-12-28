@@ -349,26 +349,7 @@ We keep the lobby in sync by treating the database as the single source of truth
 }
 ```
 
-**HOST → ALL: `position_broadcast`**
-```javascript
-{
-  type: 'position_broadcast',
-  from: 'host_uuid',
-  timestamp: 1703001234567,
-  data: {
-    updates: [
-      {
-        player_id: 'uuid1',
-        position: { x: 123.45, y: 678.90 },
-        rotation: 1.57,
-        velocity: { x: 1.0, y: 0.0 },
-        health: 95.5
-      },
-      // ... more player updates
-    ]
-  }
-}
-```
+**NOTE:** In the current simplified architecture, there is no `position_broadcast` message. All clients broadcast `position_update` directly to peers without host rebroadcasting.
 
 ##### 3. Interaction Messages (Host-Authoritative)
 
@@ -687,7 +668,7 @@ CLIENT A          SUPABASE CHANNEL          HOST              OTHER CLIENTS
 ```
 
 **Frequency**: 20 Hz (every ~50ms)
-**Optimization**: Host batches position updates and sends one broadcast per tick containing all player positions.
+**Architecture**: Direct client broadcasting - each client broadcasts their own position updates directly to all peers without host intermediary or batching.
 
 ### Detailed Data Flow: Item Pickup (Host-Authoritative)
 
@@ -817,9 +798,9 @@ The host must maintain authoritative state and process:
    - Track all item states (spawned, picked up, dropped)
 
 3. **Position Updates** (Client-Authoritative)
-   - Receive position updates from all clients
-   - Validate positions (basic sanity checks, no teleporting)
-   - Broadcast aggregated positions to all clients
+   - Clients broadcast their own positions directly to all peers
+   - No host validation or aggregation (trust-based model)
+   - Host treats position updates like any other client
 
 4. **Interaction Validation** (Host-Authoritative)
    - Validate item pickup requests (range, availability)
@@ -842,14 +823,14 @@ Each client (including the host's client instance) must:
 
 1. **Local Input Handling**
    - Capture user input (movement, attacks, pickup attempts)
-   - Immediately update local player position (client-prediction)
-   - Send position updates to host (60 Hz)
+   - Immediately update local player position
+   - Broadcast position updates directly to all peers (20 Hz)
    - Send interaction requests to host (on-demand)
 
 2. **Remote State Rendering**
-   - Receive position broadcasts from host
+   - Receive position updates from all other clients directly
    - Interpolate other players' positions for smooth rendering
-   - Receive and apply interaction results (item pickups, combat)
+   - Receive and apply interaction results from host (item pickups, combat)
    - Render game state (players, items, conflict zone)
 
 3. **UI Updates**
@@ -891,7 +872,7 @@ HOST (Every 5 seconds)
 
 ### Latency & Client Prediction
 
-**Movement**: Clients immediately update their own position locally (client prediction) and send updates to the host. The host's broadcast serves as confirmation and sync point. If the host detects a significant deviation (anti-cheat), it can send a corrective `position_correction` message.
+**Movement**: Clients immediately update their own position locally and broadcast updates directly to all peers. Each client is authoritative over their own position with no host validation or correction. This provides lowest latency but no anti-cheat protection.
 
 **Interactions**: Clients can show optimistic UI feedback (e.g., item pickup animation) but must wait for host confirmation before actually applying the state change. If the host rejects the action, the client must rollback the optimistic update.
 
@@ -969,13 +950,12 @@ Health is **HOST-AUTHORITATIVE**:
    - Anonymous auth prevents account-based attacks
 
 3. **Input Validation** (Host-side)
-   - Validate all interaction requests (range checks, state checks)
-   - Sanitize position updates (prevent teleporting)
+   - Validate all host-authoritative interaction requests (range checks, state checks)
    - Rate limit message processing (prevent spam)
 
 4. **Cheating Prevention** (Basic)
-   - Host validates all authoritative actions
-   - Position updates sanity-checked (max speed limits)
+   - Host validates all host-authoritative actions (combat, items, game state)
+   - Position updates are NOT validated (trust-based, client-authoritative)
    - Combat calculations done server-side (host)
    - Event logging for post-game analysis
 
@@ -1009,8 +989,7 @@ Health is **HOST-AUTHORITATIVE**:
 │  COMBAT  │
 │          │  Main gameplay loop
 │          │
-│  Events: │  • position_update (60 Hz)
-│          │  • position_broadcast (60 Hz)
+│  Events: │  • position_update (20 Hz, direct client broadcast)
 │          │  • item_pickup_request
 │          │  • item_pickup_result
 │          │  • attack_action
