@@ -393,7 +393,7 @@ export class Network extends EventEmitter {
     }
   }
 
-  async writePositionToDB(position, rotation, health) {
+  async writePositionToDB(position, rotation) {
     if (!this.supabase || !this.sessionId || !this.playerId) {
       console.error('Cannot write position to DB: missing supabase, sessionId, or playerId');
       return;
@@ -405,7 +405,6 @@ export class Network extends EventEmitter {
         position_x: position.x,
         position_y: position.y,
         rotation: rotation,
-        health: health,
       })
       .eq('session_id', this.sessionId)
       .eq('player_id', this.playerId);
@@ -441,14 +440,13 @@ export class Network extends EventEmitter {
   //   }
   // }
 
-  startPeriodicPositionWrite(positionGetter, rotationGetter, healthGetter) {
+  startPeriodicPositionWrite(positionGetter, rotationGetter) {
     if (this.positionWriteInterval) return; // Already running
 
     // Write immediately
     const position = typeof positionGetter === 'function' ? positionGetter() : positionGetter;
     const rotation = typeof rotationGetter === 'function' ? rotationGetter() : rotationGetter;
-    const health = typeof healthGetter === 'function' ? healthGetter() : healthGetter;
-    this.writePositionToDB(position, rotation, health).catch(err => {
+    this.writePositionToDB(position, rotation).catch(err => {
       console.error('Failed to perform immediate position write:', err);
     });
 
@@ -456,8 +454,7 @@ export class Network extends EventEmitter {
     this.positionWriteInterval = setInterval(() => {
       const position = typeof positionGetter === 'function' ? positionGetter() : positionGetter;
       const rotation = typeof rotationGetter === 'function' ? rotationGetter() : rotationGetter;
-      const health = typeof healthGetter === 'function' ? healthGetter() : healthGetter;
-      this.writePositionToDB(position, rotation, health).catch(err => {
+      this.writePositionToDB(position, rotation).catch(err => {
         console.error('Failed to perform periodic position write:', err);
       });
     }, 60000); // 60 seconds

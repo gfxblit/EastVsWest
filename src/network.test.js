@@ -889,16 +889,14 @@ describe('Network', () => {
 
       const position = { x: 100, y: 200 };
       const rotation = 1.5;
-      const health = 85;
 
-      await network.writePositionToDB(position, rotation, health);
+      await network.writePositionToDB(position, rotation);
 
       expect(mockSupabaseClient.from).toHaveBeenCalledWith('session_players');
       expect(mockUpdate).toHaveBeenCalledWith({
         position_x: 100,
         position_y: 200,
         rotation: 1.5,
-        health: 85,
       });
     });
 
@@ -918,7 +916,7 @@ describe('Network', () => {
         update: mockUpdate
       }));
 
-      await network.writePositionToDB({ x: 50, y: 75 }, 0.5, 90);
+      await network.writePositionToDB({ x: 50, y: 75 }, 0.5);
 
       expect(mockEq1).toHaveBeenCalledWith('session_id', 'test-session-id');
       expect(mockEq2).toHaveBeenCalledWith('player_id', MOCK_HOST_ID);
@@ -936,7 +934,7 @@ describe('Network', () => {
         })
       }));
 
-      await network.writePositionToDB({ x: 100, y: 200 }, 0, 100);
+      await network.writePositionToDB({ x: 100, y: 200 }, 0);
 
       expect(consoleErrorSpy).toHaveBeenCalledWith(
         'Failed to write position to DB:',
@@ -962,7 +960,7 @@ describe('Network', () => {
     });
 
     it('should start interval for periodic position writes', () => {
-      network.startPeriodicPositionWrite({ x: 100, y: 200 }, 0, 100);
+      network.startPeriodicPositionWrite({ x: 100, y: 200 }, 0);
 
       expect(network.positionWriteInterval).toBeDefined();
     });
@@ -972,9 +970,8 @@ describe('Network', () => {
 
       const positionGetter = () => ({ x: 100, y: 200 });
       const rotationGetter = () => 0;
-      const healthGetter = () => 100;
 
-      network.startPeriodicPositionWrite(positionGetter, rotationGetter, healthGetter);
+      network.startPeriodicPositionWrite(positionGetter, rotationGetter);
 
       // Fast-forward time by 60 seconds
       jest.advanceTimersByTime(60000);
@@ -987,10 +984,10 @@ describe('Network', () => {
     });
 
     it('should not start multiple intervals if already running', () => {
-      network.startPeriodicPositionWrite(() => ({ x: 100, y: 200 }), () => 0, () => 100);
+      network.startPeriodicPositionWrite(() => ({ x: 100, y: 200 }), () => 0);
       const firstInterval = network.positionWriteInterval;
 
-      network.startPeriodicPositionWrite(() => ({ x: 100, y: 200 }), () => 0, () => 100);
+      network.startPeriodicPositionWrite(() => ({ x: 100, y: 200 }), () => 0);
       const secondInterval = network.positionWriteInterval;
 
       expect(firstInterval).toBe(secondInterval);
@@ -1008,7 +1005,7 @@ describe('Network', () => {
     });
 
     it('should stop periodic position write interval', () => {
-      network.startPeriodicPositionWrite(() => ({ x: 100, y: 200 }), () => 0, () => 100);
+      network.startPeriodicPositionWrite(() => ({ x: 100, y: 200 }), () => 0);
       expect(network.positionWriteInterval).toBeDefined();
 
       network.stopPeriodicPositionWrite();

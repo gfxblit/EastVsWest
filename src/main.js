@@ -416,10 +416,6 @@ class App {
         () => {
           const localPlayer = this.game.getLocalPlayer();
           return localPlayer ? localPlayer.rotation : 0;
-        },
-        () => {
-          const localPlayer = this.game.getLocalPlayer();
-          return localPlayer ? localPlayer.health : 100;
         }
       );
     }
