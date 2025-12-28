@@ -451,4 +451,104 @@ describe('Game', () => {
       expect(localPlayer).toBe(game.localPlayer);
     });
   });
+
+  describe('Player Rotation', () => {
+    beforeEach(() => {
+      game.init();
+    });
+
+    describe('Rotation from Movement', () => {
+      test('WhenMovingDown_ShouldSetRotationToSouth', () => {
+        game.localPlayer.velocity = { x: 0, y: 100 };
+        game.updateLocalPlayer(0.016);
+        expect(game.localPlayer.rotation).toBeCloseTo(Math.PI); // 180 degrees
+      });
+
+      test('WhenMovingUp_ShouldSetRotationToNorth', () => {
+        game.localPlayer.velocity = { x: 0, y: -100 };
+        game.updateLocalPlayer(0.016);
+        expect(game.localPlayer.rotation).toBeCloseTo(0); // 0 degrees
+      });
+
+      test('WhenMovingRight_ShouldSetRotationToEast', () => {
+        game.localPlayer.velocity = { x: 100, y: 0 };
+        game.updateLocalPlayer(0.016);
+        expect(game.localPlayer.rotation).toBeCloseTo(Math.PI / 2); // 90 degrees
+      });
+
+      test('WhenMovingLeft_ShouldSetRotationToWest', () => {
+        game.localPlayer.velocity = { x: -100, y: 0 };
+        game.updateLocalPlayer(0.016);
+        expect(game.localPlayer.rotation).toBeCloseTo(3 * Math.PI / 2); // 270 degrees
+      });
+
+      test('WhenMovingDownRight_ShouldSetRotationToSouthEast', () => {
+        game.localPlayer.velocity = { x: 100, y: 100 };
+        game.updateLocalPlayer(0.016);
+        expect(game.localPlayer.rotation).toBeCloseTo(3 * Math.PI / 4); // 135 degrees
+      });
+
+      test('WhenMovingUpRight_ShouldSetRotationToNorthEast', () => {
+        game.localPlayer.velocity = { x: 100, y: -100 };
+        game.updateLocalPlayer(0.016);
+        expect(game.localPlayer.rotation).toBeCloseTo(Math.PI / 4); // 45 degrees
+      });
+
+      test('WhenNotMoving_ShouldKeepPreviousRotation', () => {
+        game.localPlayer.rotation = Math.PI / 2; // East
+        game.localPlayer.velocity = { x: 0, y: 0 };
+        game.updateLocalPlayer(0.016);
+        expect(game.localPlayer.rotation).toBeCloseTo(Math.PI / 2); // Should remain East
+      });
+    });
+
+    describe('Rotation from Aim Direction', () => {
+      test('WhenAimingWithMouse_ShouldOverrideRotation', () => {
+        // Player at center of world
+        game.localPlayer.x = 500;
+        game.localPlayer.y = 500;
+        game.localPlayer.rotation = 0; // Initially facing north
+
+        // Aiming to the right (east)
+        const inputState = { moveX: 0, moveY: 0, aimX: 600, aimY: 500 };
+        game.handleInput(inputState);
+
+        expect(game.localPlayer.rotation).toBeCloseTo(Math.PI / 2); // 90 degrees
+      });
+
+      test('WhenAimingDown_ShouldSetRotationToSouth', () => {
+        game.localPlayer.x = 500;
+        game.localPlayer.y = 500;
+
+        const inputState = { moveX: 0, moveY: 0, aimX: 500, aimY: 600 };
+        game.handleInput(inputState);
+
+        expect(game.localPlayer.rotation).toBeCloseTo(Math.PI); // 180 degrees
+      });
+
+      test('WhenMovingAndAiming_ShouldUseAimRotation', () => {
+        game.localPlayer.x = 500;
+        game.localPlayer.y = 500;
+        game.localPlayer.velocity = { x: 100, y: 0 }; // Moving right
+
+        // Aiming down (should override movement rotation)
+        const inputState = { moveX: 1, moveY: 0, aimX: 500, aimY: 600 };
+        game.handleInput(inputState);
+
+        expect(game.localPlayer.rotation).toBeCloseTo(Math.PI); // 180 degrees (aim direction, not movement)
+      });
+
+      test('WhenAimAtSamePosition_ShouldKeepCurrentRotation', () => {
+        game.localPlayer.x = 500;
+        game.localPlayer.y = 500;
+        game.localPlayer.rotation = Math.PI / 4; // NE
+
+        // Aiming at exact player position
+        const inputState = { moveX: 0, moveY: 0, aimX: 500, aimY: 500 };
+        game.handleInput(inputState);
+
+        expect(game.localPlayer.rotation).toBeCloseTo(Math.PI / 4); // Should keep current
+      });
+    });
+  });
 });

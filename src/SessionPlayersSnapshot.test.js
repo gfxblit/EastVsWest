@@ -267,7 +267,6 @@ describe('SessionPlayersSnapshot (Built on Network)', () => {
         type: 'position_update',
         from: TEST_PLAYER_ID,
         data: {
-          player_id: TEST_PLAYER_ID,
           position_x: 300,
           position_y: 400,
           rotation: 1.57,
@@ -337,7 +336,6 @@ describe('SessionPlayersSnapshot (Built on Network)', () => {
         type: 'position_update',
         from: 'unknown-player-id',
         data: {
-          player_id: 'unknown-player-id',
           position_x: 300,
           position_y: 400,
         },

@@ -114,8 +114,19 @@ export class SessionPlayersSnapshot {
    */
   #handleBroadcast(message) {
     if (message.type === 'position_update') {
-      // Pass the full message to preserve 'from' field for player_id lookup
-      this.#handlePositionUpdate({ ...message.data, from: message.from });
+      this.#handlePositionUpdate({
+        ...message.data,
+        player_id: message.from,
+      });
+    }
+    // Handle position_broadcast (batched updates from host)
+    else if (message.type === 'position_broadcast') {
+      const { updates } = message.data;
+      if (updates && Array.isArray(updates)) {
+        updates.forEach(update => {
+          this.#handlePositionUpdate(update);
+        });
+      }
     }
   }
 
