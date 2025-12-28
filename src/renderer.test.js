@@ -30,8 +30,10 @@ describe('Renderer', () => {
     global.Image = jest.fn(() => {
       return {
         onload: null,
+        onerror: null,
         src: '',
         complete: false,
+        naturalWidth: 0, // Default to 0, tests can override
       };
     });
 
@@ -447,6 +449,7 @@ describe('Renderer', () => {
       for (let i = 0; i < 8; i++) {
         renderer.directionalImages[i] = {
           complete: true,
+          naturalWidth: 100, // Valid image
           width: 96,
           height: 96,
           src: `/white-male-${i}.png`,
@@ -583,6 +586,7 @@ describe('Renderer', () => {
         for (let i = 0; i < 8; i++) {
           renderer.directionalImages[i] = {
             complete: true,
+            naturalWidth: 100,
             width: 96,
             height: 96,
             src: `/white-male-${i}.png`,
