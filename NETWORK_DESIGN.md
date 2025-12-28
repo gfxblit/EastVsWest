@@ -36,7 +36,7 @@ A core pattern for **Host-Authoritative** actions (combat, item pickups, game st
 
 ### Authority Distribution
 
-- **Client-Authoritative**: Player movement, session joining (lobby phase), player position/health DB writes
+- **Client-Authoritative**: Player movement, session joining (lobby phase), player position DB writes
 - **Host-Authoritative**: Item pickups, combat interactions, game state changes, zone progression, player eviction (max count enforcement)
 
 ### Technology Stack
@@ -913,18 +913,30 @@ HOST (Every 5 seconds)
 
 ### Client Position DB Writes
 
-Each client writes their own position, rotation, and health to the database periodically to ensure data persistence:
+Each client writes their own position and rotation to the database periodically:
 
-- **Frequency**: Every 60 seconds (same as SessionPlayersSnapshot refresh rate)
+- **Frequency**: Every 60 seconds
 - **Authority**: Client-authoritative (each client writes their own position)
-- **Data Written**: `position_x`, `position_y`, `rotation`, `health`
-- **Purpose**:
-  - Persist player state for reconnection scenarios
-  - Provide snapshot data for late-joining players
-  - Enable post-game analytics and replay
-  - Keep DB state synchronized with game state
-- **Implementation**: `Network.startPeriodicPositionWrite()` method with getter functions for position, rotation, and health
-- **Note**: Real-time position updates continue to use the broadcast system (20Hz) for smooth gameplay. DB writes are for persistence only.
+- **Data Written**: `position_x`, `position_y`, `rotation`
+- **Purpose**: Persist state for reconnection, late-join, analytics
+- **Implementation**: `Network.startPeriodicPositionWrite()`
+- **Note**: Real-time updates use broadcast (20Hz). DB writes are for persistence only.
+
+**Health Persistence**: Health is NOT written by clients. Health is host-authoritative and will be persisted by the host via Network.js when combat is implemented.
+
+### Host Health Persistence (FUTURE)
+
+Health is **HOST-AUTHORITATIVE**:
+
+- **Authority**: Only host writes health to database
+- **Triggers**: Combat damage, zone damage, healing (host calculates all)
+- **Implementation**: NOT YET IMPLEMENTED
+- **Planned Approach**:
+  - Combat system calls `Network.writeHealthToDB(playerId, newHealth)`
+  - Host validates and persists health changes
+  - Host broadcasts via combat_event or position_broadcast
+  - Clients update SessionPlayersSnapshot in-memory only
+  - SessionPlayersSnapshot does NOT write health to database
 
 ### Scalability Considerations
 

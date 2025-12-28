@@ -415,6 +415,32 @@ export class Network extends EventEmitter {
     }
   }
 
+  // FUTURE: Host-authoritative health persistence (not yet implemented)
+  // Health changes are calculated by the host (combat, zone damage, healing)
+  // and persisted via this method, NOT by clients or SessionPlayersSnapshot
+  //
+  // async writeHealthToDB(playerId, health) {
+  //   if (!this.isHost) {
+  //     console.error('Only host can write health updates to DB');
+  //     return;
+  //   }
+  //
+  //   if (!this.supabase || !this.sessionId) {
+  //     console.error('Cannot write health to DB: missing supabase or sessionId');
+  //     return;
+  //   }
+  //
+  //   const { error } = await this.supabase
+  //     .from('session_players')
+  //     .update({ health: health })
+  //     .eq('session_id', this.sessionId)
+  //     .eq('player_id', playerId);
+  //
+  //   if (error) {
+  //     console.error('Failed to write health to DB:', error.message);
+  //   }
+  // }
+
   startPeriodicPositionWrite(positionGetter, rotationGetter, healthGetter) {
     if (this.positionWriteInterval) return; // Already running
 

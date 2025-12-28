@@ -1,9 +1,13 @@
 /**
  * SessionPlayersSnapshot
  *
- * Maintains a local synchronized copy of players in a specific game session.
- * Built on top of Network layer - subscribes to Network events instead of managing channels directly.
- * Syncs via database events, ephemeral WebSocket broadcasts, and periodic refreshes.
+ * READ-ONLY: Maintains a local synchronized copy of players in a game session.
+ * Syncs via database events, WebSocket broadcasts, and periodic refreshes.
+ *
+ * IMPORTANT: This class does NOT write to the database. All database writes
+ * are handled by Network.js according to the authority model:
+ * - Client-authoritative: position, rotation
+ * - Host-authoritative: health, combat, game state
  */
 export class SessionPlayersSnapshot {
   constructor(network, sessionId, options = {}) {
@@ -198,25 +202,10 @@ export class SessionPlayersSnapshot {
       player.rotation = payload.rotation;
     }
 
-    // Update health
+    // Update health (in-memory only)
+    // NOTE: Health persistence is handled by Network.js (host authority)
     if (payload.health !== undefined) {
-      const oldHealth = player.health;
       player.health = payload.health;
-
-      // If host and health changed, persist to DB
-      // We only persist if health changed to avoid unnecessary DB writes
-      if (this.network.isHost && oldHealth !== player.health) {
-        this.network.supabase
-          .from('session_players')
-          .update({ health: player.health })
-          .eq('session_id', this.sessionId)
-          .eq('player_id', player_id)
-          .then(({ error }) => {
-            if (error) {
-              console.error(`Failed to persist health for player ${player_id}:`, error.message);
-            }
-          });
-      }
     }
   }
 
@@ -262,36 +251,6 @@ export class SessionPlayersSnapshot {
    */
   getPlayers() {
     return this.players;
-  }
-
-  /**
-   * Add a player to the session
-   * @param {Object} playerData - Player data (player_id, player_name, is_host, etc.)
-   */
-  async addPlayer(playerData) {
-    try {
-      // Insert with session_id
-      const { data, error } = await this.network.supabase
-        .from('session_players')
-        .insert({
-          session_id: this.sessionId,
-          ...playerData,
-        })
-        .select()
-        .single();
-
-      if (error) {
-        console.error(`Failed to add player: ${error.message}`);
-        return;
-      }
-
-      // Add to local map
-      if (data) {
-        this.players.set(data.player_id, data);
-      }
-    } catch (err) {
-      console.error(`Failed to add player: ${err.message}`);
-    }
   }
 
   /**
