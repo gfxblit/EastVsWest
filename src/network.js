@@ -360,7 +360,6 @@ export class Network extends EventEmitter {
   }
 
   disconnect() {
-    this.stopPositionBroadcasting();
     this.stopPeriodicPositionWrite();
     if (this.channel) {
       this.supabase.removeChannel(this.channel);

@@ -114,7 +114,8 @@ export class SessionPlayersSnapshot {
    */
   #handleBroadcast(message) {
     if (message.type === 'position_update') {
-      this.#handlePositionUpdate(message.data);
+      // Pass the full message to preserve 'from' field for player_id lookup
+      this.#handlePositionUpdate({ ...message.data, from: message.from });
     }
   }
 
