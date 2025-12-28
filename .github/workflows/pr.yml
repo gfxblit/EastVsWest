@@ -140,7 +140,8 @@ jobs:
 
       - name: Commit and push preview
         run: |
-          git add pr-${{ steps.pr.outputs.number }}
+          touch .nojekyll
+          git add pr-${{ steps.pr.outputs.number }} .nojekyll
           git commit -m "Deploy preview for PR #${{ steps.pr.outputs.number }}" || echo "No changes to commit"
           git push origin gh-pages
 
@@ -175,9 +176,9 @@ jobs:
           ref: gh-pages
           fetch-depth: 0
 
-      - name: Clean existing files (except .git)
+      - name: Clean existing files (except .git and pr previews)
         run: |
-          ls -A | grep -v '^\.git$' | xargs rm -rf
+          ls -A | grep -v '^\.git$' | grep -v '^pr-' | xargs rm -rf
 
       - name: Download Build Artifact
         uses: actions/download-artifact@v4
@@ -192,6 +193,7 @@ jobs:
 
       - name: Commit and push production
         run: |
+          touch .nojekyll
           git add .
           git commit -m "Deploy production build from ${{ github.sha }}" || echo "No changes to commit"
           git push origin gh-pages
