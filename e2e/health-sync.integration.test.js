@@ -60,6 +60,9 @@ describe('Health Synchronization Integration', () => {
 
   afterEach(async () => {
     if (testSessionId) {
+      // Explicitly cleanup players first (though cascade delete should handle it)
+      await supabaseClient.from('session_players').delete().match({ session_id: testSessionId });
+      // Cleanup the session
       await supabaseClient.from('game_sessions').delete().match({ id: testSessionId });
       testSessionId = null;
     }
