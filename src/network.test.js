@@ -798,12 +798,36 @@ describe('Network', () => {
       const payload = {
         from: 'player-1',
         data: {
-          position: { x: 2000, y: 100 }, // x is out of bounds
+          position: { x: 3000, y: 100 }, // x is out of bounds (WORLD.WIDTH is 2400)
           rotation: 0,
           velocity: { x: 10, y: 10 },
         },
       };
       expect(network._isValidPositionUpdate(payload)).toBe(false);
+    });
+
+    it('should reject an update with invalid health', () => {
+      const payload = {
+        from: 'player-1',
+        data: {
+          position: { x: 100, y: 100 },
+          rotation: 0,
+          velocity: { x: 10, y: 10 },
+          health: -10, // Invalid health
+        },
+      };
+      expect(network._isValidPositionUpdate(payload)).toBe(false);
+
+      const payload2 = {
+        from: 'player-1',
+        data: {
+          position: { x: 100, y: 100 },
+          rotation: 0,
+          velocity: { x: 10, y: 10 },
+          health: 9999, // Invalid health > MAX_HEALTH
+        },
+      };
+      expect(network._isValidPositionUpdate(payload2)).toBe(false);
     });
 
     it('should reject an update that teleports the player', () => {

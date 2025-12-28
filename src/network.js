@@ -272,14 +272,16 @@ export class Network extends EventEmitter {
     }
 
     // Optional health validation
-    if (health !== undefined && typeof health !== 'number') {
-      return false;
+    if (health !== undefined) {
+      if (typeof health !== 'number' || health < 0 || health > CONFIG.PLAYER.MAX_HEALTH) {
+        return false;
+      }
     }
 
     // 2. Bounds checking
     if (
-      position.x < 0 || position.x > CONFIG.CANVAS.WIDTH ||
-      position.y < 0 || position.y > CONFIG.CANVAS.HEIGHT
+      position.x < 0 || position.x > CONFIG.WORLD.WIDTH ||
+      position.y < 0 || position.y > CONFIG.WORLD.HEIGHT
     ) {
       return false;
     }
