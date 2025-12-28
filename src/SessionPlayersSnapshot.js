@@ -200,7 +200,23 @@ export class SessionPlayersSnapshot {
 
     // Update health
     if (payload.health !== undefined) {
+      const oldHealth = player.health;
       player.health = payload.health;
+
+      // If host and health changed, persist to DB
+      // We only persist if health changed to avoid unnecessary DB writes
+      if (this.network.isHost && oldHealth !== player.health) {
+        this.network.supabase
+          .from('session_players')
+          .update({ health: player.health })
+          .eq('session_id', this.sessionId)
+          .eq('player_id', player_id)
+          .then(({ error }) => {
+            if (error) {
+              console.error(`Failed to persist health for player ${player_id}:`, error.message);
+            }
+          });
+      }
     }
   }
 

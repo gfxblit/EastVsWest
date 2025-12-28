@@ -371,6 +371,9 @@ export class Network extends EventEmitter {
       payload: message,
     });
 
+    // Emit locally for host's own components (like SessionPlayersSnapshot)
+    this.emit('position_broadcast', message);
+
     // Clear the buffer after broadcasting
     this.positionBuffer.clear();
   }

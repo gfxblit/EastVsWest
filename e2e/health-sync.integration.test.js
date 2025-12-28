@@ -10,7 +10,7 @@ describe('Health Synchronization Integration', () => {
   let supabaseClient;
   let hostUser, player1User, player2User;
   let hostNetwork, player1Network, player2Network;
-  let player2Snapshot;
+  let hostSnapshot, player2Snapshot;
   let testSessionId;
 
   if (!supabaseUrl || !supabaseAnonKey) {
@@ -52,6 +52,7 @@ describe('Health Synchronization Integration', () => {
     if (hostNetwork) hostNetwork.disconnect();
     if (player1Network) player1Network.disconnect();
     if (player2Network) player2Network.disconnect();
+    if (hostSnapshot) hostSnapshot.destroy();
     if (player2Snapshot) player2Snapshot.destroy();
     
     // Cleanup users (optional, usually handled by Supabase cleanup)
@@ -73,6 +74,10 @@ describe('Health Synchronization Integration', () => {
     const { session: hostSession } = await hostNetwork.hostGame('HostPlayer');
     testSessionId = hostSession.id;
     const joinCode = hostSession.join_code;
+
+    // 1.5. Initialize Snapshot on Host
+    hostSnapshot = new SessionPlayersSnapshot(hostNetwork, hostSession.id);
+    await hostSnapshot.ready();
 
     // 2. Players join
     await player1Network.joinGame(joinCode, 'Player1');
@@ -109,5 +114,68 @@ describe('Health Synchronization Integration', () => {
 
     const p1 = player2Snapshot.getPlayers().get(player1User.id);
     expect(p1.health).toBe(healthValue);
+
+    // 8. Verify health is persisted to the database
+    // The host should have persisted this update
+    await waitFor(async () => {
+      const { data: dbData, error: dbError } = await hostNetwork.supabase
+        .from('session_players')
+        .select('health')
+        .eq('session_id', testSessionId)
+        .eq('player_id', player1User.id)
+        .single();
+      
+      return !dbError && dbData && dbData.health === healthValue;
+    }, 5000, 500);
+
+    const { data: finalDbData } = await hostNetwork.supabase
+      .from('session_players')
+      .select('health')
+      .eq('session_id', testSessionId)
+      .eq('player_id', player1User.id)
+      .single();
+    expect(finalDbData.health).toBe(healthValue);
   }, 30000); // Increased timeout for network ops
+
+  test('host should persist its own health updates to the database', async () => {
+    // 1. Host creates game
+    const { session: hostSession } = await hostNetwork.hostGame('HostPlayer');
+    testSessionId = hostSession.id;
+
+    // 2. Initialize Snapshot on Host
+    hostSnapshot = new SessionPlayersSnapshot(hostNetwork, hostSession.id);
+    await hostSnapshot.ready();
+
+    // 3. Host sends position_update with health
+    const healthValue = 75;
+    hostNetwork.sendPositionUpdate({
+      position: { x: 200, y: 200 },
+      rotation: 0,
+      velocity: { x: 0, y: 0 },
+      health: healthValue
+    });
+
+    // 4. Host broadcasts (this triggers local emit)
+    hostNetwork.broadcastPositionUpdates();
+
+    // 5. Verify health is persisted to the database
+    await waitFor(async () => {
+      const { data: dbData, error: dbError } = await hostNetwork.supabase
+        .from('session_players')
+        .select('health')
+        .eq('session_id', testSessionId)
+        .eq('player_id', hostUser.id)
+        .single();
+      
+      return !dbError && dbData && dbData.health === healthValue;
+    }, 5000, 500);
+
+    const { data: finalDbData } = await hostNetwork.supabase
+      .from('session_players')
+      .select('health')
+      .eq('session_id', testSessionId)
+      .eq('player_id', hostUser.id)
+      .single();
+    expect(finalDbData.health).toBe(healthValue);
+  }, 30000);
 });
