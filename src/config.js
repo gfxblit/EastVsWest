@@ -181,4 +181,9 @@ export const CONFIG = {
     POSITION_UPDATE_INTERVAL_MS: 50, // interval between position updates (1000ms / 20Hz = 50ms)
     INTERPOLATION_DELAY_MS: 100,
   },
+
+  // Asset Settings
+  ASSETS: {
+    BASE_URL: import.meta.env?.BASE_URL || '/',
+  },
 };

@@ -32,7 +32,13 @@ export class Renderer {
     this.bgImage.onerror = (e) => {
       console.error('Failed to load background image:', this.bgImage.src, e);
     };
-    this.bgImage.src = '/game-background.png';
+    
+    // Construct path using configured BASE_URL
+    const baseUrl = CONFIG.ASSETS.BASE_URL;
+    // Ensure baseUrl ends with /
+    const normalizedBase = baseUrl.endsWith('/') ? baseUrl : `${baseUrl}/`;
+    
+    this.bgImage.src = `${normalizedBase}game-background.png`;
 
     // Load directional player images (8 frames)
     for (let i = 0; i < 8; i++) {
@@ -40,7 +46,7 @@ export class Renderer {
       img.onerror = (e) => {
         console.error(`Failed to load player image frame ${i}:`, img.src, e);
       };
-      img.src = `/white-male-${i}.png`;
+      img.src = `${normalizedBase}white-male-${i}.png`;
       this.directionalImages[i] = img;
     }
 

@@ -103,6 +103,20 @@ describe('Renderer', () => {
       expect(ctx.createPattern).toHaveBeenCalledWith(newRenderer.bgImage, 'repeat');
       expect(newRenderer.bgPattern).toBe('mock-pattern');
     });
+    test('WhenBaseUrlIsPresent_ShouldPrefixImagePaths', () => {
+      // Temporarily change base URL in config
+      const originalBase = CONFIG.ASSETS.BASE_URL;
+      CONFIG.ASSETS.BASE_URL = '/custom-base/';
+      
+      const newRenderer = new Renderer(canvas);
+      newRenderer.init();
+      
+      // Expect paths to be prefixed with custom base
+      expect(newRenderer.bgImage.src).toContain('/custom-base/game-background.png');
+      
+      // Restore config
+      CONFIG.ASSETS.BASE_URL = originalBase;
+    });
   });
 
   describe('resizeCanvas', () => {
