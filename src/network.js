@@ -258,7 +258,7 @@ export class Network extends EventEmitter {
 
   _isValidPositionUpdate(payload) {
     const { from, data } = payload;
-    const { position, rotation, velocity } = data;
+    const { position, rotation, velocity, health } = data;
 
     // 1. Type and structure validation
     if (
@@ -268,6 +268,11 @@ export class Network extends EventEmitter {
       typeof velocity?.x !== 'number' ||
       typeof velocity?.y !== 'number'
     ) {
+      return false;
+    }
+
+    // Optional health validation
+    if (health !== undefined && typeof health !== 'number') {
       return false;
     }
 

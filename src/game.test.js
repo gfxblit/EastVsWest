@@ -309,8 +309,22 @@ describe('Game', () => {
     beforeEach(() => {
       mockPlayersSnapshot = {
         getPlayers: jest.fn().mockReturnValue(new Map([
-          ['player-1', { player_id: 'player-1', player_name: 'Alice', position_x: 100, position_y: 200, rotation: 0, health: 100 }],
-          ['player-2', { player_id: 'player-2', player_name: 'Bob', position_x: 300, position_y: 400, rotation: 1.5, health: 80 }],
+          ['player-1', {
+            player_id: 'player-1',
+            player_name: 'Alice',
+            position_x: CONFIG.WORLD.WIDTH / 2,
+            position_y: CONFIG.WORLD.HEIGHT / 2,
+            rotation: 0,
+            health: 100
+          }],
+          ['player-2', {
+            player_id: 'player-2',
+            player_name: 'Bob',
+            position_x: CONFIG.WORLD.WIDTH / 2 + 50,
+            position_y: CONFIG.WORLD.HEIGHT / 2 + 50,
+            rotation: 1.5,
+            health: 80
+          }],
         ])),
       };
 
@@ -326,8 +340,8 @@ describe('Game', () => {
       expect(game.localPlayer).toBeDefined();
       expect(game.localPlayer.id).toBe('player-1');
       expect(game.localPlayer.name).toBe('Alice');
-      expect(game.localPlayer.x).toBe(100);
-      expect(game.localPlayer.y).toBe(200);
+      expect(game.localPlayer.x).toBe(CONFIG.WORLD.WIDTH / 2);
+      expect(game.localPlayer.y).toBe(CONFIG.WORLD.HEIGHT / 2);
       expect(game.localPlayer.rotation).toBe(0);
       expect(game.localPlayer.health).toBe(100);
     });
@@ -339,7 +353,7 @@ describe('Game', () => {
       game.handleInput(inputState);
       game.update(0.1); // Update for 0.1 seconds
 
-      expect(game.localPlayer.x).toBe(100 + CONFIG.PLAYER.BASE_MOVEMENT_SPEED * 0.1);
+      expect(game.localPlayer.x).toBe(CONFIG.WORLD.WIDTH / 2 + CONFIG.PLAYER.BASE_MOVEMENT_SPEED * 0.1);
     });
 
     test('WhenLocalPlayerMovesInMultiplayer_ShouldSendPositionUpdate', () => {
@@ -351,8 +365,8 @@ describe('Game', () => {
 
       expect(mockNetwork.sendPositionUpdate).toHaveBeenCalled();
       const call = mockNetwork.sendPositionUpdate.mock.calls[0][0];
-      expect(call.position.x).toBeCloseTo(120, 1); // 100 + 200 * 0.1
-      expect(call.position.y).toBe(200);
+      expect(call.position.x).toBeCloseTo(CONFIG.WORLD.WIDTH / 2 + 20, 1); // center + 200 * 0.1
+      expect(call.position.y).toBe(CONFIG.WORLD.HEIGHT / 2);
     });
 
     test('WhenLocalPlayerPositionUnchanged_ShouldNotSendUpdate', () => {
@@ -361,8 +375,22 @@ describe('Game', () => {
       // Don't move the player
       game.update(0.016);
 
-      // Should not send position update since position didn't change
+      // Should not send position update since position/health didn't change
       expect(mockNetwork.sendPositionUpdate).not.toHaveBeenCalled();
+    });
+
+    test('WhenLocalPlayerHealthChanges_ShouldSendUpdateEvenIfPositionUnchanged', () => {
+      game.init(mockPlayersSnapshot, mockNetwork);
+
+      // Manually change health
+      game.localPlayer.health = 90;
+      
+      game.update(0.016);
+
+      // Should send update because health changed
+      expect(mockNetwork.sendPositionUpdate).toHaveBeenCalled();
+      const call = mockNetwork.sendPositionUpdate.mock.calls[0][0];
+      expect(call.health).toBe(90);
     });
 
     test('WhenLocalPlayerPositionChangesTinyAmount_ShouldNotSendUpdate', () => {
@@ -379,19 +407,33 @@ describe('Game', () => {
 
     test('WhenSnapshotUpdated_ShouldNotAffectLocalPlayer', () => {
       game.init(mockPlayersSnapshot, mockNetwork);
-      expect(game.localPlayer.x).toBe(100);
+      expect(game.localPlayer.x).toBe(CONFIG.WORLD.WIDTH / 2);
 
       // Update snapshot with different position for local player
       mockPlayersSnapshot.getPlayers.mockReturnValue(new Map([
-        ['player-1', { player_id: 'player-1', player_name: 'Alice', position_x: 999, position_y: 999, rotation: 0.5, health: 90 }],
-        ['player-2', { player_id: 'player-2', player_name: 'Bob', position_x: 350, position_y: 450, rotation: 2.0, health: 70 }],
+        ['player-1', {
+          player_id: 'player-1',
+          player_name: 'Alice',
+          position_x: 999,
+          position_y: 999,
+          rotation: 0.5,
+          health: 90
+        }],
+        ['player-2', {
+          player_id: 'player-2',
+          player_name: 'Bob',
+          position_x: 350,
+          position_y: 450,
+          rotation: 2.0,
+          health: 70
+        }],
       ]));
 
       game.update(0.016);
 
       // Local player position should NOT be affected by snapshot changes
-      expect(game.localPlayer.x).toBe(100);
-      expect(game.localPlayer.y).toBe(200);
+      expect(game.localPlayer.x).toBe(CONFIG.WORLD.WIDTH / 2);
+      expect(game.localPlayer.y).toBe(CONFIG.WORLD.HEIGHT / 2);
     });
   });
 

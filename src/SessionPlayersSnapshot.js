@@ -197,6 +197,11 @@ export class SessionPlayersSnapshot {
     if (payload.rotation !== undefined) {
       player.rotation = payload.rotation;
     }
+
+    // Update health
+    if (payload.health !== undefined) {
+      player.health = payload.health;
+    }
   }
 
   /**

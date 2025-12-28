@@ -343,7 +343,8 @@ We keep the lobby in sync by treating the database as the single source of truth
   data: {
     position: { x: 123.45, y: 678.90 },
     rotation: 1.57,  // radians
-    velocity: { x: 1.0, y: 0.0 }
+    velocity: { x: 1.0, y: 0.0 },
+    health: 95.5
   }
 }
 ```
@@ -360,7 +361,8 @@ We keep the lobby in sync by treating the database as the single source of truth
         player_id: 'uuid1',
         position: { x: 123.45, y: 678.90 },
         rotation: 1.57,
-        velocity: { x: 1.0, y: 0.0 }
+        velocity: { x: 1.0, y: 0.0 },
+        health: 95.5
       },
       // ... more player updates
     ]
