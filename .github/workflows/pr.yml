@@ -140,8 +140,7 @@ jobs:
 
       - name: Commit and push preview
         run: |
-          touch .nojekyll
-          git add pr-${{ steps.pr.outputs.number }} .nojekyll
+          git add pr-${{ steps.pr.outputs.number }}
           git commit -m "Deploy preview for PR #${{ steps.pr.outputs.number }}" || echo "No changes to commit"
           git push origin gh-pages
 
@@ -193,7 +192,6 @@ jobs:
 
       - name: Commit and push production
         run: |
-          touch .nojekyll
           git add .
           git commit -m "Deploy production build from ${{ github.sha }}" || echo "No changes to commit"
           git push origin gh-pages
