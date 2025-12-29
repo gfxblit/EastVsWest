@@ -175,9 +175,9 @@ jobs:
           ref: gh-pages
           fetch-depth: 0
 
-      - name: Clean existing files (except .git and pr previews)
+      - name: Clean existing files (except .git)
         run: |
-          ls -A | grep -v '^\.git$' | grep -v '^pr-' | xargs rm -rf
+          ls -A | grep -v '^\.git$' | xargs rm -rf
 
       - name: Download Build Artifact
         uses: actions/download-artifact@v4
