@@ -31,7 +31,7 @@ A core pattern for **Host-Authoritative** actions (combat, item pickups, game st
 
 **Client-Authoritative** actions follow a **Tell-Broadcast** or **Self-Insert** model:
 
--   **Movement:** The **Client** moves locally and sends a `position_update` to the **Host**, who relays it.
+-   **Movement:** The **Client** moves locally and sends a `movement_update` directly to peers.
 -   **Joining:** The **Client** fetches the session via join code and self-inserts into `session_players`. The **Host** monitors the table to enforce `max_players` and reconcile state.
 
 ### Authority Distribution
@@ -115,7 +115,10 @@ CREATE TABLE session_players (
   -- Player state
   position_x REAL DEFAULT 0,
   position_y REAL DEFAULT 0,
+  velocity_x REAL DEFAULT 0,
+  velocity_y REAL DEFAULT 0,
   rotation REAL DEFAULT 0,
+  health REAL DEFAULT 100,
 
   -- Equipment (nullable - players start with no equipment)
   equipped_weapon VARCHAR(50),
@@ -239,13 +242,13 @@ To sync a local copy of the `session_players` Supabase table, we use a **Snapsho
 - DELETE handler must find player by `id` field before deleting from Map by `player_id`
 - Workaround: Maintain full player records in local Map to lookup by `id`
 
-#### Synchronization - Position Updates (Fast / Ephemeral, ~10 ms)
+#### Synchronization - Movement Updates (Fast / Ephemeral, ~10 ms)
 - **Source:** WebSocket broadcasts (in memory, not written to disk)
-- **Events:** High-frequency X/Y position updates
-- Listens to position update broadcasts on channel
-- Updates player position in Map **only if player exists in this session**
+- **Events:** High-frequency X/Y position and velocity updates
+- Listens to `movement_update` broadcasts on channel
+- Updates player position and velocity in Map **only if player exists in this session**
 - Does not write to DB (ephemeral)
-- **Timing**: Allow ~100ms delay after channel subscription before sending position broadcasts
+- **Timing**: Allow ~100ms delay after channel subscription before sending movement broadcasts
 
 #### Periodic Snapshotting
 - Refreshes snapshot every 60 seconds **querying only this session's players**
@@ -278,6 +281,8 @@ Each player in the Map has the same structure as a record in the `session_player
   is_alive: boolean,
   position_x: number,
   position_y: number,
+  velocity_x: number,
+  velocity_y: number,
   rotation: number,
   equipped_weapon: string | null,
   equipped_armor: string | null,
@@ -334,10 +339,10 @@ We keep the lobby in sync by treating the database as the single source of truth
 
 ##### 2. Movement Messages (Client-Authoritative)
 
-**CLIENT → HOST: `position_update`**
+**CLIENT → ALL (Broadcast): `movement_update`**
 ```javascript
 {
-  type: 'position_update',
+  type: 'movement_update',
   from: 'player_uuid',
   timestamp: 1703001234567,
   data: {
@@ -349,7 +354,7 @@ We keep the lobby in sync by treating the database as the single source of truth
 }
 ```
 
-**NOTE:** In the current simplified architecture, there is no `position_broadcast` message. All clients broadcast `position_update` directly to peers without host rebroadcasting.
+**NOTE:** In the current simplified architecture, there is no `movement_broadcast` message. All clients broadcast `movement_update` directly to peers without host rebroadcasting.
 
 ##### 3. Interaction Messages (Host-Authoritative)
 
@@ -636,7 +641,7 @@ HOST                          SUPABASE                      CLIENTS
  │                               │                              │
 ```
 
-### Detailed Data Flow: Position Update (Client-Authoritative)
+### Detailed Data Flow: Movement Update (Client-Authoritative)
 
 ```
 CLIENT A          SUPABASE CHANNEL          HOST              OTHER CLIENTS
@@ -645,30 +650,22 @@ CLIENT A          SUPABASE CHANNEL          HOST              OTHER CLIENTS
    │    (WASD input)    │                     │                    │
    │                    │                     │                    │
    │ 2. Publish update  │                     │                    │
-   ├──position_update──>│                     │                    │
-   │   (60 Hz)          │                     │                    │
+   ├──movement_update──>│                     │                    │
+   │   (20 Hz)          │                     │                    │
    │                    │                     │                    │
-   │                    │ 3. Forward to host  │                    │
-   │                    ├──position_update───>│                    │
+   │                    │ 3. Broadcast to all │                    │
+   │                    │<──movement_─────────┼───────────────────>│
+   │                    │   update            │                    │
    │                    │                     │                    │
-   │                    │                     │ 4. Update local    │
-   │                    │                     │    state for       │
-   │                    │                     │    player A        │
-   │                    │                     │                    │
-   │                    │ 5. Broadcast        │                    │
-   │                    │<──position_─────────┤                    │
-   │                    │   broadcast         │                    │
-   │                    │   (all positions)   │                    │
-   │                    │                     │                    │
-   │ 6. Receive update  │                     │ 7. Receive update  │
+   │ 4. Receive update  │                     │ 5. Receive update  │
    │    (confirmation)  │                     │    (other players) │
-   │<──position_────────┤                     ├──position_────────>│
-   │   broadcast        │                     │   broadcast        │
+   │<──movement_────────┤                     ├──movement_────────>│
+   │   update           │                     │   update           │
    │                    │                     │                    │
 ```
 
 **Frequency**: 20 Hz (every ~50ms)
-**Architecture**: Direct client broadcasting - each client broadcasts their own position updates directly to all peers without host intermediary or batching.
+**Architecture**: Direct client broadcasting - each client broadcasts their own movement updates directly to all peers without host intermediary or batching.
 
 ### Detailed Data Flow: Item Pickup (Host-Authoritative)
 
@@ -797,10 +794,10 @@ The host must maintain authoritative state and process:
    - Track all player stats (health, kills, equipment)
    - Track all item states (spawned, picked up, dropped)
 
-3. **Position Updates** (Client-Authoritative)
-   - Clients broadcast their own positions directly to all peers
+3. **Movement Updates** (Client-Authoritative)
+   - Clients broadcast their own movement updates (position, rotation, velocity) directly to all peers
    - No host validation or aggregation (trust-based model)
-   - Host treats position updates like any other client
+   - Host treats movement updates like any other client
 
 4. **Interaction Validation** (Host-Authoritative)
    - Validate item pickup requests (range, availability)
@@ -823,12 +820,12 @@ Each client (including the host's client instance) must:
 
 1. **Local Input Handling**
    - Capture user input (movement, attacks, pickup attempts)
-   - Immediately update local player position
-   - Broadcast position updates directly to all peers (20 Hz)
+   - Immediately update local player position and velocity
+   - Broadcast movement updates directly to all peers (20 Hz)
    - Send interaction requests to host (on-demand)
 
 2. **Remote State Rendering**
-   - Receive position updates from all other clients directly
+   - Receive movement updates from all other clients directly
    - Interpolate other players' positions for smooth rendering
    - Receive and apply interaction results from host (item pickups, combat)
    - Render game state (players, items, conflict zone)
@@ -872,7 +869,7 @@ HOST (Every 5 seconds)
 
 ### Latency & Client Prediction
 
-**Movement**: Clients immediately update their own position locally and broadcast updates directly to all peers. Each client is authoritative over their own position with no host validation or correction. This provides lowest latency but no anti-cheat protection.
+**Movement**: Clients immediately update their own position and velocity locally and broadcast updates directly to all peers. Each client is authoritative over their own movement with no host validation or correction. This provides lowest latency but no anti-cheat protection.
 
 **Interactions**: Clients can show optimistic UI feedback (e.g., item pickup animation) but must wait for host confirmation before actually applying the state change. If the host rejects the action, the client must rollback the optimistic update.
 
@@ -888,19 +885,20 @@ HOST (Every 5 seconds)
 | Session metadata | Database | Persistent, required for join code lookups |
 | Player list | Database + Channel | Database for persistence, Channel for real-time |
 | Player positions | Database + Channel | Database written periodically (60s) by each client, Channel for real-time broadcasts (20Hz) |
+| Player velocity | Database + Channel | Database written periodically (60s) by each client, Channel for real-time broadcasts (20Hz) |
 | Item states | Database + Channel | Database for authority, Channel for sync |
 | Combat events | Channel + Events log | Real-time sync, optional event log for debugging |
 | Game state changes | Database + Channel | Database for authority, Channel for sync |
 
-### Client Position DB Writes
+### Client Movement DB Writes
 
-Each client writes their own position and rotation to the database periodically:
+Each client writes their own position, velocity, and rotation to the database periodically:
 
 - **Frequency**: Every 60 seconds
-- **Authority**: Client-authoritative (each client writes their own position)
-- **Data Written**: `position_x`, `position_y`, `rotation`
+- **Authority**: Client-authoritative (each client writes their own movement)
+- **Data Written**: `position_x`, `position_y`, `velocity_x`, `velocity_y`, `rotation`
 - **Purpose**: Persist state for reconnection, late-join, analytics
-- **Implementation**: `Network.startPeriodicPositionWrite()`
+- **Implementation**: `Network.startPeriodicMovementWrite()`
 - **Note**: Real-time updates use broadcast (20Hz). DB writes are for persistence only.
 
 **Health Persistence**: Health is NOT written by clients. Health is host-authoritative and will be persisted by the host via Network.js when combat is implemented.
@@ -915,7 +913,7 @@ Health is **HOST-AUTHORITATIVE**:
 - **Planned Approach**:
   - Combat system calls `Network.writeHealthToDB(playerId, newHealth)`
   - Host validates and persists health changes
-  - Host broadcasts via combat_event or position_broadcast
+  - Host broadcasts via combat_event or movement_update
   - Clients update SessionPlayersSnapshot in-memory only
   - SessionPlayersSnapshot does NOT write health to database
 
@@ -989,7 +987,7 @@ Health is **HOST-AUTHORITATIVE**:
 │  COMBAT  │
 │          │  Main gameplay loop
 │          │
-│  Events: │  • position_update (20 Hz, direct client broadcast)
+│  Events: │  • movement_update (20 Hz, direct client broadcast)
 │          │  • item_pickup_request
 │          │  • item_pickup_result
 │          │  • attack_action
