@@ -25,20 +25,30 @@ export class Renderer {
     this.resizeCanvas();
 
     // Load background image
-    this.bgImage = new Image();
+    this.bgImage = this.createImage('game-background.png');
     this.bgImage.onload = () => {
       this.bgPattern = this.ctx.createPattern(this.bgImage, 'repeat');
     };
-    this.bgImage.src = '/game-background.png';
 
     // Load directional player images (8 frames)
     for (let i = 0; i < 8; i++) {
-      const img = new Image();
-      img.src = `/white-male-${i}.png`;
-      this.directionalImages[i] = img;
+      this.directionalImages[i] = this.createImage(`white-male-${i}.png`);
     }
 
     console.log('Renderer initialized');
+  }
+
+  createImage(filename) {
+    const img = new Image();
+    const baseUrl = CONFIG.ASSETS.BASE_URL;
+    // Ensure baseUrl ends with /
+    const normalizedBase = baseUrl.endsWith('/') ? baseUrl : `${baseUrl}/`;
+    
+    img.onerror = (e) => {
+      console.error(`Failed to load image: ${filename}`, img.src, e);
+    };
+    img.src = `${normalizedBase}${filename}`;
+    return img;
   }
 
   resizeCanvas() {
@@ -199,7 +209,7 @@ export class Renderer {
     const frame = this.getFrameFromRotation(player.rotation || 0);
     const img = this.directionalImages[frame];
 
-    if (img && img.complete) {
+    if (img && img.complete && img.naturalWidth > 0) {
       // Draw the directional image centered on player position
       const size = CONFIG.RENDER.PLAYER_RADIUS * 2;
       this.ctx.drawImage(

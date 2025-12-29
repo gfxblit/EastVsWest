@@ -30,8 +30,10 @@ describe('Renderer', () => {
     global.Image = jest.fn(() => {
       return {
         onload: null,
+        onerror: null,
         src: '',
         complete: false,
+        naturalWidth: 0, // Default to 0, tests can override
       };
     });
 
@@ -100,6 +102,20 @@ describe('Renderer', () => {
 
       expect(ctx.createPattern).toHaveBeenCalledWith(newRenderer.bgImage, 'repeat');
       expect(newRenderer.bgPattern).toBe('mock-pattern');
+    });
+    test('WhenBaseUrlIsPresent_ShouldPrefixImagePaths', () => {
+      // Temporarily change base URL in config
+      const originalBase = CONFIG.ASSETS.BASE_URL;
+      CONFIG.ASSETS.BASE_URL = '/custom-base/';
+      
+      const newRenderer = new Renderer(canvas);
+      newRenderer.init();
+      
+      // Expect paths to be prefixed with custom base
+      expect(newRenderer.bgImage.src).toContain('/custom-base/game-background.png');
+      
+      // Restore config
+      CONFIG.ASSETS.BASE_URL = originalBase;
     });
   });
 
@@ -447,6 +463,7 @@ describe('Renderer', () => {
       for (let i = 0; i < 8; i++) {
         renderer.directionalImages[i] = {
           complete: true,
+          naturalWidth: 100, // Valid image
           width: 96,
           height: 96,
           src: `/white-male-${i}.png`,
@@ -583,6 +600,7 @@ describe('Renderer', () => {
         for (let i = 0; i < 8; i++) {
           renderer.directionalImages[i] = {
             complete: true,
+            naturalWidth: 100,
             width: 96,
             height: 96,
             src: `/white-male-${i}.png`,
