@@ -46,7 +46,10 @@ export class Game {
           health: localPlayerData.health,
           weapon: localPlayerData.equipped_weapon || null,
           armor: localPlayerData.equipped_armor || null,
-          velocity: { x: 0, y: 0 },
+          velocity: { 
+            x: localPlayerData.velocity_x || 0, 
+            y: localPlayerData.velocity_y || 0 
+          },
         };
 
         // Initialize lastSentState to prevent unnecessary initial send
@@ -55,6 +58,8 @@ export class Game {
           y: localPlayerData.position_y,
           rotation: localPlayerData.rotation,
           health: localPlayerData.health,
+          vx: localPlayerData.velocity_x || 0,
+          vy: localPlayerData.velocity_y || 0,
         };
       }
     } else {
@@ -143,29 +148,33 @@ export class Game {
 
     // Throttle to configured rate
     const now = Date.now();
-    const minInterval = 1000 / CONFIG.NETWORK.POSITION_UPDATE_RATE;
+    const minInterval = 1000 / CONFIG.NETWORK.GAME_SIMULATION_RATE;
     if (now - this.lastPositionSendTime < minInterval) {
       return;
     }
 
-    // Only send if position/rotation/health changed
+    // Only send if position/rotation/health/velocity changed
     const currentState = {
       x: this.localPlayer.x,
       y: this.localPlayer.y,
       rotation: this.localPlayer.rotation,
-      health: this.localPlayer.health
+      health: this.localPlayer.health,
+      vx: this.localPlayer.velocity.x,
+      vy: this.localPlayer.velocity.y,
     };
 
     if (this.lastSentState &&
         Math.abs(this.lastSentState.x - currentState.x) < Number.EPSILON &&
         Math.abs(this.lastSentState.y - currentState.y) < Number.EPSILON &&
         Math.abs(this.lastSentState.rotation - currentState.rotation) < Number.EPSILON &&
-        Math.abs(this.lastSentState.health - currentState.health) < Number.EPSILON) {
+        Math.abs(this.lastSentState.health - currentState.health) < Number.EPSILON &&
+        Math.abs(this.lastSentState.vx - currentState.vx) < Number.EPSILON &&
+        Math.abs(this.lastSentState.vy - currentState.vy) < Number.EPSILON) {
       return; // No change, don't send
     }
 
-    // Send position update (including health)
-    this.network.sendPositionUpdate({
+    // Send movement update (including health and velocity)
+    this.network.sendMovementUpdate({
       position: { x: this.localPlayer.x, y: this.localPlayer.y },
       rotation: this.localPlayer.rotation,
       velocity: this.localPlayer.velocity,

@@ -36,24 +36,25 @@ describe('Position Synchronization Integration', () => {
   });
 
   afterEach(async () => {
-    network.stopPeriodicPositionWrite();
+    network.stopPeriodicMovementWrite();
     if (testSessionId) {
       await supabaseClient.from('game_sessions').delete().match({ id: testSessionId });
       testSessionId = null;
     }
   });
 
-  test('writePositionToDB() should update player position in database', async () => {
+  test('writeMovementToDB() should update player position and velocity in database', async () => {
     // 1. Host a game
     const { session: hostSession } = await network.hostGame('HostPlayer');
     testSessionId = hostSession.id;
 
-    // 2. Define new position data
+    // 2. Define new position and velocity data
     const newPosition = { x: 123.45, y: 678.90 };
     const newRotation = 1.57; // 90 degrees
+    const newVelocity = { x: 10.5, y: 20.5 };
 
-    // 3. Call writePositionToDB
-    await network.writePositionToDB(newPosition, newRotation);
+    // 3. Call writeMovementToDB
+    await network.writeMovementToDB(newPosition, newRotation, newVelocity);
 
     // 4. Verify in Database
     const { data: playerDbData, error: playerDbError } = await supabaseClient
@@ -66,10 +67,12 @@ describe('Position Synchronization Integration', () => {
     expect(playerDbError).toBeNull();
     expect(playerDbData.position_x).toBeCloseTo(newPosition.x);
     expect(playerDbData.position_y).toBeCloseTo(newPosition.y);
+    expect(playerDbData.velocity_x).toBeCloseTo(newVelocity.x);
+    expect(playerDbData.velocity_y).toBeCloseTo(newVelocity.y);
     expect(playerDbData.rotation).toBeCloseTo(newRotation);
   });
 
-  test('startPeriodicPositionWrite() should perform an immediate write to DB', async () => {
+  test('startPeriodicMovementWrite() should perform an immediate write to DB', async () => {
     // 1. Host a game
     const { session: hostSession } = await network.hostGame('HostPlayer');
     testSessionId = hostSession.id;
@@ -77,9 +80,10 @@ describe('Position Synchronization Integration', () => {
     // 2. Define getters
     const getPosition = () => ({ x: 500.1, y: 300.2 });
     const getRotation = () => 3.14;
+    const getVelocity = () => ({ x: 5.5, y: 6.6 });
 
     // 3. Start periodic write
-    network.startPeriodicPositionWrite(getPosition, getRotation);
+    network.startPeriodicMovementWrite(getPosition, getRotation, getVelocity);
 
     // 4. Wait for the async DB write to complete by checking for the updated value
     await waitFor(async () => {
@@ -103,6 +107,8 @@ describe('Position Synchronization Integration', () => {
     expect(playerDbError).toBeNull();
     expect(playerDbData.position_x).toBeCloseTo(500.1);
     expect(playerDbData.position_y).toBeCloseTo(300.2);
+    expect(playerDbData.velocity_x).toBeCloseTo(5.5);
+    expect(playerDbData.velocity_y).toBeCloseTo(6.6);
     expect(playerDbData.rotation).toBeCloseTo(3.14);
   });
 
@@ -127,7 +133,8 @@ describe('Position Synchronization Integration', () => {
 
     // 4. Host (Player A) writes new position to DB
     const newPos = { x: 800, y: 600 };
-    await network.writePositionToDB(newPos, 0, 100);
+    const newVel = { x: 10, y: 20 };
+    await network.writeMovementToDB(newPos, 0, newVel);
 
     // 5. Wait for Snapshot B to refresh
     await waitFor(() => {
@@ -142,6 +149,8 @@ describe('Position Synchronization Integration', () => {
     expect(playerA).toBeDefined();
     expect(playerA.position_x).toBe(newPos.x);
     expect(playerA.position_y).toBe(newPos.y);
+    expect(playerA.velocity_x).toBe(newVel.x);
+    expect(playerA.velocity_y).toBe(newVel.y);
 
     // Cleanup
     snapshotB.destroy();

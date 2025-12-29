@@ -423,7 +423,7 @@ describe('Network', () => {
     });
   });
 
-  describe('Position Updates (Client-Authoritative Movement)', () => {
+  describe('Movement Updates (Client-Authoritative Movement)', () => {
     const MOCK_PLAYER_ID = 'test-player-id';
     const MOCK_CHANNEL_NAME = 'game_session:TEST123';
 
@@ -435,30 +435,30 @@ describe('Network', () => {
       network.playerId = MOCK_PLAYER_ID;
     });
 
-    describe('sendPositionUpdate', () => {
-      describe('WhenClientSendsPositionUpdate_ShouldSendCorrectMessage', () => {
-        it('should send position_update message with correct format', () => {
+    describe('sendMovementUpdate', () => {
+      describe('WhenClientSendsMovementUpdate_ShouldSendCorrectMessage', () => {
+        it('should send movement_update message with correct format', () => {
           const mockChannel = {
             send: jest.fn().mockResolvedValue({ status: 'ok' }),
           };
           network.channel = mockChannel;
 
-          const positionData = {
+          const movementData = {
             position: { x: 100, y: 200 },
             rotation: 1.57,
             velocity: { x: 1.0, y: 0.5 },
           };
 
-          network.sendPositionUpdate(positionData);
+          network.sendMovementUpdate(movementData);
 
           expect(mockChannel.send).toHaveBeenCalledWith({
             type: 'broadcast',
             event: 'message',
             payload: {
-              type: 'position_update',
+              type: 'movement_update',
               from: MOCK_PLAYER_ID,
               timestamp: expect.any(Number),
-              data: positionData,
+              data: movementData,
             },
           });
         });
@@ -470,13 +470,13 @@ describe('Network', () => {
           };
           network.channel = mockChannel;
 
-          const positionData = {
+          const movementData = {
             position: { x: 100, y: 200 },
             rotation: 1.57,
             velocity: { x: 1.0, y: 0.5 },
           };
 
-          network.sendPositionUpdate(positionData);
+          network.sendMovementUpdate(movementData);
 
           expect(mockChannel.send).not.toHaveBeenCalled();
         });
@@ -485,13 +485,13 @@ describe('Network', () => {
           network.channel = null;
           const consoleWarnSpy = jest.spyOn(console, 'warn').mockImplementation(() => {});
 
-          const positionData = {
+          const movementData = {
             position: { x: 100, y: 200 },
             rotation: 1.57,
             velocity: { x: 1.0, y: 0.5 },
           };
 
-          network.sendPositionUpdate(positionData);
+          network.sendMovementUpdate(movementData);
 
           expect(consoleWarnSpy).toHaveBeenCalledWith(
             'Cannot send message, channel not connected.'
@@ -502,15 +502,15 @@ describe('Network', () => {
       });
     });
 
-    describe('Client Position Broadcast Reception', () => {
-      describe('WhenClientReceivesPositionBroadcast_ShouldEmitEvent', () => {
-        it('should emit position_broadcast event with all player positions', () => {
+    describe('Client Movement Broadcast Reception', () => {
+      describe('WhenClientReceivesMovementBroadcast_ShouldEmitEvent', () => {
+        it('should emit movement_broadcast event with all player positions', () => {
           network.isHost = false;
           const eventListener = jest.fn();
-          network.on('position_broadcast', eventListener);
+          network.on('movement_broadcast', eventListener);
 
           const broadcastMessage = {
-            type: 'position_broadcast',
+            type: 'movement_broadcast',
             from: 'host-id',
             timestamp: Date.now(),
             data: {
@@ -539,12 +539,12 @@ describe('Network', () => {
     });
   });
 
-  describe('writePositionToDB', () => {
+  describe('writeMovementToDB', () => {
     beforeEach(() => {
       network.sessionId = 'test-session-id';
     });
 
-    it('should write position to database when called', async () => {
+    it('should write movement to database when called', async () => {
       const mockUpdate = jest.fn().mockReturnValue({
         eq: jest.fn().mockReturnValue({
           eq: jest.fn().mockResolvedValue({ error: null })
@@ -557,13 +557,16 @@ describe('Network', () => {
 
       const position = { x: 100, y: 200 };
       const rotation = 1.5;
+      const velocity = { x: 1, y: 2 };
 
-      await network.writePositionToDB(position, rotation);
+      await network.writeMovementToDB(position, rotation, velocity);
 
       expect(mockSupabaseClient.from).toHaveBeenCalledWith('session_players');
       expect(mockUpdate).toHaveBeenCalledWith({
         position_x: 100,
         position_y: 200,
+        velocity_x: 1,
+        velocity_y: 2,
         rotation: 1.5,
       });
     });
@@ -584,7 +587,7 @@ describe('Network', () => {
         update: mockUpdate
       }));
 
-      await network.writePositionToDB({ x: 50, y: 75 }, 0.5);
+      await network.writeMovementToDB({ x: 50, y: 75 }, 0.5, { x: 0, y: 0 });
 
       expect(mockEq1).toHaveBeenCalledWith('session_id', 'test-session-id');
       expect(mockEq2).toHaveBeenCalledWith('player_id', MOCK_HOST_ID);
@@ -602,10 +605,10 @@ describe('Network', () => {
         })
       }));
 
-      await network.writePositionToDB({ x: 100, y: 200 }, 0);
+      await network.writeMovementToDB({ x: 100, y: 200 }, 0, { x: 0, y: 0 });
 
       expect(consoleErrorSpy).toHaveBeenCalledWith(
-        'Failed to write position to DB:',
+        'Failed to write movement to DB:',
         mockError.message
       );
 
@@ -613,7 +616,7 @@ describe('Network', () => {
     });
   });
 
-  describe('startPeriodicPositionWrite', () => {
+  describe('startPeriodicMovementWrite', () => {
     beforeEach(() => {
       jest.useFakeTimers();
       network.sessionId = 'test-session-id';
@@ -621,48 +624,49 @@ describe('Network', () => {
 
     afterEach(() => {
       jest.useRealTimers();
-      if (network.positionWriteInterval) {
-        clearInterval(network.positionWriteInterval);
-        network.positionWriteInterval = null;
+      if (network.movementWriteInterval) {
+        clearInterval(network.movementWriteInterval);
+        network.movementWriteInterval = null;
       }
     });
 
-    it('should start interval for periodic position writes', () => {
-      network.startPeriodicPositionWrite({ x: 100, y: 200 }, 0);
+    it('should start interval for periodic movement writes', () => {
+      network.startPeriodicMovementWrite({ x: 100, y: 200 }, 0, { x: 0, y: 0 });
 
-      expect(network.positionWriteInterval).toBeDefined();
+      expect(network.movementWriteInterval).toBeDefined();
     });
 
-    it('should call writePositionToDB periodically', async () => {
-      const writePositionSpy = jest.spyOn(network, 'writePositionToDB').mockResolvedValue();
+    it('should call writeMovementToDB periodically', async () => {
+      const writeMovementSpy = jest.spyOn(network, 'writeMovementToDB').mockResolvedValue();
 
       const positionGetter = () => ({ x: 100, y: 200 });
       const rotationGetter = () => 0;
+      const velocityGetter = () => ({ x: 0, y: 0 });
 
-      network.startPeriodicPositionWrite(positionGetter, rotationGetter);
+      network.startPeriodicMovementWrite(positionGetter, rotationGetter, velocityGetter);
 
       // Fast-forward time by 60 seconds
       jest.advanceTimersByTime(60000);
 
       await Promise.resolve(); // Allow promises to resolve
 
-      expect(writePositionSpy).toHaveBeenCalled();
+      expect(writeMovementSpy).toHaveBeenCalled();
 
-      writePositionSpy.mockRestore();
+      writeMovementSpy.mockRestore();
     });
 
     it('should not start multiple intervals if already running', () => {
-      network.startPeriodicPositionWrite(() => ({ x: 100, y: 200 }), () => 0);
-      const firstInterval = network.positionWriteInterval;
+      network.startPeriodicMovementWrite(() => ({ x: 100, y: 200 }), () => 0, () => ({ x: 0, y: 0 }));
+      const firstInterval = network.movementWriteInterval;
 
-      network.startPeriodicPositionWrite(() => ({ x: 100, y: 200 }), () => 0);
-      const secondInterval = network.positionWriteInterval;
+      network.startPeriodicMovementWrite(() => ({ x: 100, y: 200 }), () => 0, () => ({ x: 0, y: 0 }));
+      const secondInterval = network.movementWriteInterval;
 
       expect(firstInterval).toBe(secondInterval);
     });
   });
 
-  describe('stopPeriodicPositionWrite', () => {
+  describe('stopPeriodicMovementWrite', () => {
     beforeEach(() => {
       jest.useFakeTimers();
       network.sessionId = 'test-session-id';
@@ -672,17 +676,17 @@ describe('Network', () => {
       jest.useRealTimers();
     });
 
-    it('should stop periodic position write interval', () => {
-      network.startPeriodicPositionWrite(() => ({ x: 100, y: 200 }), () => 0);
-      expect(network.positionWriteInterval).toBeDefined();
+    it('should stop periodic movement write interval', () => {
+      network.startPeriodicMovementWrite(() => ({ x: 100, y: 200 }), () => 0, () => ({ x: 0, y: 0 }));
+      expect(network.movementWriteInterval).toBeDefined();
 
-      network.stopPeriodicPositionWrite();
+      network.stopPeriodicMovementWrite();
 
-      expect(network.positionWriteInterval).toBeNull();
+      expect(network.movementWriteInterval).toBeNull();
     });
 
     it('should not throw if called when no interval is running', () => {
-      expect(() => network.stopPeriodicPositionWrite()).not.toThrow();
+      expect(() => network.stopPeriodicMovementWrite()).not.toThrow();
     });
   });
 });

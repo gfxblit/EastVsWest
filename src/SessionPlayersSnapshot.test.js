@@ -18,6 +18,8 @@ describe('SessionPlayersSnapshot (Built on Network)', () => {
     is_alive: true,
     position_x: 0,
     position_y: 0,
+    velocity_x: 0,
+    velocity_y: 0,
     rotation: 0,
     equipped_weapon: null,
     equipped_armor: null,
@@ -95,8 +97,8 @@ describe('SessionPlayersSnapshot (Built on Network)', () => {
       // Wait for async initialization
       await snapshot.ready();
 
-      // Should subscribe to Network's position_update events
-      expect(mockNetwork.on).toHaveBeenCalledWith('position_update', expect.any(Function));
+      // Should subscribe to Network's movement_update events
+      expect(mockNetwork.on).toHaveBeenCalledWith('movement_update', expect.any(Function));
     });
 
     test('WhenConstructed_ShouldFetchInitialSnapshotFilteredBySessionId', async () => {
@@ -243,44 +245,46 @@ describe('SessionPlayersSnapshot (Built on Network)', () => {
     });
   });
 
-  describe('Position Update Handling', () => {
-    test('WhenNetworkEmitsPositionUpdate_ShouldUpdatePlayerPosition', async () => {
-      const mockPlayers = [createMockPlayer({ position_x: 100, position_y: 200 })];
+  describe('Movement Update Handling', () => {
+    test('WhenNetworkEmitsMovementUpdate_ShouldUpdatePlayerPositionAndVelocity', async () => {
+      const mockPlayers = [createMockPlayer({ position_x: 100, position_y: 200, velocity_x: 0, velocity_y: 0 })];
 
       mockSupabaseClient.from().select().eq.mockResolvedValue({
         data: mockPlayers,
         error: null,
       });
 
-      let positionUpdateHandler;
+      let movementUpdateHandler;
       mockNetwork.on.mockImplementation((event, handler) => {
-        if (event === 'position_update') {
-          positionUpdateHandler = handler;
+        if (event === 'movement_update') {
+          movementUpdateHandler = handler;
         }
       });
 
       snapshot = new SessionPlayersSnapshot(mockNetwork, TEST_SESSION_ID);
       await snapshot.ready();
 
-      // Simulate Network emitting position_update
-      positionUpdateHandler({
-        type: 'position_update',
+      // Simulate Network emitting movement_update
+      movementUpdateHandler({
+        type: 'movement_update',
         from: TEST_PLAYER_ID,
         data: {
-          position_x: 300,
-          position_y: 400,
+          position: { x: 300, y: 400 },
+          velocity: { x: 10, y: 20 },
           rotation: 1.57,
         },
       });
 
-      // Should update position in memory
+      // Should update position and velocity in memory
       const player = snapshot.getPlayers().get(TEST_PLAYER_ID);
       expect(player.position_x).toBe(300);
       expect(player.position_y).toBe(400);
+      expect(player.velocity_x).toBe(10);
+      expect(player.velocity_y).toBe(20);
       expect(player.rotation).toBe(1.57);
     });
 
-    test('WhenNetworkEmitsPositionUpdateWithHealth_ShouldUpdatePlayerHealth', async () => {
+    test('WhenNetworkEmitsMovementUpdateWithHealth_ShouldUpdatePlayerHealth', async () => {
       const mockPlayers = [createMockPlayer({ health: 100 })];
 
       mockSupabaseClient.from().select().eq.mockResolvedValue({
@@ -288,19 +292,19 @@ describe('SessionPlayersSnapshot (Built on Network)', () => {
         error: null,
       });
 
-      let positionUpdateHandler;
+      let movementUpdateHandler;
       mockNetwork.on.mockImplementation((event, handler) => {
-        if (event === 'position_update') {
-          positionUpdateHandler = handler;
+        if (event === 'movement_update') {
+          movementUpdateHandler = handler;
         }
       });
 
       snapshot = new SessionPlayersSnapshot(mockNetwork, TEST_SESSION_ID);
       await snapshot.ready();
 
-      // Simulate Network emitting position_update with health
-      positionUpdateHandler({
-        type: 'position_update',
+      // Simulate Network emitting movement_update with health
+      movementUpdateHandler({
+        type: 'movement_update',
         from: TEST_PLAYER_ID,
         data: {
           player_id: TEST_PLAYER_ID,
@@ -313,7 +317,7 @@ describe('SessionPlayersSnapshot (Built on Network)', () => {
       expect(player.health).toBe(80.5);
     });
 
-    test('WhenNetworkEmitsPositionUpdateForNonexistentPlayer_ShouldIgnore', async () => {
+    test('WhenNetworkEmitsMovementUpdateForNonexistentPlayer_ShouldIgnore', async () => {
       const mockPlayers = [createMockPlayer()];
 
       mockSupabaseClient.from().select().eq.mockResolvedValue({
@@ -321,23 +325,22 @@ describe('SessionPlayersSnapshot (Built on Network)', () => {
         error: null,
       });
 
-      let positionUpdateHandler;
+      let movementUpdateHandler;
       mockNetwork.on.mockImplementation((event, handler) => {
-        if (event === 'position_update') {
-          positionUpdateHandler = handler;
+        if (event === 'movement_update') {
+          movementUpdateHandler = handler;
         }
       });
 
       snapshot = new SessionPlayersSnapshot(mockNetwork, TEST_SESSION_ID);
       await snapshot.ready();
 
-      // Simulate position_update for player not in this session
-      positionUpdateHandler({
-        type: 'position_update',
+      // Simulate movement_update for player not in this session
+      movementUpdateHandler({
+        type: 'movement_update',
         from: 'unknown-player-id',
         data: {
-          position_x: 300,
-          position_y: 400,
+          position: { x: 300, y: 400 },
         },
       });
 

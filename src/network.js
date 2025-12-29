@@ -42,7 +42,7 @@ export class Network extends EventEmitter {
     this.playerId = null;
     this.sessionId = null;
     this.channel = null;
-    this.positionWriteInterval = null; // Interval for periodic DB writes
+    this.movementWriteInterval = null; // Interval for periodic DB writes
   }
 
   initialize(supabaseClient, playerId) {
@@ -262,16 +262,16 @@ export class Network extends EventEmitter {
     });
   }
 
-  sendPositionUpdate(positionData) {
+  sendMovementUpdate(movementData) {
     if (!this.channel || !this.connected) {
       console.warn('Cannot send message, channel not connected.');
       return;
     }
     const message = {
-      type: 'position_update',
+      type: 'movement_update',
       from: this.playerId,
       timestamp: Date.now(),
-      data: positionData,
+      data: movementData,
     };
 
     // Broadcast to all other clients
@@ -282,12 +282,12 @@ export class Network extends EventEmitter {
     });
 
     // Emit locally since Supabase Realtime doesn't echo messages back to sender
-    this.emit('position_update', message);
+    this.emit('movement_update', message);
   }
 
-  async writePositionToDB(position, rotation) {
+  async writeMovementToDB(position, rotation, velocity) {
     if (!this.supabase || !this.sessionId || !this.playerId) {
-      console.error('Cannot write position to DB: missing supabase, sessionId, or playerId');
+      console.error('Cannot write movement to DB: missing supabase, sessionId, or playerId');
       return;
     }
 
@@ -296,13 +296,15 @@ export class Network extends EventEmitter {
       .update({
         position_x: position.x,
         position_y: position.y,
+        velocity_x: velocity.x,
+        velocity_y: velocity.y,
         rotation: rotation,
       })
       .eq('session_id', this.sessionId)
       .eq('player_id', this.playerId);
 
     if (error) {
-      console.error('Failed to write position to DB:', error.message);
+      console.error('Failed to write movement to DB:', error.message);
     }
   }
 
@@ -332,35 +334,37 @@ export class Network extends EventEmitter {
   //   }
   // }
 
-  startPeriodicPositionWrite(positionGetter, rotationGetter) {
-    if (this.positionWriteInterval) return; // Already running
+  startPeriodicMovementWrite(positionGetter, rotationGetter, velocityGetter) {
+    if (this.movementWriteInterval) return; // Already running
 
     // Write immediately
     const position = typeof positionGetter === 'function' ? positionGetter() : positionGetter;
     const rotation = typeof rotationGetter === 'function' ? rotationGetter() : rotationGetter;
-    this.writePositionToDB(position, rotation).catch(err => {
-      console.error('Failed to perform immediate position write:', err);
+    const velocity = typeof velocityGetter === 'function' ? velocityGetter() : velocityGetter;
+    this.writeMovementToDB(position, rotation, velocity).catch(err => {
+      console.error('Failed to perform immediate movement write:', err);
     });
 
     // Then write periodically at the same rate as snapshot refresh (60 seconds)
-    this.positionWriteInterval = setInterval(() => {
+    this.movementWriteInterval = setInterval(() => {
       const position = typeof positionGetter === 'function' ? positionGetter() : positionGetter;
       const rotation = typeof rotationGetter === 'function' ? rotationGetter() : rotationGetter;
-      this.writePositionToDB(position, rotation).catch(err => {
-        console.error('Failed to perform periodic position write:', err);
+      const velocity = typeof velocityGetter === 'function' ? velocityGetter() : velocityGetter;
+      this.writeMovementToDB(position, rotation, velocity).catch(err => {
+        console.error('Failed to perform periodic movement write:', err);
       });
     }, 60000); // 60 seconds
   }
 
-  stopPeriodicPositionWrite() {
-    if (this.positionWriteInterval) {
-      clearInterval(this.positionWriteInterval);
-      this.positionWriteInterval = null;
+  stopPeriodicMovementWrite() {
+    if (this.movementWriteInterval) {
+      clearInterval(this.movementWriteInterval);
+      this.movementWriteInterval = null;
     }
   }
 
   disconnect() {
-    this.stopPeriodicPositionWrite();
+    this.stopPeriodicMovementWrite();
     if (this.channel) {
       this.supabase.removeChannel(this.channel);
       this.channel = null;

@@ -260,7 +260,7 @@ describe('SessionPlayersSnapshot Integration with Network', () => {
     });
   });
 
-  describe('Position Updates via Network Broadcasts', () => {
+  describe('Movement Updates via Network Broadcasts', () => {
     test('should update player positions from Network broadcasts', async () => {
       // Player joins
       await playerNetwork.joinGame(testJoinCode, 'TestPlayer');
@@ -277,25 +277,25 @@ describe('SessionPlayersSnapshot Integration with Network', () => {
       expect(hostPlayerBefore.position_x).toBe(0);
       expect(hostPlayerBefore.position_y).toBe(0);
 
-      // Track position_update events received by playerNetwork
+      // Track movement_update events received by playerNetwork
       const receivedEvents = [];
       const eventHandler = (msg) => {
         receivedEvents.push(msg);
       };
-      playerNetwork.on('position_update', eventHandler);
+      playerNetwork.on('movement_update', eventHandler);
 
-      // Send actual position update through Network channel
+      // Send actual movement update through Network channel
       // This broadcasts directly to all peers
-      hostNetwork.sendPositionUpdate({
+      hostNetwork.sendMovementUpdate({
         position: { x: 100, y: 200 },
         rotation: 1.57,
         velocity: { x: 0, y: 0 },
       });
 
-      // First, verify that the position_update event reaches playerNetwork
+      // First, verify that the movement_update event reaches playerNetwork
       await waitFor(() => receivedEvents.length > 0, 5000);
       expect(receivedEvents.length).toBeGreaterThan(0);
-      expect(receivedEvents[0].type).toBe('position_update');
+      expect(receivedEvents[0].type).toBe('movement_update');
       expect(receivedEvents[0].from).toBe(hostUser.id);
 
       // Then verify it propagates to playerSnapshot
@@ -305,7 +305,7 @@ describe('SessionPlayersSnapshot Integration with Network', () => {
       }, 5000);
 
       // Clean up event handler
-      playerNetwork.off('position_update', eventHandler);
+      playerNetwork.off('movement_update', eventHandler);
 
       // Position should update in playerSnapshot via Network broadcast handler
       const hostPlayerAfter = playerSnapshot.getPlayers().get(hostUser.id);

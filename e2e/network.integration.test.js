@@ -240,8 +240,8 @@ describe('Network Module Integration with Supabase', () => {
     await playerClient.auth.signOut();
   });
 
-  describe('Position Updates (Direct Client Broadcasting)', () => {
-    test('should send position updates directly from client to all peers', async () => {
+  describe('Movement Updates (Direct Client Broadcasting)', () => {
+    test('should send movement updates directly from client to all peers', async () => {
       // Host creates a session
       const hostName = 'HostPlayer';
       const { session: hostSession } = await network.hostGame(hostName);
@@ -263,53 +263,53 @@ describe('Network Module Integration with Supabase', () => {
       await player1Network.joinGame(joinCode, 'Player1');
       await player2Network.joinGame(joinCode, 'Player2');
 
-      // Set up listeners for position updates
+      // Set up listeners for movement updates
       const player2Updates = [];
       const p2Handler = (payload) => {
         player2Updates.push(payload);
       };
-      player2Network.on('position_update', p2Handler);
+      player2Network.on('movement_update', p2Handler);
 
       const hostUpdates = [];
       const hostHandler = (payload) => {
         hostUpdates.push(payload);
       };
-      network.on('position_update', hostHandler);
+      network.on('movement_update', hostHandler);
 
-      // Player 1 sends a position update (broadcasts to all peers)
-      const positionData = {
+      // Player 1 sends a movement update (broadcasts to all peers)
+      const movementData = {
         position: { x: 100, y: 200 },
         rotation: 1.57,
         velocity: { x: 1.0, y: 0.5 },
       };
-      player1Network.sendPositionUpdate(positionData);
+      player1Network.sendMovementUpdate(movementData);
 
       // Wait for updates to reach other clients
       await waitFor(() => player2Updates.length > 0 && hostUpdates.length > 0);
 
-      // Verify player2 received player1's position update
+      // Verify player2 received player1's movement update
       const player2ReceivedUpdate = player2Updates.find(u => u.from === player1Auth.user.id);
       expect(player2ReceivedUpdate).toBeDefined();
-      expect(player2ReceivedUpdate.type).toBe('position_update');
+      expect(player2ReceivedUpdate.type).toBe('movement_update');
       expect(player2ReceivedUpdate.data.position).toEqual({ x: 100, y: 200 });
       expect(player2ReceivedUpdate.data.rotation).toBe(1.57);
 
-      // Verify host received player1's position update
+      // Verify host received player1's movement update
       const hostReceivedUpdate = hostUpdates.find(u => u.from === player1Auth.user.id);
       expect(hostReceivedUpdate).toBeDefined();
-      expect(hostReceivedUpdate.type).toBe('position_update');
+      expect(hostReceivedUpdate.type).toBe('movement_update');
       expect(hostReceivedUpdate.data.position).toEqual({ x: 100, y: 200 });
 
       // Clean up
-      player2Network.off('position_update', p2Handler);
-      network.off('position_update', hostHandler);
+      player2Network.off('movement_update', p2Handler);
+      network.off('movement_update', hostHandler);
       player1Network.disconnect();
       player2Network.disconnect();
       await player1Client.auth.signOut();
       await player2Client.auth.signOut();
     });
 
-    test('should allow multiple clients to send position updates simultaneously', async () => {
+    test('should allow multiple clients to send movement updates simultaneously', async () => {
       // Host creates a session
       const { session: hostSession } = await network.hostGame('HostPlayer');
       testSessionId = hostSession.id;
@@ -335,16 +335,16 @@ describe('Network Module Integration with Supabase', () => {
       const hostHandler = (payload) => {
         receivedUpdates.push(payload);
       };
-      network.on('position_update', hostHandler);
+      network.on('movement_update', hostHandler);
 
-      // Both players send position updates
-      player1Network.sendPositionUpdate({
+      // Both players send movement updates
+      player1Network.sendMovementUpdate({
         position: { x: 100, y: 200 },
         rotation: 0,
         velocity: { x: 1, y: 0 },
       });
 
-      player2Network.sendPositionUpdate({
+      player2Network.sendMovementUpdate({
         position: { x: 300, y: 400 },
         rotation: 1.57,
         velocity: { x: 0, y: 1 },
@@ -353,7 +353,7 @@ describe('Network Module Integration with Supabase', () => {
       // Wait for both updates to reach host
       await waitFor(() => receivedUpdates.length >= 2);
 
-      // Verify host received both position updates
+      // Verify host received both movement updates
       expect(receivedUpdates.length).toBeGreaterThanOrEqual(2);
 
       const player1Update = receivedUpdates.find(u => u.from === player1Auth.user.id);
@@ -365,32 +365,32 @@ describe('Network Module Integration with Supabase', () => {
       expect(player2Update.data.position).toEqual({ x: 300, y: 400 });
 
       // Clean up
-      network.off('position_update', hostHandler);
+      network.off('movement_update', hostHandler);
       player1Network.disconnect();
       player2Network.disconnect();
       await player1Client.auth.signOut();
       await player2Client.auth.signOut();
     });
 
-    test('should emit position updates locally for sender', async () => {
+    test('should emit movement updates locally for sender', async () => {
       // Host creates a session
       const { session: hostSession } = await network.hostGame('HostPlayer');
       testSessionId = hostSession.id;
 
-      // Set up listener on host for its own position updates
+      // Set up listener on host for its own movement updates
       const hostLocalUpdates = [];
       const hostHandler = (payload) => {
         hostLocalUpdates.push(payload);
       };
-      network.on('position_update', hostHandler);
+      network.on('movement_update', hostHandler);
 
-      // Host sends position update
-      const positionData = {
+      // Host sends movement update
+      const movementData = {
         position: { x: 10, y: 10 },
         rotation: 0,
         velocity: { x: 0, y: 0 },
       };
-      network.sendPositionUpdate(positionData);
+      network.sendMovementUpdate(movementData);
 
       // Wait for local emission
       await waitFor(() => hostLocalUpdates.length > 0);
@@ -398,11 +398,11 @@ describe('Network Module Integration with Supabase', () => {
       // Verify host received its own update locally
       expect(hostLocalUpdates.length).toBe(1);
       expect(hostLocalUpdates[0].from).toBe(hostUser.id);
-      expect(hostLocalUpdates[0].type).toBe('position_update');
+      expect(hostLocalUpdates[0].type).toBe('movement_update');
       expect(hostLocalUpdates[0].data.position).toEqual({ x: 10, y: 10 });
 
       // Clean up
-      network.off('position_update', hostHandler);
+      network.off('movement_update', hostHandler);
     });
   });
 });

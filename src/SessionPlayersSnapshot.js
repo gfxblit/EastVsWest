@@ -82,9 +82,9 @@ export class SessionPlayersSnapshot {
     // Subscribe to Network's generic postgres_changes events
     this.network.on('postgres_changes', this.postgresChangesHandler);
 
-    // Subscribe to Network's position_update events
+    // Subscribe to Network's movement_update events
     // All clients broadcast directly, no host rebroadcasting
-    this.network.on('position_update', this.broadcastHandler);
+    this.network.on('movement_update', this.broadcastHandler);
   }
 
   /**
@@ -110,21 +110,21 @@ export class SessionPlayersSnapshot {
   }
 
   /**
-   * Handle position_update events from Network
+   * Handle movement_update events from Network
    */
   #handleBroadcast(message) {
-    if (message.type === 'position_update') {
-      this.#handlePositionUpdate({
+    if (message.type === 'movement_update') {
+      this.#handleMovementUpdate({
         ...message.data,
         player_id: message.from,
       });
     }
-    // Handle position_broadcast (batched updates from host)
-    else if (message.type === 'position_broadcast') {
+    // Handle movement_broadcast (batched updates from host)
+    else if (message.type === 'movement_broadcast') {
       const { updates } = message.data;
       if (updates && Array.isArray(updates)) {
         updates.forEach(update => {
-          this.#handlePositionUpdate(update);
+          this.#handleMovementUpdate(update);
         });
       }
     }
@@ -164,12 +164,12 @@ export class SessionPlayersSnapshot {
   }
 
   /**
-   * Handle position update broadcasts
+   * Handle movement update broadcasts
    * Handles both formats:
-   * - Direct format: { player_id, position_x, position_y, rotation }
-   * - Nested format: { player_id, position: {x, y}, rotation, velocity }
+   * - Direct format: { player_id, position_x, position_y, rotation, velocity_x, velocity_y }
+   * - Nested format: { player_id, position: {x, y}, rotation, velocity: {x, y} }
    */
-  #handlePositionUpdate(payload) {
+  #handleMovementUpdate(payload) {
     const player_id = payload.player_id || payload.from;
     const player = this.players.get(player_id);
 
@@ -178,7 +178,7 @@ export class SessionPlayersSnapshot {
       return;
     }
 
-    // Handle nested position format (from position_update/position_broadcast)
+    // Handle nested position format (from movement_update/movement_broadcast)
     if (payload.position) {
       if (payload.position.x !== undefined) {
         player.position_x = payload.position.x;
@@ -194,6 +194,25 @@ export class SessionPlayersSnapshot {
       }
       if (payload.position_y !== undefined) {
         player.position_y = payload.position_y;
+      }
+    }
+
+    // Handle nested velocity format
+    if (payload.velocity) {
+      if (payload.velocity.x !== undefined) {
+        player.velocity_x = payload.velocity.x;
+      }
+      if (payload.velocity.y !== undefined) {
+        player.velocity_y = payload.velocity.y;
+      }
+    }
+    // Handle direct velocity format
+    else {
+      if (payload.velocity_x !== undefined) {
+        player.velocity_x = payload.velocity_x;
+      }
+      if (payload.velocity_y !== undefined) {
+        player.velocity_y = payload.velocity_y;
       }
     }
 
@@ -266,7 +285,7 @@ export class SessionPlayersSnapshot {
     // Unsubscribe from Network events
     if (this.network) {
       this.network.off('postgres_changes', this.postgresChangesHandler);
-      this.network.off('position_update', this.broadcastHandler);
+      this.network.off('movement_update', this.broadcastHandler);
     }
   }
 }

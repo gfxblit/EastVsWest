@@ -59,7 +59,16 @@ describe('Game', () => {
     test('WhenInitializedWithSnapshot_ShouldLoadLocalPlayerFromSnapshot', () => {
       const mockSnapshot = {
         getPlayers: jest.fn().mockReturnValue(new Map([
-          ['player-1', { player_id: 'player-1', player_name: 'Alice', position_x: 100, position_y: 200, rotation: 0.5, health: 90 }],
+          ['player-1', { 
+            player_id: 'player-1', 
+            player_name: 'Alice', 
+            position_x: 100, 
+            position_y: 200, 
+            velocity_x: 10,
+            velocity_y: 20,
+            rotation: 0.5, 
+            health: 90 
+          }],
         ])),
       };
       const mockNetwork = { playerId: 'player-1' };
@@ -71,6 +80,8 @@ describe('Game', () => {
       expect(game.localPlayer.name).toBe('Alice');
       expect(game.localPlayer.x).toBe(100);
       expect(game.localPlayer.y).toBe(200);
+      expect(game.localPlayer.velocity.x).toBe(10);
+      expect(game.localPlayer.velocity.y).toBe(20);
       expect(game.localPlayer.rotation).toBe(0.5);
       expect(game.localPlayer.health).toBe(90);
     });
@@ -330,7 +341,7 @@ describe('Game', () => {
 
       mockNetwork = {
         playerId: 'player-1',
-        sendPositionUpdate: jest.fn(),
+        sendMovementUpdate: jest.fn(),
       };
     });
 
@@ -356,17 +367,19 @@ describe('Game', () => {
       expect(game.localPlayer.x).toBe(CONFIG.WORLD.WIDTH / 2 + CONFIG.PLAYER.BASE_MOVEMENT_SPEED * 0.1);
     });
 
-    test('WhenLocalPlayerMovesInMultiplayer_ShouldSendPositionUpdate', () => {
+    test('WhenLocalPlayerMovesInMultiplayer_ShouldSendMovementUpdate', () => {
       game.init(mockPlayersSnapshot, mockNetwork);
 
       const inputState = { moveX: 1, moveY: 0 };
       game.handleInput(inputState);
       game.update(0.1); // Update triggers position send
 
-      expect(mockNetwork.sendPositionUpdate).toHaveBeenCalled();
-      const call = mockNetwork.sendPositionUpdate.mock.calls[0][0];
+      expect(mockNetwork.sendMovementUpdate).toHaveBeenCalled();
+      const call = mockNetwork.sendMovementUpdate.mock.calls[0][0];
       expect(call.position.x).toBeCloseTo(CONFIG.WORLD.WIDTH / 2 + 20, 1); // center + 200 * 0.1
       expect(call.position.y).toBe(CONFIG.WORLD.HEIGHT / 2);
+      expect(call.velocity.x).toBeGreaterThan(0);
+      expect(call.velocity.y).toBe(0);
     });
 
     test('WhenLocalPlayerPositionUnchanged_ShouldNotSendUpdate', () => {
@@ -375,8 +388,8 @@ describe('Game', () => {
       // Don't move the player
       game.update(0.016);
 
-      // Should not send position update since position/health didn't change
-      expect(mockNetwork.sendPositionUpdate).not.toHaveBeenCalled();
+      // Should not send position update since position/health/velocity didn't change
+      expect(mockNetwork.sendMovementUpdate).not.toHaveBeenCalled();
     });
 
     test('WhenLocalPlayerHealthChanges_ShouldSendUpdateEvenIfPositionUnchanged', () => {
@@ -388,8 +401,8 @@ describe('Game', () => {
       game.update(0.016);
 
       // Should send update because health changed
-      expect(mockNetwork.sendPositionUpdate).toHaveBeenCalled();
-      const call = mockNetwork.sendPositionUpdate.mock.calls[0][0];
+      expect(mockNetwork.sendMovementUpdate).toHaveBeenCalled();
+      const call = mockNetwork.sendMovementUpdate.mock.calls[0][0];
       expect(call.health).toBe(90);
     });
 
@@ -402,7 +415,7 @@ describe('Game', () => {
       game.update(0.016);
 
       // Should not send position update since change is negligible
-      expect(mockNetwork.sendPositionUpdate).not.toHaveBeenCalled();
+      expect(mockNetwork.sendMovementUpdate).not.toHaveBeenCalled();
     });
 
     test('WhenSnapshotUpdated_ShouldNotAffectLocalPlayer', () => {
