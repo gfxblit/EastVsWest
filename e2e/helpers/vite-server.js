@@ -22,7 +22,6 @@ const VITE_URL = `http://localhost:${VITE_PORT}`;
 export async function startViteServer() {
   return new Promise((resolve, reject) => {
     const env = { ...process.env };
-    
     // Only set VITE_ env vars if they are provided in the process environment.
     // Otherwise, let Vite load them from .env.local / .env files.
     if (process.env.SUPABASE_URL) {
@@ -39,11 +38,17 @@ export async function startViteServer() {
     });
 
     let output = '';
+    let startTimeout = null;
 
     viteProcess.stdout.on('data', (data) => {
       output += data.toString();
       // Look for the server ready message
       if (output.includes('Local:') || output.includes(`localhost:${VITE_PORT}`)) {
+        // Clear the timeout as soon as we know it's starting
+        if (startTimeout) {
+          clearTimeout(startTimeout);
+          startTimeout = null;
+        }
         // Give it a moment to fully start
         setTimeout(() => resolve(VITE_URL), 1000);
       }
@@ -53,22 +58,34 @@ export async function startViteServer() {
       const message = data.toString();
       console.error('Vite server error:', message);
       if (message.includes('Port') && message.includes('is already in use')) {
+        if (startTimeout) {
+          clearTimeout(startTimeout);
+          startTimeout = null;
+        }
         reject(new Error(`Vite server port conflict: ${message.trim()}`));
       }
     });
 
     viteProcess.on('error', (error) => {
+      if (startTimeout) {
+        clearTimeout(startTimeout);
+        startTimeout = null;
+      }
       reject(new Error(`Failed to start Vite server: ${error.message}`));
     });
 
     viteProcess.on('exit', (code) => {
+      if (startTimeout) {
+        clearTimeout(startTimeout);
+        startTimeout = null;
+      }
       if (code !== 0 && code !== null) {
         reject(new Error(`Vite server exited with code ${code}`));
       }
     });
 
     // Timeout after 30 seconds
-    setTimeout(() => {
+    startTimeout = setTimeout(() => {
       if (viteProcess) {
         reject(new Error('Vite server failed to start within 30 seconds'));
       }
@@ -82,7 +99,13 @@ export async function startViteServer() {
 export async function stopViteServer() {
   return new Promise((resolve) => {
     if (viteProcess) {
+      let forceKillTimeout = null;
+
       const onExit = () => {
+        if (forceKillTimeout) {
+          clearTimeout(forceKillTimeout);
+          forceKillTimeout = null;
+        }
         viteProcess = null;
         resolve();
       };
@@ -94,7 +117,7 @@ export async function stopViteServer() {
       viteProcess.kill('SIGTERM');
 
       // Force kill after 2 seconds if not stopped
-      setTimeout(() => {
+      forceKillTimeout = setTimeout(() => {
         if (viteProcess) {
           viteProcess.kill('SIGKILL');
         }
