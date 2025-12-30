@@ -60,7 +60,7 @@ export class Input {
   }
 
   handleKeyDown(event) {
-    const key = event.key.toLowerCase();
+    const key = event.code;
     this.keysPressed.add(key);
     this.updateMovement();
 
@@ -75,7 +75,7 @@ export class Input {
   }
 
   handleKeyUp(event) {
-    const key = event.key.toLowerCase();
+    const key = event.code;
     this.keysPressed.delete(key);
     this.updateMovement();
 

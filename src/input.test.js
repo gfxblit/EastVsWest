@@ -80,66 +80,69 @@ describe('Input', () => {
     });
 
     test('WhenWKeyPressed_ShouldUpdateMoveY', () => {
-      const event = new KeyboardEvent('keydown', { key: 'w' });
+      const event = new KeyboardEvent('keydown', { code: 'KeyW' });
       input.handleKeyDown(event);
 
       expect(input.inputState.moveY).toBe(-1);
     });
 
     test('WhenAKeyPressed_ShouldUpdateMoveX', () => {
-      const event = new KeyboardEvent('keydown', { key: 'a' });
+      const event = new KeyboardEvent('keydown', { code: 'KeyA' });
       input.handleKeyDown(event);
 
       expect(input.inputState.moveX).toBe(-1);
     });
 
     test('WhenSKeyPressed_ShouldUpdateMoveY', () => {
-      const event = new KeyboardEvent('keydown', { key: 's' });
+      const event = new KeyboardEvent('keydown', { code: 'KeyS' });
       input.handleKeyDown(event);
 
       expect(input.inputState.moveY).toBe(1);
     });
 
     test('WhenDKeyPressed_ShouldUpdateMoveX', () => {
-      const event = new KeyboardEvent('keydown', { key: 'd' });
+      const event = new KeyboardEvent('keydown', { code: 'KeyD' });
       input.handleKeyDown(event);
 
       expect(input.inputState.moveX).toBe(1);
     });
 
     test('WhenSpecialAbilityKeyPressed_ShouldSetSpecialAbilityTrue', () => {
-      const event = new KeyboardEvent('keydown', { key: CONFIG.INPUT.SPECIAL_ABILITY_KEY });
+      const event = new KeyboardEvent('keydown', { code: CONFIG.INPUT.SPECIAL_ABILITY_KEY });
       input.handleKeyDown(event);
 
       expect(input.inputState.specialAbility).toBe(true);
     });
 
     test('WhenInteractKeyPressed_ShouldSetInteractTrue', () => {
-      const event = new KeyboardEvent('keydown', { key: CONFIG.INPUT.INTERACT_KEY });
+      const event = new KeyboardEvent('keydown', { code: CONFIG.INPUT.INTERACT_KEY });
       input.handleKeyDown(event);
 
       expect(input.inputState.interact).toBe(true);
     });
 
     test('WhenKeyPressed_ShouldAddToKeysPressed', () => {
-      const event = new KeyboardEvent('keydown', { key: 'w' });
+      const event = new KeyboardEvent('keydown', { code: 'KeyW' });
       input.handleKeyDown(event);
 
-      expect(input.keysPressed.has('w')).toBe(true);
+      expect(input.keysPressed.has('KeyW')).toBe(true);
     });
 
     test('WhenKeyPressed_ShouldCallCallback', () => {
-      const event = new KeyboardEvent('keydown', { key: 'w' });
+      const event = new KeyboardEvent('keydown', { code: 'KeyW' });
       input.handleKeyDown(event);
 
       expect(mockCallback).toHaveBeenCalled();
     });
 
-    test('WhenUppercaseKey_ShouldConvertToLowercase', () => {
-      const event = new KeyboardEvent('keydown', { key: 'W' });
+    test('WhenDvorakLayoutUsed_ShouldStillMoveBasedOnPhysicalPosition', () => {
+      // On Dvorak, physical 'W' key produces ','
+      const event = new KeyboardEvent('keydown', { 
+        key: ',', 
+        code: 'KeyW' 
+      });
       input.handleKeyDown(event);
 
-      expect(input.keysPressed.has('w')).toBe(true);
       expect(input.inputState.moveY).toBe(-1);
     });
   });
@@ -151,44 +154,44 @@ describe('Input', () => {
 
     test('WhenWKeyReleased_ShouldResetMoveY', () => {
       // Press W
-      const downEvent = new KeyboardEvent('keydown', { key: 'w' });
+      const downEvent = new KeyboardEvent('keydown', { code: 'KeyW' });
       input.handleKeyDown(downEvent);
 
       // Release W
-      const upEvent = new KeyboardEvent('keyup', { key: 'w' });
+      const upEvent = new KeyboardEvent('keyup', { code: 'KeyW' });
       input.handleKeyUp(upEvent);
 
       expect(input.inputState.moveY).toBe(0);
     });
 
     test('WhenSpecialAbilityKeyReleased_ShouldSetSpecialAbilityFalse', () => {
-      const downEvent = new KeyboardEvent('keydown', { key: CONFIG.INPUT.SPECIAL_ABILITY_KEY });
+      const downEvent = new KeyboardEvent('keydown', { code: CONFIG.INPUT.SPECIAL_ABILITY_KEY });
       input.handleKeyDown(downEvent);
 
-      const upEvent = new KeyboardEvent('keyup', { key: CONFIG.INPUT.SPECIAL_ABILITY_KEY });
+      const upEvent = new KeyboardEvent('keyup', { code: CONFIG.INPUT.SPECIAL_ABILITY_KEY });
       input.handleKeyUp(upEvent);
 
       expect(input.inputState.specialAbility).toBe(false);
     });
 
     test('WhenInteractKeyReleased_ShouldSetInteractFalse', () => {
-      const downEvent = new KeyboardEvent('keydown', { key: CONFIG.INPUT.INTERACT_KEY });
+      const downEvent = new KeyboardEvent('keydown', { code: CONFIG.INPUT.INTERACT_KEY });
       input.handleKeyDown(downEvent);
 
-      const upEvent = new KeyboardEvent('keyup', { key: CONFIG.INPUT.INTERACT_KEY });
+      const upEvent = new KeyboardEvent('keyup', { code: CONFIG.INPUT.INTERACT_KEY });
       input.handleKeyUp(upEvent);
 
       expect(input.inputState.interact).toBe(false);
     });
 
     test('WhenKeyReleased_ShouldRemoveFromKeysPressed', () => {
-      const downEvent = new KeyboardEvent('keydown', { key: 'w' });
+      const downEvent = new KeyboardEvent('keydown', { code: 'KeyW' });
       input.handleKeyDown(downEvent);
 
-      const upEvent = new KeyboardEvent('keyup', { key: 'w' });
+      const upEvent = new KeyboardEvent('keyup', { code: 'KeyW' });
       input.handleKeyUp(upEvent);
 
-      expect(input.keysPressed.has('w')).toBe(false);
+      expect(input.keysPressed.has('KeyW')).toBe(false);
     });
   });
 
@@ -198,8 +201,8 @@ describe('Input', () => {
     });
 
     test('WhenWAndDPressed_ShouldNormalizeDiagonalMovement', () => {
-      input.keysPressed.add('w');
-      input.keysPressed.add('d');
+      input.keysPressed.add('KeyW');
+      input.keysPressed.add('KeyD');
       input.updateMovement();
 
       const magnitude = Math.sqrt(
@@ -209,16 +212,16 @@ describe('Input', () => {
     });
 
     test('WhenWAndSPressed_ShouldCancelVerticalMovement', () => {
-      input.keysPressed.add('w');
-      input.keysPressed.add('s');
+      input.keysPressed.add('KeyW');
+      input.keysPressed.add('KeyS');
       input.updateMovement();
 
       expect(input.inputState.moveY).toBe(0);
     });
 
     test('WhenAAndDPressed_ShouldCancelHorizontalMovement', () => {
-      input.keysPressed.add('a');
-      input.keysPressed.add('d');
+      input.keysPressed.add('KeyA');
+      input.keysPressed.add('KeyD');
       input.updateMovement();
 
       expect(input.inputState.moveX).toBe(0);
@@ -796,7 +799,7 @@ describe('Input', () => {
 
     test('WhenTouchActive_ShouldOverrideKeyboardInput', () => {
       // Press keyboard keys
-      const keyEvent = new KeyboardEvent('keydown', { key: 'w' });
+      const keyEvent = new KeyboardEvent('keydown', { code: 'KeyW' });
       input.handleKeyDown(keyEvent);
 
       // Verify keyboard sets movement
