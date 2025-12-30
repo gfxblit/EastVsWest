@@ -165,9 +165,7 @@ export class SessionPlayersSnapshot {
 
   /**
    * Handle movement update broadcasts
-   * Handles both formats:
-   * - Direct format: { player_id, position_x, position_y, rotation, velocity_x, velocity_y }
-   * - Nested format: { player_id, position: {x, y}, rotation, velocity: {x, y} }
+   * Uses flattened format: { player_id, position_x, position_y, rotation, velocity_x, velocity_y, health }
    */
   #handleMovementUpdate(payload) {
     const player_id = payload.player_id || payload.from;
@@ -178,51 +176,40 @@ export class SessionPlayersSnapshot {
       return;
     }
 
-    // Handle nested position format (from movement_update/movement_broadcast)
+    // Handle flattened position format (preferred)
+    if (payload.position_x !== undefined) {
+      player.position_x = payload.position_x;
+    }
+    if (payload.position_y !== undefined) {
+      player.position_y = payload.position_y;
+    }
+
+    // Handle legacy nested position format
     if (payload.position) {
-      if (payload.position.x !== undefined) {
-        player.position_x = payload.position.x;
-      }
-      if (payload.position.y !== undefined) {
-        player.position_y = payload.position.y;
-      }
-    }
-    // Handle direct format (for backwards compatibility)
-    else {
-      if (payload.position_x !== undefined) {
-        player.position_x = payload.position_x;
-      }
-      if (payload.position_y !== undefined) {
-        player.position_y = payload.position_y;
-      }
+      if (payload.position.x !== undefined) player.position_x = payload.position.x;
+      if (payload.position.y !== undefined) player.position_y = payload.position.y;
     }
 
-    // Handle nested velocity format
+    // Handle flattened velocity format (preferred)
+    if (payload.velocity_x !== undefined) {
+      player.velocity_x = payload.velocity_x;
+    }
+    if (payload.velocity_y !== undefined) {
+      player.velocity_y = payload.velocity_y;
+    }
+
+    // Handle legacy nested velocity format
     if (payload.velocity) {
-      if (payload.velocity.x !== undefined) {
-        player.velocity_x = payload.velocity.x;
-      }
-      if (payload.velocity.y !== undefined) {
-        player.velocity_y = payload.velocity.y;
-      }
-    }
-    // Handle direct velocity format
-    else {
-      if (payload.velocity_x !== undefined) {
-        player.velocity_x = payload.velocity_x;
-      }
-      if (payload.velocity_y !== undefined) {
-        player.velocity_y = payload.velocity_y;
-      }
+      if (payload.velocity.x !== undefined) player.velocity_x = payload.velocity.x;
+      if (payload.velocity.y !== undefined) player.velocity_y = payload.velocity.y;
     }
 
-    // Update rotation (works for both formats)
+    // Update rotation
     if (payload.rotation !== undefined) {
       player.rotation = payload.rotation;
     }
 
     // Update health (in-memory only)
-    // NOTE: Health persistence is handled by Network.js (host authority)
     if (payload.health !== undefined) {
       player.health = payload.health;
     }

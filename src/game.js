@@ -146,9 +146,9 @@ export class Game {
   sendLocalPlayerPosition() {
     if (!this.localPlayer) return;
 
-    // Throttle to configured rate
+    // Throttle to configured interval
     const now = Date.now();
-    const minInterval = 1000 / CONFIG.NETWORK.GAME_SIMULATION_RATE;
+    const minInterval = CONFIG.NETWORK.GAME_SIMULATION_INTERVAL_MS;
     if (now - this.lastPositionSendTime < minInterval) {
       return;
     }
@@ -173,11 +173,13 @@ export class Game {
       return; // No change, don't send
     }
 
-    // Send movement update (including health and velocity)
+    // Send movement update (including health and velocity) using flattened format
     this.network.sendMovementUpdate({
-      position: { x: this.localPlayer.x, y: this.localPlayer.y },
+      position_x: this.localPlayer.x,
+      position_y: this.localPlayer.y,
       rotation: this.localPlayer.rotation,
-      velocity: this.localPlayer.velocity,
+      velocity_x: this.localPlayer.velocity.x,
+      velocity_y: this.localPlayer.velocity.y,
       health: this.localPlayer.health,
     });
 

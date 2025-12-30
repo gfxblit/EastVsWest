@@ -285,11 +285,13 @@ describe('SessionPlayersSnapshot Integration with Network', () => {
       playerNetwork.on('movement_update', eventHandler);
 
       // Send actual movement update through Network channel
-      // This broadcasts directly to all peers
+      // This broadcasts directly to all peers using flattened format
       hostNetwork.sendMovementUpdate({
-        position: { x: 100, y: 200 },
+        position_x: 100,
+        position_y: 200,
         rotation: 1.57,
-        velocity: { x: 0, y: 0 },
+        velocity_x: 0,
+        velocity_y: 0,
       });
 
       // First, verify that the movement_update event reaches playerNetwork

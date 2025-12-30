@@ -264,13 +264,15 @@ describe('SessionPlayersSnapshot (Built on Network)', () => {
       snapshot = new SessionPlayersSnapshot(mockNetwork, TEST_SESSION_ID);
       await snapshot.ready();
 
-      // Simulate Network emitting movement_update
+      // Simulate Network emitting movement_update using flattened format
       movementUpdateHandler({
         type: 'movement_update',
         from: TEST_PLAYER_ID,
         data: {
-          position: { x: 300, y: 400 },
-          velocity: { x: 10, y: 20 },
+          position_x: 300,
+          position_y: 400,
+          velocity_x: 10,
+          velocity_y: 20,
           rotation: 1.57,
         },
       });
@@ -282,6 +284,42 @@ describe('SessionPlayersSnapshot (Built on Network)', () => {
       expect(player.velocity_x).toBe(10);
       expect(player.velocity_y).toBe(20);
       expect(player.rotation).toBe(1.57);
+    });
+
+    test('WhenNetworkEmitsMovementUpdateUsingLegacyNestedFormat_ShouldStillUpdate', async () => {
+      const mockPlayers = [createMockPlayer({ position_x: 100, position_y: 200 })];
+
+      mockSupabaseClient.from().select().eq.mockResolvedValue({
+        data: mockPlayers,
+        error: null,
+      });
+
+      let movementUpdateHandler;
+      mockNetwork.on.mockImplementation((event, handler) => {
+        if (event === 'movement_update') {
+          movementUpdateHandler = handler;
+        }
+      });
+
+      snapshot = new SessionPlayersSnapshot(mockNetwork, TEST_SESSION_ID);
+      await snapshot.ready();
+
+      // Simulate Network emitting movement_update using legacy nested format
+      movementUpdateHandler({
+        type: 'movement_update',
+        from: TEST_PLAYER_ID,
+        data: {
+          position: { x: 500, y: 600 },
+          velocity: { x: 50, y: 60 },
+        },
+      });
+
+      // Should still update position and velocity in memory
+      const player = snapshot.getPlayers().get(TEST_PLAYER_ID);
+      expect(player.position_x).toBe(500);
+      expect(player.position_y).toBe(600);
+      expect(player.velocity_x).toBe(50);
+      expect(player.velocity_y).toBe(60);
     });
 
     test('WhenNetworkEmitsMovementUpdateWithHealth_ShouldUpdatePlayerHealth', async () => {

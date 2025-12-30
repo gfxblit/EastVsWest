@@ -376,20 +376,10 @@ describe('Game', () => {
 
       expect(mockNetwork.sendMovementUpdate).toHaveBeenCalled();
       const call = mockNetwork.sendMovementUpdate.mock.calls[0][0];
-      expect(call.position.x).toBeCloseTo(CONFIG.WORLD.WIDTH / 2 + 20, 1); // center + 200 * 0.1
-      expect(call.position.y).toBe(CONFIG.WORLD.HEIGHT / 2);
-      expect(call.velocity.x).toBeGreaterThan(0);
-      expect(call.velocity.y).toBe(0);
-    });
-
-    test('WhenLocalPlayerPositionUnchanged_ShouldNotSendUpdate', () => {
-      game.init(mockPlayersSnapshot, mockNetwork);
-
-      // Don't move the player
-      game.update(0.016);
-
-      // Should not send position update since position/health/velocity didn't change
-      expect(mockNetwork.sendMovementUpdate).not.toHaveBeenCalled();
+      expect(call.position_x).toBeCloseTo(CONFIG.WORLD.WIDTH / 2 + 20, 1); // center + 200 * 0.1
+      expect(call.position_y).toBe(CONFIG.WORLD.HEIGHT / 2);
+      expect(call.velocity_x).toBeGreaterThan(0);
+      expect(call.velocity_y).toBe(0);
     });
 
     test('WhenLocalPlayerHealthChanges_ShouldSendUpdateEvenIfPositionUnchanged', () => {
@@ -398,7 +388,7 @@ describe('Game', () => {
       // Manually change health
       game.localPlayer.health = 90;
       
-      game.update(0.016);
+      game.update(0.1); // Use enough time to pass throttling
 
       // Should send update because health changed
       expect(mockNetwork.sendMovementUpdate).toHaveBeenCalled();

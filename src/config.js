@@ -178,8 +178,7 @@ export const CONFIG = {
 
   // Network Settings
   NETWORK: {
-    GAME_SIMULATION_RATE: 20, // position updates per second (20 Hz as per NETWORK_DESIGN.md)
-    GAME_SIMULATION_INTERVAL_MS: 50, // interval between position updates (1000ms / 20Hz = 50ms)
+    GAME_SIMULATION_INTERVAL_MS: 50, // interval between position updates (20 Hz = 50ms)
     INTERPOLATION_DELAY_MS: 100,
   },
 

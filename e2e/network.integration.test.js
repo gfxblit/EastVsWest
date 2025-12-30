@@ -278,9 +278,11 @@ describe('Network Module Integration with Supabase', () => {
 
       // Player 1 sends a movement update (broadcasts to all peers)
       const movementData = {
-        position: { x: 100, y: 200 },
+        position_x: 100,
+        position_y: 200,
         rotation: 1.57,
-        velocity: { x: 1.0, y: 0.5 },
+        velocity_x: 1.0,
+        velocity_y: 0.5,
       };
       player1Network.sendMovementUpdate(movementData);
 
@@ -291,14 +293,15 @@ describe('Network Module Integration with Supabase', () => {
       const player2ReceivedUpdate = player2Updates.find(u => u.from === player1Auth.user.id);
       expect(player2ReceivedUpdate).toBeDefined();
       expect(player2ReceivedUpdate.type).toBe('movement_update');
-      expect(player2ReceivedUpdate.data.position).toEqual({ x: 100, y: 200 });
+      expect(player2ReceivedUpdate.data.position_x).toBe(100);
+      expect(player2ReceivedUpdate.data.position_y).toBe(200);
       expect(player2ReceivedUpdate.data.rotation).toBe(1.57);
 
       // Verify host received player1's movement update
       const hostReceivedUpdate = hostUpdates.find(u => u.from === player1Auth.user.id);
       expect(hostReceivedUpdate).toBeDefined();
       expect(hostReceivedUpdate.type).toBe('movement_update');
-      expect(hostReceivedUpdate.data.position).toEqual({ x: 100, y: 200 });
+      expect(hostReceivedUpdate.data.position_x).toBe(100);
 
       // Clean up
       player2Network.off('movement_update', p2Handler);
@@ -339,15 +342,19 @@ describe('Network Module Integration with Supabase', () => {
 
       // Both players send movement updates
       player1Network.sendMovementUpdate({
-        position: { x: 100, y: 200 },
+        position_x: 100,
+        position_y: 200,
         rotation: 0,
-        velocity: { x: 1, y: 0 },
+        velocity_x: 1,
+        velocity_y: 0,
       });
 
       player2Network.sendMovementUpdate({
-        position: { x: 300, y: 400 },
+        position_x: 300,
+        position_y: 400,
         rotation: 1.57,
-        velocity: { x: 0, y: 1 },
+        velocity_x: 0,
+        velocity_y: 1,
       });
 
       // Wait for both updates to reach host
@@ -358,11 +365,13 @@ describe('Network Module Integration with Supabase', () => {
 
       const player1Update = receivedUpdates.find(u => u.from === player1Auth.user.id);
       expect(player1Update).toBeDefined();
-      expect(player1Update.data.position).toEqual({ x: 100, y: 200 });
+      expect(player1Update.data.position_x).toBe(100);
+      expect(player1Update.data.position_y).toBe(200);
 
       const player2Update = receivedUpdates.find(u => u.from === player2Auth.user.id);
       expect(player2Update).toBeDefined();
-      expect(player2Update.data.position).toEqual({ x: 300, y: 400 });
+      expect(player2Update.data.position_x).toBe(300);
+      expect(player2Update.data.position_y).toBe(400);
 
       // Clean up
       network.off('movement_update', hostHandler);
@@ -386,9 +395,11 @@ describe('Network Module Integration with Supabase', () => {
 
       // Host sends movement update
       const movementData = {
-        position: { x: 10, y: 10 },
+        position_x: 10,
+        position_y: 10,
         rotation: 0,
-        velocity: { x: 0, y: 0 },
+        velocity_x: 0,
+        velocity_y: 0,
       };
       network.sendMovementUpdate(movementData);
 
@@ -399,7 +410,8 @@ describe('Network Module Integration with Supabase', () => {
       expect(hostLocalUpdates.length).toBe(1);
       expect(hostLocalUpdates[0].from).toBe(hostUser.id);
       expect(hostLocalUpdates[0].type).toBe('movement_update');
-      expect(hostLocalUpdates[0].data.position).toEqual({ x: 10, y: 10 });
+      expect(hostLocalUpdates[0].data.position_x).toBe(10);
+      expect(hostLocalUpdates[0].data.position_y).toBe(10);
 
       // Clean up
       network.off('movement_update', hostHandler);

@@ -44,7 +44,7 @@ describe('Game Position Throttling', () => {
     mockNetwork.sendMovementUpdate.mockClear();
 
     // Advance time by slightly less than the update interval
-    const intervalMs = 1000 / CONFIG.NETWORK.GAME_SIMULATION_RATE; // 50ms
+    const intervalMs = CONFIG.NETWORK.GAME_SIMULATION_INTERVAL_MS; // 50ms
     jest.setSystemTime(t0 + intervalMs - 5);
     
     // Move player again and update

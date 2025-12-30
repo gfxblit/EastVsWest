@@ -444,9 +444,11 @@ describe('Network', () => {
           network.channel = mockChannel;
 
           const movementData = {
-            position: { x: 100, y: 200 },
+            position_x: 100,
+            position_y: 200,
             rotation: 1.57,
-            velocity: { x: 1.0, y: 0.5 },
+            velocity_x: 1.0,
+            velocity_y: 0.5,
           };
 
           network.sendMovementUpdate(movementData);
@@ -471,9 +473,11 @@ describe('Network', () => {
           network.channel = mockChannel;
 
           const movementData = {
-            position: { x: 100, y: 200 },
+            position_x: 100,
+            position_y: 200,
             rotation: 1.57,
-            velocity: { x: 1.0, y: 0.5 },
+            velocity_x: 1.0,
+            velocity_y: 0.5,
           };
 
           network.sendMovementUpdate(movementData);
@@ -486,9 +490,11 @@ describe('Network', () => {
           const consoleWarnSpy = jest.spyOn(console, 'warn').mockImplementation(() => {});
 
           const movementData = {
-            position: { x: 100, y: 200 },
+            position_x: 100,
+            position_y: 200,
             rotation: 1.57,
-            velocity: { x: 1.0, y: 0.5 },
+            velocity_x: 1.0,
+            velocity_y: 0.5,
           };
 
           network.sendMovementUpdate(movementData);
@@ -555,11 +561,13 @@ describe('Network', () => {
         update: mockUpdate
       }));
 
-      const position = { x: 100, y: 200 };
+      const posX = 100;
+      const posY = 200;
       const rotation = 1.5;
-      const velocity = { x: 1, y: 2 };
+      const velX = 1;
+      const velY = 2;
 
-      await network.writeMovementToDB(position, rotation, velocity);
+      await network.writeMovementToDB(posX, posY, rotation, velX, velY);
 
       expect(mockSupabaseClient.from).toHaveBeenCalledWith('session_players');
       expect(mockUpdate).toHaveBeenCalledWith({
@@ -587,7 +595,7 @@ describe('Network', () => {
         update: mockUpdate
       }));
 
-      await network.writeMovementToDB({ x: 50, y: 75 }, 0.5, { x: 0, y: 0 });
+      await network.writeMovementToDB(50, 75, 0.5, 0, 0);
 
       expect(mockEq1).toHaveBeenCalledWith('session_id', 'test-session-id');
       expect(mockEq2).toHaveBeenCalledWith('player_id', MOCK_HOST_ID);
@@ -605,7 +613,7 @@ describe('Network', () => {
         })
       }));
 
-      await network.writeMovementToDB({ x: 100, y: 200 }, 0, { x: 0, y: 0 });
+      await network.writeMovementToDB(100, 200, 0, 0, 0);
 
       expect(consoleErrorSpy).toHaveBeenCalledWith(
         'Failed to write movement to DB:',

@@ -64,7 +64,7 @@ describe('Network', () => {
     network.channel = mockChannel;
 
     // Act
-    network.sendMovementUpdate({ position: { x: 100, y: 200 }, velocity: { x: 0, y: 0 } });
+    network.sendMovementUpdate({ position_x: 100, position_y: 200, velocity_x: 0, velocity_y: 0 });
 
     // Assert
     expect(mockChannel.send).toHaveBeenCalledWith(expect.objectContaining({
@@ -125,7 +125,7 @@ describe('Network Integration', () => {
     const broadcasts = [];
     playerNetwork.on('movement_update', (msg) => broadcasts.push(msg));
 
-    playerNetwork.sendMovementUpdate({ position: { x: 100, y: 200 }, velocity: { x: 0, y: 0 } });
+    playerNetwork.sendMovementUpdate({ position_x: 100, position_y: 200, velocity_x: 0, velocity_y: 0 });
     await new Promise(resolve => setTimeout(resolve, 100));
 
     expect(broadcasts.length).toBeGreaterThan(0);

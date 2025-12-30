@@ -54,7 +54,7 @@ describe('Position Synchronization Integration', () => {
     const newVelocity = { x: 10.5, y: 20.5 };
 
     // 3. Call writeMovementToDB
-    await network.writeMovementToDB(newPosition, newRotation, newVelocity);
+    await network.writeMovementToDB(newPosition.x, newPosition.y, newRotation, newVelocity.x, newVelocity.y);
 
     // 4. Verify in Database
     const { data: playerDbData, error: playerDbError } = await supabaseClient
@@ -134,7 +134,7 @@ describe('Position Synchronization Integration', () => {
     // 4. Host (Player A) writes new position to DB
     const newPos = { x: 800, y: 600 };
     const newVel = { x: 10, y: 20 };
-    await network.writeMovementToDB(newPos, 0, newVel);
+    await network.writeMovementToDB(newPos.x, newPos.y, 0, newVel.x, newVel.y);
 
     // 5. Wait for Snapshot B to refresh
     await waitFor(() => {

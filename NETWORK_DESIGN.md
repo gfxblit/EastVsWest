@@ -346,9 +346,11 @@ We keep the lobby in sync by treating the database as the single source of truth
   from: 'player_uuid',
   timestamp: 1703001234567,
   data: {
-    position: { x: 123.45, y: 678.90 },
+    position_x: 123.45,
+    position_y: 678.90,
     rotation: 1.57,  // radians
-    velocity: { x: 1.0, y: 0.0 },
+    velocity_x: 1.0,
+    velocity_y: 0.0,
     health: 95.5
   }
 }

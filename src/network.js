@@ -285,7 +285,7 @@ export class Network extends EventEmitter {
     this.emit('movement_update', message);
   }
 
-  async writeMovementToDB(position, rotation, velocity) {
+  async writeMovementToDB(position_x, position_y, rotation, velocity_x, velocity_y) {
     if (!this.supabase || !this.sessionId || !this.playerId) {
       console.error('Cannot write movement to DB: missing supabase, sessionId, or playerId');
       return;
@@ -294,11 +294,11 @@ export class Network extends EventEmitter {
     const { error } = await this.supabase
       .from('session_players')
       .update({
-        position_x: position.x,
-        position_y: position.y,
-        velocity_x: velocity.x,
-        velocity_y: velocity.y,
-        rotation: rotation,
+        position_x,
+        position_y,
+        velocity_x,
+        velocity_y,
+        rotation,
       })
       .eq('session_id', this.sessionId)
       .eq('player_id', this.playerId);
@@ -337,23 +337,27 @@ export class Network extends EventEmitter {
   startPeriodicMovementWrite(positionGetter, rotationGetter, velocityGetter) {
     if (this.movementWriteInterval) return; // Already running
 
-    // Write immediately
-    const position = typeof positionGetter === 'function' ? positionGetter() : positionGetter;
-    const rotation = typeof rotationGetter === 'function' ? rotationGetter() : rotationGetter;
-    const velocity = typeof velocityGetter === 'function' ? velocityGetter() : velocityGetter;
-    this.writeMovementToDB(position, rotation, velocity).catch(err => {
-      console.error('Failed to perform immediate movement write:', err);
-    });
-
-    // Then write periodically at the same rate as snapshot refresh (60 seconds)
-    this.movementWriteInterval = setInterval(() => {
+    const performWrite = () => {
       const position = typeof positionGetter === 'function' ? positionGetter() : positionGetter;
       const rotation = typeof rotationGetter === 'function' ? rotationGetter() : rotationGetter;
       const velocity = typeof velocityGetter === 'function' ? velocityGetter() : velocityGetter;
-      this.writeMovementToDB(position, rotation, velocity).catch(err => {
-        console.error('Failed to perform periodic movement write:', err);
+      
+      this.writeMovementToDB(
+        position.x, 
+        position.y, 
+        rotation, 
+        velocity.x, 
+        velocity.y
+      ).catch(err => {
+        console.error('Failed to perform movement write:', err);
       });
-    }, 60000); // 60 seconds
+    };
+
+    // Write immediately
+    performWrite();
+
+    // Then write periodically at the same rate as snapshot refresh (60 seconds)
+    this.movementWriteInterval = setInterval(performWrite, 60000); // 60 seconds
   }
 
   stopPeriodicMovementWrite() {
