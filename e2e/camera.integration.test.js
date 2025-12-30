@@ -4,39 +4,81 @@
  */
 
 import puppeteer from 'puppeteer';
-import { fileURLToPath } from 'url';
-import { dirname, join } from 'path';
+import { startViteServer, stopViteServer } from './helpers/vite-server.js';
 import { getPuppeteerConfig } from './helpers/puppeteer-config.js';
-
-const __filename = fileURLToPath(import.meta.url);
-const __dirname = dirname(__filename);
 
 describe('Camera Follow System Integration', () => {
   let browser;
   let page;
+  let serverUrl;
 
   beforeAll(async () => {
+    // Start Vite dev server
+    serverUrl = await startViteServer();
     browser = await puppeteer.launch(getPuppeteerConfig());
-    page = await browser.newPage();
-  });
+  }, 60000);
 
   afterAll(async () => {
     await browser.close();
+    await stopViteServer();
+  });
+
+  beforeEach(async () => {
+    page = await browser.newPage();
+    
+    // Set viewport to match test expectations (1200px width -> 600px half-width)
+    await page.setViewport({ width: 1200, height: 800 });
+
+    await page.goto(serverUrl);
+
+    // Wait for app to initialize
+    await page.waitForSelector('body.loaded', { timeout: 10000 });
+
+    // Host and start a game to initialize the game environment
+    await page.click('#host-game-btn');
+    
+    // Wait for lobby and start button (host sees start button)
+    await page.waitForSelector('#start-game-btn:not(.hidden)', { timeout: 10000 });
+    
+    // Start the game
+    await page.click('#start-game-btn');
+    
+    // Wait for game canvas to be visible
+    await page.waitForSelector('#game-canvas', { timeout: 10000 });
+    
+    // Give a moment for game initialization to complete
+    await new Promise(resolve => setTimeout(resolve, 1000));
+    
+    // Ensure focus on canvas for input
+    await page.click('#game-canvas');
+
+    // Teleport player to center of map (1200, 800) to ensure camera can move freely
+    await page.evaluate(() => {
+      if (window.game && window.game.localPlayer) {
+        window.game.localPlayer.x = 1200;
+        window.game.localPlayer.y = 800;
+        // Also reset velocity
+        window.game.localPlayer.velocity = { x: 0, y: 0 };
+        // Force camera update immediately
+        if (window.camera) {
+            window.camera.update(1200, 800, 1.0); // Snap to position
+        }
+      }
+    });
+    
+    // Wait for camera to settle
+    await new Promise(resolve => setTimeout(resolve, 200));
+  });
+
+  afterEach(async () => {
+    await page.close();
   });
 
   test('WhenPlayerMoves_CameraShouldFollowLocalPlayer', async () => {
-    // Arrange
-    const indexPath = join(__dirname, '..', 'index.html');
-    await page.goto('file://' + indexPath);
-
-    // Wait for game to load
-    await page.waitForSelector('#game-canvas');
-
     // Get initial camera position
     const initialCameraPos = await page.evaluate(() => {
-      // Access the game instance from the global window object (may need adjustment)
-      if (window.game && window.game.camera) {
-        return { x: window.game.camera.x, y: window.game.camera.y };
+      if (window.camera) {
+        return { x: window.camera.x, y: window.camera.y };
       }
       return null;
     });
@@ -51,8 +93,8 @@ describe('Camera Follow System Integration', () => {
 
     // Assert
     const newCameraPos = await page.evaluate(() => {
-      if (window.game && window.game.camera) {
-        return { x: window.game.camera.x, y: window.game.camera.y };
+      if (window.camera) {
+        return { x: window.camera.x, y: window.camera.y };
       }
       return null;
     });
@@ -63,22 +105,17 @@ describe('Camera Follow System Integration', () => {
   }, 10000);
 
   test('WhenPlayerAtWorldEdge_CameraShouldBeClampedToWorldBounds', async () => {
-    // Arrange
-    const indexPath = join(__dirname, '..', 'index.html');
-    await page.goto('file://' + indexPath);
-    await page.waitForSelector('#game-canvas');
-
     // Act - Move player to far left edge
     await page.keyboard.down('a'); // Move left
-    await new Promise(resolve => setTimeout(resolve, 3000)); // Move for a while
+    await new Promise(resolve => setTimeout(resolve, 4000)); // Move for a while (was 3000)
     await page.keyboard.up('a');
 
     await new Promise(resolve => setTimeout(resolve, 200));
 
     // Assert
     const cameraPos = await page.evaluate(() => {
-      if (window.game && window.game.camera) {
-        return { x: window.game.camera.x, y: window.game.camera.y };
+      if (window.camera) {
+        return { x: window.camera.x, y: window.camera.y };
       }
       return null;
     });
@@ -89,11 +126,6 @@ describe('Camera Follow System Integration', () => {
   }, 15000);
 
   test('WhenConflictZoneRendered_ShouldStayAtFixedWorldPosition', async () => {
-    // Arrange
-    const indexPath = join(__dirname, '..', 'index.html');
-    await page.goto('file://' + indexPath);
-    await page.waitForSelector('#game-canvas');
-
     // Get conflict zone position (should be at world center 1200, 800)
     const conflictZonePos = await page.evaluate(() => {
       if (window.game && window.game.getState) {
@@ -113,11 +145,6 @@ describe('Camera Follow System Integration', () => {
   }, 10000);
 
   test('WhenCameraFollows_ShouldUseSmoothInterpolation', async () => {
-    // Arrange
-    const indexPath = join(__dirname, '..', 'index.html');
-    await page.goto('file://' + indexPath);
-    await page.waitForSelector('#game-canvas');
-
     // Record camera positions over time
     const cameraPositions = [];
 
@@ -128,8 +155,8 @@ describe('Camera Follow System Integration', () => {
     for (let i = 0; i < 5; i++) {
       await new Promise(resolve => setTimeout(resolve, 100));
       const pos = await page.evaluate(() => {
-        if (window.game && window.game.camera) {
-          return { x: window.game.camera.x, y: window.game.camera.y };
+        if (window.camera) {
+          return { x: window.camera.x, y: window.camera.y };
         }
         return null;
       });
@@ -152,11 +179,6 @@ describe('Camera Follow System Integration', () => {
   }, 10000);
 
   test('WhenWorldIsLargerThanViewport_PlayerShouldBeAbleToExploreFullWorld', async () => {
-    // Arrange
-    const indexPath = join(__dirname, '..', 'index.html');
-    await page.goto('file://' + indexPath);
-    await page.waitForSelector('#game-canvas');
-
     // Test that player can move to different corners of the world
     // Move to top-left
     await page.keyboard.down('w');

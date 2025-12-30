@@ -12,6 +12,8 @@ CREATE TABLE session_players (
   -- Player state
   position_x REAL DEFAULT 0,
   position_y REAL DEFAULT 0,
+  velocity_x REAL DEFAULT 0,
+  velocity_y REAL DEFAULT 0,
   rotation REAL DEFAULT 0,
   health REAL DEFAULT 100,
 

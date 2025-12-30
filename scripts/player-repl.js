@@ -143,16 +143,19 @@ async function updatePosition(dx, dy) {
   console.log(`   Rotation: ${currentRotation.toFixed(2)}`);
 
   try {
-    // Broadcast position update via Realtime
-    network.sendPositionUpdate({
-      position: currentPosition,
+    // Broadcast movement update via Realtime using flattened format
+    network.sendMovementUpdate({
+      position_x: currentPosition.x,
+      position_y: currentPosition.y,
       rotation: currentRotation,
+      velocity_x: 0,
+      velocity_y: 0,
       health: currentHealth,
     });
     console.log('   ✅ Broadcasted via Realtime');
 
-    // Write to database
-    await network.writePositionToDB(currentPosition, currentRotation, currentHealth);
+    // Write to database using flattened parameters
+    await network.writeMovementToDB(currentPosition.x, currentPosition.y, currentRotation, 0, 0);
     console.log('   ✅ Written to database\n');
 
   } catch (error) {

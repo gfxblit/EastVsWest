@@ -406,9 +406,9 @@ class App {
     // Listen to resize (covers most cases including orientation change)
     window.addEventListener('resize', this.handleResize);
 
-    // Start periodic position DB writes if we have a session
+    // Start periodic movement DB writes if we have a session
     if (this.playersSnapshot && this.network) {
-      this.network.startPeriodicPositionWrite(
+      this.network.startPeriodicMovementWrite(
         () => {
           const localPlayer = this.game.getLocalPlayer();
           return localPlayer ? { x: localPlayer.x, y: localPlayer.y } : { x: 0, y: 0 };
@@ -416,6 +416,10 @@ class App {
         () => {
           const localPlayer = this.game.getLocalPlayer();
           return localPlayer ? localPlayer.rotation : 0;
+        },
+        () => {
+          const localPlayer = this.game.getLocalPlayer();
+          return localPlayer ? { x: localPlayer.velocity.x, y: localPlayer.velocity.y } : { x: 0, y: 0 };
         }
       );
     }

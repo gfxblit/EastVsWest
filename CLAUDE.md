@@ -64,12 +64,12 @@ describe('Network', () => {
     network.channel = mockChannel;
 
     // Act
-    network.sendPositionUpdate({ position: { x: 100, y: 200 } });
+    network.sendMovementUpdate({ position_x: 100, position_y: 200, velocity_x: 0, velocity_y: 0 });
 
     // Assert
     expect(mockChannel.send).toHaveBeenCalledWith(expect.objectContaining({
       type: 'broadcast',
-      payload: expect.objectContaining({ type: 'position_update' })
+      payload: expect.objectContaining({ type: 'movement_update' })
     }));
   });
 });
@@ -109,7 +109,7 @@ describe('Network Integration', () => {
     hostNetwork.initialize(supabaseClient, data.user.id);
   });
 
-  test('should send position updates through real Supabase channel', async () => {
+  test('should send movement updates through real Supabase channel', async () => {
     // Test with real Supabase Realtime channels
     const { session } = await hostNetwork.hostGame('Host');
 
@@ -123,11 +123,9 @@ describe('Network Integration', () => {
 
     // Test real message flow
     const broadcasts = [];
-    playerNetwork.on('position_broadcast', (msg) => broadcasts.push(msg));
+    playerNetwork.on('movement_update', (msg) => broadcasts.push(msg));
 
-    playerNetwork.sendPositionUpdate({ position: { x: 100, y: 200 } });
-    await new Promise(resolve => setTimeout(resolve, 100));
-    hostNetwork.broadcastPositionUpdates();
+    playerNetwork.sendMovementUpdate({ position_x: 100, position_y: 200, velocity_x: 0, velocity_y: 0 });
     await new Promise(resolve => setTimeout(resolve, 100));
 
     expect(broadcasts.length).toBeGreaterThan(0);
@@ -338,14 +336,12 @@ The project uses [Jest](https://jestjs.io/) for unit and integration testing and
 **Phase 2 (Write Tests) should include BOTH:**
 
 1. **Unit Tests First**: Write mocked unit tests for individual methods
-   - Test `sendPositionUpdate()` with mocked channel
-   - Test `broadcastPositionUpdates()` with mocked buffer
+   - Test `sendMovementUpdate()` with mocked channel
    - Run: `npm test src/network.test.js`
 
 2. **Integration Tests Second**: Write integration tests for real network flow
-   - Test actual position update flow through Supabase Realtime
-   - Test multiple clients sending and receiving position broadcasts
-   - Test message batching with real timing
+   - Test actual movement update flow through Supabase Realtime
+   - Test multiple clients sending and receiving movement updates
    - Run: `npm run test:e2e e2e/network.integration.test.js`
 
 **Phase 5 (Final Verification) must verify BOTH:**

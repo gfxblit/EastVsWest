@@ -82,9 +82,9 @@ export class SessionPlayersSnapshot {
     // Subscribe to Network's generic postgres_changes events
     this.network.on('postgres_changes', this.postgresChangesHandler);
 
-    // Subscribe to Network's position_update events
+    // Subscribe to Network's movement_update events
     // All clients broadcast directly, no host rebroadcasting
-    this.network.on('position_update', this.broadcastHandler);
+    this.network.on('movement_update', this.broadcastHandler);
   }
 
   /**
@@ -110,21 +110,21 @@ export class SessionPlayersSnapshot {
   }
 
   /**
-   * Handle position_update events from Network
+   * Handle movement_update events from Network
    */
   #handleBroadcast(message) {
-    if (message.type === 'position_update') {
-      this.#handlePositionUpdate({
+    if (message.type === 'movement_update') {
+      this.#handleMovementUpdate({
         ...message.data,
         player_id: message.from,
       });
     }
-    // Handle position_broadcast (batched updates from host)
-    else if (message.type === 'position_broadcast') {
+    // Handle movement_broadcast (batched updates from host)
+    else if (message.type === 'movement_broadcast') {
       const { updates } = message.data;
       if (updates && Array.isArray(updates)) {
         updates.forEach(update => {
-          this.#handlePositionUpdate(update);
+          this.#handleMovementUpdate(update);
         });
       }
     }
@@ -164,12 +164,10 @@ export class SessionPlayersSnapshot {
   }
 
   /**
-   * Handle position update broadcasts
-   * Handles both formats:
-   * - Direct format: { player_id, position_x, position_y, rotation }
-   * - Nested format: { player_id, position: {x, y}, rotation, velocity }
+   * Handle movement update broadcasts
+   * Uses flattened format: { player_id, position_x, position_y, rotation, velocity_x, velocity_y, health }
    */
-  #handlePositionUpdate(payload) {
+  #handleMovementUpdate(payload) {
     const player_id = payload.player_id || payload.from;
     const player = this.players.get(player_id);
 
@@ -178,32 +176,40 @@ export class SessionPlayersSnapshot {
       return;
     }
 
-    // Handle nested position format (from position_update/position_broadcast)
-    if (payload.position) {
-      if (payload.position.x !== undefined) {
-        player.position_x = payload.position.x;
-      }
-      if (payload.position.y !== undefined) {
-        player.position_y = payload.position.y;
-      }
+    // Handle flattened position format (preferred)
+    if (payload.position_x !== undefined) {
+      player.position_x = payload.position_x;
     }
-    // Handle direct format (for backwards compatibility)
-    else {
-      if (payload.position_x !== undefined) {
-        player.position_x = payload.position_x;
-      }
-      if (payload.position_y !== undefined) {
-        player.position_y = payload.position_y;
-      }
+    if (payload.position_y !== undefined) {
+      player.position_y = payload.position_y;
     }
 
-    // Update rotation (works for both formats)
+    // Handle legacy nested position format
+    if (payload.position) {
+      if (payload.position.x !== undefined) player.position_x = payload.position.x;
+      if (payload.position.y !== undefined) player.position_y = payload.position.y;
+    }
+
+    // Handle flattened velocity format (preferred)
+    if (payload.velocity_x !== undefined) {
+      player.velocity_x = payload.velocity_x;
+    }
+    if (payload.velocity_y !== undefined) {
+      player.velocity_y = payload.velocity_y;
+    }
+
+    // Handle legacy nested velocity format
+    if (payload.velocity) {
+      if (payload.velocity.x !== undefined) player.velocity_x = payload.velocity.x;
+      if (payload.velocity.y !== undefined) player.velocity_y = payload.velocity.y;
+    }
+
+    // Update rotation
     if (payload.rotation !== undefined) {
       player.rotation = payload.rotation;
     }
 
     // Update health (in-memory only)
-    // NOTE: Health persistence is handled by Network.js (host authority)
     if (payload.health !== undefined) {
       player.health = payload.health;
     }
@@ -266,7 +272,7 @@ export class SessionPlayersSnapshot {
     // Unsubscribe from Network events
     if (this.network) {
       this.network.off('postgres_changes', this.postgresChangesHandler);
-      this.network.off('position_update', this.broadcastHandler);
+      this.network.off('movement_update', this.broadcastHandler);
     }
   }
 }
