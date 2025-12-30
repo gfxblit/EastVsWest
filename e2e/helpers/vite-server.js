@@ -50,7 +50,11 @@ export async function startViteServer() {
     });
 
     viteProcess.stderr.on('data', (data) => {
-      console.error('Vite server error:', data.toString());
+      const message = data.toString();
+      console.error('Vite server error:', message);
+      if (message.includes('Port') && message.includes('is already in use')) {
+        reject(new Error(`Vite server port conflict: ${message.trim()}`));
+      }
     });
 
     viteProcess.on('error', (error) => {

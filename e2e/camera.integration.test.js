@@ -19,11 +19,16 @@ describe('Camera Follow System Integration', () => {
   }, 60000);
 
   afterAll(async () => {
-    await browser.close();
+    if (browser) {
+      await browser.close();
+    }
     await stopViteServer();
   });
 
   beforeEach(async () => {
+    if (!browser) {
+      throw new Error('Browser not initialized. Check beforeAll failure.');
+    }
     page = await browser.newPage();
     
     // Set viewport to match test expectations (1200px width -> 600px half-width)
@@ -71,7 +76,9 @@ describe('Camera Follow System Integration', () => {
   });
 
   afterEach(async () => {
-    await page.close();
+    if (page) {
+      await page.close();
+    }
   });
 
   test('WhenPlayerMoves_CameraShouldFollowLocalPlayer', async () => {

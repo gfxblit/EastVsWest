@@ -20,11 +20,16 @@ describe('Lobby UI Interactions', () => {
   }, 60000); // Increase timeout for server startup
 
   afterAll(async () => {
-    await browser.close();
+    if (browser) {
+      await browser.close();
+    }
     await stopViteServer();
   });
 
   beforeEach(async () => {
+    if (!browser) {
+      throw new Error('Browser not initialized. Check beforeAll failure.');
+    }
     page = await browser.newPage();
 
     await page.goto(serverUrl);
@@ -34,7 +39,9 @@ describe('Lobby UI Interactions', () => {
   });
 
   afterEach(async () => {
-    await page.close();
+    if (page) {
+      await page.close();
+    }
   });
 
   describe('Lobby Screen Elements', () => {

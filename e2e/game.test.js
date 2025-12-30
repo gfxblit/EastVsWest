@@ -20,7 +20,9 @@ describe('Conflict Zone: East vs West E2E', () => {
   });
 
   afterAll(async () => {
-    await browser.close();
+    if (browser) {
+      await browser.close();
+    }
   });
 
   test('should load the game page correctly', async () => {
