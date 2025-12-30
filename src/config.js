@@ -166,13 +166,13 @@ export const CONFIG = {
   // Input Settings
   INPUT: {
     KEYBOARD_MOVE_KEYS: {
-      w: { x: 0, y: -1 },
-      a: { x: -1, y: 0 },
-      s: { x: 0, y: 1 },
-      d: { x: 1, y: 0 },
+      KeyW: { x: 0, y: -1 },
+      KeyA: { x: -1, y: 0 },
+      KeyS: { x: 0, y: 1 },
+      KeyD: { x: 1, y: 0 },
     },
-    SPECIAL_ABILITY_KEY: 'q',
-    INTERACT_KEY: 'f',
+    SPECIAL_ABILITY_KEY: 'KeyQ',
+    INTERACT_KEY: 'KeyF',
     MAX_JOYSTICK_DISTANCE: 45, // Maximum distance for virtual joystick movement
   },
 
