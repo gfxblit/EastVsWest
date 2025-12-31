@@ -170,6 +170,11 @@ export const CONFIG = {
       KeyA: { x: -1, y: 0 },
       KeyS: { x: 0, y: 1 },
       KeyD: { x: 1, y: 0 },
+      // Arrow keys for compatibility
+      ArrowUp: { x: 0, y: -1 },
+      ArrowLeft: { x: -1, y: 0 },
+      ArrowDown: { x: 0, y: 1 },
+      ArrowRight: { x: 1, y: 0 },
     },
     SPECIAL_ABILITY_KEY: 'KeyQ',
     INTERACT_KEY: 'KeyF',

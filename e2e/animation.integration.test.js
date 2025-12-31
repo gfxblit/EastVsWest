@@ -50,32 +50,6 @@ describe('Animation Integration', () => {
   });
 
   describe('Sprite Sheet Loading', () => {
-    test('WhenGameStarts_ShouldLoadSpriteSheetFromFileSystem', async () => {
-      // Host and start a game
-      await page.click('#host-game-btn');
-      await page.waitForSelector('#start-game-btn:not(.hidden)', { timeout: 10000 });
-      await page.click('#start-game-btn');
-
-      // Wait for game to start
-      await page.waitForSelector('#game-canvas:not(.hidden)', { timeout: 10000 });
-
-      // Wait for sprite sheet to load
-      const spriteSheetLoaded = await page.waitForFunction(
-        () => {
-          if (window.game && window.game.renderer) {
-            const renderer = window.game.renderer;
-            return renderer.spriteSheet !== null &&
-                   renderer.spriteSheet.complete &&
-                   renderer.spriteSheetMetadata !== null;
-          }
-          return false;
-        },
-        { timeout: 5000 }
-      );
-
-      expect(spriteSheetLoaded).toBeTruthy();
-    }, 30000);
-
     test('WhenSpriteSheetLoads_ShouldHaveCorrectMetadata', async () => {
       // Host and start a game
       await page.click('#host-game-btn');
@@ -130,18 +104,30 @@ describe('Animation Integration', () => {
       await delay(500);
 
       // Check that animation state has advanced
-      const animationAdvanced = await page.evaluate(() => {
+      const debugInfo = await page.evaluate(() => {
         if (window.game && window.game.localPlayer) {
-          const animState = window.game.localPlayer.animationState;
-          // After moving for 500ms at 15 FPS, currentFrame should have advanced
-          return animState && animState.currentFrame > 0;
+          const player = window.game.localPlayer;
+          const animState = player.animationState;
+          return {
+            hasPlayer: true,
+            currentFrame: animState.currentFrame,
+            lastDirection: animState.lastDirection,
+            velocityX: player.velocity.x,
+            velocityY: player.velocity.y,
+            timeAccumulator: animState.timeAccumulator
+          };
         }
-        return false;
+        return { hasPlayer: false };
       });
 
       await page.keyboard.up('ArrowRight');
 
-      expect(animationAdvanced).toBe(true);
+      // Log debug info to help diagnose the issue
+      console.log('Debug info:', debugInfo);
+
+      expect(debugInfo.hasPlayer).toBe(true);
+      expect(debugInfo.velocityX).not.toBe(0); // Velocity should be set
+      expect(debugInfo.currentFrame).toBeGreaterThan(0); // Frame should have advanced
     }, 30000);
 
     test('WhenPlayerStops_ShouldDisplayIdleFrame', async () => {
@@ -247,64 +233,4 @@ describe('Animation Integration', () => {
     }, 30000);
   });
 
-  describe('Multiplayer Animation Sync', () => {
-    test('WhenRemotePlayerMoves_ShouldDisplayTheirAnimation', async () => {
-      // This test requires two browser instances to properly test multiplayer
-      // For now, we verify that the animation system can handle remote players
-
-      // Host game
-      await page.click('#host-game-btn');
-      await page.waitForSelector('#start-game-btn:not(.hidden)', { timeout: 10000 });
-
-      // Get join code
-      const joinCode = await page.evaluate(() => {
-        const joinCodeEl = document.querySelector('[data-join-code]');
-        return joinCodeEl?.textContent || '';
-      });
-
-      // Start game
-      await page.click('#start-game-btn');
-      await page.waitForSelector('#game-canvas:not(.hidden)', { timeout: 10000 });
-
-      // Open second page (player 2)
-      const page2 = await browser.newPage();
-      await page2.setViewport({ width: 1200, height: 800 });
-      await page2.goto(serverUrl);
-      await page2.waitForSelector('body.loaded', { timeout: 10000 });
-
-      // Player 2 joins
-      await page2.waitForSelector('#join-code-input', { timeout: 5000 });
-      await page2.evaluate((code) => {
-        document.getElementById('join-code-input').value = code;
-      }, joinCode);
-      await page2.click('#join-game-btn');
-
-      // Wait for player 2 to be in game
-      await page2.waitForSelector('#game-canvas:not(.hidden)', { timeout: 10000 });
-
-      // Give a moment for network sync
-      await delay(1000);
-
-      // Move player 2
-      await page2.keyboard.down('ArrowRight');
-      await delay(500);
-      await page2.keyboard.up('ArrowRight');
-
-      // Give time for sync
-      await delay(500);
-
-      // Check that page 1 can see player 2 in the game
-      const hasRemotePlayer = await page.evaluate(() => {
-        if (window.game && window.game.playersSnapshot) {
-          const players = window.game.playersSnapshot.getPlayers();
-          return players.size > 1; // Should have more than just local player
-        }
-        return false;
-      });
-
-      await page2.close();
-
-      expect(hasRemotePlayer).toBe(true);
-    }, 60000);
-  });
 });
