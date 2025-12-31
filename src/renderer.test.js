@@ -698,4 +698,238 @@ describe('Renderer', () => {
       });
     });
   });
+
+  describe('Sprite Sheet Animation', () => {
+    describe('loadSpriteSheet', () => {
+      test('WhenLoadingSpriteSheet_ShouldLoadImageAndMetadata', async () => {
+        // Mock fetch for metadata
+        global.fetch = jest.fn(() =>
+          Promise.resolve({
+            ok: true,
+            json: () => Promise.resolve({
+              frameWidth: 96,
+              frameHeight: 96,
+              columns: 6,
+              rows: 8,
+              directions: ['south', 'south-east', 'east', 'north-east', 'north', 'north-west', 'west', 'south-west']
+            })
+          })
+        );
+
+        const newRenderer = new Renderer(canvas);
+
+        // Start loading sprite sheet
+        const loadPromise = newRenderer.loadSpriteSheet();
+
+        // Simulate image load completion after event loop tick
+        setTimeout(() => {
+          if (newRenderer.spriteSheet && newRenderer.spriteSheet.onload) {
+            newRenderer.spriteSheet.onload();
+          }
+        }, 0);
+
+        await loadPromise;
+
+        expect(newRenderer.spriteSheet).toBeDefined();
+        expect(newRenderer.spriteSheetMetadata).toBeDefined();
+        expect(newRenderer.spriteSheetMetadata.frameWidth).toBe(96);
+        expect(newRenderer.spriteSheetMetadata.frameHeight).toBe(96);
+        expect(newRenderer.spriteSheetMetadata.columns).toBe(6);
+        expect(newRenderer.spriteSheetMetadata.rows).toBe(8);
+      });
+
+      test('WhenMetadataLoadFails_ShouldHandleGracefully', async () => {
+        global.fetch = jest.fn(() =>
+          Promise.resolve({
+            ok: false,
+            statusText: 'Not Found'
+          })
+        );
+
+        const newRenderer = new Renderer(canvas);
+        await expect(newRenderer.loadSpriteSheet()).rejects.toThrow();
+      });
+    });
+
+    describe('initAnimationState', () => {
+      test('WhenInitializingAnimationState_ShouldSetDefaultValues', () => {
+        const animState = renderer.initAnimationState();
+
+        expect(animState).toBeDefined();
+        expect(animState.currentFrame).toBe(0);
+        expect(animState.timeAccumulator).toBe(0);
+        expect(animState.lastDirection).toBe(0); // Default to South
+      });
+    });
+
+    describe('updateAnimationState', () => {
+      test('WhenPlayerIsMoving_ShouldAdvanceFrame', () => {
+        const animState = {
+          currentFrame: 0,
+          timeAccumulator: 0,
+          lastDirection: 2 // East
+        };
+
+        const deltaTime = 1 / CONFIG.ANIMATION.FPS; // One frame duration
+        const isMoving = true;
+        const direction = 2; // East
+
+        renderer.updateAnimationState(animState, deltaTime, isMoving, direction);
+
+        expect(animState.currentFrame).toBe(1); // Should advance to next frame
+        expect(animState.timeAccumulator).toBeLessThan(deltaTime);
+        expect(animState.lastDirection).toBe(2); // Should maintain direction
+      });
+
+      test('WhenPlayerIsIdle_ShouldNotAdvanceFrame', () => {
+        const animState = {
+          currentFrame: 3,
+          timeAccumulator: 0,
+          lastDirection: 2 // East
+        };
+
+        const deltaTime = 1 / CONFIG.ANIMATION.FPS; // One frame duration
+        const isMoving = false;
+        const direction = null; // Idle
+
+        renderer.updateAnimationState(animState, deltaTime, isMoving, direction);
+
+        expect(animState.currentFrame).toBe(0); // Should reset to idle frame
+        expect(animState.lastDirection).toBe(2); // Should keep last direction
+      });
+
+      test('WhenFrameExceedsMax_ShouldLoopBackToZero', () => {
+        const animState = {
+          currentFrame: 5, // Last frame
+          timeAccumulator: 0,
+          lastDirection: 4 // North
+        };
+
+        const deltaTime = 1 / CONFIG.ANIMATION.FPS; // One frame duration
+        const isMoving = true;
+        const direction = 4; // North
+
+        renderer.updateAnimationState(animState, deltaTime, isMoving, direction);
+
+        expect(animState.currentFrame).toBe(0); // Should loop back to first frame
+      });
+
+      test('WhenDirectionChanges_ShouldUpdateLastDirection', () => {
+        const animState = {
+          currentFrame: 2,
+          timeAccumulator: 0,
+          lastDirection: 2 // East
+        };
+
+        const deltaTime = 0.01; // Small delta
+        const isMoving = true;
+        const direction = 4; // Changed to North
+
+        renderer.updateAnimationState(animState, deltaTime, isMoving, direction);
+
+        expect(animState.lastDirection).toBe(4); // Should update to new direction
+      });
+    });
+
+    describe('renderPlayerWithSpriteSheet', () => {
+      beforeEach(() => {
+        // Mock sprite sheet as loaded
+        renderer.spriteSheet = {
+          complete: true,
+          naturalWidth: 576, // 6 columns * 96px
+          naturalHeight: 768, // 8 rows * 96px
+        };
+        renderer.spriteSheetMetadata = {
+          frameWidth: 96,
+          frameHeight: 96,
+          columns: 6,
+          rows: 8,
+        };
+
+        ctx.drawImage = jest.fn();
+      });
+
+      test('WhenRenderingPlayerWithSpriteSheet_ShouldDrawCorrectFrame', () => {
+        const player = {
+          id: 'player-1',
+          x: 1500,
+          y: 900,
+          health: 100,
+          animationState: {
+            currentFrame: 2, // Frame 2
+            lastDirection: 4, // North (row 4)
+          },
+        };
+
+        renderer.renderPlayerWithSpriteSheet(player, false);
+
+        // Should draw frame from sprite sheet
+        // sourceX = currentFrame * frameWidth = 2 * 96 = 192
+        // sourceY = lastDirection * frameHeight = 4 * 96 = 384
+        expect(ctx.drawImage).toHaveBeenCalledWith(
+          renderer.spriteSheet,
+          192, // sourceX
+          384, // sourceY
+          96,  // sourceWidth
+          96,  // sourceHeight
+          1500 - CONFIG.RENDER.PLAYER_RADIUS, // destX (centered)
+          900 - CONFIG.RENDER.PLAYER_RADIUS,  // destY (centered)
+          CONFIG.RENDER.PLAYER_RADIUS * 2,    // destWidth
+          CONFIG.RENDER.PLAYER_RADIUS * 2     // destHeight
+        );
+      });
+
+      test('WhenSpriteSheetNotLoaded_ShouldFallbackToPinkRectangle', () => {
+        renderer.spriteSheet = null;
+
+        const player = {
+          id: 'player-1',
+          x: 1500,
+          y: 900,
+          health: 100,
+          animationState: {
+            currentFrame: 0,
+            lastDirection: 0,
+          },
+        };
+
+        renderer.renderPlayerWithSpriteSheet(player, false);
+
+        // Should draw fallback rectangle
+        expect(ctx.fillRect).toHaveBeenCalled();
+        // Check that pink color was set
+        expect(ctx.fillStyle).toContain('ff'); // Pink has high red and blue
+      });
+
+      test('WhenRenderingIdlePlayer_ShouldUseFrame0', () => {
+        const player = {
+          id: 'player-1',
+          x: 1500,
+          y: 900,
+          health: 100,
+          animationState: {
+            currentFrame: 0, // Idle frame
+            lastDirection: 2, // East
+          },
+        };
+
+        renderer.renderPlayerWithSpriteSheet(player, false);
+
+        // Should draw first frame (idle) from East direction row
+        // sourceX = 0 * 96 = 0
+        // sourceY = 2 * 96 = 192
+        expect(ctx.drawImage).toHaveBeenCalledWith(
+          renderer.spriteSheet,
+          0,   // sourceX (idle frame)
+          192, // sourceY (East row)
+          96,
+          96,
+          expect.any(Number),
+          expect.any(Number),
+          expect.any(Number),
+          expect.any(Number)
+        );
+      });
+    });
+  });
 });

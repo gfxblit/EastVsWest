@@ -74,4 +74,28 @@ describe('CONFIG', () => {
     // Weaknesses should be greater than 1.0 (increase damage)
     expect(CONFIG.ARMOR.PLATED.weaknesses.blunt).toBeGreaterThan(1.0);
   });
+
+  describe('Animation Configuration', () => {
+    test('WhenCheckingAnimationConfig_ShouldHaveFPS', () => {
+      expect(CONFIG.ANIMATION).toBeDefined();
+      expect(CONFIG.ANIMATION.FPS).toBe(15);
+    });
+
+    test('WhenCheckingAnimationConfig_ShouldHaveFramesPerDirection', () => {
+      expect(CONFIG.ANIMATION).toBeDefined();
+      expect(CONFIG.ANIMATION.FRAMES_PER_DIRECTION).toBe(6);
+    });
+
+    test('WhenCheckingAssetConfig_ShouldHaveSpriteSheetPath', () => {
+      expect(CONFIG.ASSETS).toBeDefined();
+      expect(CONFIG.ASSETS.SPRITE_SHEET).toBeDefined();
+      expect(CONFIG.ASSETS.SPRITE_SHEET.PATH).toBe('assets/player/player-walk-spritesheet.png');
+    });
+
+    test('WhenCheckingAssetConfig_ShouldHaveSpriteSheetMetadata', () => {
+      expect(CONFIG.ASSETS).toBeDefined();
+      expect(CONFIG.ASSETS.SPRITE_SHEET).toBeDefined();
+      expect(CONFIG.ASSETS.SPRITE_SHEET.METADATA).toBe('assets/player/player-walk-spritesheet.json');
+    });
+  });
 });

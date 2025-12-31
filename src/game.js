@@ -4,6 +4,7 @@
  */
 
 import { CONFIG } from './config.js';
+import { getDirectionFromVelocity } from './animationHelper.js';
 
 export class Game {
   constructor() {
@@ -46,9 +47,14 @@ export class Game {
           health: localPlayerData.health,
           weapon: localPlayerData.equipped_weapon || null,
           armor: localPlayerData.equipped_armor || null,
-          velocity: { 
-            x: localPlayerData.velocity_x || 0, 
-            y: localPlayerData.velocity_y || 0 
+          velocity: {
+            x: localPlayerData.velocity_x || 0,
+            y: localPlayerData.velocity_y || 0
+          },
+          animationState: {
+            currentFrame: 0,
+            timeAccumulator: 0,
+            lastDirection: 0, // Default to South
           },
         };
 
@@ -73,6 +79,11 @@ export class Game {
         armor: null,
         velocity: { x: 0, y: 0 },
         rotation: 0,
+        animationState: {
+          currentFrame: 0,
+          timeAccumulator: 0,
+          lastDirection: 0, // Default to South
+        },
       };
     }
   }
@@ -111,6 +122,30 @@ export class Game {
     // Update player position based on velocity
     this.localPlayer.x += this.localPlayer.velocity.x * deltaTime;
     this.localPlayer.y += this.localPlayer.velocity.y * deltaTime;
+
+    // Calculate direction from velocity for animation
+    const isMoving = this.localPlayer.velocity.x !== 0 || this.localPlayer.velocity.y !== 0;
+    const direction = getDirectionFromVelocity(this.localPlayer.velocity.x, this.localPlayer.velocity.y);
+
+    // Update animation state
+    if (isMoving && direction !== null) {
+      // Player is moving: advance animation frames
+      this.localPlayer.animationState.lastDirection = direction;
+      this.localPlayer.animationState.timeAccumulator += deltaTime;
+
+      const frameDuration = 1 / CONFIG.ANIMATION.FPS;
+      while (this.localPlayer.animationState.timeAccumulator >= frameDuration) {
+        this.localPlayer.animationState.timeAccumulator -= frameDuration;
+        this.localPlayer.animationState.currentFrame++;
+
+        if (this.localPlayer.animationState.currentFrame >= CONFIG.ANIMATION.FRAMES_PER_DIRECTION) {
+          this.localPlayer.animationState.currentFrame = 0;
+        }
+      }
+    } else {
+      // Player is idle: reset to first frame
+      this.localPlayer.animationState.currentFrame = 0;
+    }
 
     // Update rotation based on velocity (if moving)
     if (this.localPlayer.velocity.x !== 0 || this.localPlayer.velocity.y !== 0) {

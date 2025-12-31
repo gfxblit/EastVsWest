@@ -12,6 +12,8 @@ export class Renderer {
     this.bgImage = null;
     this.bgPattern = null;
     this.directionalImages = [];
+    this.spriteSheet = null;
+    this.spriteSheetMetadata = null;
   }
 
   init() {
@@ -296,5 +298,143 @@ export class Renderer {
     this.ctx.fill();
 
     this.ctx.restore();
+  }
+
+  /**
+   * Load sprite sheet image and metadata
+   * @returns {Promise<void>}
+   */
+  async loadSpriteSheet() {
+    const baseUrl = CONFIG.ASSETS.BASE_URL;
+    const normalizedBase = baseUrl.endsWith('/') ? baseUrl : `${baseUrl}/`;
+
+    // Load metadata
+    const metadataPath = `${normalizedBase}${CONFIG.ASSETS.SPRITE_SHEET.METADATA}`;
+    const response = await fetch(metadataPath);
+
+    if (!response.ok) {
+      throw new Error(`Failed to load sprite sheet metadata: ${response.statusText}`);
+    }
+
+    this.spriteSheetMetadata = await response.json();
+
+    // Load sprite sheet image
+    this.spriteSheet = this.createImage(CONFIG.ASSETS.SPRITE_SHEET.PATH);
+
+    // Wait for image to load
+    return new Promise((resolve, reject) => {
+      this.spriteSheet.onload = resolve;
+      this.spriteSheet.onerror = reject;
+    });
+  }
+
+  /**
+   * Initialize animation state for a player
+   * @returns {Object} Animation state { currentFrame, timeAccumulator, lastDirection }
+   */
+  initAnimationState() {
+    return {
+      currentFrame: 0,
+      timeAccumulator: 0,
+      lastDirection: 0, // Default to South
+    };
+  }
+
+  /**
+   * Update animation state based on time and movement
+   * @param {Object} animState - Animation state to update
+   * @param {number} deltaTime - Time since last frame in seconds
+   * @param {boolean} isMoving - Whether the player is moving
+   * @param {number|null} direction - Direction index (0-7) or null if idle
+   */
+  updateAnimationState(animState, deltaTime, isMoving, direction) {
+    if (!isMoving || direction === null) {
+      // Idle: reset to first frame
+      animState.currentFrame = 0;
+      return;
+    }
+
+    // Update last direction
+    animState.lastDirection = direction;
+
+    // Accumulate time
+    animState.timeAccumulator += deltaTime;
+
+    // Calculate frame duration (1 / FPS)
+    const frameDuration = 1 / CONFIG.ANIMATION.FPS;
+
+    // Advance frames based on accumulated time
+    while (animState.timeAccumulator >= frameDuration) {
+      animState.timeAccumulator -= frameDuration;
+      animState.currentFrame++;
+
+      // Loop back to 0 when exceeding max frames
+      if (animState.currentFrame >= CONFIG.ANIMATION.FRAMES_PER_DIRECTION) {
+        animState.currentFrame = 0;
+      }
+    }
+  }
+
+  /**
+   * Render player using sprite sheet animation
+   * @param {Object} player - Player object with position, health, and animationState
+   * @param {boolean} isLocal - Whether this is the local player
+   */
+  renderPlayerWithSpriteSheet(player, isLocal = false) {
+    // Check if sprite sheet is loaded
+    if (!this.spriteSheet || !this.spriteSheet.complete || !this.spriteSheetMetadata) {
+      // Fallback: render pink rectangle
+      this.ctx.fillStyle = '#ff69b4'; // Pink
+      this.ctx.fillRect(
+        player.x - CONFIG.RENDER.PLAYER_RADIUS,
+        player.y - CONFIG.RENDER.PLAYER_RADIUS,
+        CONFIG.RENDER.PLAYER_RADIUS * 2,
+        CONFIG.RENDER.PLAYER_RADIUS * 2
+      );
+      return;
+    }
+
+    const { currentFrame, lastDirection } = player.animationState;
+    const { frameWidth, frameHeight } = this.spriteSheetMetadata;
+
+    // Calculate source rectangle (which frame to draw from sprite sheet)
+    const sourceX = currentFrame * frameWidth;
+    const sourceY = lastDirection * frameHeight;
+
+    // Draw frame from sprite sheet, centered on player position
+    this.ctx.drawImage(
+      this.spriteSheet,
+      sourceX,
+      sourceY,
+      frameWidth,
+      frameHeight,
+      player.x - CONFIG.RENDER.PLAYER_RADIUS,
+      player.y - CONFIG.RENDER.PLAYER_RADIUS,
+      CONFIG.RENDER.PLAYER_RADIUS * 2,
+      CONFIG.RENDER.PLAYER_RADIUS * 2
+    );
+
+    // Add white outline for local player
+    if (isLocal) {
+      this.ctx.strokeStyle = '#ffffff';
+      this.ctx.lineWidth = 2;
+      this.ctx.beginPath();
+      this.ctx.arc(player.x, player.y, CONFIG.RENDER.PLAYER_RADIUS, 0, Math.PI * 2);
+      this.ctx.stroke();
+    }
+
+    // Health bar above player
+    const barWidth = CONFIG.RENDER.HEALTH_BAR_WIDTH;
+    const barHeight = CONFIG.RENDER.HEALTH_BAR_HEIGHT;
+    const barX = player.x - barWidth / 2;
+    const barY = player.y - (CONFIG.RENDER.PLAYER_RADIUS + CONFIG.RENDER.HEALTH_BAR_OFFSET_FROM_PLAYER);
+
+    // Background
+    this.ctx.fillStyle = '#333';
+    this.ctx.fillRect(barX, barY, barWidth, barHeight);
+
+    // Health
+    this.ctx.fillStyle = '#ff6b6b';
+    this.ctx.fillRect(barX, barY, (player.health / 100) * barWidth, barHeight);
   }
 }

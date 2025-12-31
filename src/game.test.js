@@ -554,4 +554,40 @@ describe('Game', () => {
       });
     });
   });
+
+  describe('Animation State', () => {
+    test('WhenPlayerInitialized_ShouldHaveAnimationState', () => {
+      game.init();
+
+      expect(game.localPlayer.animationState).toBeDefined();
+      expect(game.localPlayer.animationState.currentFrame).toBe(0);
+      expect(game.localPlayer.animationState.timeAccumulator).toBe(0);
+      expect(game.localPlayer.animationState.lastDirection).toBeDefined();
+    });
+
+    test('WhenPlayerIsMoving_ShouldUpdateAnimationState', () => {
+      game.init();
+      game.localPlayer.velocity = { x: 100, y: 0 }; // Moving east
+
+      const deltaTime = 1 / CONFIG.ANIMATION.FPS; // One frame duration
+
+      game.updateLocalPlayer(deltaTime);
+
+      // Frame should advance when moving
+      expect(game.localPlayer.animationState.currentFrame).toBeGreaterThan(0);
+    });
+
+    test('WhenPlayerIsIdle_ShouldResetToFrame0', () => {
+      game.init();
+      game.localPlayer.velocity = { x: 0, y: 0 }; // Idle
+      game.localPlayer.animationState.currentFrame = 3; // Start at frame 3
+
+      const deltaTime = 1 / CONFIG.ANIMATION.FPS;
+
+      game.updateLocalPlayer(deltaTime);
+
+      // Frame should reset to 0 when idle
+      expect(game.localPlayer.animationState.currentFrame).toBe(0);
+    });
+  });
 });

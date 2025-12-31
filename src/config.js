@@ -185,5 +185,15 @@ export const CONFIG = {
   // Asset Settings
   ASSETS: {
     BASE_URL: import.meta.env?.BASE_URL || '/',
+    SPRITE_SHEET: {
+      PATH: 'assets/player/player-walk-spritesheet.png',
+      METADATA: 'assets/player/player-walk-spritesheet.json',
+    },
+  },
+
+  // Animation Settings
+  ANIMATION: {
+    FPS: 15,
+    FRAMES_PER_DIRECTION: 6,
   },
 };
