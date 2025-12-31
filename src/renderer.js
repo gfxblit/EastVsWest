@@ -4,6 +4,7 @@
  */
 
 import { CONFIG } from './config.js';
+import { getDirectionFromVelocity } from './animationHelper.js';
 
 export class Renderer {
   constructor(canvas) {
@@ -100,6 +101,12 @@ export class Renderer {
         // Skip local player, we'll render it separately
         if (localPlayer && playerId === localPlayer.id) return;
 
+        // Calculate animation state for remote player based on velocity
+        const vx = playerData.velocity_x || 0;
+        const vy = playerData.velocity_y || 0;
+        const direction = getDirectionFromVelocity(vx, vy);
+        const isMoving = vx !== 0 || vy !== 0;
+
         const player = {
           id: playerId,
           name: playerData.player_name,
@@ -107,6 +114,11 @@ export class Renderer {
           y: playerData.position_y,
           rotation: playerData.rotation,
           health: playerData.health,
+          animationState: {
+            currentFrame: isMoving ? 1 : 0, // Use frame 1 for moving (approximate animation)
+            lastDirection: direction !== null ? direction : 0, // Use calculated direction or default to South
+            timeAccumulator: 0,
+          },
         };
         this.renderPlayer(player, false);
       });
@@ -338,41 +350,6 @@ export class Renderer {
       timeAccumulator: 0,
       lastDirection: 0, // Default to South
     };
-  }
-
-  /**
-   * Update animation state based on time and movement
-   * @param {Object} animState - Animation state to update
-   * @param {number} deltaTime - Time since last frame in seconds
-   * @param {boolean} isMoving - Whether the player is moving
-   * @param {number|null} direction - Direction index (0-7) or null if idle
-   */
-  updateAnimationState(animState, deltaTime, isMoving, direction) {
-    if (!isMoving || direction === null) {
-      // Idle: reset to first frame
-      animState.currentFrame = 0;
-      return;
-    }
-
-    // Update last direction
-    animState.lastDirection = direction;
-
-    // Accumulate time
-    animState.timeAccumulator += deltaTime;
-
-    // Calculate frame duration (1 / FPS)
-    const frameDuration = 1 / CONFIG.ANIMATION.FPS;
-
-    // Advance frames based on accumulated time
-    while (animState.timeAccumulator >= frameDuration) {
-      animState.timeAccumulator -= frameDuration;
-      animState.currentFrame++;
-
-      // Loop back to 0 when exceeding max frames
-      if (animState.currentFrame >= CONFIG.ANIMATION.FRAMES_PER_DIRECTION) {
-        animState.currentFrame = 0;
-      }
-    }
   }
 
   /**

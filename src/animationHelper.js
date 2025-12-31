@@ -3,6 +3,8 @@
  * Utilities for player sprite animations
  */
 
+import { CONFIG } from './config.js';
+
 /**
  * Calculate direction index (0-7) from velocity vector
  * @param {number} vx - Velocity X component
@@ -26,8 +28,9 @@ export function getDirectionFromVelocity(vx, vy) {
   }
 
   // Calculate angle from velocity
-  // atan2(y, x) gives angle in standard math convention:
-  // 0 = East, π/2 = North, π = West, -π/2 = South
+  // Note: In screen coordinates, Y increases downward (not upward like in standard math)
+  // atan2(vy, vx) with screen coordinates gives:
+  // 0° = East (right), 90° = South (down), 180° = West (left), -90° (270°) = North (up)
   const angle = Math.atan2(vy, vx);
 
   // Convert angle to degrees for easier calculation
@@ -66,5 +69,40 @@ export function getDirectionFromVelocity(vx, vy) {
     return 4; // North
   } else { // degrees >= 292.5 && degrees < 337.5
     return 3; // North-East
+  }
+}
+
+/**
+ * Update animation state based on time and movement
+ * @param {Object} animState - Animation state to update
+ * @param {number} deltaTime - Time since last frame in seconds
+ * @param {boolean} isMoving - Whether the player is moving
+ * @param {number|null} direction - Direction index (0-7) or null if idle
+ */
+export function updateAnimationState(animState, deltaTime, isMoving, direction) {
+  if (!isMoving || direction === null) {
+    // Idle: reset to first frame
+    animState.currentFrame = 0;
+    return;
+  }
+
+  // Update last direction
+  animState.lastDirection = direction;
+
+  // Accumulate time
+  animState.timeAccumulator += deltaTime;
+
+  // Calculate frame duration (1 / FPS)
+  const frameDuration = 1 / CONFIG.ANIMATION.FPS;
+
+  // Advance frames based on accumulated time
+  while (animState.timeAccumulator >= frameDuration) {
+    animState.timeAccumulator -= frameDuration;
+    animState.currentFrame++;
+
+    // Loop back to 0 when exceeding max frames
+    if (animState.currentFrame >= CONFIG.ANIMATION.FRAMES_PER_DIRECTION) {
+      animState.currentFrame = 0;
+    }
   }
 }

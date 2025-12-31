@@ -6,6 +6,7 @@ import { jest } from '@jest/globals';
 
 import { Renderer } from './renderer.js';
 import { CONFIG } from './config.js';
+import { updateAnimationState } from './animationHelper.js';
 
 describe('Renderer', () => {
   let canvas;
@@ -774,7 +775,7 @@ describe('Renderer', () => {
         const isMoving = true;
         const direction = 2; // East
 
-        renderer.updateAnimationState(animState, deltaTime, isMoving, direction);
+        updateAnimationState(animState, deltaTime, isMoving, direction);
 
         expect(animState.currentFrame).toBe(1); // Should advance to next frame
         expect(animState.timeAccumulator).toBeLessThan(deltaTime);
@@ -792,7 +793,7 @@ describe('Renderer', () => {
         const isMoving = false;
         const direction = null; // Idle
 
-        renderer.updateAnimationState(animState, deltaTime, isMoving, direction);
+        updateAnimationState(animState, deltaTime, isMoving, direction);
 
         expect(animState.currentFrame).toBe(0); // Should reset to idle frame
         expect(animState.lastDirection).toBe(2); // Should keep last direction
@@ -809,7 +810,7 @@ describe('Renderer', () => {
         const isMoving = true;
         const direction = 4; // North
 
-        renderer.updateAnimationState(animState, deltaTime, isMoving, direction);
+        updateAnimationState(animState, deltaTime, isMoving, direction);
 
         expect(animState.currentFrame).toBe(0); // Should loop back to first frame
       });
@@ -825,7 +826,7 @@ describe('Renderer', () => {
         const isMoving = true;
         const direction = 4; // Changed to North
 
-        renderer.updateAnimationState(animState, deltaTime, isMoving, direction);
+        updateAnimationState(animState, deltaTime, isMoving, direction);
 
         expect(animState.lastDirection).toBe(4); // Should update to new direction
       });

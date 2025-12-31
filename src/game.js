@@ -4,7 +4,7 @@
  */
 
 import { CONFIG } from './config.js';
-import { getDirectionFromVelocity } from './animationHelper.js';
+import { getDirectionFromVelocity, updateAnimationState } from './animationHelper.js';
 
 export class Game {
   constructor() {
@@ -127,25 +127,8 @@ export class Game {
     const isMoving = this.localPlayer.velocity.x !== 0 || this.localPlayer.velocity.y !== 0;
     const direction = getDirectionFromVelocity(this.localPlayer.velocity.x, this.localPlayer.velocity.y);
 
-    // Update animation state
-    if (isMoving && direction !== null) {
-      // Player is moving: advance animation frames
-      this.localPlayer.animationState.lastDirection = direction;
-      this.localPlayer.animationState.timeAccumulator += deltaTime;
-
-      const frameDuration = 1 / CONFIG.ANIMATION.FPS;
-      while (this.localPlayer.animationState.timeAccumulator >= frameDuration) {
-        this.localPlayer.animationState.timeAccumulator -= frameDuration;
-        this.localPlayer.animationState.currentFrame++;
-
-        if (this.localPlayer.animationState.currentFrame >= CONFIG.ANIMATION.FRAMES_PER_DIRECTION) {
-          this.localPlayer.animationState.currentFrame = 0;
-        }
-      }
-    } else {
-      // Player is idle: reset to first frame
-      this.localPlayer.animationState.currentFrame = 0;
-    }
+    // Update animation state using helper function
+    updateAnimationState(this.localPlayer.animationState, deltaTime, isMoving, direction);
 
     // Update rotation based on velocity (if moving)
     if (this.localPlayer.velocity.x !== 0 || this.localPlayer.velocity.y !== 0) {
