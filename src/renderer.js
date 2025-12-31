@@ -33,10 +33,15 @@ export class Renderer {
       this.bgPattern = this.ctx.createPattern(this.bgImage, 'repeat');
     };
 
-    // Load directional player images (8 frames)
+    // Load directional player images (8 frames) - DEPRECATED, kept for fallback
     for (let i = 0; i < 8; i++) {
       this.directionalImages[i] = this.createImage(`white-male-${i}.png`);
     }
+
+    // Load sprite sheet for animations
+    this.loadSpriteSheet().catch(err => {
+      console.warn('Failed to load sprite sheet, using fallback rendering:', err.message);
+    });
 
     console.log('Renderer initialized');
   }
@@ -219,44 +224,8 @@ export class Renderer {
   }
 
   renderPlayer(player, isLocal = false) {
-    // Render player with directional sprite
-    const frame = this.getFrameFromRotation(player.rotation || 0);
-    const img = this.directionalImages[frame];
-
-    if (img && img.complete && img.naturalWidth > 0) {
-      // Draw the directional image centered on player position
-      const size = CONFIG.RENDER.PLAYER_RADIUS * 2;
-      this.ctx.drawImage(
-        img,
-        player.x - CONFIG.RENDER.PLAYER_RADIUS,
-        player.y - CONFIG.RENDER.PLAYER_RADIUS,
-        size,
-        size
-      );
-    }
-
-    // Add white outline for local player
-    if (isLocal) {
-      this.ctx.strokeStyle = '#ffffff';
-      this.ctx.lineWidth = 2;
-      this.ctx.beginPath();
-      this.ctx.arc(player.x, player.y, CONFIG.RENDER.PLAYER_RADIUS, 0, Math.PI * 2);
-      this.ctx.stroke();
-    }
-
-    // Health bar above player
-    const barWidth = CONFIG.RENDER.HEALTH_BAR_WIDTH;
-    const barHeight = CONFIG.RENDER.HEALTH_BAR_HEIGHT;
-    const barX = player.x - barWidth / 2;
-    const barY = player.y - (CONFIG.RENDER.PLAYER_RADIUS + CONFIG.RENDER.HEALTH_BAR_OFFSET_FROM_PLAYER);
-
-    // Background
-    this.ctx.fillStyle = '#333';
-    this.ctx.fillRect(barX, barY, barWidth, barHeight);
-
-    // Health
-    this.ctx.fillStyle = '#ff6b6b';
-    this.ctx.fillRect(barX, barY, (player.health / 100) * barWidth, barHeight);
+    // Use sprite sheet animation rendering
+    this.renderPlayerWithSpriteSheet(player, isLocal);
   }
 
   renderLoot(loot) {
