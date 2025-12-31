@@ -12,6 +12,7 @@ export class Renderer {
     this.bgImage = null;
     this.bgPattern = null;
     this.directionalImages = [];
+    this.shadowImage = null;
   }
 
   init() {
@@ -29,6 +30,9 @@ export class Renderer {
     this.bgImage.onload = () => {
       this.bgPattern = this.ctx.createPattern(this.bgImage, 'repeat');
     };
+
+    // Load shadow image
+    this.shadowImage = this.createImage('shadow.png');
 
     // Load directional player images (8 frames)
     for (let i = 0; i < 8; i++) {
@@ -205,17 +209,30 @@ export class Renderer {
   }
 
   renderPlayer(player, isLocal = false) {
+    const size = CONFIG.RENDER.PLAYER_RADIUS * 2;
+    const spriteX = player.x - CONFIG.RENDER.PLAYER_RADIUS;
+    const spriteY = player.y - CONFIG.RENDER.PLAYER_RADIUS;
+
+    // Render shadow first (beneath player)
+    if (this.shadowImage && this.shadowImage.complete && this.shadowImage.naturalWidth > 0) {
+      this.ctx.drawImage(
+        this.shadowImage,
+        spriteX,
+        spriteY,
+        size,
+        size
+      );
+    }
+
     // Render player with directional sprite
     const frame = this.getFrameFromRotation(player.rotation || 0);
     const img = this.directionalImages[frame];
 
     if (img && img.complete && img.naturalWidth > 0) {
-      // Draw the directional image centered on player position
-      const size = CONFIG.RENDER.PLAYER_RADIUS * 2;
       this.ctx.drawImage(
         img,
-        player.x - CONFIG.RENDER.PLAYER_RADIUS,
-        player.y - CONFIG.RENDER.PLAYER_RADIUS,
+        spriteX,
+        spriteY,
         size,
         size
       );
