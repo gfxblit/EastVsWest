@@ -41,6 +41,26 @@ describe('Animation Integration', () => {
 
     // Wait for app to initialize
     await page.waitForSelector('body.loaded', { timeout: 10000 });
+
+    // Shared game initialization (moved from individual tests)
+    await page.click('#host-game-btn');
+    await page.waitForSelector('#start-game-btn:not(.hidden)', { timeout: 10000 });
+    await page.click('#start-game-btn');
+    await page.waitForSelector('#game-canvas:not(.hidden)', { timeout: 10000 });
+
+    // Wait for assets to load
+    await delay(1000);
+
+    // Reset to known animation state
+    await page.evaluate(() => {
+      if (window.game && window.game.localPlayer) {
+        window.game.localPlayer.velocity = { x: 0, y: 0 };
+        if (window.game.localPlayer.animationState) {
+          window.game.localPlayer.animationState.currentFrame = 0;
+          window.game.localPlayer.animationState.timeAccumulator = 0;
+        }
+      }
+    });
   });
 
   afterEach(async () => {
@@ -51,17 +71,6 @@ describe('Animation Integration', () => {
 
   describe('Sprite Sheet Loading', () => {
     test('WhenSpriteSheetLoads_ShouldHaveCorrectMetadata', async () => {
-      // Host and start a game
-      await page.click('#host-game-btn');
-      await page.waitForSelector('#start-game-btn:not(.hidden)', { timeout: 10000 });
-      await page.click('#start-game-btn');
-
-      // Wait for game to start
-      await page.waitForSelector('#game-canvas:not(.hidden)', { timeout: 10000 });
-
-      // Give it a moment to load assets
-      await delay(1000);
-
       // Inject code to check the sprite sheet metadata
       const metadata = await page.evaluate(() => {
         // Access the game's renderer via window.game if available
@@ -86,17 +95,6 @@ describe('Animation Integration', () => {
 
   describe('Animation Rendering', () => {
     test('WhenPlayerMoves_ShouldDisplayWalkingAnimation', async () => {
-      // Host and start a game
-      await page.click('#host-game-btn');
-      await page.waitForSelector('#start-game-btn:not(.hidden)', { timeout: 10000 });
-      await page.click('#start-game-btn');
-
-      // Wait for game to start
-      await page.waitForSelector('#game-canvas:not(.hidden)', { timeout: 10000 });
-
-      // Wait for assets to load
-      await delay(1000);
-
       // Simulate player movement by sending keyboard events
       await page.keyboard.down('ArrowRight');
 
@@ -131,17 +129,6 @@ describe('Animation Integration', () => {
     }, 30000);
 
     test('WhenPlayerStops_ShouldDisplayIdleFrame', async () => {
-      // Host and start a game
-      await page.click('#host-game-btn');
-      await page.waitForSelector('#start-game-btn:not(.hidden)', { timeout: 10000 });
-      await page.click('#start-game-btn');
-
-      // Wait for game to start
-      await page.waitForSelector('#game-canvas:not(.hidden)', { timeout: 10000 });
-
-      // Wait for assets to load
-      await delay(1000);
-
       // Move player
       await page.keyboard.down('ArrowRight');
       await delay(300);
@@ -164,17 +151,6 @@ describe('Animation Integration', () => {
     }, 30000);
 
     test('WhenPlayerChangesDirection_ShouldUpdateAnimationDirection', async () => {
-      // Host and start a game
-      await page.click('#host-game-btn');
-      await page.waitForSelector('#start-game-btn:not(.hidden)', { timeout: 10000 });
-      await page.click('#start-game-btn');
-
-      // Wait for game to start
-      await page.waitForSelector('#game-canvas:not(.hidden)', { timeout: 10000 });
-
-      // Wait for assets to load
-      await delay(1000);
-
       // Move right (should be East direction = 2)
       await page.keyboard.down('ArrowRight');
       await delay(300);
@@ -215,14 +191,6 @@ describe('Animation Integration', () => {
       // This test would require modifying the server to simulate a 404
       // For now, we can verify that the fallback logic exists by checking the code
       // In a real scenario, you'd intercept the network request and force it to fail
-
-      // Host and start a game
-      await page.click('#host-game-btn');
-      await page.waitForSelector('#start-game-btn:not(.hidden)', { timeout: 10000 });
-      await page.click('#start-game-btn');
-
-      // Wait for game to start
-      await page.waitForSelector('#game-canvas:not(.hidden)', { timeout: 10000 });
 
       // The game should still render even if sprite sheet fails to load
       const gameIsRunning = await page.evaluate(() => {
