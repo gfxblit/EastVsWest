@@ -1,7 +1,7 @@
 export default {
   testEnvironment: 'jsdom',
   moduleFileExtensions: ['js'],
-  testMatch: ['**/src/**/*.test.js'],
+  testMatch: ['**/src/**/*.test.js', '**/scripts/**/*.test.js'],
   transform: {},
   setupFilesAfterEnv: ['<rootDir>/jest.setup.js'],
   moduleNameMapper: {

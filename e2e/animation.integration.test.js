@@ -58,13 +58,15 @@ describe('Animation Integration', () => {
 
       // Check that sprite sheet loaded successfully
       const spriteSheetLoaded = await page.evaluate(() => {
-        // Access the game instance (assuming it's available globally or via window)
-        const canvas = document.getElementById('game-canvas');
-        if (!canvas) return false;
-
-        // We can't directly access the renderer, but we can check if the sprite sheet image exists
-        // by checking for failed loads via console errors or by checking if we're rendering fallback
-        return true; // Initial load check
+        // Access the game instance via window.game
+        if (window.game && window.game.renderer) {
+          const renderer = window.game.renderer;
+          // Check if sprite sheet and metadata are loaded
+          return renderer.spriteSheet !== null &&
+                 renderer.spriteSheet.complete &&
+                 renderer.spriteSheetMetadata !== null;
+        }
+        return false;
       });
 
       expect(spriteSheetLoaded).toBe(true);

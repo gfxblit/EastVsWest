@@ -88,10 +88,9 @@ describe('Renderer', () => {
       expect(canvas.getContext).toHaveBeenCalledWith('2d');
       expect(canvas.width).toBe(CONFIG.CANVAS.WIDTH);
       expect(canvas.height).toBe(CONFIG.CANVAS.HEIGHT);
-      // Should load background image + 8 directional images = 9 total
-      expect(global.Image).toHaveBeenCalledTimes(9);
+      // Should load background image only (sprite sheet loaded via fetch)
+      expect(global.Image).toHaveBeenCalledTimes(1);
       expect(newRenderer.bgImage.src).toBe('/game-background.png');
-      expect(newRenderer.directionalImages.length).toBe(8);
     });
 
     test('WhenImageLoads_ShouldCreatePattern', () => {
@@ -459,21 +458,6 @@ describe('Renderer', () => {
 
     test('WhenRenderingPlayer_ShouldUseWorldCoordinates', () => {
       // Arrange
-      // Mock directional images as loaded
-      renderer.directionalImages = [];
-      for (let i = 0; i < 8; i++) {
-        renderer.directionalImages[i] = {
-          complete: true,
-          naturalWidth: 100, // Valid image
-          width: 96,
-          height: 96,
-          src: `/white-male-${i}.png`,
-        };
-      }
-
-      // Add drawImage to context
-      ctx.drawImage = jest.fn();
-
       // Mock sprite sheet as loaded
       renderer.spriteSheet = {
         complete: true,
@@ -486,6 +470,9 @@ describe('Renderer', () => {
         columns: 6,
         rows: 8,
       };
+
+      // Add drawImage to context
+      ctx.drawImage = jest.fn();
 
       const player = {
         id: 'player-1',
@@ -586,42 +573,13 @@ describe('Renderer', () => {
 
         newRenderer.init();
 
-        // Should create 8 directional images + 1 background image = 9 total
-        expect(global.Image).toHaveBeenCalledTimes(9);
+        // Should create only background image (sprite sheet loaded via fetch)
+        expect(global.Image).toHaveBeenCalledTimes(1);
       });
 
-      test('WhenImagesLoaded_ShouldHaveAllFramesAvailable', () => {
-        // Simulate all images loaded
-        renderer.directionalImages = [
-          { complete: true },
-          { complete: true },
-          { complete: true },
-          { complete: true },
-          { complete: true },
-          { complete: true },
-          { complete: true },
-          { complete: true },
-        ];
-
-        expect(renderer.directionalImages.length).toBe(8);
-        expect(renderer.directionalImages.every(img => img.complete)).toBe(true);
-      });
     });
 
-    describe('Player Rendering with Directional Images', () => {
-      beforeEach(() => {
-        // Mock directional images as loaded
-        renderer.directionalImages = [];
-        for (let i = 0; i < 8; i++) {
-          renderer.directionalImages[i] = {
-            complete: true,
-            naturalWidth: 100,
-            width: 96,
-            height: 96,
-            src: `/white-male-${i}.png`,
-          };
-        }
-      });
+    describe('Player Rendering with Sprite Sheets', () => {
 
       test('WhenRenderingPlayerFacingSouth_ShouldDrawFrame0', () => {
         // Mock sprite sheet as loaded

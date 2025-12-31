@@ -12,9 +12,9 @@ export class Renderer {
     this.ctx = null;
     this.bgImage = null;
     this.bgPattern = null;
-    this.directionalImages = [];
     this.spriteSheet = null;
     this.spriteSheetMetadata = null;
+    this.spriteSheetLoaded = false;
   }
 
   init() {
@@ -32,11 +32,6 @@ export class Renderer {
     this.bgImage.onload = () => {
       this.bgPattern = this.ctx.createPattern(this.bgImage, 'repeat');
     };
-
-    // Load directional player images (8 frames) - DEPRECATED, kept for fallback
-    for (let i = 0; i < 8; i++) {
-      this.directionalImages[i] = this.createImage(`white-male-${i}.png`);
-    }
 
     // Load sprite sheet for animations
     this.loadSpriteSheet().catch(err => {
@@ -289,24 +284,35 @@ export class Renderer {
     const baseUrl = CONFIG.ASSETS.BASE_URL;
     const normalizedBase = baseUrl.endsWith('/') ? baseUrl : `${baseUrl}/`;
 
-    // Load metadata
-    const metadataPath = `${normalizedBase}${CONFIG.ASSETS.SPRITE_SHEET.METADATA}`;
-    const response = await fetch(metadataPath);
+    try {
+      // Load metadata
+      const metadataPath = `${normalizedBase}${CONFIG.ASSETS.SPRITE_SHEET.METADATA}`;
+      const response = await fetch(metadataPath);
 
-    if (!response.ok) {
-      throw new Error(`Failed to load sprite sheet metadata: ${response.statusText}`);
+      if (!response.ok) {
+        throw new Error(`Failed to load sprite sheet metadata: ${response.statusText}`);
+      }
+
+      this.spriteSheetMetadata = await response.json();
+
+      // Load sprite sheet image
+      this.spriteSheet = this.createImage(CONFIG.ASSETS.SPRITE_SHEET.PATH);
+
+      // Wait for image to load
+      await new Promise((resolve, reject) => {
+        this.spriteSheet.onload = resolve;
+        this.spriteSheet.onerror = reject;
+      });
+
+      // Mark sprite sheet as loaded
+      this.spriteSheetLoaded = true;
+    } catch (error) {
+      // Ensure sprite sheet stays null for fallback rendering
+      this.spriteSheet = null;
+      this.spriteSheetMetadata = null;
+      this.spriteSheetLoaded = false;
+      throw error;
     }
-
-    this.spriteSheetMetadata = await response.json();
-
-    // Load sprite sheet image
-    this.spriteSheet = this.createImage(CONFIG.ASSETS.SPRITE_SHEET.PATH);
-
-    // Wait for image to load
-    return new Promise((resolve, reject) => {
-      this.spriteSheet.onload = resolve;
-      this.spriteSheet.onerror = reject;
-    });
   }
 
   /**
