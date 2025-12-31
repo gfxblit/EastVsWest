@@ -137,13 +137,41 @@ describe('Input', () => {
 
     test('WhenDvorakLayoutUsed_ShouldStillMoveBasedOnPhysicalPosition', () => {
       // On Dvorak, physical 'W' key produces ','
-      const event = new KeyboardEvent('keydown', { 
-        key: ',', 
-        code: 'KeyW' 
+      const event = new KeyboardEvent('keydown', {
+        key: ',',
+        code: 'KeyW'
       });
       input.handleKeyDown(event);
 
       expect(input.inputState.moveY).toBe(-1);
+    });
+
+    test('WhenArrowUpPressed_ShouldUpdateMoveY', () => {
+      const event = new KeyboardEvent('keydown', { code: 'ArrowUp' });
+      input.handleKeyDown(event);
+
+      expect(input.inputState.moveY).toBe(-1);
+    });
+
+    test('WhenArrowLeftPressed_ShouldUpdateMoveX', () => {
+      const event = new KeyboardEvent('keydown', { code: 'ArrowLeft' });
+      input.handleKeyDown(event);
+
+      expect(input.inputState.moveX).toBe(-1);
+    });
+
+    test('WhenArrowDownPressed_ShouldUpdateMoveY', () => {
+      const event = new KeyboardEvent('keydown', { code: 'ArrowDown' });
+      input.handleKeyDown(event);
+
+      expect(input.inputState.moveY).toBe(1);
+    });
+
+    test('WhenArrowRightPressed_ShouldUpdateMoveX', () => {
+      const event = new KeyboardEvent('keydown', { code: 'ArrowRight' });
+      input.handleKeyDown(event);
+
+      expect(input.inputState.moveX).toBe(1);
     });
   });
 
@@ -193,6 +221,18 @@ describe('Input', () => {
 
       expect(input.keysPressed.has('KeyW')).toBe(false);
     });
+
+    test('WhenArrowUpReleased_ShouldResetMoveY', () => {
+      // Press ArrowUp
+      const downEvent = new KeyboardEvent('keydown', { code: 'ArrowUp' });
+      input.handleKeyDown(downEvent);
+
+      // Release ArrowUp
+      const upEvent = new KeyboardEvent('keyup', { code: 'ArrowUp' });
+      input.handleKeyUp(upEvent);
+
+      expect(input.inputState.moveY).toBe(0);
+    });
   });
 
   describe('updateMovement', () => {
@@ -239,6 +279,51 @@ describe('Input', () => {
       input.updateMovement();
 
       expect(mockCallback).toHaveBeenCalledWith(input.inputState);
+    });
+
+    test('WhenArrowUpAndArrowRightPressed_ShouldNormalizeDiagonalMovement', () => {
+      input.keysPressed.add('ArrowUp');
+      input.keysPressed.add('ArrowRight');
+      input.updateMovement();
+
+      const magnitude = Math.sqrt(
+        input.inputState.moveX ** 2 + input.inputState.moveY ** 2
+      );
+      expect(magnitude).toBeCloseTo(1, 5);
+    });
+
+    test('WhenArrowUpAndArrowDownPressed_ShouldCancelVerticalMovement', () => {
+      input.keysPressed.add('ArrowUp');
+      input.keysPressed.add('ArrowDown');
+      input.updateMovement();
+
+      expect(input.inputState.moveY).toBe(0);
+    });
+
+    test('WhenArrowLeftAndArrowRightPressed_ShouldCancelHorizontalMovement', () => {
+      input.keysPressed.add('ArrowLeft');
+      input.keysPressed.add('ArrowRight');
+      input.updateMovement();
+
+      expect(input.inputState.moveX).toBe(0);
+    });
+
+    test('WhenWASDAndArrowKeysPressed_ShouldCombineMovement', () => {
+      input.keysPressed.add('KeyW');
+      input.keysPressed.add('ArrowRight');
+      input.updateMovement();
+
+      // When both WASD and arrow keys are pressed, they combine
+      // W gives y=-1, ArrowRight gives x=1
+      // This creates diagonal movement that gets normalized
+      expect(input.inputState.moveX).toBeCloseTo(0.7071067811865475, 5);
+      expect(input.inputState.moveY).toBeCloseTo(-0.7071067811865475, 5);
+
+      // Verify diagonal movement is normalized to magnitude 1
+      const magnitude = Math.sqrt(
+        input.inputState.moveX ** 2 + input.inputState.moveY ** 2
+      );
+      expect(magnitude).toBeCloseTo(1, 5);
     });
   });
 
