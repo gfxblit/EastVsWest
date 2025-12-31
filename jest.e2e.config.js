@@ -2,5 +2,5 @@ export default {
   testEnvironment: 'node',
   testMatch: ['**/e2e/**/*.test.js'],
   transform: {},
-  testTimeout: 30000
+  testTimeout: 15000
 };

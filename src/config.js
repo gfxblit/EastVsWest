@@ -170,6 +170,7 @@ export const CONFIG = {
       KeyA: { x: -1, y: 0 },
       KeyS: { x: 0, y: 1 },
       KeyD: { x: 1, y: 0 },
+      // Arrow keys for compatibility
       ArrowUp: { x: 0, y: -1 },
       ArrowLeft: { x: -1, y: 0 },
       ArrowDown: { x: 0, y: 1 },
@@ -189,5 +190,15 @@ export const CONFIG = {
   // Asset Settings
   ASSETS: {
     BASE_URL: import.meta.env?.BASE_URL || '/',
+    SPRITE_SHEET: {
+      PATH: 'assets/player/player-walk-spritesheet.png',
+      METADATA: 'assets/player/player-walk-spritesheet.json',
+    },
+  },
+
+  // Animation Settings
+  ANIMATION: {
+    FPS: 15,
+    FRAMES_PER_DIRECTION: 6,
   },
 };

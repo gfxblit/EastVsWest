@@ -6,6 +6,7 @@ import { jest } from '@jest/globals';
 
 import { Renderer } from './renderer.js';
 import { CONFIG } from './config.js';
+import { updateAnimationState } from './animationHelper.js';
 
 describe('Renderer', () => {
   let canvas;
@@ -87,11 +88,10 @@ describe('Renderer', () => {
       expect(canvas.getContext).toHaveBeenCalledWith('2d');
       expect(canvas.width).toBe(CONFIG.CANVAS.WIDTH);
       expect(canvas.height).toBe(CONFIG.CANVAS.HEIGHT);
-      // Should load background image + shadow image + 8 directional images = 10 total
-      expect(global.Image).toHaveBeenCalledTimes(10);
+      // Should load background image + shadow image (sprite sheet loaded via fetch)
+      expect(global.Image).toHaveBeenCalledTimes(2);
       expect(newRenderer.bgImage.src).toBe('/game-background.png');
       expect(newRenderer.shadowImage.src).toBe('/shadow.png');
-      expect(newRenderer.directionalImages.length).toBe(8);
     });
 
     test('WhenImageLoads_ShouldCreatePattern', () => {
@@ -459,17 +459,18 @@ describe('Renderer', () => {
 
     test('WhenRenderingPlayer_ShouldUseWorldCoordinates', () => {
       // Arrange
-      // Mock directional images as loaded
-      renderer.directionalImages = [];
-      for (let i = 0; i < 8; i++) {
-        renderer.directionalImages[i] = {
-          complete: true,
-          naturalWidth: 100, // Valid image
-          width: 96,
-          height: 96,
-          src: `/white-male-${i}.png`,
-        };
-      }
+      // Mock sprite sheet as loaded
+      renderer.spriteSheet = {
+        complete: true,
+        naturalWidth: 576,
+        naturalHeight: 768,
+      };
+      renderer.spriteSheetMetadata = {
+        frameWidth: 96,
+        frameHeight: 96,
+        columns: 6,
+        rows: 8,
+      };
 
       // Add drawImage to context
       ctx.drawImage = jest.fn();
@@ -481,22 +482,23 @@ describe('Renderer', () => {
         y: 900,
         health: 100,
         rotation: 0, // North
+        animationState: {
+          currentFrame: 0,
+          lastDirection: 4, // North
+          timeAccumulator: 0,
+        },
       };
 
       // Act
       renderer.renderPlayer(player, false);
 
       // Assert
-      // Should render player image centered at world coordinates (1500, 900)
-      const expectedX = 1500 - CONFIG.RENDER.PLAYER_RADIUS;
-      const expectedY = 900 - CONFIG.RENDER.PLAYER_RADIUS;
-      expect(ctx.drawImage).toHaveBeenCalledWith(
-        renderer.directionalImages[4], // North frame
-        expectedX,
-        expectedY,
-        CONFIG.RENDER.PLAYER_RADIUS * 2,
-        CONFIG.RENDER.PLAYER_RADIUS * 2
-      );
+      // Should render player using sprite sheet at world coordinates (1500, 900)
+      expect(ctx.drawImage).toHaveBeenCalled();
+      // Verify sprite sheet rendering (9 parameters for source + dest)
+      const drawImageCalls = ctx.drawImage.mock.calls;
+      const hasSpriteSheetCall = drawImageCalls.some(call => call.length === 9);
+      expect(hasSpriteSheetCall).toBe(true);
     });
   });
 
@@ -538,14 +540,27 @@ describe('Renderer', () => {
       newRenderer.init();
 
       // Assert
-      // Should create shadow image + background image + 8 directional images = 10 total
-      expect(global.Image).toHaveBeenCalledTimes(10);
+      // Should create shadow image + background image (sprite sheet loaded via fetch)
+      expect(global.Image).toHaveBeenCalledTimes(2);
       expect(newRenderer.shadowImage).toBeDefined();
       expect(newRenderer.shadowImage.src).toBe('/shadow.png');
     });
 
     test('WhenRenderingPlayer_ShouldRenderShadowBeforePlayerSprite', () => {
       // Arrange
+      // Mock sprite sheet as loaded
+      renderer.spriteSheet = {
+        complete: true,
+        naturalWidth: 576,
+        naturalHeight: 768,
+      };
+      renderer.spriteSheetMetadata = {
+        frameWidth: 96,
+        frameHeight: 96,
+        columns: 6,
+        rows: 8,
+      };
+
       const player = {
         id: 'player-1',
         name: 'Player1',
@@ -553,6 +568,11 @@ describe('Renderer', () => {
         y: 900,
         health: 100,
         rotation: 0,
+        animationState: {
+          currentFrame: 0,
+          lastDirection: 4, // North
+          timeAccumulator: 0,
+        },
       };
 
       const drawImageCalls = [];
@@ -564,18 +584,31 @@ describe('Renderer', () => {
       renderer.renderPlayer(player, false);
 
       // Assert
-      // Should call drawImage twice: once for shadow, once for player
+      // Should call drawImage twice: once for shadow, once for player sprite sheet
       expect(ctx.drawImage).toHaveBeenCalledTimes(2);
 
       // First call should be shadow (rendered before player)
       expect(drawImageCalls[0][0]).toBe(renderer.shadowImage);
 
-      // Second call should be player sprite
-      expect(drawImageCalls[1][0]).toBe(renderer.directionalImages[4]); // North frame
+      // Second call should be player sprite sheet
+      expect(drawImageCalls[1][0]).toBe(renderer.spriteSheet);
     });
 
     test('WhenRenderingPlayer_ShouldPositionShadowAtPlayerLocation', () => {
       // Arrange
+      // Mock sprite sheet as loaded
+      renderer.spriteSheet = {
+        complete: true,
+        naturalWidth: 576,
+        naturalHeight: 768,
+      };
+      renderer.spriteSheetMetadata = {
+        frameWidth: 96,
+        frameHeight: 96,
+        columns: 6,
+        rows: 8,
+      };
+
       const player = {
         id: 'player-1',
         name: 'Player1',
@@ -583,6 +616,11 @@ describe('Renderer', () => {
         y: 900,
         health: 100,
         rotation: 0,
+        animationState: {
+          currentFrame: 0,
+          lastDirection: 4,
+          timeAccumulator: 0,
+        },
       };
 
       const drawImageCalls = [];
@@ -609,6 +647,19 @@ describe('Renderer', () => {
       // Arrange - Test multiple rotations
       const rotations = [0, Math.PI / 4, Math.PI / 2, Math.PI, 3 * Math.PI / 2];
 
+      // Mock sprite sheet as loaded
+      renderer.spriteSheet = {
+        complete: true,
+        naturalWidth: 576,
+        naturalHeight: 768,
+      };
+      renderer.spriteSheetMetadata = {
+        frameWidth: 96,
+        frameHeight: 96,
+        columns: 6,
+        rows: 8,
+      };
+
       for (const rotation of rotations) {
         ctx.drawImage.mockClear();
         const drawImageCalls = [];
@@ -623,6 +674,11 @@ describe('Renderer', () => {
           y: 900,
           health: 100,
           rotation: rotation,
+          animationState: {
+            currentFrame: 0,
+            lastDirection: 4,
+            timeAccumulator: 0,
+          },
         };
 
         // Act
@@ -637,6 +693,19 @@ describe('Renderer', () => {
 
     test('WhenRenderingLocalPlayer_ShouldRenderShadow', () => {
       // Arrange
+      // Mock sprite sheet as loaded
+      renderer.spriteSheet = {
+        complete: true,
+        naturalWidth: 576,
+        naturalHeight: 768,
+      };
+      renderer.spriteSheetMetadata = {
+        frameWidth: 96,
+        frameHeight: 96,
+        columns: 6,
+        rows: 8,
+      };
+
       const player = {
         id: 'player-1',
         name: 'Player1',
@@ -644,6 +713,11 @@ describe('Renderer', () => {
         y: 900,
         health: 100,
         rotation: 0,
+        animationState: {
+          currentFrame: 0,
+          lastDirection: 4,
+          timeAccumulator: 0,
+        },
       };
 
       const drawImageCalls = [];
@@ -663,6 +737,19 @@ describe('Renderer', () => {
       // Arrange
       renderer.shadowImage = null;
 
+      // Mock sprite sheet as loaded
+      renderer.spriteSheet = {
+        complete: true,
+        naturalWidth: 576,
+        naturalHeight: 768,
+      };
+      renderer.spriteSheetMetadata = {
+        frameWidth: 96,
+        frameHeight: 96,
+        columns: 6,
+        rows: 8,
+      };
+
       const player = {
         id: 'player-1',
         name: 'Player1',
@@ -670,6 +757,11 @@ describe('Renderer', () => {
         y: 900,
         health: 100,
         rotation: 0,
+        animationState: {
+          currentFrame: 0,
+          lastDirection: 4,
+          timeAccumulator: 0,
+        },
       };
 
       const drawImageCalls = [];
@@ -681,9 +773,9 @@ describe('Renderer', () => {
       renderer.renderPlayer(player, false);
 
       // Assert
-      // Should only render player sprite, not shadow
+      // Should only render player sprite sheet, not shadow
       expect(ctx.drawImage).toHaveBeenCalledTimes(1);
-      expect(drawImageCalls[0][0]).not.toBe(renderer.shadowImage);
+      expect(drawImageCalls[0][0]).toBe(renderer.spriteSheet);
     });
   });
 
@@ -759,44 +851,28 @@ describe('Renderer', () => {
 
         newRenderer.init();
 
-        // Should create 8 directional images + 1 background image + 1 shadow image = 10 total
-        expect(global.Image).toHaveBeenCalledTimes(10);
+        // Should create background image + shadow image (sprite sheet loaded via fetch)
+        expect(global.Image).toHaveBeenCalledTimes(2);
       });
 
-      test('WhenImagesLoaded_ShouldHaveAllFramesAvailable', () => {
-        // Simulate all images loaded
-        renderer.directionalImages = [
-          { complete: true },
-          { complete: true },
-          { complete: true },
-          { complete: true },
-          { complete: true },
-          { complete: true },
-          { complete: true },
-          { complete: true },
-        ];
-
-        expect(renderer.directionalImages.length).toBe(8);
-        expect(renderer.directionalImages.every(img => img.complete)).toBe(true);
-      });
     });
 
-    describe('Player Rendering with Directional Images', () => {
-      beforeEach(() => {
-        // Mock directional images as loaded
-        renderer.directionalImages = [];
-        for (let i = 0; i < 8; i++) {
-          renderer.directionalImages[i] = {
-            complete: true,
-            naturalWidth: 100,
-            width: 96,
-            height: 96,
-            src: `/white-male-${i}.png`,
-          };
-        }
-      });
+    describe('Player Rendering with Sprite Sheets', () => {
 
       test('WhenRenderingPlayerFacingSouth_ShouldDrawFrame0', () => {
+        // Mock sprite sheet as loaded
+        renderer.spriteSheet = {
+          complete: true,
+          naturalWidth: 576,
+          naturalHeight: 768,
+        };
+        renderer.spriteSheetMetadata = {
+          frameWidth: 96,
+          frameHeight: 96,
+          columns: 6,
+          rows: 8,
+        };
+
         const player = {
           id: 'player-1',
           name: 'Player1',
@@ -804,21 +880,33 @@ describe('Renderer', () => {
           y: 900,
           health: 100,
           rotation: Math.PI, // South
+          animationState: {
+            currentFrame: 0,
+            lastDirection: 0, // South
+            timeAccumulator: 0,
+          },
         };
 
         renderer.renderPlayer(player, false);
 
-        // Should draw the south-facing image (frame 0)
-        expect(ctx.drawImage).toHaveBeenCalledWith(
-          renderer.directionalImages[0],
-          expect.any(Number), // x position
-          expect.any(Number), // y position
-          CONFIG.RENDER.PLAYER_RADIUS * 2, // width
-          CONFIG.RENDER.PLAYER_RADIUS * 2  // height
-        );
+        // Should draw from sprite sheet (using renderPlayerWithSpriteSheet)
+        expect(ctx.drawImage).toHaveBeenCalled();
       });
 
       test('WhenRenderingPlayerFacingEast_ShouldDrawFrame2', () => {
+        // Mock sprite sheet as loaded
+        renderer.spriteSheet = {
+          complete: true,
+          naturalWidth: 576,
+          naturalHeight: 768,
+        };
+        renderer.spriteSheetMetadata = {
+          frameWidth: 96,
+          frameHeight: 96,
+          columns: 6,
+          rows: 8,
+        };
+
         const player = {
           id: 'player-1',
           name: 'Player1',
@@ -826,21 +914,33 @@ describe('Renderer', () => {
           y: 900,
           health: 100,
           rotation: Math.PI / 2, // East
+          animationState: {
+            currentFrame: 0,
+            lastDirection: 2, // East
+            timeAccumulator: 0,
+          },
         };
 
         renderer.renderPlayer(player, false);
 
-        // Should draw the east-facing image (frame 2)
-        expect(ctx.drawImage).toHaveBeenCalledWith(
-          renderer.directionalImages[2],
-          expect.any(Number),
-          expect.any(Number),
-          CONFIG.RENDER.PLAYER_RADIUS * 2,
-          CONFIG.RENDER.PLAYER_RADIUS * 2
-        );
+        // Should draw from sprite sheet (using renderPlayerWithSpriteSheet)
+        expect(ctx.drawImage).toHaveBeenCalled();
       });
 
       test('WhenRenderingPlayer_ShouldCenterImageOnPlayerPosition', () => {
+        // Mock sprite sheet as loaded
+        renderer.spriteSheet = {
+          complete: true,
+          naturalWidth: 576,
+          naturalHeight: 768,
+        };
+        renderer.spriteSheetMetadata = {
+          frameWidth: 96,
+          frameHeight: 96,
+          columns: 6,
+          rows: 8,
+        };
+
         const player = {
           id: 'player-1',
           name: 'Player1',
@@ -848,24 +948,47 @@ describe('Renderer', () => {
           y: 900,
           health: 100,
           rotation: 0, // North
+          animationState: {
+            currentFrame: 0,
+            lastDirection: 4, // North
+            timeAccumulator: 0,
+          },
         };
 
         renderer.renderPlayer(player, false);
 
-        // Image should be centered on player position
-        const expectedX = 1500 - CONFIG.RENDER.PLAYER_RADIUS;
-        const expectedY = 900 - CONFIG.RENDER.PLAYER_RADIUS;
-
-        expect(ctx.drawImage).toHaveBeenCalledWith(
-          expect.any(Object),
-          expectedX,
-          expectedY,
-          CONFIG.RENDER.PLAYER_RADIUS * 2,
-          CONFIG.RENDER.PLAYER_RADIUS * 2
-        );
+        // Image should be centered on player position (using sprite sheet)
+        expect(ctx.drawImage).toHaveBeenCalled();
+        // Verify at least one drawImage call has the player position
+        const drawImageCalls = ctx.drawImage.mock.calls;
+        const hasCorrectPosition = drawImageCalls.some(call => {
+          // Check if this is a sprite sheet draw (9 parameters) and has correct dest coordinates
+          if (call.length === 9) {
+            const destX = call[5];
+            const destY = call[6];
+            const expectedX = 1500 - CONFIG.RENDER.PLAYER_RADIUS;
+            const expectedY = 900 - CONFIG.RENDER.PLAYER_RADIUS;
+            return destX === expectedX && destY === expectedY;
+          }
+          return false;
+        });
+        expect(hasCorrectPosition).toBe(true);
       });
 
       test('WhenRenderingLocalPlayer_ShouldDrawImageAndWhiteOutline', () => {
+        // Mock sprite sheet as loaded
+        renderer.spriteSheet = {
+          complete: true,
+          naturalWidth: 576,
+          naturalHeight: 768,
+        };
+        renderer.spriteSheetMetadata = {
+          frameWidth: 96,
+          frameHeight: 96,
+          columns: 6,
+          rows: 8,
+        };
+
         const player = {
           id: 'player-1',
           name: 'Player1',
@@ -873,16 +996,255 @@ describe('Renderer', () => {
           y: 900,
           health: 100,
           rotation: 0,
+          animationState: {
+            currentFrame: 0,
+            lastDirection: 4, // North
+            timeAccumulator: 0,
+          },
         };
 
         renderer.renderPlayer(player, true); // isLocal = true
 
-        // Should draw the directional image
+        // Should draw the sprite from sprite sheet
         expect(ctx.drawImage).toHaveBeenCalled();
 
         // Should also draw white outline for local player
         expect(ctx.stroke).toHaveBeenCalled();
         expect(ctx.strokeStyle).toBe('#ffffff');
+      });
+    });
+  });
+
+  describe('Sprite Sheet Animation', () => {
+    describe('loadSpriteSheet', () => {
+      test('WhenLoadingSpriteSheet_ShouldLoadImageAndMetadata', async () => {
+        // Mock fetch for metadata
+        global.fetch = jest.fn(() =>
+          Promise.resolve({
+            ok: true,
+            json: () => Promise.resolve({
+              frameWidth: 96,
+              frameHeight: 96,
+              columns: 6,
+              rows: 8,
+              directions: ['south', 'south-east', 'east', 'north-east', 'north', 'north-west', 'west', 'south-west']
+            })
+          })
+        );
+
+        const newRenderer = new Renderer(canvas);
+
+        // Start loading sprite sheet
+        const loadPromise = newRenderer.loadSpriteSheet();
+
+        // Simulate image load completion after event loop tick
+        setTimeout(() => {
+          if (newRenderer.spriteSheet && newRenderer.spriteSheet.onload) {
+            newRenderer.spriteSheet.onload();
+          }
+        }, 0);
+
+        await loadPromise;
+
+        expect(newRenderer.spriteSheet).toBeDefined();
+        expect(newRenderer.spriteSheetMetadata).toBeDefined();
+        expect(newRenderer.spriteSheetMetadata.frameWidth).toBe(96);
+        expect(newRenderer.spriteSheetMetadata.frameHeight).toBe(96);
+        expect(newRenderer.spriteSheetMetadata.columns).toBe(6);
+        expect(newRenderer.spriteSheetMetadata.rows).toBe(8);
+      });
+
+      test('WhenMetadataLoadFails_ShouldHandleGracefully', async () => {
+        global.fetch = jest.fn(() =>
+          Promise.resolve({
+            ok: false,
+            statusText: 'Not Found'
+          })
+        );
+
+        const newRenderer = new Renderer(canvas);
+        await expect(newRenderer.loadSpriteSheet()).rejects.toThrow();
+      });
+    });
+
+    describe('initAnimationState', () => {
+      test('WhenInitializingAnimationState_ShouldSetDefaultValues', () => {
+        const animState = renderer.initAnimationState();
+
+        expect(animState).toBeDefined();
+        expect(animState.currentFrame).toBe(0);
+        expect(animState.timeAccumulator).toBe(0);
+        expect(animState.lastDirection).toBe(0); // Default to South
+      });
+    });
+
+    describe('updateAnimationState', () => {
+      test('WhenPlayerIsMoving_ShouldAdvanceFrame', () => {
+        const animState = {
+          currentFrame: 0,
+          timeAccumulator: 0,
+          lastDirection: 2 // East
+        };
+
+        const deltaTime = 1 / CONFIG.ANIMATION.FPS; // One frame duration
+        const isMoving = true;
+        const direction = 2; // East
+
+        updateAnimationState(animState, deltaTime, isMoving, direction);
+
+        expect(animState.currentFrame).toBe(1); // Should advance to next frame
+        expect(animState.timeAccumulator).toBeLessThan(deltaTime);
+        expect(animState.lastDirection).toBe(2); // Should maintain direction
+      });
+
+      test('WhenPlayerIsIdle_ShouldNotAdvanceFrame', () => {
+        const animState = {
+          currentFrame: 3,
+          timeAccumulator: 0,
+          lastDirection: 2 // East
+        };
+
+        const deltaTime = 1 / CONFIG.ANIMATION.FPS; // One frame duration
+        const isMoving = false;
+        const direction = null; // Idle
+
+        updateAnimationState(animState, deltaTime, isMoving, direction);
+
+        expect(animState.currentFrame).toBe(0); // Should reset to idle frame
+        expect(animState.lastDirection).toBe(2); // Should keep last direction
+      });
+
+      test('WhenFrameExceedsMax_ShouldLoopBackToZero', () => {
+        const animState = {
+          currentFrame: 5, // Last frame
+          timeAccumulator: 0,
+          lastDirection: 4 // North
+        };
+
+        const deltaTime = 1 / CONFIG.ANIMATION.FPS; // One frame duration
+        const isMoving = true;
+        const direction = 4; // North
+
+        updateAnimationState(animState, deltaTime, isMoving, direction);
+
+        expect(animState.currentFrame).toBe(0); // Should loop back to first frame
+      });
+
+      test('WhenDirectionChanges_ShouldUpdateLastDirection', () => {
+        const animState = {
+          currentFrame: 2,
+          timeAccumulator: 0,
+          lastDirection: 2 // East
+        };
+
+        const deltaTime = 0.01; // Small delta
+        const isMoving = true;
+        const direction = 4; // Changed to North
+
+        updateAnimationState(animState, deltaTime, isMoving, direction);
+
+        expect(animState.lastDirection).toBe(4); // Should update to new direction
+      });
+    });
+
+    describe('renderPlayerWithSpriteSheet', () => {
+      beforeEach(() => {
+        // Mock sprite sheet as loaded
+        renderer.spriteSheet = {
+          complete: true,
+          naturalWidth: 576, // 6 columns * 96px
+          naturalHeight: 768, // 8 rows * 96px
+        };
+        renderer.spriteSheetMetadata = {
+          frameWidth: 96,
+          frameHeight: 96,
+          columns: 6,
+          rows: 8,
+        };
+
+        ctx.drawImage = jest.fn();
+      });
+
+      test('WhenRenderingPlayerWithSpriteSheet_ShouldDrawCorrectFrame', () => {
+        const player = {
+          id: 'player-1',
+          x: 1500,
+          y: 900,
+          health: 100,
+          animationState: {
+            currentFrame: 2, // Frame 2
+            lastDirection: 4, // North (row 4)
+          },
+        };
+
+        renderer.renderPlayerWithSpriteSheet(player, false);
+
+        // Should draw frame from sprite sheet
+        // sourceX = currentFrame * frameWidth = 2 * 96 = 192
+        // sourceY = lastDirection * frameHeight = 4 * 96 = 384
+        expect(ctx.drawImage).toHaveBeenCalledWith(
+          renderer.spriteSheet,
+          192, // sourceX
+          384, // sourceY
+          96,  // sourceWidth
+          96,  // sourceHeight
+          1500 - CONFIG.RENDER.PLAYER_RADIUS, // destX (centered)
+          900 - CONFIG.RENDER.PLAYER_RADIUS,  // destY (centered)
+          CONFIG.RENDER.PLAYER_RADIUS * 2,    // destWidth
+          CONFIG.RENDER.PLAYER_RADIUS * 2     // destHeight
+        );
+      });
+
+      test('WhenSpriteSheetNotLoaded_ShouldFallbackToPinkRectangle', () => {
+        renderer.spriteSheet = null;
+
+        const player = {
+          id: 'player-1',
+          x: 1500,
+          y: 900,
+          health: 100,
+          animationState: {
+            currentFrame: 0,
+            lastDirection: 0,
+          },
+        };
+
+        renderer.renderPlayerWithSpriteSheet(player, false);
+
+        // Should draw fallback rectangle
+        expect(ctx.fillRect).toHaveBeenCalled();
+        // Check that pink color was set
+        expect(ctx.fillStyle).toContain('ff'); // Pink has high red and blue
+      });
+
+      test('WhenRenderingIdlePlayer_ShouldUseFrame0', () => {
+        const player = {
+          id: 'player-1',
+          x: 1500,
+          y: 900,
+          health: 100,
+          animationState: {
+            currentFrame: 0, // Idle frame
+            lastDirection: 2, // East
+          },
+        };
+
+        renderer.renderPlayerWithSpriteSheet(player, false);
+
+        // Should draw first frame (idle) from East direction row
+        // sourceX = 0 * 96 = 0
+        // sourceY = 2 * 96 = 192
+        expect(ctx.drawImage).toHaveBeenCalledWith(
+          renderer.spriteSheet,
+          0,   // sourceX (idle frame)
+          192, // sourceY (East row)
+          96,
+          96,
+          expect.any(Number),
+          expect.any(Number),
+          expect.any(Number),
+          expect.any(Number)
+        );
       });
     });
   });

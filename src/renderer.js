@@ -4,6 +4,7 @@
  */
 
 import { CONFIG } from './config.js';
+import { getDirectionFromVelocity } from './animationHelper.js';
 
 export class Renderer {
   constructor(canvas) {
@@ -11,7 +12,9 @@ export class Renderer {
     this.ctx = null;
     this.bgImage = null;
     this.bgPattern = null;
-    this.directionalImages = [];
+    this.spriteSheet = null;
+    this.spriteSheetMetadata = null;
+    this.spriteSheetLoaded = false;
     this.shadowImage = null;
   }
 
@@ -34,10 +37,10 @@ export class Renderer {
     // Load shadow image
     this.shadowImage = this.createImage('shadow.png');
 
-    // Load directional player images (8 frames)
-    for (let i = 0; i < 8; i++) {
-      this.directionalImages[i] = this.createImage(`white-male-${i}.png`);
-    }
+    // Load sprite sheet for animations
+    this.loadSpriteSheet().catch(err => {
+      console.warn('Failed to load sprite sheet, using fallback rendering:', err.message);
+    });
 
     console.log('Renderer initialized');
   }
@@ -102,6 +105,12 @@ export class Renderer {
         // Skip local player, we'll render it separately
         if (localPlayer && playerId === localPlayer.id) return;
 
+        // Calculate animation state for remote player based on velocity
+        const vx = playerData.velocity_x || 0;
+        const vy = playerData.velocity_y || 0;
+        const direction = getDirectionFromVelocity(vx, vy);
+        const isMoving = vx !== 0 || vy !== 0;
+
         const player = {
           id: playerId,
           name: playerData.player_name,
@@ -109,6 +118,11 @@ export class Renderer {
           y: playerData.position_y,
           rotation: playerData.rotation,
           health: playerData.health,
+          animationState: {
+            currentFrame: isMoving ? 1 : 0, // Use frame 1 for moving (approximate animation)
+            lastDirection: direction !== null ? direction : 0, // Use calculated direction or default to South
+            timeAccumulator: 0,
+          },
         };
         this.renderPlayer(player, false);
       });
@@ -209,57 +223,8 @@ export class Renderer {
   }
 
   renderPlayer(player, isLocal = false) {
-    const size = CONFIG.RENDER.PLAYER_RADIUS * 2;
-    const spriteX = player.x - CONFIG.RENDER.PLAYER_RADIUS;
-    const spriteY = player.y - CONFIG.RENDER.PLAYER_RADIUS;
-
-    // Render shadow first (beneath player)
-    if (this.shadowImage && this.shadowImage.complete && this.shadowImage.naturalWidth > 0) {
-      this.ctx.drawImage(
-        this.shadowImage,
-        spriteX,
-        spriteY,
-        size,
-        size
-      );
-    }
-
-    // Render player with directional sprite
-    const frame = this.getFrameFromRotation(player.rotation || 0);
-    const img = this.directionalImages[frame];
-
-    if (img && img.complete && img.naturalWidth > 0) {
-      this.ctx.drawImage(
-        img,
-        spriteX,
-        spriteY,
-        size,
-        size
-      );
-    }
-
-    // Add white outline for local player
-    if (isLocal) {
-      this.ctx.strokeStyle = '#ffffff';
-      this.ctx.lineWidth = 2;
-      this.ctx.beginPath();
-      this.ctx.arc(player.x, player.y, CONFIG.RENDER.PLAYER_RADIUS, 0, Math.PI * 2);
-      this.ctx.stroke();
-    }
-
-    // Health bar above player
-    const barWidth = CONFIG.RENDER.HEALTH_BAR_WIDTH;
-    const barHeight = CONFIG.RENDER.HEALTH_BAR_HEIGHT;
-    const barX = player.x - barWidth / 2;
-    const barY = player.y - (CONFIG.RENDER.PLAYER_RADIUS + CONFIG.RENDER.HEALTH_BAR_OFFSET_FROM_PLAYER);
-
-    // Background
-    this.ctx.fillStyle = '#333';
-    this.ctx.fillRect(barX, barY, barWidth, barHeight);
-
-    // Health
-    this.ctx.fillStyle = '#ff6b6b';
-    this.ctx.fillRect(barX, barY, (player.health / 100) * barWidth, barHeight);
+    // Use sprite sheet animation rendering
+    this.renderPlayerWithSpriteSheet(player, isLocal);
   }
 
   renderLoot(loot) {
@@ -313,5 +278,134 @@ export class Renderer {
     this.ctx.fill();
 
     this.ctx.restore();
+  }
+
+  /**
+   * Load sprite sheet image and metadata
+   * @returns {Promise<void>}
+   */
+  async loadSpriteSheet() {
+    const baseUrl = CONFIG.ASSETS.BASE_URL;
+    const normalizedBase = baseUrl.endsWith('/') ? baseUrl : `${baseUrl}/`;
+
+    try {
+      // Load metadata
+      const metadataPath = `${normalizedBase}${CONFIG.ASSETS.SPRITE_SHEET.METADATA}`;
+      const response = await fetch(metadataPath);
+
+      if (!response.ok) {
+        throw new Error(`Failed to load sprite sheet metadata: ${response.statusText}`);
+      }
+
+      this.spriteSheetMetadata = await response.json();
+
+      // Load sprite sheet image
+      this.spriteSheet = this.createImage(CONFIG.ASSETS.SPRITE_SHEET.PATH);
+
+      // Wait for image to load
+      await new Promise((resolve, reject) => {
+        this.spriteSheet.onload = resolve;
+        this.spriteSheet.onerror = reject;
+      });
+
+      // Mark sprite sheet as loaded
+      this.spriteSheetLoaded = true;
+    } catch (error) {
+      // Ensure sprite sheet stays null for fallback rendering
+      this.spriteSheet = null;
+      this.spriteSheetMetadata = null;
+      this.spriteSheetLoaded = false;
+      throw error;
+    }
+  }
+
+  /**
+   * Initialize animation state for a player
+   * @returns {Object} Animation state { currentFrame, timeAccumulator, lastDirection }
+   */
+  initAnimationState() {
+    return {
+      currentFrame: 0,
+      timeAccumulator: 0,
+      lastDirection: 0, // Default to South
+    };
+  }
+
+  /**
+   * Render player using sprite sheet animation
+   * @param {Object} player - Player object with position, health, and animationState
+   * @param {boolean} isLocal - Whether this is the local player
+   */
+  renderPlayerWithSpriteSheet(player, isLocal = false) {
+    const size = CONFIG.RENDER.PLAYER_RADIUS * 2;
+    const spriteX = player.x - CONFIG.RENDER.PLAYER_RADIUS;
+    const spriteY = player.y - CONFIG.RENDER.PLAYER_RADIUS;
+
+    // Render shadow first (beneath player)
+    if (this.shadowImage && this.shadowImage.complete && this.shadowImage.naturalWidth > 0) {
+      this.ctx.drawImage(
+        this.shadowImage,
+        spriteX,
+        spriteY,
+        size,
+        size
+      );
+    }
+
+    // Check if sprite sheet is loaded
+    if (!this.spriteSheet || !this.spriteSheet.complete || !this.spriteSheetMetadata) {
+      // Fallback: render pink rectangle
+      this.ctx.fillStyle = '#ff69b4'; // Pink
+      this.ctx.fillRect(
+        spriteX,
+        spriteY,
+        size,
+        size
+      );
+      return;
+    }
+
+    const { currentFrame, lastDirection } = player.animationState;
+    const { frameWidth, frameHeight } = this.spriteSheetMetadata;
+
+    // Calculate source rectangle (which frame to draw from sprite sheet)
+    const sourceX = currentFrame * frameWidth;
+    const sourceY = lastDirection * frameHeight;
+
+    // Draw frame from sprite sheet, centered on player position
+    this.ctx.drawImage(
+      this.spriteSheet,
+      sourceX,
+      sourceY,
+      frameWidth,
+      frameHeight,
+      spriteX,
+      spriteY,
+      size,
+      size
+    );
+
+    // Add white outline for local player
+    if (isLocal) {
+      this.ctx.strokeStyle = '#ffffff';
+      this.ctx.lineWidth = 2;
+      this.ctx.beginPath();
+      this.ctx.arc(player.x, player.y, CONFIG.RENDER.PLAYER_RADIUS, 0, Math.PI * 2);
+      this.ctx.stroke();
+    }
+
+    // Health bar above player
+    const barWidth = CONFIG.RENDER.HEALTH_BAR_WIDTH;
+    const barHeight = CONFIG.RENDER.HEALTH_BAR_HEIGHT;
+    const barX = player.x - barWidth / 2;
+    const barY = player.y - (CONFIG.RENDER.PLAYER_RADIUS + CONFIG.RENDER.HEALTH_BAR_OFFSET_FROM_PLAYER);
+
+    // Background
+    this.ctx.fillStyle = '#333';
+    this.ctx.fillRect(barX, barY, barWidth, barHeight);
+
+    // Health
+    this.ctx.fillStyle = '#ff6b6b';
+    this.ctx.fillRect(barX, barY, (player.health / 100) * barWidth, barHeight);
   }
 }
