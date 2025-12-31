@@ -7,6 +7,9 @@ import puppeteer from 'puppeteer';
 import { startViteServer, stopViteServer } from './helpers/vite-server.js';
 import { getPuppeteerConfig } from './helpers/puppeteer-config.js';
 
+// Helper function to replace deprecated page.waitForTimeout
+const delay = (ms) => new Promise(resolve => setTimeout(resolve, ms));
+
 describe('Animation Integration', () => {
   let browser;
   let page;
@@ -56,20 +59,21 @@ describe('Animation Integration', () => {
       // Wait for game to start
       await page.waitForSelector('#game-canvas:not(.hidden)', { timeout: 10000 });
 
-      // Check that sprite sheet loaded successfully
-      const spriteSheetLoaded = await page.evaluate(() => {
-        // Access the game instance via window.game
-        if (window.game && window.game.renderer) {
-          const renderer = window.game.renderer;
-          // Check if sprite sheet and metadata are loaded
-          return renderer.spriteSheet !== null &&
-                 renderer.spriteSheet.complete &&
-                 renderer.spriteSheetMetadata !== null;
-        }
-        return false;
-      });
+      // Wait for sprite sheet to load
+      const spriteSheetLoaded = await page.waitForFunction(
+        () => {
+          if (window.game && window.game.renderer) {
+            const renderer = window.game.renderer;
+            return renderer.spriteSheet !== null &&
+                   renderer.spriteSheet.complete &&
+                   renderer.spriteSheetMetadata !== null;
+          }
+          return false;
+        },
+        { timeout: 5000 }
+      );
 
-      expect(spriteSheetLoaded).toBe(true);
+      expect(spriteSheetLoaded).toBeTruthy();
     }, 30000);
 
     test('WhenSpriteSheetLoads_ShouldHaveCorrectMetadata', async () => {
@@ -82,7 +86,7 @@ describe('Animation Integration', () => {
       await page.waitForSelector('#game-canvas:not(.hidden)', { timeout: 10000 });
 
       // Give it a moment to load assets
-      await page.waitForTimeout(1000);
+      await delay(1000);
 
       // Inject code to check the sprite sheet metadata
       const metadata = await page.evaluate(() => {
@@ -117,13 +121,13 @@ describe('Animation Integration', () => {
       await page.waitForSelector('#game-canvas:not(.hidden)', { timeout: 10000 });
 
       // Wait for assets to load
-      await page.waitForTimeout(1000);
+      await delay(1000);
 
       // Simulate player movement by sending keyboard events
       await page.keyboard.down('ArrowRight');
 
       // Wait a bit for animation to run
-      await page.waitForTimeout(500);
+      await delay(500);
 
       // Check that animation state has advanced
       const animationAdvanced = await page.evaluate(() => {
@@ -150,15 +154,15 @@ describe('Animation Integration', () => {
       await page.waitForSelector('#game-canvas:not(.hidden)', { timeout: 10000 });
 
       // Wait for assets to load
-      await page.waitForTimeout(1000);
+      await delay(1000);
 
       // Move player
       await page.keyboard.down('ArrowRight');
-      await page.waitForTimeout(300);
+      await delay(300);
       await page.keyboard.up('ArrowRight');
 
       // Wait for player to stop
-      await page.waitForTimeout(200);
+      await delay(200);
 
       // Check that animation state reset to idle frame (frame 0)
       const isIdleFrame = await page.evaluate(() => {
@@ -183,11 +187,11 @@ describe('Animation Integration', () => {
       await page.waitForSelector('#game-canvas:not(.hidden)', { timeout: 10000 });
 
       // Wait for assets to load
-      await page.waitForTimeout(1000);
+      await delay(1000);
 
       // Move right (should be East direction = 2)
       await page.keyboard.down('ArrowRight');
-      await page.waitForTimeout(300);
+      await delay(300);
 
       const eastDirection = await page.evaluate(() => {
         if (window.game && window.game.localPlayer) {
@@ -200,7 +204,7 @@ describe('Animation Integration', () => {
 
       // Move down (should be South direction = 0)
       await page.keyboard.down('ArrowDown');
-      await page.waitForTimeout(300);
+      await delay(300);
 
       const southDirection = await page.evaluate(() => {
         if (window.game && window.game.localPlayer) {
@@ -269,24 +273,25 @@ describe('Animation Integration', () => {
       await page2.waitForSelector('body.loaded', { timeout: 10000 });
 
       // Player 2 joins
-      await page2.click('#join-game-btn');
       await page2.waitForSelector('#join-code-input', { timeout: 5000 });
-      await page2.type('#join-code-input', joinCode);
-      await page2.click('#join-submit-btn');
+      await page2.evaluate((code) => {
+        document.getElementById('join-code-input').value = code;
+      }, joinCode);
+      await page2.click('#join-game-btn');
 
       // Wait for player 2 to be in game
       await page2.waitForSelector('#game-canvas:not(.hidden)', { timeout: 10000 });
 
       // Give a moment for network sync
-      await page.waitForTimeout(1000);
+      await delay(1000);
 
       // Move player 2
       await page2.keyboard.down('ArrowRight');
-      await page2.waitForTimeout(500);
+      await delay(500);
       await page2.keyboard.up('ArrowRight');
 
       // Give time for sync
-      await page.waitForTimeout(500);
+      await delay(500);
 
       // Check that page 1 can see player 2 in the game
       const hasRemotePlayer = await page.evaluate(() => {
