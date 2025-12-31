@@ -88,9 +88,10 @@ describe('Renderer', () => {
       expect(canvas.getContext).toHaveBeenCalledWith('2d');
       expect(canvas.width).toBe(CONFIG.CANVAS.WIDTH);
       expect(canvas.height).toBe(CONFIG.CANVAS.HEIGHT);
-      // Should load background image only (sprite sheet loaded via fetch)
-      expect(global.Image).toHaveBeenCalledTimes(1);
+      // Should load background image + shadow image (sprite sheet loaded via fetch)
+      expect(global.Image).toHaveBeenCalledTimes(2);
       expect(newRenderer.bgImage.src).toBe('/game-background.png');
+      expect(newRenderer.shadowImage.src).toBe('/shadow.png');
     });
 
     test('WhenImageLoads_ShouldCreatePattern', () => {
@@ -539,14 +540,27 @@ describe('Renderer', () => {
       newRenderer.init();
 
       // Assert
-      // Should create shadow image + background image + 8 directional images = 10 total
-      expect(global.Image).toHaveBeenCalledTimes(10);
+      // Should create shadow image + background image (sprite sheet loaded via fetch)
+      expect(global.Image).toHaveBeenCalledTimes(2);
       expect(newRenderer.shadowImage).toBeDefined();
       expect(newRenderer.shadowImage.src).toBe('/shadow.png');
     });
 
     test('WhenRenderingPlayer_ShouldRenderShadowBeforePlayerSprite', () => {
       // Arrange
+      // Mock sprite sheet as loaded
+      renderer.spriteSheet = {
+        complete: true,
+        naturalWidth: 576,
+        naturalHeight: 768,
+      };
+      renderer.spriteSheetMetadata = {
+        frameWidth: 96,
+        frameHeight: 96,
+        columns: 6,
+        rows: 8,
+      };
+
       const player = {
         id: 'player-1',
         name: 'Player1',
@@ -554,6 +568,11 @@ describe('Renderer', () => {
         y: 900,
         health: 100,
         rotation: 0,
+        animationState: {
+          currentFrame: 0,
+          lastDirection: 4, // North
+          timeAccumulator: 0,
+        },
       };
 
       const drawImageCalls = [];
@@ -565,18 +584,31 @@ describe('Renderer', () => {
       renderer.renderPlayer(player, false);
 
       // Assert
-      // Should call drawImage twice: once for shadow, once for player
+      // Should call drawImage twice: once for shadow, once for player sprite sheet
       expect(ctx.drawImage).toHaveBeenCalledTimes(2);
 
       // First call should be shadow (rendered before player)
       expect(drawImageCalls[0][0]).toBe(renderer.shadowImage);
 
-      // Second call should be player sprite
-      expect(drawImageCalls[1][0]).toBe(renderer.directionalImages[4]); // North frame
+      // Second call should be player sprite sheet
+      expect(drawImageCalls[1][0]).toBe(renderer.spriteSheet);
     });
 
     test('WhenRenderingPlayer_ShouldPositionShadowAtPlayerLocation', () => {
       // Arrange
+      // Mock sprite sheet as loaded
+      renderer.spriteSheet = {
+        complete: true,
+        naturalWidth: 576,
+        naturalHeight: 768,
+      };
+      renderer.spriteSheetMetadata = {
+        frameWidth: 96,
+        frameHeight: 96,
+        columns: 6,
+        rows: 8,
+      };
+
       const player = {
         id: 'player-1',
         name: 'Player1',
@@ -584,6 +616,11 @@ describe('Renderer', () => {
         y: 900,
         health: 100,
         rotation: 0,
+        animationState: {
+          currentFrame: 0,
+          lastDirection: 4,
+          timeAccumulator: 0,
+        },
       };
 
       const drawImageCalls = [];
@@ -610,6 +647,19 @@ describe('Renderer', () => {
       // Arrange - Test multiple rotations
       const rotations = [0, Math.PI / 4, Math.PI / 2, Math.PI, 3 * Math.PI / 2];
 
+      // Mock sprite sheet as loaded
+      renderer.spriteSheet = {
+        complete: true,
+        naturalWidth: 576,
+        naturalHeight: 768,
+      };
+      renderer.spriteSheetMetadata = {
+        frameWidth: 96,
+        frameHeight: 96,
+        columns: 6,
+        rows: 8,
+      };
+
       for (const rotation of rotations) {
         ctx.drawImage.mockClear();
         const drawImageCalls = [];
@@ -624,6 +674,11 @@ describe('Renderer', () => {
           y: 900,
           health: 100,
           rotation: rotation,
+          animationState: {
+            currentFrame: 0,
+            lastDirection: 4,
+            timeAccumulator: 0,
+          },
         };
 
         // Act
@@ -638,6 +693,19 @@ describe('Renderer', () => {
 
     test('WhenRenderingLocalPlayer_ShouldRenderShadow', () => {
       // Arrange
+      // Mock sprite sheet as loaded
+      renderer.spriteSheet = {
+        complete: true,
+        naturalWidth: 576,
+        naturalHeight: 768,
+      };
+      renderer.spriteSheetMetadata = {
+        frameWidth: 96,
+        frameHeight: 96,
+        columns: 6,
+        rows: 8,
+      };
+
       const player = {
         id: 'player-1',
         name: 'Player1',
@@ -645,6 +713,11 @@ describe('Renderer', () => {
         y: 900,
         health: 100,
         rotation: 0,
+        animationState: {
+          currentFrame: 0,
+          lastDirection: 4,
+          timeAccumulator: 0,
+        },
       };
 
       const drawImageCalls = [];
@@ -664,6 +737,19 @@ describe('Renderer', () => {
       // Arrange
       renderer.shadowImage = null;
 
+      // Mock sprite sheet as loaded
+      renderer.spriteSheet = {
+        complete: true,
+        naturalWidth: 576,
+        naturalHeight: 768,
+      };
+      renderer.spriteSheetMetadata = {
+        frameWidth: 96,
+        frameHeight: 96,
+        columns: 6,
+        rows: 8,
+      };
+
       const player = {
         id: 'player-1',
         name: 'Player1',
@@ -671,6 +757,11 @@ describe('Renderer', () => {
         y: 900,
         health: 100,
         rotation: 0,
+        animationState: {
+          currentFrame: 0,
+          lastDirection: 4,
+          timeAccumulator: 0,
+        },
       };
 
       const drawImageCalls = [];
@@ -682,9 +773,9 @@ describe('Renderer', () => {
       renderer.renderPlayer(player, false);
 
       // Assert
-      // Should only render player sprite, not shadow
+      // Should only render player sprite sheet, not shadow
       expect(ctx.drawImage).toHaveBeenCalledTimes(1);
-      expect(drawImageCalls[0][0]).not.toBe(renderer.shadowImage);
+      expect(drawImageCalls[0][0]).toBe(renderer.spriteSheet);
     });
   });
 
@@ -760,8 +851,8 @@ describe('Renderer', () => {
 
         newRenderer.init();
 
-        // Should create only background image (sprite sheet loaded via fetch)
-        expect(global.Image).toHaveBeenCalledTimes(1);
+        // Should create background image + shadow image (sprite sheet loaded via fetch)
+        expect(global.Image).toHaveBeenCalledTimes(2);
       });
 
     });

@@ -15,6 +15,7 @@ export class Renderer {
     this.spriteSheet = null;
     this.spriteSheetMetadata = null;
     this.spriteSheetLoaded = false;
+    this.shadowImage = null;
   }
 
   init() {
@@ -32,6 +33,9 @@ export class Renderer {
     this.bgImage.onload = () => {
       this.bgPattern = this.ctx.createPattern(this.bgImage, 'repeat');
     };
+
+    // Load shadow image
+    this.shadowImage = this.createImage('shadow.png');
 
     // Load sprite sheet for animations
     this.loadSpriteSheet().catch(err => {
@@ -333,15 +337,30 @@ export class Renderer {
    * @param {boolean} isLocal - Whether this is the local player
    */
   renderPlayerWithSpriteSheet(player, isLocal = false) {
+    const size = CONFIG.RENDER.PLAYER_RADIUS * 2;
+    const spriteX = player.x - CONFIG.RENDER.PLAYER_RADIUS;
+    const spriteY = player.y - CONFIG.RENDER.PLAYER_RADIUS;
+
+    // Render shadow first (beneath player)
+    if (this.shadowImage && this.shadowImage.complete && this.shadowImage.naturalWidth > 0) {
+      this.ctx.drawImage(
+        this.shadowImage,
+        spriteX,
+        spriteY,
+        size,
+        size
+      );
+    }
+
     // Check if sprite sheet is loaded
     if (!this.spriteSheet || !this.spriteSheet.complete || !this.spriteSheetMetadata) {
       // Fallback: render pink rectangle
       this.ctx.fillStyle = '#ff69b4'; // Pink
       this.ctx.fillRect(
-        player.x - CONFIG.RENDER.PLAYER_RADIUS,
-        player.y - CONFIG.RENDER.PLAYER_RADIUS,
-        CONFIG.RENDER.PLAYER_RADIUS * 2,
-        CONFIG.RENDER.PLAYER_RADIUS * 2
+        spriteX,
+        spriteY,
+        size,
+        size
       );
       return;
     }
@@ -360,10 +379,10 @@ export class Renderer {
       sourceY,
       frameWidth,
       frameHeight,
-      player.x - CONFIG.RENDER.PLAYER_RADIUS,
-      player.y - CONFIG.RENDER.PLAYER_RADIUS,
-      CONFIG.RENDER.PLAYER_RADIUS * 2,
-      CONFIG.RENDER.PLAYER_RADIUS * 2
+      spriteX,
+      spriteY,
+      size,
+      size
     );
 
     // Add white outline for local player
