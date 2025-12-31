@@ -501,6 +501,193 @@ describe('Renderer', () => {
     });
   });
 
+  describe('Shadow Rendering', () => {
+    beforeEach(() => {
+      // Add drawImage method to mock context
+      ctx.drawImage = jest.fn();
+
+      // Mock shadow image as loaded
+      renderer.shadowImage = {
+        complete: true,
+        naturalWidth: 100,
+        width: 96,
+        height: 96,
+        src: '/shadow.png',
+      };
+
+      // Mock directional images as loaded
+      renderer.directionalImages = [];
+      for (let i = 0; i < 8; i++) {
+        renderer.directionalImages[i] = {
+          complete: true,
+          naturalWidth: 100,
+          width: 96,
+          height: 96,
+          src: `/white-male-${i}.png`,
+        };
+      }
+    });
+
+    test('WhenInitialized_ShouldLoadShadowImage', () => {
+      // Arrange - Create new renderer to test initialization
+      const newRenderer = new Renderer(canvas);
+
+      // Clear existing Image mock calls
+      global.Image.mockClear();
+
+      // Act
+      newRenderer.init();
+
+      // Assert
+      // Should create shadow image + background image + 8 directional images = 10 total
+      expect(global.Image).toHaveBeenCalledTimes(10);
+      expect(newRenderer.shadowImage).toBeDefined();
+      expect(newRenderer.shadowImage.src).toBe('/shadow.png');
+    });
+
+    test('WhenRenderingPlayer_ShouldRenderShadowBeforePlayerSprite', () => {
+      // Arrange
+      const player = {
+        id: 'player-1',
+        name: 'Player1',
+        x: 1500,
+        y: 900,
+        health: 100,
+        rotation: 0,
+      };
+
+      const drawImageCalls = [];
+      ctx.drawImage.mockImplementation((...args) => {
+        drawImageCalls.push(args);
+      });
+
+      // Act
+      renderer.renderPlayer(player, false);
+
+      // Assert
+      // Should call drawImage twice: once for shadow, once for player
+      expect(ctx.drawImage).toHaveBeenCalledTimes(2);
+
+      // First call should be shadow (rendered before player)
+      expect(drawImageCalls[0][0]).toBe(renderer.shadowImage);
+
+      // Second call should be player sprite
+      expect(drawImageCalls[1][0]).toBe(renderer.directionalImages[4]); // North frame
+    });
+
+    test('WhenRenderingPlayer_ShouldPositionShadowAtPlayerLocation', () => {
+      // Arrange
+      const player = {
+        id: 'player-1',
+        name: 'Player1',
+        x: 1500,
+        y: 900,
+        health: 100,
+        rotation: 0,
+      };
+
+      const drawImageCalls = [];
+      ctx.drawImage.mockImplementation((...args) => {
+        drawImageCalls.push(args);
+      });
+
+      // Act
+      renderer.renderPlayer(player, false);
+
+      // Assert
+      // Shadow should be centered at player position
+      const shadowCall = drawImageCalls[0];
+      const expectedX = 1500 - CONFIG.RENDER.PLAYER_RADIUS;
+      const expectedY = 900 - CONFIG.RENDER.PLAYER_RADIUS;
+
+      expect(shadowCall[1]).toBe(expectedX);
+      expect(shadowCall[2]).toBe(expectedY);
+      expect(shadowCall[3]).toBe(CONFIG.RENDER.PLAYER_RADIUS * 2); // width
+      expect(shadowCall[4]).toBe(CONFIG.RENDER.PLAYER_RADIUS * 2); // height
+    });
+
+    test('WhenPlayerRotates_ShadowShouldNotRotate', () => {
+      // Arrange - Test multiple rotations
+      const rotations = [0, Math.PI / 4, Math.PI / 2, Math.PI, 3 * Math.PI / 2];
+
+      for (const rotation of rotations) {
+        ctx.drawImage.mockClear();
+        const drawImageCalls = [];
+        ctx.drawImage.mockImplementation((...args) => {
+          drawImageCalls.push(args);
+        });
+
+        const player = {
+          id: 'player-1',
+          name: 'Player1',
+          x: 1500,
+          y: 900,
+          health: 100,
+          rotation: rotation,
+        };
+
+        // Act
+        renderer.renderPlayer(player, false);
+
+        // Assert
+        // Shadow should always use the same image regardless of rotation
+        const shadowCall = drawImageCalls[0];
+        expect(shadowCall[0]).toBe(renderer.shadowImage);
+      }
+    });
+
+    test('WhenRenderingLocalPlayer_ShouldRenderShadow', () => {
+      // Arrange
+      const player = {
+        id: 'player-1',
+        name: 'Player1',
+        x: 1500,
+        y: 900,
+        health: 100,
+        rotation: 0,
+      };
+
+      const drawImageCalls = [];
+      ctx.drawImage.mockImplementation((...args) => {
+        drawImageCalls.push(args);
+      });
+
+      // Act
+      renderer.renderPlayer(player, true); // isLocal = true
+
+      // Assert
+      // Should render shadow even for local player
+      expect(drawImageCalls[0][0]).toBe(renderer.shadowImage);
+    });
+
+    test('WhenShadowImageNotLoaded_ShouldSkipShadowRendering', () => {
+      // Arrange
+      renderer.shadowImage = null;
+
+      const player = {
+        id: 'player-1',
+        name: 'Player1',
+        x: 1500,
+        y: 900,
+        health: 100,
+        rotation: 0,
+      };
+
+      const drawImageCalls = [];
+      ctx.drawImage.mockImplementation((...args) => {
+        drawImageCalls.push(args);
+      });
+
+      // Act
+      renderer.renderPlayer(player, false);
+
+      // Assert
+      // Should only render player sprite, not shadow
+      expect(ctx.drawImage).toHaveBeenCalledTimes(1);
+      expect(drawImageCalls[0][0]).not.toBe(renderer.shadowImage);
+    });
+  });
+
   describe('Directional Player Rendering', () => {
     beforeEach(() => {
       // Add drawImage method to mock context
