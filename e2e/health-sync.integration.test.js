@@ -33,6 +33,10 @@ describe('Health Synchronization Integration', () => {
     if (hostNetwork) hostNetwork.disconnect();
     if (playerNetwork) playerNetwork.disconnect();
     
+    // Explicitly disconnect Supabase Realtime sockets to prevent open handles
+    if (hostClient && hostClient.realtime) await hostClient.realtime.disconnect();
+    if (playerClient && playerClient.realtime) await playerClient.realtime.disconnect();
+
     // Clean up session
     if (sessionData && hostClient) {
       await hostClient.from('game_sessions').delete().eq('id', sessionData.id);
