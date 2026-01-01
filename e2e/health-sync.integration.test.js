@@ -74,6 +74,12 @@ describe('Health Synchronization Integration', () => {
     });
   }, 30000); // 30s timeout for setup
 
+  // Cleanup after each test
+  afterEach(() => {
+    if (hostSnapshot) hostSnapshot.destroy();
+    if (playerSnapshot) playerSnapshot.destroy();
+  });
+
   test('WhenHostCalculatesZoneDamage_ShouldPersistHealthToDB', async () => {
     // 1. Move player outside zone on host
     // We need to simulate the player being outside the zone.
