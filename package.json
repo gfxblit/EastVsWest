@@ -8,7 +8,7 @@
     "build": "vite build",
     "preview": "vite preview",
     "supabase:reset": "./supabase/reset.sh",
-    "test": "node --experimental-vm-modules node_modules/jest/bin/jest.js",
+    "test": "node --experimental-vm-modules node_modules/jest/bin/jest.js --silent",
     "test:e2e": "e2e/run_e2e.sh",
     "test:watch": "node --experimental-vm-modules node_modules/jest/bin/jest.js --watch",
     "test:join": "node scripts/join-test.js",
