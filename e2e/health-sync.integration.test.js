@@ -159,13 +159,32 @@ describe('Health Synchronization Integration', () => {
     const damage = 10;
     playerOnHost.health -= damage;
     
+    // Setup listener for broadcast on client
+    const updatePromise = new Promise(resolve => {
+      const handler = (msg) => {
+        // Handle both single object and array of updates
+        const data = msg.data;
+        const updates = Array.isArray(data) ? data : [data];
+        
+        const update = updates.find(u => u.player_id === playerId);
+        if (update && update.health === (initialHealth - damage)) {
+          playerNetwork.off('player_state_update', handler);
+          resolve(update);
+        }
+      };
+      playerNetwork.on('player_state_update', handler);
+    });
+
     // 2. Broadcast update (simulating what hostGame.updateAllPlayersHealth would do)
     hostNetwork.broadcastPlayerStateUpdate({
         player_id: playerId,
         health: playerOnHost.health
     });
     
-    // 3. Wait for client to receive update
+    // 3. Wait for client to receive update via broadcast
+    await expect(updatePromise).resolves.toBeDefined();
+    
+    // 4. Verify snapshot is also updated (via its own listener)
     await waitFor(() => {
         const clientPlayerMap = playerSnapshot.getPlayers();
         const playerOnClient = clientPlayerMap.get(playerId);
@@ -175,5 +194,32 @@ describe('Health Synchronization Integration', () => {
     const clientPlayerMap = playerSnapshot.getPlayers();
     const playerOnClient = clientPlayerMap.get(playerId);
     expect(playerOnClient.health).toBe(90);
+  });
+
+  test('WhenClientBroadcastsHealth_ShouldBeIgnoredByOtherClients', async () => {
+    // 1. Setup initial state
+    const playerId = playerNetwork.playerId;
+    const hostPlayerMap = hostSnapshot.getPlayers();
+    const playerOnHost = hostPlayerMap.get(playerId);
+    
+    // Set health to 50 on host (authoritative)
+    playerOnHost.health = 50;
+    
+    // 2. Client tries to cheat by broadcasting full health
+    // Use player_state_update which allows health field
+    playerNetwork.broadcastPlayerStateUpdate({
+        player_id: playerId,
+        health: 100
+    });
+    
+    // 3. Wait a bit to ensure message would have arrived
+    await new Promise(resolve => setTimeout(resolve, 1000));
+    
+    // 4. Verify host snapshot ignored the update
+    // Host snapshot should only accept health updates from host (self) or logic, 
+    // but here we are checking if it accepts network updates from client.
+    // Since we manually set it to 50, if it accepted the broadcast it would become 100.
+    const playerOnHostAfter = hostSnapshot.getPlayers().get(playerId);
+    expect(playerOnHostAfter.health).toBe(50);
   });
 });
