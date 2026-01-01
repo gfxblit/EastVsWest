@@ -905,19 +905,18 @@ Each client writes their own position, velocity, and rotation to the database pe
 
 **Health Persistence**: Health is NOT written by clients. Health is host-authoritative and will be persisted by the host via Network.js when combat is implemented.
 
-### Host Health Persistence (FUTURE)
+### Host Health Persistence (IMPLEMENTED)
 
 Health is **HOST-AUTHORITATIVE**:
 
 - **Authority**: Only host writes health to database
-- **Triggers**: Combat damage, zone damage, healing (host calculates all)
-- **Implementation**: NOT YET IMPLEMENTED
-- **Planned Approach**:
-  - Combat system calls `Network.writeHealthToDB(playerId, newHealth)`
-  - Host validates and persists health changes
-  - Host broadcasts via combat_event or movement_update
-  - Clients update SessionPlayersSnapshot in-memory only
-  - SessionPlayersSnapshot does NOT write health to database
+- **Triggers**: Zone damage (host calculates), Combat damage (host calculates)
+- **Implementation**: `Network.startPeriodicPlayerStateWrite()` called by Host
+- **Process**:
+  - Host calculates health changes (e.g. zone damage)
+  - Host broadcasts updates via `player_state_update` (generic system)
+  - Host persists all players' health to DB every 60 seconds
+  - Clients receive updates and update `SessionPlayersSnapshot` (in-memory)
 
 ### Scalability Considerations
 

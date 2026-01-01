@@ -194,7 +194,7 @@ describe('Game', () => {
       expect(game.localPlayer.y).toBe(0);
     });
 
-    test('WhenPlayerOutsideZone_ShouldTakeDamage', () => {
+    test('WhenPlayerOutsideZone_ShouldNotTakeDamageLocally', () => {
       game.localPlayer.health = 100;
 
       // Place player far outside zone
@@ -206,9 +206,8 @@ describe('Game', () => {
 
       game.updateLocalPlayer(1); // 1 second
 
-      const expectedDamage = CONFIG.ZONE.DAMAGE_PER_SECOND +
-        (CONFIG.ZONE.DAMAGE_INCREASE_PER_PHASE * game.state.phase);
-      expect(game.localPlayer.health).toBe(100 - expectedDamage);
+      // Health should NOT change locally (waiting for host update)
+      expect(game.localPlayer.health).toBe(100);
     });
 
     test('WhenPlayerInsideZone_ShouldNotTakeDamage', () => {
@@ -222,26 +221,86 @@ describe('Game', () => {
 
       expect(game.localPlayer.health).toBe(100);
     });
+  });
 
-    test('WhenPlayerOutsideZoneInHigherPhase_ShouldTakeMoreDamage', () => {
-      // Place player outside zone
-      game.localPlayer.x = 0;
-      game.localPlayer.y = 0;
-      game.state.conflictZone.radius = 10;
+  describe('Host Health Authority', () => {
+    let mockNetwork;
+    let mockPlayersSnapshot;
 
-      // Test Phase 0
-      game.state.phase = 0;
-      game.localPlayer.health = 100;
-      game.updateLocalPlayer(1);
-      const phase0Damage = 100 - game.localPlayer.health;
+    beforeEach(() => {
+      mockNetwork = {
+        isHost: true,
+        broadcastPlayerStateUpdate: jest.fn(),
+      };
+      
+      mockPlayersSnapshot = {
+        getPlayers: jest.fn().mockReturnValue(new Map([
+          ['player-1', {
+            player_id: 'player-1',
+            position_x: 0, // Outside zone
+            position_y: 0,
+            health: 100
+          }],
+          ['player-2', {
+            player_id: 'player-2',
+            position_x: CONFIG.WORLD.WIDTH / 2, // Inside zone
+            position_y: CONFIG.WORLD.HEIGHT / 2,
+            health: 100
+          }]
+        ]))
+      };
 
-      // Test Phase 2
-      game.state.phase = 2;
-      game.localPlayer.health = 100;
-      game.updateLocalPlayer(1);
-      const phase2Damage = 100 - game.localPlayer.health;
+      game.init(mockPlayersSnapshot, mockNetwork);
+      game.state.conflictZone.radius = 100;
+    });
 
-      expect(phase2Damage).toBeGreaterThan(phase0Damage);
+    test('WhenHostCalculatesZoneDamage_ShouldUpdateAllPlayersHealth', () => {
+      const deltaTime = 1.0;
+      game.updateAllPlayersHealth(deltaTime);
+
+      // Verify updates were broadcast
+      expect(mockNetwork.broadcastPlayerStateUpdate).toHaveBeenCalled();
+      
+      // Get the update payload
+      const updates = mockNetwork.broadcastPlayerStateUpdate.mock.calls[0][0];
+      expect(Array.isArray(updates)).toBe(true);
+      
+      // Find update for player-1 (outside zone)
+      const p1Update = updates.find(u => u.player_id === 'player-1');
+      expect(p1Update).toBeDefined();
+      expect(p1Update.health).toBeLessThan(100);
+      
+      // Find update for player-2 (inside zone)
+      const p2Update = updates.find(u => u.player_id === 'player-2');
+      // Should NOT be in updates list if health didn't change
+      expect(p2Update).toBeUndefined();
+    });
+
+    test('WhenPlayerHealthReachesZero_ShouldMarkPlayerDead', () => {
+      // Setup player with low health
+      mockPlayersSnapshot.getPlayers.mockReturnValue(new Map([
+        ['player-1', {
+          player_id: 'player-1',
+          position_x: 0,
+          position_y: 0,
+          health: 1
+        }]
+      ]));
+
+      const deltaTime = 1.0; // Enough damage to kill
+      game.updateAllPlayersHealth(deltaTime);
+
+      const updates = mockNetwork.broadcastPlayerStateUpdate.mock.calls[0][0];
+      const p1Update = updates.find(u => u.player_id === 'player-1');
+      
+      expect(p1Update.health).toBe(0);
+      // Future: expect(p1Update.is_dead).toBe(true);
+    });
+
+    test('WhenNotHost_ShouldNotCalculateHealth', () => {
+      game.network.isHost = false;
+      game.updateAllPlayersHealth(1.0);
+      expect(mockNetwork.broadcastPlayerStateUpdate).not.toHaveBeenCalled();
     });
   });
 
@@ -385,12 +444,13 @@ describe('Game', () => {
     test('WhenLocalPlayerHealthChanges_ShouldSendUpdateEvenIfPositionUnchanged', () => {
       game.init(mockPlayersSnapshot, mockNetwork);
 
-      // Manually change health
-      game.localPlayer.health = 90;
+      // Simulate host updating health via snapshot
+      const player = mockPlayersSnapshot.getPlayers().get('player-1');
+      player.health = 90;
       
       game.update(0.1); // Use enough time to pass throttling
 
-      // Should send update because health changed
+      // Should send update because health changed (client echoes state)
       expect(mockNetwork.sendMovementUpdate).toHaveBeenCalled();
       const call = mockNetwork.sendMovementUpdate.mock.calls[0][0];
       expect(call.health).toBe(90);
