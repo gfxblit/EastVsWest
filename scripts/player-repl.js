@@ -144,13 +144,12 @@ async function updatePosition(dx, dy) {
 
   try {
     // Broadcast movement update via Realtime using flattened format
-    network.sendMovementUpdate({
-      position_x: currentPosition.x,
-      position_y: currentPosition.y,
-      rotation: currentRotation,
+    network.broadcastPlayerStateUpdate({
+      position_x: x,
+      position_y: y,
+      rotation: 0,
       velocity_x: 0,
-      velocity_y: 0,
-      health: currentHealth,
+      velocity_y: 0
     });
     console.log('   ✅ Broadcasted via Realtime');
 

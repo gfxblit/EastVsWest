@@ -57,7 +57,7 @@ describe('Interpolation Simulation', () => {
     // Capture network handler
     await snapshot.ready(); // Triggers subscription
     const calls = mockNetwork.on.mock.calls;
-    networkHandler = calls.find(call => call[0] === 'movement_update')[1];
+    networkHandler = calls.find(call => call[0] === 'player_state_update')[1];
     
     // Setup Renderer
     renderer = new Renderer(mockCanvas);
@@ -83,7 +83,7 @@ describe('Interpolation Simulation', () => {
     const sendUpdate = (t, x) => {
       mockNow.mockReturnValue(t);
       networkHandler({
-        type: 'movement_update',
+        type: 'player_state_update',
         from: playerId,
         data: {
           position_x: x,
