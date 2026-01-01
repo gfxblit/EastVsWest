@@ -338,6 +338,9 @@ describe('Player State Sync Integration with Supabase', () => {
       const player1Snapshot = new SessionPlayersSnapshot(player1Network, testSessionId);
       await player1Snapshot.ready();
 
+      // Wait for snapshot to fully subscribe to realtime events
+      await new Promise(resolve => setTimeout(resolve, 500));
+
       // Host broadcasts batched health updates
       const batchUpdates = [
         { player_id: player1Auth.user.id, health: 70 },
