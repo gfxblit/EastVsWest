@@ -42,7 +42,8 @@ export class Network extends EventEmitter {
     this.playerId = null;
     this.sessionId = null;
     this.channel = null;
-    this.movementWriteInterval = null; // Interval for periodic DB writes
+    this.movementWriteInterval = null; // Interval for periodic DB writes (legacy)
+    this.playerStateWriteInterval = null; // Interval for generic periodic DB writes
   }
 
   initialize(supabaseClient, playerId) {
@@ -341,12 +342,12 @@ export class Network extends EventEmitter {
       const position = typeof positionGetter === 'function' ? positionGetter() : positionGetter;
       const rotation = typeof rotationGetter === 'function' ? rotationGetter() : rotationGetter;
       const velocity = typeof velocityGetter === 'function' ? velocityGetter() : velocityGetter;
-      
+
       this.writeMovementToDB(
-        position.x, 
-        position.y, 
-        rotation, 
-        velocity.x, 
+        position.x,
+        position.y,
+        rotation,
+        velocity.x,
         velocity.y
       ).catch(err => {
         console.error('Failed to perform movement write:', err);
@@ -367,8 +368,125 @@ export class Network extends EventEmitter {
     }
   }
 
+  /**
+   * Generic Player State Update System
+   * Supports both client-authoritative (position, velocity) and host-authoritative (health, equipment) data
+   */
+
+  /**
+   * Broadcast player state update(s) to all clients
+   * @param {Object|Array} updates - Single update object or array of updates
+   *   Each update can contain any combination of:
+   *   - Client-auth: player_id, position_x, position_y, rotation, velocity_x, velocity_y
+   *   - Host-auth: health, equipped_weapon, equipped_armor
+   */
+  broadcastPlayerStateUpdate(updates) {
+    if (!this.channel || !this.connected) {
+      console.warn('Cannot send message, channel not connected.');
+      return;
+    }
+
+    const message = {
+      type: 'player_state_update',
+      from: this.playerId,
+      timestamp: Date.now(),
+      data: updates, // Can be single object or array
+    };
+
+    // Broadcast to all other clients
+    this.channel.send({
+      type: 'broadcast',
+      event: 'message',
+      payload: message,
+    });
+
+    // Emit locally since Supabase Realtime doesn't echo messages back to sender
+    this.emit('player_state_update', message);
+  }
+
+  /**
+   * Write player state to database
+   * @param {string|Array} playerIdOrUpdates - Player ID (for single update) or array of updates (for batch)
+   * @param {Object} stateData - State data to write (only used for single update)
+   */
+  async writePlayerStateToDB(playerIdOrUpdates, stateData) {
+    if (!this.supabase || !this.sessionId) {
+      console.error('Cannot write player state to DB: missing supabase or sessionId');
+      return;
+    }
+
+    // Handle batch updates
+    if (Array.isArray(playerIdOrUpdates)) {
+      const batchUpdates = playerIdOrUpdates;
+      // Process each update in the batch
+      await Promise.all(
+        batchUpdates.map(update => {
+          const { player_id, ...updateData } = update;
+          return this.writePlayerStateToDB(player_id, updateData);
+        })
+      );
+      return;
+    }
+
+    // Handle single update
+    const playerId = playerIdOrUpdates;
+    const { error } = await this.supabase
+      .from('session_players')
+      .update(stateData)
+      .eq('session_id', this.sessionId)
+      .eq('player_id', playerId);
+
+    if (error) {
+      console.error('Failed to write player state to DB:', error.message);
+    }
+  }
+
+  /**
+   * Start periodic player state writes to database
+   * @param {Function|Object|Array} stateGetter - Function that returns state data, or state data itself
+   *   Can return single update object or array of updates (for batching)
+   * @param {number} intervalMs - Write interval in milliseconds (default: 60000 / 60 seconds)
+   */
+  startPeriodicPlayerStateWrite(stateGetter, intervalMs = 60000) {
+    if (this.playerStateWriteInterval) return; // Already running
+
+    const performWrite = () => {
+      const stateData = typeof stateGetter === 'function' ? stateGetter() : stateGetter;
+
+      // Handle batch updates (array)
+      if (Array.isArray(stateData)) {
+        this.writePlayerStateToDB(stateData).catch(err => {
+          console.error('Failed to perform batched player state write:', err);
+        });
+      } else {
+        // Handle single update
+        const { player_id, ...updateData } = stateData;
+        this.writePlayerStateToDB(player_id, updateData).catch(err => {
+          console.error('Failed to perform player state write:', err);
+        });
+      }
+    };
+
+    // Write immediately
+    performWrite();
+
+    // Then write periodically
+    this.playerStateWriteInterval = setInterval(performWrite, intervalMs);
+  }
+
+  /**
+   * Stop periodic player state writes
+   */
+  stopPeriodicPlayerStateWrite() {
+    if (this.playerStateWriteInterval) {
+      clearInterval(this.playerStateWriteInterval);
+      this.playerStateWriteInterval = null;
+    }
+  }
+
   disconnect() {
     this.stopPeriodicMovementWrite();
+    this.stopPeriodicPlayerStateWrite();
     if (this.channel) {
       this.supabase.removeChannel(this.channel);
       this.channel = null;

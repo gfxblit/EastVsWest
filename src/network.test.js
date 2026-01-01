@@ -697,4 +697,334 @@ describe('Network', () => {
       expect(() => network.stopPeriodicMovementWrite()).not.toThrow();
     });
   });
+
+  describe('Generic Player State Update System', () => {
+    const MOCK_PLAYER_ID = 'test-player-id';
+
+    beforeEach(() => {
+      jest.clearAllMocks();
+      network = new Network();
+      network.initialize(mockSupabaseClient, MOCK_PLAYER_ID);
+      network.connected = true;
+      network.sessionId = 'test-session-id';
+      network.playerId = MOCK_PLAYER_ID;
+    });
+
+    describe('broadcastPlayerStateUpdate', () => {
+      describe('WhenClientBroadcastsPosition_ShouldUseGenericMethod', () => {
+        it('should broadcast single player state update with position fields', () => {
+          const mockChannel = {
+            send: jest.fn().mockResolvedValue({ status: 'ok' }),
+          };
+          network.channel = mockChannel;
+
+          const stateUpdate = {
+            player_id: MOCK_PLAYER_ID,
+            position_x: 100,
+            position_y: 200,
+            rotation: 1.57,
+            velocity_x: 1.0,
+            velocity_y: 0.5,
+          };
+
+          network.broadcastPlayerStateUpdate(stateUpdate);
+
+          expect(mockChannel.send).toHaveBeenCalledWith({
+            type: 'broadcast',
+            event: 'message',
+            payload: {
+              type: 'player_state_update',
+              from: MOCK_PLAYER_ID,
+              timestamp: expect.any(Number),
+              data: stateUpdate,
+            },
+          });
+        });
+
+        it('should not send if channel is not connected', () => {
+          network.connected = false;
+          const mockChannel = { send: jest.fn() };
+          network.channel = mockChannel;
+
+          network.broadcastPlayerStateUpdate({ player_id: MOCK_PLAYER_ID, position_x: 100 });
+
+          expect(mockChannel.send).not.toHaveBeenCalled();
+        });
+      });
+
+      describe('WhenHostBroadcastsHealth_ShouldUseGenericMethod', () => {
+        it('should broadcast single player state update with health field', () => {
+          const mockChannel = {
+            send: jest.fn().mockResolvedValue({ status: 'ok' }),
+          };
+          network.channel = mockChannel;
+          network.isHost = true;
+
+          const stateUpdate = {
+            player_id: 'player-123',
+            health: 75,
+          };
+
+          network.broadcastPlayerStateUpdate(stateUpdate);
+
+          expect(mockChannel.send).toHaveBeenCalledWith({
+            type: 'broadcast',
+            event: 'message',
+            payload: {
+              type: 'player_state_update',
+              from: MOCK_PLAYER_ID,
+              timestamp: expect.any(Number),
+              data: stateUpdate,
+            },
+          });
+        });
+      });
+
+      describe('WhenHostBroadcastsMultiplePlayers_ShouldBatchUpdates', () => {
+        it('should broadcast batched player state updates', () => {
+          const mockChannel = {
+            send: jest.fn().mockResolvedValue({ status: 'ok' }),
+          };
+          network.channel = mockChannel;
+          network.isHost = true;
+
+          const batchUpdates = [
+            { player_id: 'player-1', health: 80, position_x: 100, position_y: 200 },
+            { player_id: 'player-2', health: 60, position_x: 300, position_y: 400 },
+            { player_id: 'player-3', health: 90, position_x: 500, position_y: 600 },
+          ];
+
+          network.broadcastPlayerStateUpdate(batchUpdates);
+
+          expect(mockChannel.send).toHaveBeenCalledWith({
+            type: 'broadcast',
+            event: 'message',
+            payload: {
+              type: 'player_state_update',
+              from: MOCK_PLAYER_ID,
+              timestamp: expect.any(Number),
+              data: batchUpdates,
+            },
+          });
+        });
+      });
+    });
+
+    describe('writePlayerStateToDB', () => {
+      describe('WhenClientPersistsPosition_ShouldUseGenericMethod', () => {
+        it('should write client-authoritative fields to database', async () => {
+          const mockUpdate = jest.fn().mockReturnValue({
+            eq: jest.fn().mockReturnValue({
+              eq: jest.fn().mockResolvedValue({ error: null })
+            })
+          });
+
+          mockSupabaseClient.from = jest.fn(() => ({
+            update: mockUpdate
+          }));
+
+          const stateData = {
+            position_x: 150,
+            position_y: 250,
+            rotation: 3.14,
+            velocity_x: 2.0,
+            velocity_y: 1.5,
+          };
+
+          await network.writePlayerStateToDB(MOCK_PLAYER_ID, stateData);
+
+          expect(mockSupabaseClient.from).toHaveBeenCalledWith('session_players');
+          expect(mockUpdate).toHaveBeenCalledWith(stateData);
+        });
+      });
+
+      describe('WhenHostPersistsHealth_ShouldUseGenericMethod', () => {
+        it('should write host-authoritative fields to database', async () => {
+          network.isHost = true;
+
+          const mockUpdate = jest.fn().mockReturnValue({
+            eq: jest.fn().mockReturnValue({
+              eq: jest.fn().mockResolvedValue({ error: null })
+            })
+          });
+
+          mockSupabaseClient.from = jest.fn(() => ({
+            update: mockUpdate
+          }));
+
+          const stateData = {
+            health: 85,
+          };
+
+          await network.writePlayerStateToDB('player-456', stateData);
+
+          expect(mockSupabaseClient.from).toHaveBeenCalledWith('session_players');
+          expect(mockUpdate).toHaveBeenCalledWith(stateData);
+        });
+      });
+
+      describe('WhenHostPersistsMultiplePlayers_ShouldBatchWrite', () => {
+        it('should write multiple player states in a batch', async () => {
+          network.isHost = true;
+
+          const batchUpdates = [
+            { player_id: 'player-1', health: 70 },
+            { player_id: 'player-2', health: 85 },
+            { player_id: 'player-3', health: 95 },
+          ];
+
+          // Mock multiple update operations
+          const mockUpdatePromises = batchUpdates.map(() => ({ error: null }));
+          let callCount = 0;
+
+          mockSupabaseClient.from = jest.fn(() => ({
+            update: jest.fn().mockReturnValue({
+              eq: jest.fn().mockReturnValue({
+                eq: jest.fn(() => Promise.resolve(mockUpdatePromises[callCount++]))
+              })
+            })
+          }));
+
+          await network.writePlayerStateToDB(batchUpdates);
+
+          expect(mockSupabaseClient.from).toHaveBeenCalledTimes(3);
+        });
+      });
+
+      it('should log error if database write fails', async () => {
+        const mockError = new Error('DB write failed');
+        const consoleErrorSpy = jest.spyOn(console, 'error').mockImplementation();
+
+        mockSupabaseClient.from = jest.fn(() => ({
+          update: jest.fn().mockReturnValue({
+            eq: jest.fn().mockReturnValue({
+              eq: jest.fn().mockResolvedValue({ error: mockError })
+            })
+          })
+        }));
+
+        await network.writePlayerStateToDB(MOCK_PLAYER_ID, { health: 100 });
+
+        expect(consoleErrorSpy).toHaveBeenCalledWith(
+          'Failed to write player state to DB:',
+          mockError.message
+        );
+
+        consoleErrorSpy.mockRestore();
+      });
+    });
+
+    describe('startPeriodicPlayerStateWrite', () => {
+      beforeEach(() => {
+        jest.useFakeTimers();
+      });
+
+      afterEach(() => {
+        jest.useRealTimers();
+        if (network.playerStateWriteInterval) {
+          clearInterval(network.playerStateWriteInterval);
+          network.playerStateWriteInterval = null;
+        }
+      });
+
+      it('should start interval for periodic player state writes', () => {
+        const stateGetter = () => ({ player_id: MOCK_PLAYER_ID, position_x: 100, position_y: 200 });
+
+        network.startPeriodicPlayerStateWrite(stateGetter);
+
+        expect(network.playerStateWriteInterval).toBeDefined();
+      });
+
+      it('should call writePlayerStateToDB periodically with position data', async () => {
+        const writeStateSpy = jest.spyOn(network, 'writePlayerStateToDB').mockResolvedValue();
+
+        const stateGetter = () => ({
+          player_id: MOCK_PLAYER_ID,
+          position_x: 100,
+          position_y: 200,
+          rotation: 0,
+          velocity_x: 0,
+          velocity_y: 0,
+        });
+
+        network.startPeriodicPlayerStateWrite(stateGetter);
+
+        // Fast-forward time by 60 seconds
+        jest.advanceTimersByTime(60000);
+
+        await Promise.resolve(); // Allow promises to resolve
+
+        expect(writeStateSpy).toHaveBeenCalled();
+
+        writeStateSpy.mockRestore();
+      });
+
+      it('should call writePlayerStateToDB periodically with health data (host)', async () => {
+        network.isHost = true;
+        const writeStateSpy = jest.spyOn(network, 'writePlayerStateToDB').mockResolvedValue();
+
+        const stateGetter = () => [
+          { player_id: 'player-1', health: 80 },
+          { player_id: 'player-2', health: 60 },
+        ];
+
+        network.startPeriodicPlayerStateWrite(stateGetter);
+
+        // Fast-forward time by 60 seconds
+        jest.advanceTimersByTime(60000);
+
+        await Promise.resolve(); // Allow promises to resolve
+
+        expect(writeStateSpy).toHaveBeenCalled();
+
+        writeStateSpy.mockRestore();
+      });
+
+      it('should use custom interval when provided', () => {
+        const stateGetter = () => ({ player_id: MOCK_PLAYER_ID, position_x: 100 });
+        const customInterval = 30000; // 30 seconds
+
+        network.startPeriodicPlayerStateWrite(stateGetter, customInterval);
+
+        expect(network.playerStateWriteInterval).toBeDefined();
+      });
+
+      it('should not start multiple intervals if already running', () => {
+        const stateGetter = () => ({ player_id: MOCK_PLAYER_ID, position_x: 100 });
+
+        network.startPeriodicPlayerStateWrite(stateGetter);
+        const firstInterval = network.playerStateWriteInterval;
+
+        network.startPeriodicPlayerStateWrite(stateGetter);
+        const secondInterval = network.playerStateWriteInterval;
+
+        expect(firstInterval).toBe(secondInterval);
+      });
+    });
+
+    describe('stopPeriodicPlayerStateWrite', () => {
+      beforeEach(() => {
+        jest.useFakeTimers();
+      });
+
+      afterEach(() => {
+        jest.useRealTimers();
+      });
+
+      it('should stop periodic player state write interval', () => {
+        const stateGetter = () => ({ player_id: MOCK_PLAYER_ID, position_x: 100 });
+
+        network.startPeriodicPlayerStateWrite(stateGetter);
+        expect(network.playerStateWriteInterval).toBeDefined();
+
+        network.stopPeriodicPlayerStateWrite();
+
+        expect(network.playerStateWriteInterval).toBeNull();
+      });
+
+      it('should not throw if called when no interval is running', () => {
+        expect(() => network.stopPeriodicPlayerStateWrite()).not.toThrow();
+      });
+    });
+  });
 });
