@@ -4,7 +4,7 @@ import { Game } from '../src/game.js';
 import { Network } from '../src/network.js';
 import { CONFIG } from '../src/config.js';
 import { SessionPlayersSnapshot } from '../src/SessionPlayersSnapshot.js';
-import { waitForCondition } from './helpers/wait-utils.js';
+import { waitFor } from './helpers/wait-utils.js';
 
 describe('Health Synchronization Integration', () => {
   let hostClient, playerClient;
@@ -49,8 +49,8 @@ describe('Health Synchronization Integration', () => {
     await playerNetwork.joinGame(sessionData.join_code, 'ClientPlayer');
     
     // Setup Snapshots
-    hostSnapshot = new SessionPlayersSnapshot(hostNetwork);
-    playerSnapshot = new SessionPlayersSnapshot(playerNetwork);
+    hostSnapshot = new SessionPlayersSnapshot(hostNetwork, sessionData.id);
+    playerSnapshot = new SessionPlayersSnapshot(playerNetwork, sessionData.id);
     
     // Initialize Games
     hostGame = new Game();
@@ -60,10 +60,10 @@ describe('Health Synchronization Integration', () => {
     playerGame.init(playerSnapshot, playerNetwork);
     
     // Wait for connection
-    await waitForCondition(() => hostNetwork.connected && playerNetwork.connected);
+    await waitFor(() => hostNetwork.connected && playerNetwork.connected);
     
     // Wait for players to appear in snapshots
-    await waitForCondition(() => {
+    await waitFor(() => {
       const hostPlayers = hostSnapshot.getPlayers();
       const clientPlayers = playerSnapshot.getPlayers();
       return hostPlayers.size >= 2 && clientPlayers.size >= 2;
@@ -156,7 +156,7 @@ describe('Health Synchronization Integration', () => {
     });
     
     // 3. Wait for client to receive update
-    await waitForCondition(() => {
+    await waitFor(() => {
         const clientPlayerMap = playerSnapshot.getPlayers();
         const playerOnClient = clientPlayerMap.get(playerId);
         return playerOnClient && playerOnClient.health === (initialHealth - damage);
