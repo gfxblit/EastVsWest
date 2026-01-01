@@ -41,6 +41,7 @@ export class Network extends EventEmitter {
     this.supabase = null;
     this.playerId = null;
     this.sessionId = null;
+    this.hostId = null; // Track host ID for authorization checks
     this.channel = null;
     this.movementWriteInterval = null; // Interval for periodic DB writes (legacy)
     this.playerStateWriteInterval = null; // Interval for generic periodic DB writes
@@ -73,7 +74,8 @@ export class Network extends EventEmitter {
     this.sessionId = sessionData.id;
     this.isHost = true;
     this.joinCode = newJoinCode;
-    
+    this.hostId = this.playerId; // Track host ID
+
     // Subscribe to channel and postgres changes
     await this._subscribeToChannel(channelName);
 
@@ -111,6 +113,7 @@ export class Network extends EventEmitter {
     this.sessionId = session.id;
     this.isHost = false;
     this.joinCode = joinCode;
+    this.hostId = session.host_id; // Track host ID for authorization
 
     // 2. Client-authoritative join: Self-insert into session_players FIRST
     // This ensures RLS policies allow us to read/listen to other players in this session
