@@ -6,7 +6,7 @@ The flow requires these inputs:
 - `GAME_DESIGN.md`: describes what the game is, how its played, etc.
 - `ARCHITECTURE.md`: describes high level: how game state is managed, player inputs, etc; and low level: programming language, test frameworks, etc.
 - `Roadmap` issue: provides an ordering of work to be done, linking to issues, and tracks status.
-- `CLAUDE.md`: describes the agent behavior, using test-driven development
+- `GEMINI.md`: describes the agent behavior, using test-driven development
 
 Here's the dev flow:
 
