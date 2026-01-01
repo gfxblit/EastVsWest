@@ -276,7 +276,7 @@ jobs:
           gemini_cli_version: '${{ vars.GEMINI_CLI_VERSION }}'
 
           # Debugging & Artifacts
-          gemini_debug: '${{ fromJSON(vars.GEMINI_DEBUG || vars.ACTIONS_STEP_DEBUG || false) }}'
+          gemini_debug: true
           upload_artifacts: '${{ vars.UPLOAD_ARTIFACTS }}'
 
           # Workflow Identification
@@ -289,7 +289,7 @@ jobs:
                 "maxSessionTurns": 25
               },
               "telemetry": {
-                "enabled": true,
+                "enabled": false,
                 "target": "local",
                 "outfile": ".gemini/telemetry.log"
               },
@@ -326,6 +326,21 @@ jobs:
               }
             }
           prompt: '${{ env.GEMINI_REVIEW_PROMPT }}'
+
+      - name: 'Expose Gemini Error Reports'
+        if: failure()
+        run: |
+          echo "Checking for Gemini error reports in /tmp..."
+          REPORTS=$(find /tmp -name "gemini-client-error-*.json" 2>/dev/null || true)
+          if [ -n "$REPORTS" ]; then
+            for report in $REPORTS; do
+              echo "::group::Error Report: $report"
+              cat "$report"
+              echo "::endgroup::"
+            done
+          else
+            echo "No Gemini error reports found in /tmp."
+          fi
 
       - name: 'Post failure comment'
         if: failure()
