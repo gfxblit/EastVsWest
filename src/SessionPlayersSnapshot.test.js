@@ -788,6 +788,154 @@ describe('SessionPlayersSnapshot (Built on Network)', () => {
     });
   });
 
+  describe('Position Interpolation History', () => {
+    let mockNow;
+
+    beforeEach(() => {
+      mockNow = jest.spyOn(performance, 'now').mockReturnValue(1000);
+    });
+
+    afterEach(() => {
+      mockNow.mockRestore();
+    });
+
+    test('WhenMovementUpdateReceived_ShouldAddSnapshotToHistory', async () => {
+      const mockPlayers = [createMockPlayer({ position_x: 100, position_y: 200 })];
+
+      mockSupabaseClient.from().select().eq.mockResolvedValue({
+        data: mockPlayers,
+        error: null,
+      });
+
+      let movementUpdateHandler;
+      mockNetwork.on.mockImplementation((event, handler) => {
+        if (event === 'movement_update') {
+          movementUpdateHandler = handler;
+        }
+      });
+
+      snapshot = new SessionPlayersSnapshot(mockNetwork, TEST_SESSION_ID);
+      await snapshot.ready();
+
+      // Simulate update at t=1000
+      mockNow.mockReturnValue(1000);
+      movementUpdateHandler({
+        type: 'movement_update',
+        from: TEST_PLAYER_ID,
+        data: {
+          position_x: 110,
+          position_y: 210,
+          rotation: 1.0,
+          velocity_x: 10,
+          velocity_y: 10
+        },
+      });
+
+      const player = snapshot.getPlayers().get(TEST_PLAYER_ID);
+      expect(player.positionHistory).toBeDefined();
+      expect(player.positionHistory).toHaveLength(1);
+      expect(player.positionHistory[0]).toEqual({
+        x: 110,
+        y: 210,
+        rotation: 1.0,
+        velocity_x: 10,
+        velocity_y: 10,
+        timestamp: 1000
+      });
+    });
+
+    test('WhenMultipleUpdatesReceived_ShouldMaintainCircularBufferOfSize3', async () => {
+      const mockPlayers = [createMockPlayer({ position_x: 100, position_y: 200 })];
+
+      mockSupabaseClient.from().select().eq.mockResolvedValue({
+        data: mockPlayers,
+        error: null,
+      });
+
+      let movementUpdateHandler;
+      mockNetwork.on.mockImplementation((event, handler) => {
+        if (event === 'movement_update') {
+          movementUpdateHandler = handler;
+        }
+      });
+
+      snapshot = new SessionPlayersSnapshot(mockNetwork, TEST_SESSION_ID);
+      await snapshot.ready();
+
+      // Add 4 updates
+      const timestamps = [1000, 1050, 1100, 1150];
+      
+      timestamps.forEach((time, index) => {
+        mockNow.mockReturnValue(time);
+        movementUpdateHandler({
+          type: 'movement_update',
+          from: TEST_PLAYER_ID,
+          data: {
+            position_x: 100 + index,
+            position_y: 200 + index,
+            rotation: 0,
+            velocity_x: 0,
+            velocity_y: 0
+          },
+        });
+      });
+
+      const player = snapshot.getPlayers().get(TEST_PLAYER_ID);
+      expect(player.positionHistory).toHaveLength(3);
+      
+      // Should have last 3 updates (1050, 1100, 1150)
+      expect(player.positionHistory[0].timestamp).toBe(1050);
+      expect(player.positionHistory[1].timestamp).toBe(1100);
+      expect(player.positionHistory[2].timestamp).toBe(1150);
+    });
+
+    test('WhenPlayerStateUpdateReceived_ShouldAlsoUpdateHistory', async () => {
+      // Setup host auth
+      mockNetwork.hostId = 'host-id';
+      
+      const mockPlayers = [createMockPlayer({ position_x: 100, position_y: 200 })];
+
+      mockSupabaseClient.from().select().eq.mockResolvedValue({
+        data: mockPlayers,
+        error: null,
+      });
+
+      let playerStateUpdateHandler;
+      mockNetwork.on.mockImplementation((event, handler) => {
+        if (event === 'player_state_update') {
+          playerStateUpdateHandler = handler;
+        }
+      });
+
+      snapshot = new SessionPlayersSnapshot(mockNetwork, TEST_SESSION_ID);
+      await snapshot.ready();
+
+      // Simulate update at t=2000
+      mockNow.mockReturnValue(2000);
+      playerStateUpdateHandler({
+        type: 'player_state_update',
+        from: TEST_PLAYER_ID,
+        data: {
+          player_id: TEST_PLAYER_ID,
+          position_x: 150,
+          position_y: 250,
+          rotation: 2.0,
+          velocity_x: 5,
+          velocity_y: 5
+        },
+      });
+
+      const player = snapshot.getPlayers().get(TEST_PLAYER_ID);
+      expect(player.positionHistory).toBeDefined();
+      expect(player.positionHistory.length).toBeGreaterThan(0);
+      const lastUpdate = player.positionHistory[player.positionHistory.length - 1];
+      
+      expect(lastUpdate.x).toBe(150);
+      expect(lastUpdate.y).toBe(250);
+      expect(lastUpdate.timestamp).toBe(2000);
+    });
+  });
+
   describe('Destroy', () => {
     test('WhenDestroyCalled_ShouldUnsubscribeFromNetworkEvents', async () => {
       snapshot = new SessionPlayersSnapshot(mockNetwork, TEST_SESSION_ID);

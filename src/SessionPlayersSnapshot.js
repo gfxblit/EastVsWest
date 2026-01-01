@@ -9,6 +9,8 @@
  * - Client-authoritative: position, rotation
  * - Host-authoritative: health, combat, game state
  */
+import { CONFIG } from './config.js';
+
 export class SessionPlayersSnapshot {
   constructor(network, sessionId, options = {}) {
     this.network = network;
@@ -233,6 +235,15 @@ export class SessionPlayersSnapshot {
     if (payload.health !== undefined) {
       player.health = payload.health;
     }
+
+    // Update position history for interpolation
+    this.#updatePositionHistory(player, {
+      position_x: player.position_x,
+      position_y: player.position_y,
+      rotation: player.rotation,
+      velocity_x: player.velocity_x,
+      velocity_y: player.velocity_y
+    });
   }
 
   /**
@@ -270,6 +281,44 @@ export class SessionPlayersSnapshot {
       if (payload.health !== undefined) player.health = payload.health;
       if (payload.equipped_weapon !== undefined) player.equipped_weapon = payload.equipped_weapon;
       if (payload.equipped_armor !== undefined) player.equipped_armor = payload.equipped_armor;
+    }
+
+    // Update position history for interpolation
+    this.#updatePositionHistory(player, {
+      position_x: payload.position_x !== undefined ? payload.position_x : player.position_x,
+      position_y: payload.position_y !== undefined ? payload.position_y : player.position_y,
+      rotation: payload.rotation !== undefined ? payload.rotation : player.rotation,
+      velocity_x: payload.velocity_x !== undefined ? payload.velocity_x : player.velocity_x,
+      velocity_y: payload.velocity_y !== undefined ? payload.velocity_y : player.velocity_y,
+    });
+  }
+
+  /**
+   * Update the position history buffer for a player
+   * Used for client-side interpolation
+   * @param {Object} player - The player object to update
+   * @param {Object} data - The update data containing position/rotation/velocity
+   */
+  #updatePositionHistory(player, data) {
+    if (!player.positionHistory) {
+      player.positionHistory = [];
+    }
+
+    const timestamp = performance.now();
+    const snapshot = {
+      x: data.position_x,
+      y: data.position_y,
+      rotation: data.rotation,
+      velocity_x: data.velocity_x,
+      velocity_y: data.velocity_y,
+      timestamp: timestamp
+    };
+
+    player.positionHistory.push(snapshot);
+
+    // Keep only the last N snapshots
+    if (player.positionHistory.length > CONFIG.NETWORK.INTERPOLATION_BUFFER_SIZE) {
+      player.positionHistory.shift();
     }
   }
 

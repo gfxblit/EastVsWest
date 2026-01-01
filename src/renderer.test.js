@@ -1248,4 +1248,117 @@ describe('Renderer', () => {
       });
     });
   });
+
+  describe('Interpolation Logic', () => {
+    describe('interpolateRotation', () => {
+      test('ShouldInterpolateShortestPath', () => {
+        // 10 degrees to 20 degrees
+        expect(renderer.interpolateRotation(0.174, 0.349, 0.5)).toBeCloseTo(0.2615); 
+      });
+
+      test('ShouldHandleWraparoundZeroToTwoPi', () => {
+        // 350 degrees (6.10 rad) to 10 degrees (0.17 rad)
+        // Shortest path crosses 0/2PI
+        // Diff is ~20 degrees (0.35 rad)
+        // Midpoint should be 0 (or 2PI)
+        const start = 6.1086; // ~350 deg
+        const end = 0.1745;   // ~10 deg
+        const result = renderer.interpolateRotation(start, end, 0.5);
+        
+        // Expected: ~0 or ~6.28
+        // Let's check if it's close to 0 (normalized) or 2PI
+        // 6.1086 + (0.1745 - 6.1086 + 2PI)/2 = 6.1086 + 0.174 = 6.28...
+        // Normalized should be approx 0
+        const normalizedResult = result % (2 * Math.PI);
+        expect(Math.abs(normalizedResult) < 0.1 || Math.abs(normalizedResult - 2 * Math.PI) < 0.1).toBe(true);
+      });
+      
+      test('ShouldHandleWraparoundTwoPiToZero', () => {
+        const start = 0.1745; // 10 deg
+        const end = 6.1086;   // 350 deg
+        const result = renderer.interpolateRotation(start, end, 0.5);
+        
+        const normalizedResult = result % (2 * Math.PI);
+        // Should be around 0 / 2PI
+         expect(Math.abs(normalizedResult) < 0.1 || Math.abs(normalizedResult - 2 * Math.PI) < 0.1).toBe(true);
+      });
+    });
+
+    describe('interpolatePosition', () => {
+      const createHistory = () => [
+        { x: 0, y: 0, rotation: 0, timestamp: 1000 },
+        { x: 100, y: 100, rotation: 1.0, timestamp: 1100 }, // 100ms later
+        { x: 200, y: 200, rotation: 2.0, timestamp: 1200 }  // 200ms later
+      ];
+
+      test('WhenBetweenSnapshots_ShouldLinearInterpolate', () => {
+        const player = {
+          positionHistory: createHistory(),
+          x: 0, y: 0 // current raw pos
+        };
+        
+        // Target time: 1050 (halfway between 1000 and 1100)
+        // Passed time must be Target + DELAY (100ms) = 1150
+        const renderTime = 1150;
+        
+        const result = renderer.interpolatePosition(player, renderTime);
+        
+        expect(result.x).toBe(50);
+        expect(result.y).toBe(50);
+        expect(result.rotation).toBeCloseTo(0.5);
+      });
+
+      test('WhenExactlyOnSnapshot_ShouldReturnSnapshotValue', () => {
+        const player = {
+          positionHistory: createHistory(),
+        };
+        
+        // Target 1100 -> Pass 1200
+        const result = renderer.interpolatePosition(player, 1200);
+        
+        expect(result.x).toBe(100);
+        expect(result.y).toBe(100);
+        expect(result.rotation).toBe(1.0);
+      });
+
+      test('WhenRenderTimeIsBeforeHistory_ShouldUseOldest', () => {
+        const player = {
+          positionHistory: createHistory(),
+        };
+        
+        // Target 900 (before 1000) -> Pass 1000
+        const result = renderer.interpolatePosition(player, 1000);
+        
+        expect(result.x).toBe(0);
+        expect(result.y).toBe(0);
+      });
+
+      test('WhenRenderTimeIsAfterHistory_ShouldUseNewest', () => {
+        const player = {
+          positionHistory: createHistory(),
+        };
+        
+        // Target 1300 (after 1200) -> Pass 1400
+        const result = renderer.interpolatePosition(player, 1400);
+        
+        expect(result.x).toBe(200);
+        expect(result.y).toBe(200);
+      });
+
+      test('WhenHistoryInsufficient_ShouldReturnCurrentPosition', () => {
+        const player = {
+          positionHistory: [], // Empty
+          position_x: 999,
+          position_y: 888,
+          rotation: 0
+        };
+        
+        const result = renderer.interpolatePosition(player, 1100);
+        
+        expect(result.x).toBe(999);
+        expect(result.y).toBe(888);
+      });
+    });
+  });
 });
+
