@@ -118,6 +118,7 @@ export class Renderer {
           y: playerData.position_y,
           rotation: playerData.rotation,
           health: playerData.health,
+          isAttacking: playerData.is_attacking || false,
           animationState: {
             currentFrame: isMoving ? 1 : 0, // Use frame 1 for moving (approximate animation)
             lastDirection: direction !== null ? direction : 0, // Use calculated direction or default to South
@@ -392,6 +393,17 @@ export class Renderer {
       this.ctx.beginPath();
       this.ctx.arc(player.x, player.y, CONFIG.RENDER.PLAYER_RADIUS, 0, Math.PI * 2);
       this.ctx.stroke();
+    }
+
+    // Attack flash
+    if (player.isAttacking) {
+      this.ctx.save();
+      this.ctx.globalAlpha = 0.5;
+      this.ctx.fillStyle = '#ffffff';
+      this.ctx.beginPath();
+      this.ctx.arc(player.x, player.y, CONFIG.RENDER.PLAYER_RADIUS + 10, 0, Math.PI * 2);
+      this.ctx.fill();
+      this.ctx.restore();
     }
 
     // Health bar above player
