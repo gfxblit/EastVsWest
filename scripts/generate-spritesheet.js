@@ -157,12 +157,12 @@ export async function generateMetadata(outputPath, directions) {
  * Main sprite sheet generator class
  */
 export class SpriteSheetGenerator {
-  constructor(projectRoot, pixelLabDir) {
+  constructor(projectRoot, pixelLabDir, outputDir = 'public/assets/player') {
     this.projectRoot = projectRoot;
     this.pixelLabDir = pixelLabDir;
     this.metadataPath = path.join(pixelLabDir, 'metadata.json');
-    this.outputSpritePath = path.join(projectRoot, 'public/assets/player/player-walk-spritesheet.png');
-    this.outputMetadataPath = path.join(projectRoot, 'public/assets/player/player-walk-spritesheet.json');
+    this.outputSpritePath = path.join(projectRoot, outputDir, 'player-walk-spritesheet.png');
+    this.outputMetadataPath = path.join(projectRoot, outputDir, 'player-walk-spritesheet.json');
   }
 
   async generate() {

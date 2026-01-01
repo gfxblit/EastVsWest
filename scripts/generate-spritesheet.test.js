@@ -20,20 +20,24 @@ describe('Sprite Sheet Generator', () => {
   // Use /tmp/pixellab_character as the test directory
   const pixelLabDir = '/tmp/pixellab_character';
   const metadataPath = path.join(pixelLabDir, 'metadata.json');
-  const outputSpritePath = path.join(projectRoot, 'public/assets/player/player-walk-spritesheet.png');
-  const outputMetadataPath = path.join(projectRoot, 'public/assets/player/player-walk-spritesheet.json');
+  
+  // Use a temporary output directory for tests
+  const testOutputDirName = 'test-output';
+  const testOutputDir = path.join(projectRoot, testOutputDirName);
+  const outputSpritePath = path.join(testOutputDir, 'player-walk-spritesheet.png');
+  const outputMetadataPath = path.join(testOutputDir, 'player-walk-spritesheet.json');
+
+  beforeEach(async () => {
+    // Ensure test output directory exists
+    await fs.mkdir(testOutputDir, { recursive: true });
+  });
 
   afterEach(async () => {
-    // Clean up generated files after tests
+    // Clean up generated files and directory after tests
     try {
-      await fs.unlink(outputSpritePath);
+      await fs.rm(testOutputDir, { recursive: true, force: true });
     } catch (err) {
-      // File might not exist, that's ok
-    }
-    try {
-      await fs.unlink(outputMetadataPath);
-    } catch (err) {
-      // File might not exist, that's ok
+      // Ignore cleanup errors
     }
   });
 
@@ -191,7 +195,7 @@ describe('Sprite Sheet Generator', () => {
 
   describe('SpriteSheetGenerator (Integration)', () => {
     test('WhenRunningFullGeneration_ShouldCreateBothFiles', async () => {
-      const generator = new SpriteSheetGenerator(projectRoot, pixelLabDir);
+      const generator = new SpriteSheetGenerator(projectRoot, pixelLabDir, testOutputDirName);
       await generator.generate();
 
       // Verify both files exist
@@ -213,7 +217,7 @@ describe('Sprite Sheet Generator', () => {
     });
 
     test('WhenMetadataFileMissing_ShouldThrowError', async () => {
-      const generator = new SpriteSheetGenerator(projectRoot, '/fake/path');
+      const generator = new SpriteSheetGenerator(projectRoot, '/fake/path', testOutputDirName);
 
       await expect(generator.generate()).rejects.toThrow();
     });
