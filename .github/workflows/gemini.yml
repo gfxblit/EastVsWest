@@ -86,6 +86,20 @@ jobs:
       - name: 'Checkout repository'
         uses: 'actions/checkout@v4'
 
+      - name: 'Inject Credentials'
+        env:
+          GEMINI_SETTINGS_JSON: '${{ secrets.GEMINI_SETTINGS_JSON }}'
+          GEMINI_OAUTH_CREDS_JSON: '${{ secrets.GEMINI_OAUTH_CREDS_JSON }}'
+        run: |
+          if [ -n "$GEMINI_SETTINGS_JSON" ] && [ -n "$GEMINI_OAUTH_CREDS_JSON" ]; then
+            mkdir -p ~/.gemini
+            printf '%s' "$GEMINI_SETTINGS_JSON" > ~/.gemini/settings.json
+            printf '%s' "$GEMINI_OAUTH_CREDS_JSON" > ~/.gemini/oauth_creds.json
+            echo "Successfully injected Gemini credentials into ~/.gemini/"
+          else
+            echo "::warning::GEMINI_SETTINGS_JSON or GEMINI_OAUTH_CREDS_JSON secrets are missing. Falling back to API key configuration."
+          fi
+
       - name: 'Run Gemini pull request review'
         uses: 'google-github-actions/run-gemini-cli@v0.1.18' # ratchet:exclude
         id: 'gemini_pr_review'
