@@ -15,4 +15,4 @@ fi
 echo "Running E2E tests against: $URL"
 
 # Run tests with environment variables and --runInBand for stability
-SUPABASE_URL="$URL" SUPABASE_ANON_KEY="$KEY" npm run test:e2e -- --runInBand "$@"
+SUPABASE_URL="$URL" SUPABASE_ANON_KEY="$KEY" node --experimental-vm-modules node_modules/jest/bin/jest.js --config=jest.e2e.config.js --runInBand "$@"
