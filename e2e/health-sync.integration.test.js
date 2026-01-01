@@ -182,7 +182,8 @@ describe('Health Synchronization Integration', () => {
     });
     
     // 3. Wait for client to receive update via broadcast
-    await expect(updatePromise).resolves.toBeDefined();
+    const receivedUpdate = await updatePromise;
+    expect(receivedUpdate.health).toBe(initialHealth - damage);
     
     // 4. Verify snapshot is also updated (via its own listener)
     await waitFor(() => {
