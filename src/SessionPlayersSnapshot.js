@@ -82,9 +82,12 @@ export class SessionPlayersSnapshot {
     // Subscribe to Network's generic postgres_changes events
     this.network.on('postgres_changes', this.postgresChangesHandler);
 
-    // Subscribe to Network's movement_update events
+    // Subscribe to Network's movement_update events (legacy)
     // All clients broadcast directly, no host rebroadcasting
     this.network.on('movement_update', this.broadcastHandler);
+
+    // Subscribe to Network's player_state_update events (generic)
+    this.network.on('player_state_update', this.broadcastHandler);
   }
 
   /**
@@ -110,7 +113,7 @@ export class SessionPlayersSnapshot {
   }
 
   /**
-   * Handle movement_update events from Network
+   * Handle movement_update and player_state_update events from Network
    */
   #handleBroadcast(message) {
     if (message.type === 'movement_update') {
@@ -126,6 +129,23 @@ export class SessionPlayersSnapshot {
         updates.forEach(update => {
           this.#handleMovementUpdate(update);
         });
+      }
+    }
+    // Handle generic player_state_update (single or batch)
+    else if (message.type === 'player_state_update') {
+      const data = message.data;
+      const senderId = message.from;
+      // Handle batched updates
+      if (Array.isArray(data)) {
+        data.forEach(update => {
+          this.#handlePlayerStateUpdate(update, senderId);
+        });
+      } else {
+        // Handle single update
+        this.#handlePlayerStateUpdate({
+          ...data,
+          player_id: data.player_id || senderId,
+        }, senderId);
       }
     }
   }
@@ -216,6 +236,44 @@ export class SessionPlayersSnapshot {
   }
 
   /**
+   * Handle generic player state update broadcasts
+   * Supports any combination of client-auth and host-auth fields
+   * Enforces authorization: clients can only update their own client-auth fields,
+   * host can update all fields for any player
+   *
+   * @param {Object} payload - The state update payload
+   * @param {string} senderId - The player ID of the sender
+   */
+  #handlePlayerStateUpdate(payload, senderId) {
+    const player_id = payload.player_id || senderId;
+    const player = this.players.get(player_id);
+
+    // Only update if player exists in this session
+    if (!player) {
+      return;
+    }
+
+    const isFromHost = senderId === this.network.hostId;
+    const isFromSelf = senderId === player_id;
+
+    // Client-authoritative fields: only accept from the player themselves OR the host
+    if (isFromSelf || isFromHost) {
+      if (payload.position_x !== undefined) player.position_x = payload.position_x;
+      if (payload.position_y !== undefined) player.position_y = payload.position_y;
+      if (payload.rotation !== undefined) player.rotation = payload.rotation;
+      if (payload.velocity_x !== undefined) player.velocity_x = payload.velocity_x;
+      if (payload.velocity_y !== undefined) player.velocity_y = payload.velocity_y;
+    }
+
+    // Host-authoritative fields: ONLY accept from the host
+    if (isFromHost) {
+      if (payload.health !== undefined) player.health = payload.health;
+      if (payload.equipped_weapon !== undefined) player.equipped_weapon = payload.equipped_weapon;
+      if (payload.equipped_armor !== undefined) player.equipped_armor = payload.equipped_armor;
+    }
+  }
+
+  /**
    * Start periodic snapshot refresh
    */
   #startPeriodicRefresh() {
@@ -273,6 +331,7 @@ export class SessionPlayersSnapshot {
     if (this.network) {
       this.network.off('postgres_changes', this.postgresChangesHandler);
       this.network.off('movement_update', this.broadcastHandler);
+      this.network.off('player_state_update', this.broadcastHandler);
     }
   }
 }

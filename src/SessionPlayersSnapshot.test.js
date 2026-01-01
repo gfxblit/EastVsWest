@@ -387,6 +387,407 @@ describe('SessionPlayersSnapshot (Built on Network)', () => {
     });
   });
 
+  describe('Generic Player State Update Handling', () => {
+    test('WhenNetworkEmitsPlayerStateUpdate_ShouldUpdateAllProvidedFields', async () => {
+      const HOST_ID = 'host-player-id';
+      mockNetwork.hostId = HOST_ID; // Set host ID for authorization
+
+      const mockPlayers = [createMockPlayer({
+        position_x: 100,
+        position_y: 200,
+        health: 100,
+        velocity_x: 0,
+        velocity_y: 0
+      })];
+
+      mockSupabaseClient.from().select().eq.mockResolvedValue({
+        data: mockPlayers,
+        error: null,
+      });
+
+      let playerStateUpdateHandler;
+      mockNetwork.on.mockImplementation((event, handler) => {
+        if (event === 'player_state_update') {
+          playerStateUpdateHandler = handler;
+        }
+      });
+
+      snapshot = new SessionPlayersSnapshot(mockNetwork, TEST_SESSION_ID);
+      await snapshot.ready();
+
+      // Simulate Network emitting player_state_update with mixed fields from host
+      playerStateUpdateHandler({
+        type: 'player_state_update',
+        from: HOST_ID, // From host (can update all fields)
+        data: {
+          player_id: TEST_PLAYER_ID,
+          position_x: 300,
+          position_y: 400,
+          velocity_x: 10,
+          velocity_y: 20,
+          rotation: 1.57,
+          health: 75,
+        },
+      });
+
+      // Should update all provided fields in memory
+      const player = snapshot.getPlayers().get(TEST_PLAYER_ID);
+      expect(player.position_x).toBe(300);
+      expect(player.position_y).toBe(400);
+      expect(player.velocity_x).toBe(10);
+      expect(player.velocity_y).toBe(20);
+      expect(player.rotation).toBe(1.57);
+      expect(player.health).toBe(75);
+    });
+
+    test('WhenNetworkEmitsBatchedPlayerStateUpdate_ShouldUpdateAllPlayers', async () => {
+      const HOST_ID = 'host-id';
+      mockNetwork.hostId = HOST_ID; // Set host ID for authorization
+
+      const mockPlayers = [
+        createMockPlayer({ player_id: 'player-1', health: 100 }),
+        createMockPlayer({ player_id: 'player-2', health: 100 }),
+        createMockPlayer({ player_id: 'player-3', health: 100 }),
+      ];
+
+      mockSupabaseClient.from().select().eq.mockResolvedValue({
+        data: mockPlayers,
+        error: null,
+      });
+
+      let playerStateUpdateHandler;
+      mockNetwork.on.mockImplementation((event, handler) => {
+        if (event === 'player_state_update') {
+          playerStateUpdateHandler = handler;
+        }
+      });
+
+      snapshot = new SessionPlayersSnapshot(mockNetwork, TEST_SESSION_ID);
+      await snapshot.ready();
+
+      // Simulate Network emitting batched player_state_update from host
+      playerStateUpdateHandler({
+        type: 'player_state_update',
+        from: HOST_ID, // From host (can update health)
+        data: [
+          { player_id: 'player-1', health: 80, position_x: 100 },
+          { player_id: 'player-2', health: 60, position_x: 200 },
+          { player_id: 'player-3', health: 90, position_x: 300 },
+        ],
+      });
+
+      // Should update all players
+      const player1 = snapshot.getPlayers().get('player-1');
+      expect(player1.health).toBe(80);
+      expect(player1.position_x).toBe(100);
+
+      const player2 = snapshot.getPlayers().get('player-2');
+      expect(player2.health).toBe(60);
+      expect(player2.position_x).toBe(200);
+
+      const player3 = snapshot.getPlayers().get('player-3');
+      expect(player3.health).toBe(90);
+      expect(player3.position_x).toBe(300);
+    });
+
+    test('WhenNetworkEmitsPlayerStateUpdateWithOnlyHealth_ShouldUpdateOnlyHealth', async () => {
+      const HOST_ID = 'host-id';
+      mockNetwork.hostId = HOST_ID; // Set host ID for authorization
+
+      const mockPlayers = [createMockPlayer({
+        position_x: 100,
+        position_y: 200,
+        health: 100
+      })];
+
+      mockSupabaseClient.from().select().eq.mockResolvedValue({
+        data: mockPlayers,
+        error: null,
+      });
+
+      let playerStateUpdateHandler;
+      mockNetwork.on.mockImplementation((event, handler) => {
+        if (event === 'player_state_update') {
+          playerStateUpdateHandler = handler;
+        }
+      });
+
+      snapshot = new SessionPlayersSnapshot(mockNetwork, TEST_SESSION_ID);
+      await snapshot.ready();
+
+      // Simulate Network emitting player_state_update with only health from host
+      playerStateUpdateHandler({
+        type: 'player_state_update',
+        from: HOST_ID, // From host (can update health)
+        data: {
+          player_id: TEST_PLAYER_ID,
+          health: 50,
+        },
+      });
+
+      // Should update only health, position remains unchanged
+      const player = snapshot.getPlayers().get(TEST_PLAYER_ID);
+      expect(player.health).toBe(50);
+      expect(player.position_x).toBe(100); // unchanged
+      expect(player.position_y).toBe(200); // unchanged
+    });
+
+    test('WhenNetworkEmitsPlayerStateUpdateForNonexistentPlayer_ShouldIgnore', async () => {
+      const mockPlayers = [createMockPlayer()];
+
+      mockSupabaseClient.from().select().eq.mockResolvedValue({
+        data: mockPlayers,
+        error: null,
+      });
+
+      let playerStateUpdateHandler;
+      mockNetwork.on.mockImplementation((event, handler) => {
+        if (event === 'player_state_update') {
+          playerStateUpdateHandler = handler;
+        }
+      });
+
+      snapshot = new SessionPlayersSnapshot(mockNetwork, TEST_SESSION_ID);
+      await snapshot.ready();
+
+      // Simulate player_state_update for player not in this session
+      playerStateUpdateHandler({
+        type: 'player_state_update',
+        from: 'host-id',
+        data: {
+          player_id: 'unknown-player-id',
+          health: 50,
+        },
+      });
+
+      // Should not crash or add new player
+      expect(snapshot.getPlayers().get('unknown-player-id')).toBeUndefined();
+    });
+  });
+
+  describe('Authorization Checks', () => {
+    const HOST_ID = 'host-player-id';
+    const OTHER_PLAYER_ID = 'other-player-id';
+
+    beforeEach(() => {
+      mockNetwork.hostId = HOST_ID;
+    });
+
+    test('WhenClientTriesToSpoofOtherPlayerPosition_ShouldReject', async () => {
+      const mockPlayers = [
+        createMockPlayer({ player_id: TEST_PLAYER_ID, position_x: 100, position_y: 200 }),
+        createMockPlayer({ player_id: OTHER_PLAYER_ID, position_x: 300, position_y: 400 }),
+      ];
+
+      mockSupabaseClient.from().select().eq.mockResolvedValue({
+        data: mockPlayers,
+        error: null,
+      });
+
+      let playerStateUpdateHandler;
+      mockNetwork.on.mockImplementation((event, handler) => {
+        if (event === 'player_state_update') {
+          playerStateUpdateHandler = handler;
+        }
+      });
+
+      snapshot = new SessionPlayersSnapshot(mockNetwork, TEST_SESSION_ID);
+      await snapshot.ready();
+
+      // Malicious client tries to update another player's position
+      playerStateUpdateHandler({
+        type: 'player_state_update',
+        from: TEST_PLAYER_ID, // Sender is TEST_PLAYER_ID
+        data: {
+          player_id: OTHER_PLAYER_ID, // But trying to update OTHER_PLAYER_ID
+          position_x: 999,
+          position_y: 999,
+        },
+      });
+
+      // Should NOT update other player's position
+      const otherPlayer = snapshot.getPlayers().get(OTHER_PLAYER_ID);
+      expect(otherPlayer.position_x).toBe(300); // Unchanged
+      expect(otherPlayer.position_y).toBe(400); // Unchanged
+    });
+
+    test('WhenClientTriesToUpdateHealth_ShouldReject', async () => {
+      const mockPlayers = [createMockPlayer({ player_id: TEST_PLAYER_ID, health: 100 })];
+
+      mockSupabaseClient.from().select().eq.mockResolvedValue({
+        data: mockPlayers,
+        error: null,
+      });
+
+      let playerStateUpdateHandler;
+      mockNetwork.on.mockImplementation((event, handler) => {
+        if (event === 'player_state_update') {
+          playerStateUpdateHandler = handler;
+        }
+      });
+
+      snapshot = new SessionPlayersSnapshot(mockNetwork, TEST_SESSION_ID);
+      await snapshot.ready();
+
+      // Malicious client tries to update their own health (host-auth field)
+      playerStateUpdateHandler({
+        type: 'player_state_update',
+        from: TEST_PLAYER_ID,
+        data: {
+          player_id: TEST_PLAYER_ID,
+          health: 999, // Trying to set health to 999
+        },
+      });
+
+      // Should NOT update health (host-auth field)
+      const player = snapshot.getPlayers().get(TEST_PLAYER_ID);
+      expect(player.health).toBe(100); // Unchanged
+    });
+
+    test('WhenHostUpdatesOtherPlayerPosition_ShouldAccept', async () => {
+      const mockPlayers = [
+        createMockPlayer({ player_id: OTHER_PLAYER_ID, position_x: 300, position_y: 400 }),
+      ];
+
+      mockSupabaseClient.from().select().eq.mockResolvedValue({
+        data: mockPlayers,
+        error: null,
+      });
+
+      let playerStateUpdateHandler;
+      mockNetwork.on.mockImplementation((event, handler) => {
+        if (event === 'player_state_update') {
+          playerStateUpdateHandler = handler;
+        }
+      });
+
+      snapshot = new SessionPlayersSnapshot(mockNetwork, TEST_SESSION_ID);
+      await snapshot.ready();
+
+      // Host updates another player's position (allowed)
+      playerStateUpdateHandler({
+        type: 'player_state_update',
+        from: HOST_ID, // From host
+        data: {
+          player_id: OTHER_PLAYER_ID,
+          position_x: 999,
+          position_y: 888,
+        },
+      });
+
+      // Should update position (host can update client-auth fields)
+      const player = snapshot.getPlayers().get(OTHER_PLAYER_ID);
+      expect(player.position_x).toBe(999);
+      expect(player.position_y).toBe(888);
+    });
+
+    test('WhenHostUpdatesPlayerHealth_ShouldAccept', async () => {
+      const mockPlayers = [createMockPlayer({ player_id: TEST_PLAYER_ID, health: 100 })];
+
+      mockSupabaseClient.from().select().eq.mockResolvedValue({
+        data: mockPlayers,
+        error: null,
+      });
+
+      let playerStateUpdateHandler;
+      mockNetwork.on.mockImplementation((event, handler) => {
+        if (event === 'player_state_update') {
+          playerStateUpdateHandler = handler;
+        }
+      });
+
+      snapshot = new SessionPlayersSnapshot(mockNetwork, TEST_SESSION_ID);
+      await snapshot.ready();
+
+      // Host updates player health (allowed)
+      playerStateUpdateHandler({
+        type: 'player_state_update',
+        from: HOST_ID, // From host
+        data: {
+          player_id: TEST_PLAYER_ID,
+          health: 75,
+        },
+      });
+
+      // Should update health (host can update host-auth fields)
+      const player = snapshot.getPlayers().get(TEST_PLAYER_ID);
+      expect(player.health).toBe(75);
+    });
+
+    test('WhenPlayerUpdatesOwnPosition_ShouldAccept', async () => {
+      const mockPlayers = [createMockPlayer({ player_id: TEST_PLAYER_ID, position_x: 100, position_y: 200 })];
+
+      mockSupabaseClient.from().select().eq.mockResolvedValue({
+        data: mockPlayers,
+        error: null,
+      });
+
+      let playerStateUpdateHandler;
+      mockNetwork.on.mockImplementation((event, handler) => {
+        if (event === 'player_state_update') {
+          playerStateUpdateHandler = handler;
+        }
+      });
+
+      snapshot = new SessionPlayersSnapshot(mockNetwork, TEST_SESSION_ID);
+      await snapshot.ready();
+
+      // Player updates their own position (allowed)
+      playerStateUpdateHandler({
+        type: 'player_state_update',
+        from: TEST_PLAYER_ID, // From self
+        data: {
+          player_id: TEST_PLAYER_ID,
+          position_x: 500,
+          position_y: 600,
+        },
+      });
+
+      // Should update position (player can update own client-auth fields)
+      const player = snapshot.getPlayers().get(TEST_PLAYER_ID);
+      expect(player.position_x).toBe(500);
+      expect(player.position_y).toBe(600);
+    });
+  });
+
+  describe('Backward Compatibility', () => {
+    test('WhenNetworkEmitsMovementUpdate_ShouldStillWork', async () => {
+      const mockPlayers = [createMockPlayer({ position_x: 100, position_y: 200 })];
+
+      mockSupabaseClient.from().select().eq.mockResolvedValue({
+        data: mockPlayers,
+        error: null,
+      });
+
+      let movementUpdateHandler;
+      mockNetwork.on.mockImplementation((event, handler) => {
+        if (event === 'movement_update') {
+          movementUpdateHandler = handler;
+        }
+      });
+
+      snapshot = new SessionPlayersSnapshot(mockNetwork, TEST_SESSION_ID);
+      await snapshot.ready();
+
+      // Simulate Network emitting legacy movement_update
+      movementUpdateHandler({
+        type: 'movement_update',
+        from: TEST_PLAYER_ID,
+        data: {
+          position_x: 500,
+          position_y: 600,
+          rotation: 3.14,
+        },
+      });
+
+      // Should still update position using legacy format
+      const player = snapshot.getPlayers().get(TEST_PLAYER_ID);
+      expect(player.position_x).toBe(500);
+      expect(player.position_y).toBe(600);
+      expect(player.rotation).toBe(3.14);
+    });
+  });
+
   describe('Destroy', () => {
     test('WhenDestroyCalled_ShouldUnsubscribeFromNetworkEvents', async () => {
       snapshot = new SessionPlayersSnapshot(mockNetwork, TEST_SESSION_ID);
