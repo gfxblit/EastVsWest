@@ -24,6 +24,7 @@ export class Game {
     this.network = null;
     this.lastPositionSendTime = 0;
     this.lastSentState = null;
+    this.healthUpdateAccumulator = 0;
   }
 
   init(playersSnapshot = null, network = null) {
@@ -165,13 +166,24 @@ export class Game {
   updateAllPlayersHealth(deltaTime) {
     if (!this.network?.isHost || !this.playersSnapshot) return;
 
+    // Accumulate time since last update
+    this.healthUpdateAccumulator += deltaTime;
+
+    // Throttle updates to match network simulation interval
+    const updateIntervalSeconds = CONFIG.NETWORK.GAME_SIMULATION_INTERVAL_MS / 1000;
+    if (this.healthUpdateAccumulator < updateIntervalSeconds) {
+      return;
+    }
+
     const updates = [];
     const players = this.playersSnapshot.getPlayers();
 
     // Calculate damage per second based on phase
     const damagePerSecond = CONFIG.ZONE.DAMAGE_PER_SECOND +
       (CONFIG.ZONE.DAMAGE_INCREASE_PER_PHASE * this.state.phase);
-    const damageAmount = damagePerSecond * deltaTime;
+    
+    // Apply damage for the accumulated time
+    const damageAmount = damagePerSecond * this.healthUpdateAccumulator;
 
     for (const [playerId, player] of players) {
       // Check if player is outside conflict zone
@@ -200,6 +212,9 @@ export class Game {
     if (updates.length > 0) {
       this.network.broadcastPlayerStateUpdate(updates);
     }
+
+    // Reset accumulator after processing
+    this.healthUpdateAccumulator = 0;
   }
 
   sendLocalPlayerPosition() {
