@@ -276,7 +276,7 @@ jobs:
           gemini_cli_version: '${{ vars.GEMINI_CLI_VERSION }}'
 
           # Debugging & Artifacts
-          gemini_debug: '${{ fromJSON(vars.GEMINI_DEBUG || vars.ACTIONS_STEP_DEBUG || false) }}'
+          gemini_debug: true
           upload_artifacts: '${{ vars.UPLOAD_ARTIFACTS }}'
 
           # Workflow Identification
@@ -318,7 +318,6 @@ jobs:
               "tools": {
                 "core": [
                   "run_shell_command(cat)",
-                  "run_shell_command(echo)",
                   "run_shell_command(grep)",
                   "run_shell_command(head)",
                   "run_shell_command(tail)"
