@@ -71,7 +71,7 @@ describe('Game', () => {
           }],
         ])),
       };
-      const mockNetwork = { playerId: 'player-1' };
+      const mockNetwork = { playerId: 'player-1', on: jest.fn() };
 
       game.init(mockSnapshot, mockNetwork);
 
@@ -230,6 +230,7 @@ describe('Game', () => {
     beforeEach(() => {
       mockNetwork = {
         isHost: true,
+        on: jest.fn(),
         broadcastPlayerStateUpdate: jest.fn(),
       };
       
@@ -401,6 +402,7 @@ describe('Game', () => {
     mockNetwork = {
       playerId: 'player-1',
       broadcastPlayerStateUpdate: jest.fn(),
+      on: jest.fn(),
     };
     });
 

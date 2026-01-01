@@ -35,8 +35,12 @@ export class Game {
     // Initialize local player
     if (playersSnapshot && network) {
       // Multiplayer mode: get local player from snapshot
-      const snapshotPlayers = playersSnapshot.getPlayers();
-      const localPlayerData = snapshotPlayers.get(network.playerId);
+      const snapshotPlayersMap = playersSnapshot.getPlayers();
+      const localPlayerData = snapshotPlayersMap.get(network.playerId);
+
+      if (network.isHost) {
+        network.on('attack_request', (msg) => this.handleAttackRequest(msg));
+      }
 
       if (localPlayerData) {
         this.localPlayer = {
@@ -48,6 +52,10 @@ export class Game {
           health: localPlayerData.health,
           weapon: localPlayerData.equipped_weapon || null,
           armor: localPlayerData.equipped_armor || null,
+          lastAttackTime: 0,
+          lastSpecialTime: 0,
+          isAttacking: false,
+          attackAnimTime: 0,
           velocity: {
             x: localPlayerData.velocity_x || 0,
             y: localPlayerData.velocity_y || 0
@@ -78,6 +86,10 @@ export class Game {
         health: 100,
         weapon: null,
         armor: null,
+        lastAttackTime: 0,
+        lastSpecialTime: 0,
+        isAttacking: false,
+        attackAnimTime: 0,
         velocity: { x: 0, y: 0 },
         rotation: 0,
         animationState: {
@@ -153,11 +165,31 @@ export class Game {
     this.localPlayer.x = Math.max(0, Math.min(CONFIG.WORLD.WIDTH, this.localPlayer.x));
     this.localPlayer.y = Math.max(0, Math.min(CONFIG.WORLD.HEIGHT, this.localPlayer.y));
 
-    // Sync health from snapshot if available (Client sync)
+    // Sync health, weapon, and armor from snapshot if available (Client sync)
     if (this.playersSnapshot && this.network) {
       const snapshotData = this.playersSnapshot.getPlayers().get(this.network.playerId);
-      if (snapshotData && snapshotData.health !== undefined) {
-        this.localPlayer.health = snapshotData.health;
+      if (snapshotData) {
+        if (snapshotData.health !== undefined) {
+          this.localPlayer.health = snapshotData.health;
+        }
+        if (snapshotData.equipped_weapon !== undefined) {
+          this.localPlayer.weapon = snapshotData.equipped_weapon;
+        }
+        if (snapshotData.equipped_armor !== undefined) {
+          this.localPlayer.armor = snapshotData.equipped_armor;
+        }
+        if (snapshotData.is_attacking !== undefined) {
+          this.localPlayer.isAttacking = snapshotData.is_attacking;
+        }
+      }
+    }
+
+    // Update attack animation timer
+    if (this.localPlayer.attackAnimTime > 0) {
+      this.localPlayer.attackAnimTime -= deltaTime;
+      if (this.localPlayer.attackAnimTime <= 0) {
+        this.localPlayer.isAttacking = false;
+        this.localPlayer.attackAnimTime = 0;
       }
     }
   }
@@ -215,6 +247,116 @@ export class Game {
 
     // Reset accumulator after processing
     this.healthUpdateAccumulator = 0;
+  }
+
+  /** @authority HOST */
+  handleAttackRequest(message) {
+    if (!this.network?.isHost || !this.playersSnapshot) return;
+
+    const attackerId = message.from;
+    const { weapon_id, aim_x, aim_y, is_special } = message.data;
+    const players = this.playersSnapshot.getPlayers();
+    const attacker = players.get(attackerId);
+
+    if (!attacker || attacker.health <= 0) return;
+
+    // Server-side cooldown validation
+    const now = Date.now();
+    const weaponConfig = Object.values(CONFIG.WEAPONS).find(w => w.id === weapon_id) || CONFIG.WEAPONS.FIST;
+    const cooldown = is_special ? CONFIG.COMBAT.SPECIAL_ABILITY_COOLDOWN_MS : (1000 / weaponConfig.attackSpeed);
+    const lastTimeKey = is_special ? 'lastSpecialTime' : 'lastAttackTime';
+    const lastTime = attacker[lastTimeKey] || 0;
+
+    if (now - lastTime < cooldown - 50) { // 50ms buffer for network jitter
+      return;
+    }
+    attacker[lastTimeKey] = now;
+
+    const aimAngle = Math.atan2(aim_y - attacker.position_y, aim_x - attacker.position_x);
+    const arc = this.calculateAttackArc(weaponConfig, is_special);
+    
+    const updates = [];
+    for (const [victimId, victim] of players) {
+      if (victimId === attackerId || victim.health <= 0) continue;
+
+      if (this.isTargetInAttackArc(attacker, victim, aimAngle, arc, weaponConfig.range)) {
+        const damage = this.calculateDamage(attacker, victim, weaponConfig, is_special);
+        const newHealth = Math.max(0, victim.health - damage);
+
+        if (newHealth !== victim.health) {
+          victim.health = newHealth;
+          updates.push({
+            player_id: victimId,
+            health: newHealth
+          });
+        }
+      }
+    }
+
+    if (updates.length > 0) {
+      // Also mark attacker as attacking in the broadcast
+      updates.push({
+        player_id: attackerId,
+        is_attacking: true
+      });
+      this.network.broadcastPlayerStateUpdate(updates);
+
+      // Reset is_attacking after a short delay
+      setTimeout(() => {
+        this.network.broadcastPlayerStateUpdate([{
+          player_id: attackerId,
+          is_attacking: false
+        }]);
+      }, 200);
+    }
+  }
+
+  /** @authority HOST */
+  calculateAttackArc(weaponConfig, isSpecial) {
+    if (isSpecial && (weaponConfig.id === 'greataxe' || weaponConfig.id === 'battleaxe')) {
+      return CONFIG.COMBAT.DEFAULT_SPIN_ARC;
+    }
+    if (weaponConfig.targetType === 'multi') {
+      return CONFIG.COMBAT.DEFAULT_SWING_ARC;
+    }
+    return CONFIG.COMBAT.DEFAULT_THRUST_ARC;
+  }
+
+  /** @authority HOST */
+  isTargetInAttackArc(attacker, victim, aimAngle, arc, range) {
+    const dx = victim.position_x - attacker.position_x;
+    const dy = victim.position_y - attacker.position_y;
+    const distance = Math.sqrt(dx * dx + dy * dy);
+
+    if (distance > range + CONFIG.RENDER.PLAYER_RADIUS) {
+      return false;
+    }
+
+    if (arc >= Math.PI * 2) return true;
+
+    const angleToVictim = Math.atan2(dy, dx);
+    let angleDiff = Math.abs(angleToVictim - aimAngle);
+    if (angleDiff > Math.PI) angleDiff = 2 * Math.PI - angleDiff;
+
+    return angleDiff <= arc / 2;
+  }
+
+  /** @authority HOST */
+  calculateDamage(attacker, victim, weaponConfig, isSpecial) {
+    let damage = weaponConfig.baseDamage;
+    if (isSpecial) damage *= CONFIG.COMBAT.SPECIAL_DAMAGE_MULTIPLIER;
+
+    const victimArmorId = victim.equipped_armor;
+    if (victimArmorId) {
+      const armorConfig = Object.values(CONFIG.ARMOR).find(a => a.id === victimArmorId);
+      if (armorConfig) {
+        const resistance = armorConfig.resistances?.[weaponConfig.damageType] || 1.0;
+        const weakness = armorConfig.weaknesses?.[weaponConfig.damageType] || 1.0;
+        damage = damage * resistance * weakness;
+      }
+    }
+
+    return damage;
   }
 
   sendLocalPlayerPosition() {
@@ -304,6 +446,40 @@ export class Game {
           this.localPlayer.rotation += 2 * Math.PI;
         } else if (this.localPlayer.rotation >= 2 * Math.PI) {
           this.localPlayer.rotation -= 2 * Math.PI;
+        }
+      }
+    }
+
+    // Handle Attack
+    if (inputState.attack || inputState.specialAbility) {
+      const isSpecial = inputState.specialAbility;
+      const now = Date.now();
+      
+      // Get weapon config
+      const weaponId = this.localPlayer.weapon;
+      const weaponConfig = Object.values(CONFIG.WEAPONS).find(w => w.id === weaponId) || CONFIG.WEAPONS.FIST;
+      
+      const cooldown = isSpecial ? CONFIG.COMBAT.SPECIAL_ABILITY_COOLDOWN_MS : (1000 / weaponConfig.attackSpeed);
+      const lastTime = isSpecial ? this.localPlayer.lastSpecialTime : this.localPlayer.lastAttackTime;
+
+      if (now - lastTime >= cooldown) {
+        if (isSpecial) {
+          this.localPlayer.lastSpecialTime = now;
+        } else {
+          this.localPlayer.lastAttackTime = now;
+        }
+
+        // Set local animation state
+        this.localPlayer.isAttacking = true;
+        this.localPlayer.attackAnimTime = 0.2; // 200ms animation
+
+        if (this.network) {
+          this.network.send('attack_request', {
+            weapon_id: weaponConfig.id,
+            aim_x: inputState.aimX,
+            aim_y: inputState.aimY,
+            is_special: isSpecial
+          });
         }
       }
     }

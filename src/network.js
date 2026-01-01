@@ -264,6 +264,9 @@ export class Network extends EventEmitter {
       event: 'message',
       payload: message,
     });
+
+    // Emit locally since Supabase Realtime doesn't echo messages back to sender
+    this.emit(type, message);
   }
 
   /**
