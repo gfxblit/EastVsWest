@@ -7,21 +7,33 @@ import puppeteer from 'puppeteer';
 import { startViteServer, stopViteServer } from './helpers/vite-server.js';
 import { getPuppeteerConfig } from './helpers/puppeteer-config.js';
 
-// Helper function to replace deprecated page.waitForTimeout
-const delay = (ms) => new Promise(resolve => setTimeout(resolve, ms));
-
 describe('Animation Integration', () => {
   let browser;
   let page;
   let serverUrl;
 
   beforeAll(async () => {
-    // Start Vite dev server
+    // Start Vite dev server and launch Puppeteer
     serverUrl = await startViteServer();
     browser = await puppeteer.launch(getPuppeteerConfig());
+    page = await browser.newPage();
+
+    // Set viewport and navigate
+    await page.setViewport({ width: 1200, height: 800 });
+    await page.goto(serverUrl);
+
+    // Wait for app to initialize
+    await page.waitForSelector('body.loaded', { timeout: 10000 });
+
+    // Shared game initialization
+    await page.click('#host-game-btn');
+    await page.waitForSelector('#start-game-btn:not(.hidden)', { timeout: 10000 });
+    await page.click('#start-game-btn');
+    await page.waitForSelector('#game-canvas:not(.hidden)', { timeout: 10000 });
   }, 60000);
 
   afterAll(async () => {
+    // Close browser and stop server
     if (browser) {
       await browser.close();
     }
@@ -29,45 +41,23 @@ describe('Animation Integration', () => {
   });
 
   beforeEach(async () => {
-    if (!browser) {
-      throw new Error('Browser not initialized. Check beforeAll failure.');
-    }
-    page = await browser.newPage();
-
-    // Set viewport
-    await page.setViewport({ width: 1200, height: 800 });
-
-    await page.goto(serverUrl);
-
-    // Wait for app to initialize
-    await page.waitForSelector('body.loaded', { timeout: 10000 });
-
-    // Shared game initialization (moved from individual tests)
-    await page.click('#host-game-btn');
-    await page.waitForSelector('#start-game-btn:not(.hidden)', { timeout: 10000 });
-    await page.click('#start-game-btn');
-    await page.waitForSelector('#game-canvas:not(.hidden)', { timeout: 10000 });
-
-    // Wait for assets to load
-    await delay(1000);
-
-    // Reset to known animation state
+    // Reset to a known animation state before each test
     await page.evaluate(() => {
       if (window.game && window.game.localPlayer) {
         window.game.localPlayer.velocity = { x: 0, y: 0 };
+        // Ensure animationState is also reset
         if (window.game.localPlayer.animationState) {
           window.game.localPlayer.animationState.currentFrame = 0;
           window.game.localPlayer.animationState.timeAccumulator = 0;
+          window.game.localPlayer.animationState.lastDirection = 0; // Reset direction
         }
       }
     });
+    // Release any pressed keys
+    await page.keyboard.up('ArrowRight');
+    await page.keyboard.up('ArrowDown');
   });
 
-  afterEach(async () => {
-    if (page) {
-      await page.close();
-    }
-  });
 
   describe('Sprite Sheet Loading', () => {
     test('WhenSpriteSheetLoads_ShouldHaveCorrectMetadata', async () => {
@@ -98,30 +88,25 @@ describe('Animation Integration', () => {
       // Simulate player movement by sending keyboard events
       await page.keyboard.down('ArrowRight');
 
-      // Wait a bit for animation to run
-      await delay(500);
+      // Wait for the animation frame to advance, indicating movement
+      await page.waitForFunction(() => {
+        return window.game && window.game.localPlayer && window.game.localPlayer.animationState.currentFrame > 0;
+      }, { timeout: 5000 });
 
       // Check that animation state has advanced
       const debugInfo = await page.evaluate(() => {
-        if (window.game && window.game.localPlayer) {
-          const player = window.game.localPlayer;
-          const animState = player.animationState;
-          return {
-            hasPlayer: true,
-            currentFrame: animState.currentFrame,
-            lastDirection: animState.lastDirection,
-            velocityX: player.velocity.x,
-            velocityY: player.velocity.y,
-            timeAccumulator: animState.timeAccumulator
-          };
-        }
-        return { hasPlayer: false };
+        const player = window.game.localPlayer;
+        const animState = player.animationState;
+        return {
+          hasPlayer: true,
+          currentFrame: animState.currentFrame,
+          lastDirection: animState.lastDirection,
+          velocityX: player.velocity.x,
+          velocityY: player.velocity.y,
+        };
       });
 
       await page.keyboard.up('ArrowRight');
-
-      // Log debug info to help diagnose the issue
-      console.log('Debug info:', debugInfo);
 
       expect(debugInfo.hasPlayer).toBe(true);
       expect(debugInfo.velocityX).not.toBe(0); // Velocity should be set
@@ -131,20 +116,17 @@ describe('Animation Integration', () => {
     test('WhenPlayerStops_ShouldDisplayIdleFrame', async () => {
       // Move player
       await page.keyboard.down('ArrowRight');
-      await delay(300);
       await page.keyboard.up('ArrowRight');
 
-      // Wait for player to stop
-      await delay(200);
+      // Wait for the player's velocity to be zero and animation to return to idle
+      await page.waitForFunction(() => {
+        const player = window.game && window.game.localPlayer;
+        return player && player.velocity.x === 0 && player.animationState.currentFrame === 0;
+      }, { timeout: 5000 });
 
       // Check that animation state reset to idle frame (frame 0)
       const isIdleFrame = await page.evaluate(() => {
-        if (window.game && window.game.localPlayer) {
-          const animState = window.game.localPlayer.animationState;
-          // When idle, currentFrame should be 0
-          return animState && animState.currentFrame === 0;
-        }
-        return false;
+        return window.game.localPlayer.animationState.currentFrame === 0;
       });
 
       expect(isIdleFrame).toBe(true);
@@ -153,7 +135,7 @@ describe('Animation Integration', () => {
     test('WhenPlayerChangesDirection_ShouldUpdateAnimationDirection', async () => {
       // Move right (should be East direction = 2)
       await page.keyboard.down('ArrowRight');
-      await delay(300);
+      await new Promise(resolve => setTimeout(resolve, 300));
 
       const eastDirection = await page.evaluate(() => {
         if (window.game && window.game.localPlayer) {
@@ -166,7 +148,7 @@ describe('Animation Integration', () => {
 
       // Move down (should be South direction = 0)
       await page.keyboard.down('ArrowDown');
-      await delay(300);
+      await new Promise(resolve => setTimeout(resolve, 300));
 
       const southDirection = await page.evaluate(() => {
         if (window.game && window.game.localPlayer) {
