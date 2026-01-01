@@ -45,14 +45,29 @@ describe('Player State Sync Integration with Supabase', () => {
     if (hostClient) {
       await hostClient.auth.signOut();
     }
+
+    // Give time for cleanup to complete
+    await new Promise(resolve => setTimeout(resolve, 500));
   });
 
   afterEach(async () => {
     // Clean up the created test data after each test
     if (testSessionId) {
+      // First disconnect host network to clean up channels
+      if (hostNetwork && hostNetwork.channel) {
+        hostNetwork.disconnect();
+      }
+
       await hostClient.from('game_sessions').delete().match({ id: testSessionId });
       testSessionId = null;
+
+      // Recreate host network for next test
+      hostNetwork = new Network();
+      hostNetwork.initialize(hostClient, hostUser.id);
     }
+
+    // Give time for cleanup to complete
+    await new Promise(resolve => setTimeout(resolve, 100));
   });
 
   describe('Generic Broadcast and Persistence', () => {
@@ -111,6 +126,9 @@ describe('Player State Sync Integration with Supabase', () => {
       player2Network.disconnect();
       await player1Client.auth.signOut();
       await player2Client.auth.signOut();
+
+      // Wait for connections to close
+      await new Promise(resolve => setTimeout(resolve, 100));
     });
 
     test('WhenHostBroadcastsHealth_AllClientsShouldReceive', async () => {
@@ -153,6 +171,9 @@ describe('Player State Sync Integration with Supabase', () => {
       playerNetwork.off('player_state_update', playerHandler);
       playerNetwork.disconnect();
       await playerClient.auth.signOut();
+
+      // Wait for connections to close
+      await new Promise(resolve => setTimeout(resolve, 100));
     });
 
     test('WhenClientPersistsPosition_ShouldWriteToDB', async () => {
@@ -197,7 +218,10 @@ describe('Player State Sync Integration with Supabase', () => {
       // Clean up
       playerNetwork.disconnect();
       await playerClient.auth.signOut();
-    });
+
+      // Wait for connections to close
+      await new Promise(resolve => setTimeout(resolve, 100));
+    }, 10000); // Increase timeout for this test
 
     test('WhenHostPersistsHealth_ShouldWriteToDB', async () => {
       // Host creates a session
@@ -233,7 +257,10 @@ describe('Player State Sync Integration with Supabase', () => {
       // Clean up
       playerNetwork.disconnect();
       await playerClient.auth.signOut();
-    });
+
+      // Wait for connections to close
+      await new Promise(resolve => setTimeout(resolve, 100));
+    }, 10000); // Increase timeout for this test
 
     test('WhenClientReconnects_ShouldLoadPositionAndHealthFromDB', async () => {
       // Host creates a session
@@ -277,7 +304,10 @@ describe('Player State Sync Integration with Supabase', () => {
       // Clean up
       snapshot.destroy();
       await playerClient.auth.signOut();
-    });
+
+      // Wait for connections to close
+      await new Promise(resolve => setTimeout(resolve, 100));
+    }, 10000); // Increase timeout for this test
 
     test('WhenHostBroadcastsMultiplePlayerHealth_AllShouldSync', async () => {
       // Host creates a session
@@ -343,6 +373,9 @@ describe('Player State Sync Integration with Supabase', () => {
       await player1Client.auth.signOut();
       await player2Client.auth.signOut();
       await player3Client.auth.signOut();
-    });
+
+      // Wait for connections to close
+      await new Promise(resolve => setTimeout(resolve, 100));
+    }, 10000); // Increase timeout for this test
   });
 });
