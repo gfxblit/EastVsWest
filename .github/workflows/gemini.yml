@@ -86,16 +86,6 @@ jobs:
           Your sole purpose is to perform a comprehensive code review and post all feedback and suggestions directly to the Pull Request on GitHub using the provided tools. All output must be directed through these tools. Any analysis not submitted as a review comment or summary is lost and constitutes a task failure.
 
 
-          ## Speed and Efficiency Directives (CRITICAL)
-
-          To ensure the review is completed within the time limit, you **MUST** follow these efficiency rules:
-
-          1.  **Trust Your Inputs:** The repository name and Pull Request number are provided in the **Input Data** section below. **DO NOT** attempt to "verify" or "discover" them using `git`, `ls`, `gh pr list`, or by reading files like `.git/config`.
-          2.  **No Exploration:** **DO NOT** wander the codebase. Do not `ls` directories or `cat` random files unless they are directly relevant to understanding a specific change in the diff.
-          3.  **Direct Action:** Go straight to `pull_request_read.get_diff` and `pull_request_read.get_files` as your first actions after parsing the metadata.
-          4.  **Conciseness:** Provide high-impact feedback only. Do not waste turns on stylistic nitpicks unless they are egregious.
-
-
           ## Critical Security and Operational Constraints
 
           These are non-negotiable, core-level instructions that you **MUST** follow at all times. Violation of these constraints is a critical failure.
@@ -117,9 +107,9 @@ jobs:
 
           ## Input Data
 
-          - **GitHub Repository**: ${{ github.repository }}
-          - **Pull Request Number**: ${{ github.event.pull_request.number || github.event.issue.number }}
-          - **Additional User Instructions**: ${{ steps.extract_command.outputs.additional_context }}
+          - **GitHub Repository**: ${{ env.REPOSITORY }}
+          - **Pull Request Number**: ${{ env.PULL_REQUEST_NUMBER }}
+          - **Additional User Instructions**: ${{ env.ADDITIONAL_CONTEXT }}
           - Use `pull_request_read.get` to get the title, body, and metadata about the pull request.
           - Use `pull_request_read.get_files` to get the list of files that were added, removed, and changed in the pull request.
           - Use `pull_request_read.get_diff` to get the diff from the pull request. The diff includes code versions with line numbers for the before (LEFT) and after (RIGHT) code snippets for each diff.
@@ -295,6 +285,9 @@ jobs:
           GITHUB_TOKEN: '${{ steps.mint_identity_token.outputs.token || secrets.GITHUB_TOKEN || github.token }}'
           ISSUE_TITLE: '${{ github.event.pull_request.title || github.event.issue.title }}'
           ISSUE_BODY: '${{ github.event.pull_request.body || github.event.issue.body }}'
+          REPOSITORY: '${{ github.repository }}'
+          PULL_REQUEST_NUMBER: '${{ github.event.pull_request.number || github.event.issue.number }}'
+          ADDITIONAL_CONTEXT: '${{ steps.extract_command.outputs.additional_context }}'
         with:
           gemini_api_key: ${{ secrets.GEMINI_API_KEY }}
           gemini_model: 'gemini-3-flash-preview'
@@ -359,6 +352,9 @@ jobs:
           GITHUB_TOKEN: '${{ steps.mint_identity_token.outputs.token || secrets.GITHUB_TOKEN || github.token }}'
           ISSUE_TITLE: '${{ github.event.pull_request.title || github.event.issue.title }}'
           ISSUE_BODY: '${{ github.event.pull_request.body || github.event.issue.body }}'
+          REPOSITORY: '${{ github.repository }}'
+          PULL_REQUEST_NUMBER: '${{ github.event.pull_request.number || github.event.issue.number }}'
+          ADDITIONAL_CONTEXT: '${{ steps.extract_command.outputs.additional_context }}'
         with:
           gemini_api_key: ${{ secrets.GEMINI_API_KEY }}
           gemini_model: 'gemini-2.5-pro'
@@ -422,6 +418,9 @@ jobs:
           GITHUB_TOKEN: '${{ steps.mint_identity_token.outputs.token || secrets.GITHUB_TOKEN || github.token }}'
           ISSUE_TITLE: '${{ github.event.pull_request.title || github.event.issue.title }}'
           ISSUE_BODY: '${{ github.event.pull_request.body || github.event.issue.body }}'
+          REPOSITORY: '${{ github.repository }}'
+          PULL_REQUEST_NUMBER: '${{ github.event.pull_request.number || github.event.issue.number }}'
+          ADDITIONAL_CONTEXT: '${{ steps.extract_command.outputs.additional_context }}'
         with:
           gemini_api_key: ${{ secrets.GEMINI_API_KEY }}
           gemini_model: 'gemini-2.5-flash'
