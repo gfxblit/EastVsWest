@@ -248,6 +248,24 @@ export class Network extends EventEmitter {
   }
 
   // FUTURE: Host-authoritative health persistence (not yet implemented)
+  send(type, data) {
+    if (!this.channel || !this.connected) {
+      console.warn('Cannot send message, channel not connected.');
+      return;
+    }
+    const message = {
+      type,
+      from: this.playerId,
+      timestamp: Date.now(),
+      data,
+    };
+    this.channel.send({
+      type: 'broadcast',
+      event: 'message',
+      payload: message,
+    });
+  }
+
   /**
    * Generic Player State Update System
    * Supports both client-authoritative (position, velocity) and host-authoritative (health, equipment) data

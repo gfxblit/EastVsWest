@@ -284,7 +284,7 @@ describe('SessionPlayersSnapshot Integration with Network', () => {
 
       // Act: hostNetwork sends a position update
       hostNetwork.broadcastPlayerStateUpdate({
-        player_id: MOCK_HOST_ID,
+        player_id: hostUser.id,
         position_x: 100,
         position_y: 200,
         rotation: 1.5,
@@ -309,7 +309,7 @@ describe('SessionPlayersSnapshot Integration with Network', () => {
       // They update the in-memory player object in the snapshot
       expect(hostPlayerAfter.position_x).toBe(100);
       expect(hostPlayerAfter.position_y).toBe(200);
-      expect(hostPlayerAfter.rotation).toBe(1.57);
+      expect(hostPlayerAfter.rotation).toBe(1.5);
     }, 15000); // Increase test timeout to 15s
   });
 

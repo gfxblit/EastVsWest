@@ -36,25 +36,29 @@ describe('Position Synchronization Integration', () => {
   });
 
   afterEach(async () => {
-    network.stopPeriodicMovementWrite();
+    network.stopPeriodicPlayerStateWrite();
     if (testSessionId) {
       await supabaseClient.from('game_sessions').delete().match({ id: testSessionId });
       testSessionId = null;
     }
   });
 
-  test('writeMovementToDB() should update player position and velocity in database', async () => {
+  test('writePlayerStateToDB() should update player position and velocity in database', async () => {
     // 1. Host a game
     const { session: hostSession } = await network.hostGame('HostPlayer');
     testSessionId = hostSession.id;
 
     // 2. Define new position and velocity data
-    const newPosition = { x: 123.45, y: 678.90 };
-    const newRotation = 1.57; // 90 degrees
-    const newVelocity = { x: 10.5, y: 20.5 };
+    const newState = {
+      position_x: 123.45,
+      position_y: 678.90,
+      rotation: 1.57,
+      velocity_x: 10.5,
+      velocity_y: 20.5
+    };
 
-    // 3. Call writeMovementToDB
-    await network.writeMovementToDB(newPosition.x, newPosition.y, newRotation, newVelocity.x, newVelocity.y);
+    // 3. Call writePlayerStateToDB
+    await network.writePlayerStateToDB(hostUser.id, newState);
 
     // 4. Verify in Database
     const { data: playerDbData, error: playerDbError } = await supabaseClient
@@ -65,25 +69,30 @@ describe('Position Synchronization Integration', () => {
       .single();
 
     expect(playerDbError).toBeNull();
-    expect(playerDbData.position_x).toBeCloseTo(newPosition.x);
-    expect(playerDbData.position_y).toBeCloseTo(newPosition.y);
-    expect(playerDbData.velocity_x).toBeCloseTo(newVelocity.x);
-    expect(playerDbData.velocity_y).toBeCloseTo(newVelocity.y);
-    expect(playerDbData.rotation).toBeCloseTo(newRotation);
+    expect(playerDbData.position_x).toBeCloseTo(newState.position_x);
+    expect(playerDbData.position_y).toBeCloseTo(newState.position_y);
+    expect(playerDbData.velocity_x).toBeCloseTo(newState.velocity_x);
+    expect(playerDbData.velocity_y).toBeCloseTo(newState.velocity_y);
+    expect(playerDbData.rotation).toBeCloseTo(newState.rotation);
   });
 
-  test('startPeriodicMovementWrite() should perform an immediate write to DB', async () => {
+  test('startPeriodicPlayerStateWrite() should perform an immediate write to DB', async () => {
     // 1. Host a game
     const { session: hostSession } = await network.hostGame('HostPlayer');
     testSessionId = hostSession.id;
 
-    // 2. Define getters
-    const getPosition = () => ({ x: 500.1, y: 300.2 });
-    const getRotation = () => 3.14;
-    const getVelocity = () => ({ x: 5.5, y: 6.6 });
+    // 2. Define state getter
+    const getState = () => ({
+      player_id: hostUser.id,
+      position_x: 500.1,
+      position_y: 300.2,
+      rotation: 3.14,
+      velocity_x: 5.5,
+      velocity_y: 6.6
+    });
 
     // 3. Start periodic write
-    network.startPeriodicMovementWrite(getPosition, getRotation, getVelocity);
+    network.startPeriodicPlayerStateWrite(getState);
 
     // 4. Wait for the async DB write to complete by checking for the updated value
     await waitFor(async () => {
@@ -132,14 +141,19 @@ describe('Position Synchronization Integration', () => {
     await snapshotB.ready();
 
     // 4. Host (Player A) writes new position to DB
-    const newPos = { x: 800, y: 600 };
-    const newVel = { x: 10, y: 20 };
-    await network.writeMovementToDB(newPos.x, newPos.y, 0, newVel.x, newVel.y);
+    const newState = {
+      position_x: 800,
+      position_y: 600,
+      velocity_x: 10,
+      velocity_y: 20,
+      rotation: 0
+    };
+    await network.writePlayerStateToDB(hostUser.id, newState);
 
     // 5. Wait for Snapshot B to refresh
     await waitFor(() => {
       const p = snapshotB.getPlayers().get(hostUser.id);
-      return p && p.position_x === newPos.x;
+      return p && p.position_x === newState.position_x;
     }, 5000);
 
     // 6. Verify Player B sees Player A's new position
@@ -147,10 +161,10 @@ describe('Position Synchronization Integration', () => {
     const playerA = players.get(hostUser.id);
     
     expect(playerA).toBeDefined();
-    expect(playerA.position_x).toBe(newPos.x);
-    expect(playerA.position_y).toBe(newPos.y);
-    expect(playerA.velocity_x).toBe(newVel.x);
-    expect(playerA.velocity_y).toBe(newVel.y);
+    expect(playerA.position_x).toBe(newState.position_x);
+    expect(playerA.position_y).toBe(newState.position_y);
+    expect(playerA.velocity_x).toBe(newState.velocity_x);
+    expect(playerA.velocity_y).toBe(newState.velocity_y);
 
     // Cleanup
     snapshotB.destroy();
