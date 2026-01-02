@@ -4,7 +4,7 @@
  */
 
 import { CONFIG } from './config.js';
-import { getDirectionFromVelocity } from './animationHelper.js';
+import { getDirectionFromVelocity, updateAnimationState } from './animationHelper.js';
 
 export class Renderer {
   constructor(canvas) {
@@ -16,6 +16,7 @@ export class Renderer {
     this.spriteSheetMetadata = null;
     this.spriteSheetLoaded = false;
     this.shadowImage = null;
+    this.remoteAnimationStates = new Map(); // Store animation state for remote players
   }
 
   init() {
@@ -65,7 +66,7 @@ export class Renderer {
     this.canvas.height = window.innerHeight;
   }
 
-  render(gameState, localPlayer = null, playersSnapshot = null, camera = null) {
+  render(gameState, localPlayer = null, playersSnapshot = null, camera = null, deltaTime = 0) {
     if (!this.ctx) return;
 
     // Clear canvas
@@ -108,15 +109,24 @@ export class Renderer {
         // Skip local player, we'll render it separately
         if (localPlayer && playerId === localPlayer.id) return;
 
-        // Interpolate position
+        // Interpolate position and velocity
         const interpolated = this.interpolatePosition(playerData, currentTime);
 
-        // Calculate animation state for remote player based on velocity
-        // Use interpolated velocity if available, or last known
-        const vx = playerData.velocity_x || 0;
-        const vy = playerData.velocity_y || 0;
+        // Get or create persistent animation state for this remote player
+        let animState = this.remoteAnimationStates.get(playerId);
+        if (!animState) {
+          animState = this.initAnimationState();
+          this.remoteAnimationStates.set(playerId, animState);
+        }
+
+        // Calculate animation state for remote player based on interpolated velocity
+        const vx = interpolated.vx;
+        const vy = interpolated.vy;
         const direction = getDirectionFromVelocity(vx, vy);
-        const isMoving = vx !== 0 || vy !== 0;
+        const isMoving = Math.abs(vx) > 0.1 || Math.abs(vy) > 0.1;
+
+        // Update animation state using helper
+        updateAnimationState(animState, deltaTime, isMoving, direction);
 
         const player = {
           id: playerId,
@@ -125,14 +135,17 @@ export class Renderer {
           y: interpolated.y,
           rotation: interpolated.rotation,
           health: playerData.health,
-          animationState: {
-            currentFrame: isMoving ? 1 : 0, // Use frame 1 for moving (approximate animation)
-            lastDirection: direction !== null ? direction : 0, // Use calculated direction or default to South
-            timeAccumulator: 0,
-          },
+          animationState: animState,
         };
         this.renderPlayer(player, false);
       });
+
+      // Cleanup animation states for players who left
+      for (const playerId of this.remoteAnimationStates.keys()) {
+        if (!snapshotPlayers.has(playerId)) {
+          this.remoteAnimationStates.delete(playerId);
+        }
+      }
     }
 
     // Render local player last (on top, with visual distinction)
@@ -420,7 +433,7 @@ export class Renderer {
    * Interpolate player position based on history buffer
    * @param {Object} player - Player object with positionHistory
    * @param {number} renderTime - Current frame time
-   * @returns {Object} { x, y, rotation }
+   * @returns {Object} { x, y, rotation, vx, vy }
    */
   interpolatePosition(player, renderTime) {
     // If no history, return current position
@@ -428,7 +441,9 @@ export class Renderer {
       return {
         x: player.position_x || 0,
         y: player.position_y || 0,
-        rotation: player.rotation || 0
+        rotation: player.rotation || 0,
+        vx: player.velocity_x || 0,
+        vy: player.velocity_y || 0
       };
     }
 
@@ -438,13 +453,13 @@ export class Renderer {
     // If target time is after newest snapshot, use newest (no extrapolation yet)
     if (targetTime >= history[history.length - 1].timestamp) {
       const newest = history[history.length - 1];
-      return { x: newest.x, y: newest.y, rotation: newest.rotation };
+      return { x: newest.x, y: newest.y, rotation: newest.rotation, vx: newest.velocity_x, vy: newest.velocity_y };
     }
 
     // If target time is before oldest snapshot, use oldest
     if (targetTime <= history[0].timestamp) {
       const oldest = history[0];
-      return { x: oldest.x, y: oldest.y, rotation: oldest.rotation };
+      return { x: oldest.x, y: oldest.y, rotation: oldest.rotation, vx: oldest.velocity_x, vy: oldest.velocity_y };
     }
 
     // Find bracketing snapshots
@@ -467,10 +482,14 @@ export class Renderer {
     const x = p1.x + (p2.x - p1.x) * t;
     const y = p1.y + (p2.y - p1.y) * t;
 
+    // Linear interpolation for velocity (smoother animation transitions)
+    const vx = p1.velocity_x + (p2.velocity_x - p1.velocity_x) * t;
+    const vy = p1.velocity_y + (p2.velocity_y - p1.velocity_y) * t;
+
     // Shortest path interpolation for rotation
     const rotation = this.interpolateRotation(p1.rotation, p2.rotation, t);
 
-    return { x, y, rotation };
+    return { x, y, rotation, vx, vy };
   }
 
   /**

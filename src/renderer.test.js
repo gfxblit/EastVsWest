@@ -202,7 +202,7 @@ describe('Renderer', () => {
         configurable: true
       });
 
-      renderer.render(gameState, null, null, null);
+      renderer.render(gameState, null, null, null, 0.016);
 
       // Should clear canvas with background color (canvas dimensions)
       expect(ctx.fillRect).toHaveBeenCalledWith(0, 0, CONFIG.CANVAS.WIDTH, CONFIG.CANVAS.HEIGHT);
@@ -226,7 +226,7 @@ describe('Renderer', () => {
       };
 
       // Act
-      renderer.render(gameState, null, null, camera);
+      renderer.render(gameState, null, null, camera, 0.016);
 
       // Assert
       // Should call save before transform
@@ -300,7 +300,7 @@ describe('Renderer', () => {
       });
 
       // Act
-      renderer.render(gameState, null, null, camera);
+      renderer.render(gameState, null, null, camera, 0.016);
 
       // Assert
       // Find background fill (uses pattern, not color)
@@ -1286,9 +1286,9 @@ describe('Renderer', () => {
 
     describe('interpolatePosition', () => {
       const createHistory = () => [
-        { x: 0, y: 0, rotation: 0, timestamp: 1000 },
-        { x: 100, y: 100, rotation: 1.0, timestamp: 1100 }, // 100ms later
-        { x: 200, y: 200, rotation: 2.0, timestamp: 1200 }  // 200ms later
+        { x: 0, y: 0, rotation: 0, velocity_x: 0, velocity_y: 0, timestamp: 1000 },
+        { x: 100, y: 100, rotation: 1.0, velocity_x: 10, velocity_y: 10, timestamp: 1100 }, // 100ms later
+        { x: 200, y: 200, rotation: 2.0, velocity_x: 20, velocity_y: 20, timestamp: 1200 }  // 200ms later
       ];
 
       test('WhenBetweenSnapshots_ShouldLinearInterpolate', () => {
@@ -1306,6 +1306,8 @@ describe('Renderer', () => {
         expect(result.x).toBe(50);
         expect(result.y).toBe(50);
         expect(result.rotation).toBeCloseTo(0.5);
+        expect(result.vx).toBe(5);
+        expect(result.vy).toBe(5);
       });
 
       test('WhenExactlyOnSnapshot_ShouldReturnSnapshotValue', () => {

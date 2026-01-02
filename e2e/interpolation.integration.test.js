@@ -28,6 +28,19 @@ describe('Client Interpolation Integration (Real Network)', () => {
   }
 
   beforeAll(async () => {
+    // Mock window for Renderer
+    global.window = {
+      innerWidth: 1200,
+      innerHeight: 800,
+    };
+    global.Image = class {
+      constructor() {
+        this.onload = null;
+        this.onerror = null;
+        this.src = '';
+      }
+    };
+
     // 1. Setup Clients
     hostClient = createClient(supabaseUrl, supabaseAnonKey);
     playerClient = createClient(supabaseUrl, supabaseAnonKey);
@@ -47,15 +60,34 @@ describe('Client Interpolation Integration (Real Network)', () => {
     playerNetwork.initialize(playerClient, playerUser.id);
 
     // 2. Setup Renderer (for interpolation logic)
-    const mockCanvas = { getContext: () => ({}), width: 800, height: 600 };
+    const mockCtx = {
+      fillRect: () => {},
+      save: () => {},
+      restore: () => {},
+      translate: () => {},
+      rotate: () => {},
+      drawImage: () => {},
+      beginPath: () => {},
+      arc: () => {},
+      fill: () => {},
+      stroke: () => {},
+      createPattern: () => ({})
+    };
+    const mockCanvas = { getContext: () => mockCtx, width: 800, height: 600 };
     renderer = new Renderer(mockCanvas);
-    // Note: We don't call renderer.init() to avoid image loading in E2E environment
+    renderer.init();
+  });
+
+  afterEach(async () => {
+    if (playerSnapshot) {
+      playerSnapshot.destroy();
+      playerSnapshot = null;
+    }
   });
 
   afterAll(async () => {
     if (hostNetwork) hostNetwork.disconnect();
     if (playerNetwork) playerNetwork.disconnect();
-    if (playerSnapshot) playerSnapshot.destroy();
     if (hostClient) await hostClient.auth.signOut();
     if (playerClient) await playerClient.auth.signOut();
   });
@@ -117,4 +149,63 @@ describe('Client Interpolation Integration (Real Network)', () => {
     expect(result.x).toBeCloseTo(2.5, 1);
     expect(result.y).toBe(0);
   }, 15000);
+
+  test('should animate remote players based on interpolated velocity', async () => {
+    // 1. Host Game
+    const { session } = await hostNetwork.hostGame('HostAnimate');
+    
+    // 2. Join Game
+    await playerNetwork.joinGame(session.join_code, 'PlayerAnimate');
+
+    // 3. Setup Snapshot on Player side
+    playerSnapshot = new SessionPlayersSnapshot(playerNetwork, session.id);
+    await playerSnapshot.ready();
+    
+    // Wait for host player to appear in snapshot
+    await waitFor(() => playerSnapshot.getPlayers().has(hostUser.id), 5000);
+
+    // 4. Send movement updates from Host (velocity_x = 100)
+    // We need at least 2 updates to have a velocity to interpolate
+    for (let i = 0; i < 5; i++) {
+      hostNetwork.broadcastPlayerStateUpdate({
+        player_id: hostUser.id,
+        position_x: i * 5,
+        position_y: 0,
+        rotation: 0,
+        velocity_x: 100,
+        velocity_y: 0
+      });
+      await new Promise(resolve => setTimeout(resolve, 50));
+    }
+
+    // Wait for history to be populated on player side
+    await waitFor(() => {
+      const p = playerSnapshot.getPlayers().get(hostUser.id);
+      return p && p.positionHistory && p.positionHistory.length >= 2;
+    }, 5000);
+
+    // 5. Simulate Render Loop on Player side
+    // We'll call renderer.render manually multiple times
+    const startTime = performance.now();
+    const duration = 500; // 0.5s of animation
+    const fps = 60;
+    const dt = 1/fps;
+    const mockGameState = {
+      conflictZone: { centerX: 0, centerY: 0, radius: 1000 },
+      loot: []
+    };
+
+    for (let t = 0; t < duration; t += (1000/fps)) {
+      renderer.render(mockGameState, null, playerSnapshot, null, dt);
+      await new Promise(resolve => setTimeout(resolve, 1000/fps));
+    }
+
+    // 6. Verify Animation State
+    const playerViewOfHost = playerSnapshot.getPlayers().get(hostUser.id);
+    const animState = renderer.remoteAnimationStates.get(hostUser.id);
+    
+    expect(animState).toBeDefined();
+    // At 100px/s, it should be moving, so frame should have advanced from 0
+    expect(animState.currentFrame).toBeGreaterThan(0);
+  }, 20000);
 });
