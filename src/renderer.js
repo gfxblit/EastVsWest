@@ -4,7 +4,7 @@
  */
 
 import { CONFIG } from './config.js';
-import { getDirectionFromVelocity } from './animationHelper.js';
+import { getDirectionFromVelocity, updateAnimationState } from './animationHelper.js';
 
 export class Renderer {
   constructor(canvas) {
@@ -16,6 +16,7 @@ export class Renderer {
     this.spriteSheetMetadata = null;
     this.spriteSheetLoaded = false;
     this.shadowImage = null;
+    this.remoteAnimationStates = new Map(); // Store animation state for remote players
   }
 
   init() {
@@ -65,7 +66,7 @@ export class Renderer {
     this.canvas.height = window.innerHeight;
   }
 
-  render(gameState, localPlayer = null, playersSnapshot = null, camera = null) {
+  render(gameState, localPlayer = null, playersSnapshot = null, camera = null, deltaTime = 0) {
     if (!this.ctx) return;
 
     // Clear canvas
@@ -101,31 +102,50 @@ export class Renderer {
     if (playersSnapshot) {
       // Multiplayer mode: render remote players from snapshot
       const snapshotPlayers = playersSnapshot.getPlayers();
+      // Use performance.now() if renderTime not provided (fallback)
+      const currentTime = performance.now();
+      
       snapshotPlayers.forEach((playerData, playerId) => {
         // Skip local player, we'll render it separately
         if (localPlayer && playerId === localPlayer.id) return;
 
-        // Calculate animation state for remote player based on velocity
-        const vx = playerData.velocity_x || 0;
-        const vy = playerData.velocity_y || 0;
+        // Interpolate position and velocity
+        const interpolated = this.interpolatePosition(playerData, currentTime);
+
+        // Get or create persistent animation state for this remote player
+        let animState = this.remoteAnimationStates.get(playerId);
+        if (!animState) {
+          animState = this.initAnimationState();
+          this.remoteAnimationStates.set(playerId, animState);
+        }
+
+        // Calculate animation state for remote player based on interpolated velocity
+        const vx = interpolated.vx;
+        const vy = interpolated.vy;
         const direction = getDirectionFromVelocity(vx, vy);
-        const isMoving = vx !== 0 || vy !== 0;
+        const isMoving = Math.abs(vx) > 0.1 || Math.abs(vy) > 0.1;
+
+        // Update animation state using helper
+        updateAnimationState(animState, deltaTime, isMoving, direction);
 
         const player = {
           id: playerId,
           name: playerData.player_name,
-          x: playerData.position_x,
-          y: playerData.position_y,
-          rotation: playerData.rotation,
+          x: interpolated.x,
+          y: interpolated.y,
+          rotation: interpolated.rotation,
           health: playerData.health,
-          animationState: {
-            currentFrame: isMoving ? 1 : 0, // Use frame 1 for moving (approximate animation)
-            lastDirection: direction !== null ? direction : 0, // Use calculated direction or default to South
-            timeAccumulator: 0,
-          },
+          animationState: animState,
         };
         this.renderPlayer(player, false);
       });
+
+      // Cleanup animation states for players who left
+      for (const playerId of this.remoteAnimationStates.keys()) {
+        if (!snapshotPlayers.has(playerId)) {
+          this.remoteAnimationStates.delete(playerId);
+        }
+      }
     }
 
     // Render local player last (on top, with visual distinction)
@@ -407,5 +427,105 @@ export class Renderer {
     // Health
     this.ctx.fillStyle = '#ff6b6b';
     this.ctx.fillRect(barX, barY, (player.health / 100) * barWidth, barHeight);
+  }
+
+  /**
+   * Interpolate player position based on history buffer
+   * @param {Object} player - Player object with positionHistory
+   * @param {number} renderTime - Current frame time
+   * @returns {Object} { x, y, rotation, vx, vy }
+   */
+  interpolatePosition(player, renderTime) {
+    // If no history, return current position
+    if (!player.positionHistory || player.positionHistory.length < 1) {
+      return {
+        x: player.position_x || 0,
+        y: player.position_y || 0,
+        rotation: player.rotation || 0,
+        vx: player.velocity_x || 0,
+        vy: player.velocity_y || 0
+      };
+    }
+
+    const targetTime = renderTime - CONFIG.NETWORK.INTERPOLATION_DELAY_MS;
+    const history = player.positionHistory;
+
+    // If target time is after newest snapshot, use newest (no extrapolation yet)
+    if (targetTime >= history[history.length - 1].timestamp) {
+      const newest = history[history.length - 1];
+      return { x: newest.x, y: newest.y, rotation: newest.rotation, vx: newest.velocity_x, vy: newest.velocity_y };
+    }
+
+    // If target time is before oldest snapshot, use oldest
+    if (targetTime <= history[0].timestamp) {
+      const oldest = history[0];
+      return { x: oldest.x, y: oldest.y, rotation: oldest.rotation, vx: oldest.velocity_x, vy: oldest.velocity_y };
+    }
+
+    // Find bracketing snapshots
+    let p1 = history[0];
+    let p2 = history[1];
+
+    for (let i = 0; i < history.length - 1; i++) {
+      if (history[i].timestamp <= targetTime && history[i + 1].timestamp >= targetTime) {
+        p1 = history[i];
+        p2 = history[i + 1];
+        break;
+      }
+    }
+
+    // Calculate interpolation factor (0 to 1)
+    const totalDuration = p2.timestamp - p1.timestamp;
+    const t = totalDuration > 0 ? (targetTime - p1.timestamp) / totalDuration : 0;
+
+    // Linear interpolation for position
+    const x = p1.x + (p2.x - p1.x) * t;
+    const y = p1.y + (p2.y - p1.y) * t;
+
+    // Linear interpolation for velocity (smoother animation transitions)
+    const vx = p1.velocity_x + (p2.velocity_x - p1.velocity_x) * t;
+    const vy = p1.velocity_y + (p2.velocity_y - p1.velocity_y) * t;
+
+    // Shortest path interpolation for rotation
+    const rotation = this.interpolateRotation(p1.rotation, p2.rotation, t);
+
+    return { x, y, rotation, vx, vy };
+  }
+
+  /**
+   * Interpolate rotation finding the shortest path
+   * @param {number} start - Start angle in radians
+   * @param {number} end - End angle in radians
+   * @param {number} t - Interpolation factor (0-1)
+   * @returns {number} Interpolated angle in radians
+   */
+  interpolateRotation(start, end, t) {
+    const TWO_PI = Math.PI * 2;
+
+    // Normalize angles to 0-2PI
+    let normStart = start % TWO_PI;
+    if (normStart < 0) normStart += TWO_PI;
+
+    let normEnd = end % TWO_PI;
+    if (normEnd < 0) normEnd += TWO_PI;
+
+    // Calculate difference
+    let diff = normEnd - normStart;
+
+    // Adjust for shortest path
+    if (diff > Math.PI) {
+      diff -= TWO_PI;
+    } else if (diff < -Math.PI) {
+      diff += TWO_PI;
+    }
+
+    // Interpolate
+    let result = normStart + diff * t;
+
+    // Normalize result
+    result = result % TWO_PI;
+    if (result < 0) result += TWO_PI;
+
+    return result;
   }
 }

@@ -29,7 +29,10 @@ describe('Animation Integration', () => {
     await page.click('#host-game-btn');
     await page.waitForSelector('#start-game-btn:not(.hidden)', { timeout: 10000 });
     await page.click('#start-game-btn');
-    await page.waitForSelector('#game-canvas:not(.hidden)', { timeout: 10000 });
+    await page.waitForSelector('#game-screen.active', { visible: true, timeout: 15000 });
+    await page.waitForSelector('#game-canvas', { visible: true, timeout: 5000 });
+    // Focus canvas
+    await page.evaluate(() => document.getElementById('game-canvas').focus());
   }, 60000);
 
   afterAll(async () => {
@@ -86,7 +89,7 @@ describe('Animation Integration', () => {
   describe('Animation Rendering', () => {
     test('WhenPlayerMoves_ShouldDisplayWalkingAnimation', async () => {
       // Simulate player movement by sending keyboard events
-      await page.keyboard.down('ArrowRight');
+      await page.keyboard.down('KeyD');
 
       // Wait for the animation frame to advance, indicating movement
       await page.waitForFunction(() => {
@@ -106,7 +109,7 @@ describe('Animation Integration', () => {
         };
       });
 
-      await page.keyboard.up('ArrowRight');
+      await page.keyboard.up('KeyD');
 
       expect(debugInfo.hasPlayer).toBe(true);
       expect(debugInfo.velocityX).not.toBe(0); // Velocity should be set
@@ -115,8 +118,8 @@ describe('Animation Integration', () => {
 
     test('WhenPlayerStops_ShouldDisplayIdleFrame', async () => {
       // Move player
-      await page.keyboard.down('ArrowRight');
-      await page.keyboard.up('ArrowRight');
+      await page.keyboard.down('KeyD');
+      await page.keyboard.up('KeyD');
 
       // Wait for the player's velocity to be zero and animation to return to idle
       await page.waitForFunction(() => {
@@ -134,7 +137,7 @@ describe('Animation Integration', () => {
 
     test('WhenPlayerChangesDirection_ShouldUpdateAnimationDirection', async () => {
       // Move right (should be East direction = 2)
-      await page.keyboard.down('ArrowRight');
+      await page.keyboard.down('KeyD');
       await new Promise(resolve => setTimeout(resolve, 300));
 
       const eastDirection = await page.evaluate(() => {
@@ -144,10 +147,10 @@ describe('Animation Integration', () => {
         return null;
       });
 
-      await page.keyboard.up('ArrowRight');
+      await page.keyboard.up('KeyD');
 
       // Move down (should be South direction = 0)
-      await page.keyboard.down('ArrowDown');
+      await page.keyboard.down('KeyS');
       await new Promise(resolve => setTimeout(resolve, 300));
 
       const southDirection = await page.evaluate(() => {
@@ -157,7 +160,7 @@ describe('Animation Integration', () => {
         return null;
       });
 
-      await page.keyboard.up('ArrowDown');
+      await page.keyboard.up('KeyS');
 
       // Directions should be different
       expect(eastDirection).not.toBe(southDirection);

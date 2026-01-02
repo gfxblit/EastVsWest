@@ -187,6 +187,7 @@ export const CONFIG = {
   NETWORK: {
     GAME_SIMULATION_INTERVAL_MS: 50, // interval between position updates (20 Hz = 50ms)
     INTERPOLATION_DELAY_MS: 100,
+    INTERPOLATION_BUFFER_SIZE: 3,
   },
 
   // Asset Settings
