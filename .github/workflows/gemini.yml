@@ -133,8 +133,10 @@ jobs:
             --body "${MESSAGE}" \
             --repo "${REPOSITORY}"
 
-      - name: Run Gemini CLI
+      - name: Run Gemini CLI (gemini-3-flash-preview)
         uses: google-github-actions/run-gemini-cli@v0.1.18
+        id: gemini_3_flash
+        continue-on-error: true
         env:
           SUPABASE_URL: ${{ env.SUPABASE_URL }}
           SUPABASE_ANON_KEY: ${{ env.SUPABASE_ANON_KEY }}
@@ -149,3 +151,70 @@ jobs:
           upload_artifacts: '${{ vars.UPLOAD_ARTIFACTS }}'
           workflow_name: 'gemini-cli'
           prompt: ${{ steps.extract_prompt.outputs.prompt }}
+
+      - name: Run Gemini CLI (gemini-2.5-pro)
+        if: steps.gemini_3_flash.outcome != 'success'
+        uses: google-github-actions/run-gemini-cli@v0.1.18
+        id: gemini_2_5_pro
+        continue-on-error: true
+        env:
+          SUPABASE_URL: ${{ env.SUPABASE_URL }}
+          SUPABASE_ANON_KEY: ${{ env.SUPABASE_ANON_KEY }}
+          VITE_SUPABASE_URL: ${{ env.VITE_SUPABASE_URL }}
+          VITE_SUPABASE_ANON_KEY: ${{ env.VITE_SUPABASE_ANON_KEY }}
+          GITHUB_TOKEN: ${{ steps.mint_identity_token.outputs.token || secrets.GITHUB_TOKEN || github.token }}
+        with:
+          gemini_api_key: ${{ secrets.GEMINI_API_KEY }}
+          gemini_model: 'gemini-2.5-pro'
+          gemini_cli_version: '${{ vars.GEMINI_CLI_VERSION }}'
+          gemini_debug: true
+          upload_artifacts: '${{ vars.UPLOAD_ARTIFACTS }}'
+          workflow_name: 'gemini-cli'
+          prompt: ${{ steps.extract_prompt.outputs.prompt }}
+
+      - name: Run Gemini CLI (gemini-2.5-flash)
+        if: steps.gemini_3_flash.outcome != 'success' && steps.gemini_2_5_pro.outcome != 'success'
+        uses: google-github-actions/run-gemini-cli@v0.1.18
+        id: gemini_2_5_flash
+        env:
+          SUPABASE_URL: ${{ env.SUPABASE_URL }}
+          SUPABASE_ANON_KEY: ${{ env.SUPABASE_ANON_KEY }}
+          VITE_SUPABASE_URL: ${{ env.VITE_SUPABASE_URL }}
+          VITE_SUPABASE_ANON_KEY: ${{ env.VITE_SUPABASE_ANON_KEY }}
+          GITHUB_TOKEN: ${{ steps.mint_identity_token.outputs.token || secrets.GITHUB_TOKEN || github.token }}
+        with:
+          gemini_api_key: ${{ secrets.GEMINI_API_KEY }}
+          gemini_model: 'gemini-2.5-flash'
+          gemini_cli_version: '${{ vars.GEMINI_CLI_VERSION }}'
+          gemini_debug: true
+          upload_artifacts: '${{ vars.UPLOAD_ARTIFACTS }}'
+          workflow_name: 'gemini-cli'
+          prompt: ${{ steps.extract_prompt.outputs.prompt }}
+
+      - name: Expose Gemini Error Reports
+        if: failure()
+        run: |
+          echo "Checking for Gemini error reports in /tmp..."
+          REPORTS=$(find /tmp -name "gemini-client-error-*.json" 2>/dev/null || true)
+          if [ -n "$REPORTS" ]; then
+            for report in $REPORTS; do
+              echo "::group::Error Report: $report"
+              cat "$report"
+              echo "::endgroup::"
+            done
+          else
+            echo "No Gemini error reports found in /tmp."
+          fi
+
+      - name: Post failure comment
+        if: failure()
+        env:
+          GITHUB_TOKEN: ${{ steps.mint_identity_token.outputs.token || secrets.GITHUB_TOKEN || github.token }}
+          ISSUE_NUMBER: ${{ github.event.pull_request.number || github.event.issue.number || github.event.number }}
+          MESSAGE: |-
+            🤖 I'm sorry @${{ github.actor }}, but I was unable to process your request. Please [see the logs](${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}) for more details.
+          REPOSITORY: ${{ github.repository }}
+        run: |-
+          gh issue comment "${ISSUE_NUMBER}" \
+            --body "${MESSAGE}" \
+            --repo "${REPOSITORY}"
