@@ -101,6 +101,38 @@ jobs:
             echo "::warning::GEMINI_SETTINGS_JSON or GEMINI_OAUTH_CREDS_JSON secrets are missing. Falling back to API key configuration."
           fi
 
+      - name: Extract prompt
+        id: extract_prompt
+        uses: actions/github-script@v7
+        with:
+          script: |
+            const eventName = context.eventName;
+            let prompt = '';
+            
+            if (eventName === 'issue_comment' || eventName === 'pull_request_review_comment') {
+              prompt = context.payload.comment.body;
+            } else if (eventName === 'issues') {
+              prompt = context.payload.issue.body || context.payload.issue.title;
+            } else if (eventName === 'pull_request_review') {
+              prompt = context.payload.review.body;
+            }
+            
+            // Remove the @gemini-cli mention to get the clean instruction
+            const cleanPrompt = prompt.replace(/@gemini-cli/g, '').trim();
+            core.setOutput('prompt', cleanPrompt);
+
+      - name: Acknowledge request
+        env:
+          GITHUB_TOKEN: ${{ steps.mint_identity_token.outputs.token || secrets.GITHUB_TOKEN || github.token }}
+          ISSUE_NUMBER: ${{ github.event.pull_request.number || github.event.issue.number || github.event.number }}
+          MESSAGE: |-
+            🤖 Hi @${{ github.actor }}, I've received your request and I'm on it! You can track my progress [in the logs](${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}).
+          REPOSITORY: ${{ github.repository }}
+        run: |-
+          gh issue comment "${ISSUE_NUMBER}" \
+            --body "${MESSAGE}" \
+            --repo "${REPOSITORY}"
+
       - name: Run Gemini CLI
         uses: google-github-actions/run-gemini-cli@v0.1.18
         env:
@@ -116,3 +148,4 @@ jobs:
           gemini_debug: true
           upload_artifacts: '${{ vars.UPLOAD_ARTIFACTS }}'
           workflow_name: 'gemini-cli'
+          prompt: ${{ steps.extract_prompt.outputs.prompt }}
