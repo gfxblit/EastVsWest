@@ -1313,12 +1313,12 @@ describe('Renderer', () => {
           positionHistory: createHistory(),
         };
         
-        // Target 1100 -> Pass 1200
-        const result = renderer.interpolatePosition(player, 1200);
+        // Target 1200 (the newest snapshot) -> Pass 1300 (1200 + 100 delay)
+        const result = renderer.interpolatePosition(player, 1300);
         
-        expect(result.x).toBe(100);
-        expect(result.y).toBe(100);
-        expect(result.rotation).toBe(1.0);
+        expect(result.x).toBe(200);
+        expect(result.y).toBe(200);
+        expect(result.rotation).toBe(2.0);
       });
 
       test('WhenRenderTimeIsBeforeHistory_ShouldUseOldest', () => {
@@ -1357,6 +1357,55 @@ describe('Renderer', () => {
         
         expect(result.x).toBe(999);
         expect(result.y).toBe(888);
+      });
+    });
+
+    describe('Movement Simulation', () => {
+      test('ShouldSmoothlyInterpolateMovementOverTimeline', () => {
+        // This test simulates a sequence of network updates at 20Hz (50ms)
+        // and verifies that rendering at 60Hz (approx) returns correct intermediate positions.
+        
+        const player = {
+          position_x: 0,
+          positionHistory: []
+        };
+
+        const addSnapshot = (t, x) => {
+          player.positionHistory.push({ x, y: 0, rotation: 0, timestamp: t });
+          if (player.positionHistory.length > CONFIG.NETWORK.INTERPOLATION_BUFFER_SIZE) {
+            player.positionHistory.shift();
+          }
+        };
+
+        // 1. Feed initial history
+        // t=1000: x=0
+        // t=1050: x=5
+        // t=1100: x=10
+        addSnapshot(1000, 0);
+        addSnapshot(1050, 5);
+        addSnapshot(1100, 10);
+
+        // 2. Check Rendering
+        // Delay is 100ms.
+        
+        // Render at 1100 -> Target 1000 -> x=0
+        expect(renderer.interpolatePosition(player, 1100).x).toBeCloseTo(0);
+
+        // Render at 1125 -> Target 1025 (halfway between 1000 and 1050) -> x=2.5
+        expect(renderer.interpolatePosition(player, 1125).x).toBeCloseTo(2.5);
+
+        // Render at 1150 -> Target 1050 -> x=5
+        expect(renderer.interpolatePosition(player, 1150).x).toBeCloseTo(5);
+
+        // 3. New update arrives
+        // t=1150: x=15. History becomes [1050, 1100, 1150]
+        addSnapshot(1150, 15);
+
+        // Render at 1175 -> Target 1075 (halfway between 1050 and 1100) -> x=7.5
+        expect(renderer.interpolatePosition(player, 1175).x).toBeCloseTo(7.5);
+
+        // Render at 1200 -> Target 1100 -> x=10
+        expect(renderer.interpolatePosition(player, 1200).x).toBeCloseTo(10);
       });
     });
   });
