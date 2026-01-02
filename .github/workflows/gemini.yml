@@ -35,7 +35,7 @@ jobs:
         contains(fromJSON('["OWNER", "MEMBER", "COLLABORATOR"]'), github.event.comment.author_association)
       )
     runs-on: 'ubuntu-latest'
-    timeout-minutes: 15
+    timeout-minutes: 7
     permissions:
       contents: 'read'
       id-token: 'write'
