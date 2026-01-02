@@ -4,6 +4,7 @@ on:
   pull_request:
     types:
       - 'opened'
+      - 'synchronize'
   pull_request_review_comment:
     types:
       - 'created'
