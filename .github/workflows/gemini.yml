@@ -118,6 +118,7 @@ jobs:
           gemini_debug: true
           upload_artifacts: '${{ vars.UPLOAD_ARTIFACTS }}'
           workflow_name: 'gemini-review'
+          prompt: '/gemini-review'
           settings: |-
             {
               "model": {
@@ -180,6 +181,7 @@ jobs:
           gemini_debug: true
           upload_artifacts: '${{ vars.UPLOAD_ARTIFACTS }}'
           workflow_name: 'gemini-review'
+          prompt: '/gemini-review'
           settings: |-
             {
               "model": {
@@ -241,6 +243,7 @@ jobs:
           gemini_debug: true
           upload_artifacts: '${{ vars.UPLOAD_ARTIFACTS }}'
           workflow_name: 'gemini-review'
+          prompt: '/gemini-review'
           settings: |-
             {
               "model": {
