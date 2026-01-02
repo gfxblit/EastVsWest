@@ -2,7 +2,7 @@
  * Game Configuration
  * Based on the game design for Conflict Zone: East vs West
  * 
- * NOTE: This is a SECOND test comment for the Gemini PR reviewer workflow.
+ * NOTE: This is a THIRD test comment for the Gemini PR reviewer workflow.
  */
 
 export const CONFIG = {
