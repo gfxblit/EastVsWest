@@ -35,7 +35,7 @@ jobs:
         contains(fromJSON('["OWNER", "MEMBER", "COLLABORATOR"]'), github.event.comment.author_association)
       )
     runs-on: 'ubuntu-latest'
-    timeout-minutes: 7
+    timeout-minutes: 15
     permissions:
       contents: 'read'
       id-token: 'write'
@@ -155,6 +155,7 @@ jobs:
                 "core": [
                   "run_shell_command(cat)",
                   "run_shell_command(echo)",
+                  "run_shell_command(env)",
                   "run_shell_command(gh)",
                   "run_shell_command(git)",
                   "run_shell_command(grep)",
@@ -221,6 +222,7 @@ jobs:
                 "core": [
                   "run_shell_command(cat)",
                   "run_shell_command(echo)",
+                  "run_shell_command(env)",
                   "run_shell_command(gh)",
                   "run_shell_command(git)",
                   "run_shell_command(grep)",
@@ -286,6 +288,7 @@ jobs:
                 "core": [
                   "run_shell_command(cat)",
                   "run_shell_command(echo)",
+                  "run_shell_command(env)",
                   "run_shell_command(gh)",
                   "run_shell_command(git)",
                   "run_shell_command(grep)",
