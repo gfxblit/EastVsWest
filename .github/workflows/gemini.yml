@@ -107,9 +107,9 @@ jobs:
 
           ## Input Data
 
-          - **GitHub Repository**: ${{ env.REPOSITORY }}
-          - **Pull Request Number**: ${{ env.PULL_REQUEST_NUMBER }}
-          - **Additional User Instructions**: ${{ env.ADDITIONAL_CONTEXT }}
+          - **GitHub Repository**: ${{ github.repository }}
+          - **Pull Request Number**: ${{ github.event.pull_request.number || github.event.issue.number }}
+          - **Additional User Instructions**: ${{ steps.extract_command.outputs.additional_context }}
           - Use `pull_request_read.get` to get the title, body, and metadata about the pull request.
           - Use `pull_request_read.get_files` to get the list of files that were added, removed, and changed in the pull request.
           - Use `pull_request_read.get_diff` to get the diff from the pull request. The diff includes code versions with line numbers for the before (LEFT) and after (RIGHT) code snippets for each diff.
@@ -285,9 +285,6 @@ jobs:
           GITHUB_TOKEN: '${{ steps.mint_identity_token.outputs.token || secrets.GITHUB_TOKEN || github.token }}'
           ISSUE_TITLE: '${{ github.event.pull_request.title || github.event.issue.title }}'
           ISSUE_BODY: '${{ github.event.pull_request.body || github.event.issue.body }}'
-          REPOSITORY: '${{ github.repository }}'
-          PULL_REQUEST_NUMBER: '${{ github.event.pull_request.number || github.event.issue.number }}'
-          ADDITIONAL_CONTEXT: '${{ steps.extract_command.outputs.additional_context }}'
         with:
           gemini_api_key: ${{ secrets.GEMINI_API_KEY }}
           gemini_model: 'gemini-3-flash-preview'
@@ -352,9 +349,6 @@ jobs:
           GITHUB_TOKEN: '${{ steps.mint_identity_token.outputs.token || secrets.GITHUB_TOKEN || github.token }}'
           ISSUE_TITLE: '${{ github.event.pull_request.title || github.event.issue.title }}'
           ISSUE_BODY: '${{ github.event.pull_request.body || github.event.issue.body }}'
-          REPOSITORY: '${{ github.repository }}'
-          PULL_REQUEST_NUMBER: '${{ github.event.pull_request.number || github.event.issue.number }}'
-          ADDITIONAL_CONTEXT: '${{ steps.extract_command.outputs.additional_context }}'
         with:
           gemini_api_key: ${{ secrets.GEMINI_API_KEY }}
           gemini_model: 'gemini-2.5-pro'
@@ -418,9 +412,6 @@ jobs:
           GITHUB_TOKEN: '${{ steps.mint_identity_token.outputs.token || secrets.GITHUB_TOKEN || github.token }}'
           ISSUE_TITLE: '${{ github.event.pull_request.title || github.event.issue.title }}'
           ISSUE_BODY: '${{ github.event.pull_request.body || github.event.issue.body }}'
-          REPOSITORY: '${{ github.repository }}'
-          PULL_REQUEST_NUMBER: '${{ github.event.pull_request.number || github.event.issue.number }}'
-          ADDITIONAL_CONTEXT: '${{ steps.extract_command.outputs.additional_context }}'
         with:
           gemini_api_key: ${{ secrets.GEMINI_API_KEY }}
           gemini_model: 'gemini-2.5-flash'
