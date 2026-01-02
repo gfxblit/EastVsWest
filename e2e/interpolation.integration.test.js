@@ -71,8 +71,10 @@ describe('Client Interpolation Integration (Real Network)', () => {
     // 3. Setup Snapshot on Player side
     playerSnapshot = new SessionPlayersSnapshot(playerNetwork, session.id);
     await playerSnapshot.ready();
+    // Give more time for Realtime channel to stabilize
+    await new Promise(resolve => setTimeout(resolve, 1000));
 
-    // 4. Simulate Host Movement (3 updates, 50ms apart)
+    // 4. Simulate Host Movement (3 updates, 100ms apart for stability)
     const sendUpdate = async (x) => {
       hostNetwork.broadcastPlayerStateUpdate({
         player_id: hostUser.id,
@@ -82,7 +84,7 @@ describe('Client Interpolation Integration (Real Network)', () => {
         velocity_x: 100,
         velocity_y: 0
       });
-      await new Promise(resolve => setTimeout(resolve, 50));
+      await new Promise(resolve => setTimeout(resolve, 100));
     };
 
     await sendUpdate(0);   // Snapshot 1
@@ -93,7 +95,7 @@ describe('Client Interpolation Integration (Real Network)', () => {
     await waitFor(() => {
       const p = playerSnapshot.getPlayers().get(hostUser.id);
       return p && p.positionHistory && p.positionHistory.length >= 3;
-    }, 5000);
+    }, 10000);
 
     const playerViewOfHost = playerSnapshot.getPlayers().get(hostUser.id);
     const history = playerViewOfHost.positionHistory;
