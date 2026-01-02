@@ -300,6 +300,7 @@ jobs:
           settings: |-
             {
               "model": {
+                "name": "auto",
                 "maxSessionTurns": 25
               },
               "telemetry": {
