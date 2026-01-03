@@ -166,6 +166,9 @@ jobs:
             const cleanPrompt = prompt.replace(/@gemini-cli/g, '').trim();
             core.setOutput('prompt', cleanPrompt);
             core.setOutput('discussion_context', discussionContext);
+            if (eventName === 'issue_comment' || eventName === 'pull_request_review_comment') {
+              core.setOutput('trigger_comment_id', payload.comment.id);
+            }
 
       - name: Acknowledge request
         id: acknowledge
@@ -214,14 +217,18 @@ jobs:
 
           <issue_number>${{ github.event.issue.number || github.event.pull_request.number }}</issue_number>
           <gemini_comment_id>${{ steps.acknowledge.outputs.comment_id }}</gemini_comment_id>
+          <trigger_comment_id>${{ steps.extract_prompt.outputs.trigger_comment_id }}</trigger_comment_id>
           <trigger_username>${{ github.actor }}</trigger_username>
           <trigger_display_name>${{ github.actor }}</trigger_display_name>
           <trigger_phrase>@gemini-cli</trigger_phrase>
 
           <comment_tool_info>
-          IMPORTANT: You can use the `gh` CLI tool via `run_shell_command` to update your comment.
-          Example of updating a comment body using `gh`:
+          IMPORTANT: You can use the `gh` CLI tool via `run_shell_command` to update your comment or respond to inline comments.
+          Example of updating your progress comment body using `gh`:
           gh api -X PATCH /repos/${{ github.repository }}/issues/comments/${{ steps.acknowledge.outputs.comment_id }} -f body="Your updated comment text here"
+
+          Example of responding to an inline comment thread in a PR (using the trigger_comment_id):
+          gh api -X POST /repos/${{ github.repository }}/pulls/${{ github.event.pull_request.number }}/comments -f body="Your reply here" -f in_reply_to=${{ steps.extract_prompt.outputs.trigger_comment_id }}
           </comment_tool_info>
 
           Your task is to analyze the context, understand the request, and provide helpful responses and/or implement code changes as needed.
@@ -229,7 +236,8 @@ jobs:
           IMPORTANT CLARIFICATIONS:
           - When asked to "review" code, read the code and provide review feedback (do not implement changes unless explicitly asked)
           - Your console outputs and tool results are NOT visible to the user
-          - ALL communication happens through your GitHub comment - that's how users see your feedback, answers, and progress. Your normal responses are not seen.
+          - PRIMARY communication happens through your main GitHub comment (id: ${{ steps.acknowledge.outputs.comment_id }}).
+          - CRITICAL: If you were triggered by an inline PR review comment (event_type: pull_request_review_comment), you MUST also post a reply to that specific comment thread with the results of your action (e.g., "I've implemented the changes you requested.") using the `gh api` command provided above.
 
           Follow these steps:
 
@@ -333,7 +341,8 @@ jobs:
           When users ask you to do something, be aware of what you can and cannot do. This section helps you understand how to respond when users request actions outside your scope.
 
           What You CAN Do:
-          - Respond in a single comment (by updating your initial comment with progress and results)
+          - Respond in a single main comment (by updating your initial comment with progress and results)
+          - Post replies to inline PR review comments when triggered by them.
           - Answer questions about code and provide explanations
           - Perform code reviews and provide detailed feedback (without implementing unless asked)
           - Implement code changes (simple to moderate complexity) when explicitly requested
@@ -346,7 +355,7 @@ jobs:
           What You CANNOT Do:
           - Submit formal GitHub PR reviews
           - Approve pull requests (for security reasons)
-          - Post multiple comments (you only update your initial comment)
+          - Post multiple *main* comments (you only update your initial progress comment)
           - Execute commands outside the repository context
           - Perform branch operations (cannot merge branches, rebase, or perform other git operations beyond creating and pushing commits)
           - Modify files in the .github/workflows directory (GitHub App permissions do not allow workflow modifications)
