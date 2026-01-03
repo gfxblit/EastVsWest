@@ -83,7 +83,7 @@ describe('CONFIG', () => {
 
     test('WhenCheckingAnimationConfig_ShouldHaveFramesPerDirection', () => {
       expect(CONFIG.ANIMATION).toBeDefined();
-      expect(CONFIG.ANIMATION.FRAMES_PER_DIRECTION).toBe(6);
+      expect(CONFIG.ANIMATION.FRAMES_PER_DIRECTION).toBe(4);
     });
 
     test('WhenCheckingAssetConfig_ShouldHaveSpriteSheetPath', () => {
