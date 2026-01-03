@@ -19,7 +19,7 @@ describe('Combat Integration', () => {
   let testSessionId;
 
   if (!supabaseUrl || !supabaseAnonKey) {
-    test.only('Supabase environment variables not set, skipping integration tests', () => {
+    test('Supabase environment variables not set, skipping integration tests', () => {
       expect(true).toBe(true);
     });
     return;
