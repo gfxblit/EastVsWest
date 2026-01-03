@@ -25,6 +25,7 @@ export class Game {
     this.lastPositionSendTime = 0;
     this.lastSentState = null;
     this.healthUpdateAccumulator = 0;
+    this.playerCooldowns = new Map(); // Track cooldowns independently of snapshot
   }
 
   init(playersSnapshot = null, network = null) {
@@ -41,6 +42,9 @@ export class Game {
       if (network.isHost) {
         network.on('attack_request', (msg) => this.handleAttackRequest(msg));
       }
+
+      // Listen for attack requests to trigger animations on remote players
+      network.on('attack_request', (msg) => this.handleAttackAnimation(msg));
 
       if (localPlayerData) {
         this.localPlayer = {
@@ -249,6 +253,28 @@ export class Game {
     this.healthUpdateAccumulator = 0;
   }
 
+  handleAttackAnimation(message) {
+    if (!this.playersSnapshot) return;
+    const attackerId = message.from;
+    
+    // Skip local player (already handled in handleInput)
+    if (this.localPlayer && attackerId === this.localPlayer.id) return;
+
+    const players = this.playersSnapshot.getPlayers();
+    const attacker = players.get(attackerId);
+    
+    if (attacker) {
+      attacker.is_attacking = true;
+      // Reset after animation time
+      setTimeout(() => {
+        // Check if player still exists
+        if (players.get(attackerId) === attacker) {
+          attacker.is_attacking = false;
+        }
+      }, CONFIG.COMBAT.ATTACK_ANIMATION_DURATION_SECONDS * 1000);
+    }
+  }
+
   /** @authority HOST */
   handleAttackRequest(message) {
     if (!this.network?.isHost || !this.playersSnapshot) return;
@@ -264,13 +290,19 @@ export class Game {
     const now = Date.now();
     const weaponConfig = Object.values(CONFIG.WEAPONS).find(w => w.id === weapon_id) || CONFIG.WEAPONS.FIST;
     const cooldown = is_special ? CONFIG.COMBAT.SPECIAL_ABILITY_COOLDOWN_MS : (1000 / weaponConfig.attackSpeed);
+    
+    // Use independent cooldown tracking
+    if (!this.playerCooldowns.has(attackerId)) {
+      this.playerCooldowns.set(attackerId, { lastAttackTime: 0, lastSpecialTime: 0 });
+    }
+    const cooldowns = this.playerCooldowns.get(attackerId);
     const lastTimeKey = is_special ? 'lastSpecialTime' : 'lastAttackTime';
-    const lastTime = attacker[lastTimeKey] || 0;
+    const lastTime = cooldowns[lastTimeKey] || 0;
 
     if (now - lastTime < cooldown - 50) { // 50ms buffer for network jitter
       return;
     }
-    attacker[lastTimeKey] = now;
+    cooldowns[lastTimeKey] = now;
 
     const aimAngle = Math.atan2(aim_y - attacker.position_y, aim_x - attacker.position_x);
     const arc = this.calculateAttackArc(weaponConfig, is_special);
@@ -294,24 +326,10 @@ export class Game {
     }
 
     if (updates.length > 0) {
-      // Also mark attacker as attacking in the broadcast
-      updates.push({
-        player_id: attackerId,
-        is_attacking: true
-      });
       this.network.broadcastPlayerStateUpdate(updates);
-
-      // Reset is_attacking after a short delay
-      setTimeout(() => {
-        this.network.broadcastPlayerStateUpdate([{
-          player_id: attackerId,
-          is_attacking: false
-        }]);
-      }, 200);
     }
   }
 
-  /** @authority HOST */
   calculateAttackArc(weaponConfig, isSpecial) {
     if (isSpecial && (weaponConfig.id === 'greataxe' || weaponConfig.id === 'battleaxe')) {
       return CONFIG.COMBAT.DEFAULT_SPIN_ARC;
@@ -322,7 +340,6 @@ export class Game {
     return CONFIG.COMBAT.DEFAULT_THRUST_ARC;
   }
 
-  /** @authority HOST */
   isTargetInAttackArc(attacker, victim, aimAngle, arc, range) {
     const dx = victim.position_x - attacker.position_x;
     const dy = victim.position_y - attacker.position_y;
@@ -341,7 +358,6 @@ export class Game {
     return angleDiff <= arc / 2;
   }
 
-  /** @authority HOST */
   calculateDamage(attacker, victim, weaponConfig, isSpecial) {
     let damage = weaponConfig.baseDamage;
     if (isSpecial) damage *= CONFIG.COMBAT.SPECIAL_DAMAGE_MULTIPLIER;
@@ -471,7 +487,7 @@ export class Game {
 
         // Set local animation state
         this.localPlayer.isAttacking = true;
-        this.localPlayer.attackAnimTime = 0.2; // 200ms animation
+        this.localPlayer.attackAnimTime = CONFIG.COMBAT.ATTACK_ANIMATION_DURATION_SECONDS;
 
         if (this.network) {
           this.network.send('attack_request', {

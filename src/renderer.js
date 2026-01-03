@@ -400,8 +400,15 @@ export class Renderer {
       this.ctx.save();
       this.ctx.globalAlpha = 0.5;
       this.ctx.fillStyle = '#ffffff';
+      
+      const arcWidth = 67 * (Math.PI / 180);
+      const startAngle = (player.rotation - Math.PI / 2) - (arcWidth / 2);
+      const endAngle = (player.rotation - Math.PI / 2) + (arcWidth / 2);
+
       this.ctx.beginPath();
-      this.ctx.arc(player.x, player.y, CONFIG.RENDER.PLAYER_RADIUS + 10, 0, Math.PI * 2);
+      this.ctx.moveTo(player.x, player.y);
+      this.ctx.arc(player.x, player.y, CONFIG.RENDER.PLAYER_RADIUS + 10, startAngle, endAngle);
+      this.ctx.closePath();
       this.ctx.fill();
       this.ctx.restore();
     }
