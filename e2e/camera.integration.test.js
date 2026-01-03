@@ -61,11 +61,12 @@ describe('Camera Follow System Integration', () => {
     }
     // Teleport player to center of map (1200, 800) to ensure camera can move freely
     await page.evaluate(() => {
-      if (window.game && window.game.localPlayer) {
-        window.game.localPlayer.x = 1200;
-        window.game.localPlayer.y = 800;
+      const localPlayer = window.game?.getLocalPlayer();
+      if (localPlayer) {
+        localPlayer.x = 1200;
+        localPlayer.y = 800;
         // Also reset velocity
-        window.game.localPlayer.velocity = { x: 0, y: 0 };
+        localPlayer.velocity = { x: 0, y: 0 };
         // Force camera update immediately
         if (window.camera) {
             window.camera.update(1200, 800, 1.0); // Snap to position
