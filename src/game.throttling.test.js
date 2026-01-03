@@ -21,6 +21,7 @@ describe('Game Throttling', () => {
     mockNetwork = {
       playerId: 'player-1',
       isHost: true,
+      on: jest.fn(),
       broadcastPlayerStateUpdate: jest.fn(),
     };
 
