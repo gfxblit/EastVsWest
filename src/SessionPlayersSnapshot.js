@@ -161,7 +161,14 @@ export class SessionPlayersSnapshot {
 
       case 'UPDATE':
         if (newRecord) {
-          this.players.set(newRecord.player_id, newRecord);
+          const existingPlayer = this.players.get(newRecord.player_id);
+          if (existingPlayer) {
+            // Merge new data into existing player object to preserve local state
+            // (like positionHistory, which isn't in the database)
+            Object.assign(existingPlayer, newRecord);
+          } else {
+            this.players.set(newRecord.player_id, newRecord);
+          }
         }
         break;
     }
