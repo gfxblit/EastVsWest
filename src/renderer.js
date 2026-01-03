@@ -135,6 +135,7 @@ export class Renderer {
           y: interpolated.y,
           rotation: interpolated.rotation,
           health: playerData.health,
+          isAttacking: playerData.is_attacking || false,
           animationState: animState,
         };
         this.renderPlayer(player, false);
@@ -412,6 +413,24 @@ export class Renderer {
       this.ctx.beginPath();
       this.ctx.arc(player.x, player.y, CONFIG.RENDER.PLAYER_RADIUS, 0, Math.PI * 2);
       this.ctx.stroke();
+    }
+
+    // Attack flash
+    if (player.isAttacking) {
+      this.ctx.save();
+      this.ctx.globalAlpha = 0.5;
+      this.ctx.fillStyle = '#ffffff';
+      
+      const arcWidth = 67 * (Math.PI / 180);
+      const startAngle = (player.rotation - Math.PI / 2) - (arcWidth / 2);
+      const endAngle = (player.rotation - Math.PI / 2) + (arcWidth / 2);
+
+      this.ctx.beginPath();
+      this.ctx.moveTo(player.x, player.y);
+      this.ctx.arc(player.x, player.y, CONFIG.RENDER.PLAYER_RADIUS + 10, startAngle, endAngle);
+      this.ctx.closePath();
+      this.ctx.fill();
+      this.ctx.restore();
     }
 
     // Health bar above player
