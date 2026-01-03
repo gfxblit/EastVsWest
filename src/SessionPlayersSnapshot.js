@@ -9,6 +9,8 @@
  * - Client-authoritative: position, rotation
  * - Host-authoritative: health, combat, game state
  */
+import { CONFIG } from './config.js';
+
 export class SessionPlayersSnapshot {
   constructor(network, sessionId, options = {}) {
     this.network = network;
@@ -82,10 +84,6 @@ export class SessionPlayersSnapshot {
     // Subscribe to Network's generic postgres_changes events
     this.network.on('postgres_changes', this.postgresChangesHandler);
 
-    // Subscribe to Network's movement_update events (legacy)
-    // All clients broadcast directly, no host rebroadcasting
-    this.network.on('movement_update', this.broadcastHandler);
-
     // Subscribe to Network's player_state_update events (generic)
     this.network.on('player_state_update', this.broadcastHandler);
   }
@@ -116,23 +114,8 @@ export class SessionPlayersSnapshot {
    * Handle movement_update and player_state_update events from Network
    */
   #handleBroadcast(message) {
-    if (message.type === 'movement_update') {
-      this.#handleMovementUpdate({
-        ...message.data,
-        player_id: message.from,
-      });
-    }
-    // Handle movement_broadcast (batched updates from host)
-    else if (message.type === 'movement_broadcast') {
-      const { updates } = message.data;
-      if (updates && Array.isArray(updates)) {
-        updates.forEach(update => {
-          this.#handleMovementUpdate(update);
-        });
-      }
-    }
     // Handle generic player_state_update (single or batch)
-    else if (message.type === 'player_state_update') {
+    if (message.type === 'player_state_update') {
       const data = message.data;
       const senderId = message.from;
       // Handle batched updates
@@ -184,58 +167,6 @@ export class SessionPlayersSnapshot {
   }
 
   /**
-   * Handle movement update broadcasts
-   * Uses flattened format: { player_id, position_x, position_y, rotation, velocity_x, velocity_y, health }
-   */
-  #handleMovementUpdate(payload) {
-    const player_id = payload.player_id || payload.from;
-    const player = this.players.get(player_id);
-
-    // Only update if player exists in this session
-    if (!player) {
-      return;
-    }
-
-    // Handle flattened position format (preferred)
-    if (payload.position_x !== undefined) {
-      player.position_x = payload.position_x;
-    }
-    if (payload.position_y !== undefined) {
-      player.position_y = payload.position_y;
-    }
-
-    // Handle legacy nested position format
-    if (payload.position) {
-      if (payload.position.x !== undefined) player.position_x = payload.position.x;
-      if (payload.position.y !== undefined) player.position_y = payload.position.y;
-    }
-
-    // Handle flattened velocity format (preferred)
-    if (payload.velocity_x !== undefined) {
-      player.velocity_x = payload.velocity_x;
-    }
-    if (payload.velocity_y !== undefined) {
-      player.velocity_y = payload.velocity_y;
-    }
-
-    // Handle legacy nested velocity format
-    if (payload.velocity) {
-      if (payload.velocity.x !== undefined) player.velocity_x = payload.velocity.x;
-      if (payload.velocity.y !== undefined) player.velocity_y = payload.velocity.y;
-    }
-
-    // Update rotation
-    if (payload.rotation !== undefined) {
-      player.rotation = payload.rotation;
-    }
-
-    // Update health (in-memory only)
-    if (payload.health !== undefined) {
-      player.health = payload.health;
-    }
-  }
-
-  /**
    * Handle generic player state update broadcasts
    * Supports any combination of client-auth and host-auth fields
    * Enforces authorization: clients can only update their own client-auth fields,
@@ -270,6 +201,44 @@ export class SessionPlayersSnapshot {
       if (payload.health !== undefined) player.health = payload.health;
       if (payload.equipped_weapon !== undefined) player.equipped_weapon = payload.equipped_weapon;
       if (payload.equipped_armor !== undefined) player.equipped_armor = payload.equipped_armor;
+    }
+
+    // Update position history for interpolation
+    this.#updatePositionHistory(player, {
+      position_x: payload.position_x !== undefined ? payload.position_x : player.position_x,
+      position_y: payload.position_y !== undefined ? payload.position_y : player.position_y,
+      rotation: payload.rotation !== undefined ? payload.rotation : player.rotation,
+      velocity_x: payload.velocity_x !== undefined ? payload.velocity_x : player.velocity_x,
+      velocity_y: payload.velocity_y !== undefined ? payload.velocity_y : player.velocity_y,
+    });
+  }
+
+  /**
+   * Update the position history buffer for a player
+   * Used for client-side interpolation
+   * @param {Object} player - The player object to update
+   * @param {Object} data - The update data containing position/rotation/velocity
+   */
+  #updatePositionHistory(player, data) {
+    if (!player.positionHistory) {
+      player.positionHistory = [];
+    }
+
+    const timestamp = performance.now();
+    const snapshot = {
+      x: data.position_x,
+      y: data.position_y,
+      rotation: data.rotation,
+      velocity_x: data.velocity_x,
+      velocity_y: data.velocity_y,
+      timestamp: timestamp
+    };
+
+    player.positionHistory.push(snapshot);
+
+    // Keep only the last N snapshots
+    if (player.positionHistory.length > CONFIG.NETWORK.INTERPOLATION_BUFFER_SIZE) {
+      player.positionHistory.shift();
     }
   }
 
@@ -330,7 +299,6 @@ export class SessionPlayersSnapshot {
     // Unsubscribe from Network events
     if (this.network) {
       this.network.off('postgres_changes', this.postgresChangesHandler);
-      this.network.off('movement_update', this.broadcastHandler);
       this.network.off('player_state_update', this.broadcastHandler);
     }
   }

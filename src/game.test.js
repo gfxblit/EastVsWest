@@ -399,11 +399,10 @@ describe('Game', () => {
         ])),
       };
 
-      mockNetwork = {
-        playerId: 'player-1',
-        on: jest.fn(),
-        sendMovementUpdate: jest.fn(),
-      };
+    mockNetwork = {
+      playerId: 'player-1',
+      broadcastPlayerStateUpdate: jest.fn(),
+    };
     });
 
     test('WhenInitializedWithSnapshot_ShouldLoadLocalPlayerFromSnapshot', () => {
@@ -435,8 +434,8 @@ describe('Game', () => {
       game.handleInput(inputState);
       game.update(0.1); // Update triggers position send
 
-      expect(mockNetwork.sendMovementUpdate).toHaveBeenCalled();
-      const call = mockNetwork.sendMovementUpdate.mock.calls[0][0];
+      expect(mockNetwork.broadcastPlayerStateUpdate).toHaveBeenCalled();
+      const call = mockNetwork.broadcastPlayerStateUpdate.mock.calls[0][0];
       expect(call.position_x).toBeCloseTo(CONFIG.WORLD.WIDTH / 2 + 20, 1); // center + 200 * 0.1
       expect(call.position_y).toBe(CONFIG.WORLD.HEIGHT / 2);
       expect(call.velocity_x).toBeGreaterThan(0);
@@ -453,8 +452,8 @@ describe('Game', () => {
       game.update(0.1); // Use enough time to pass throttling
 
       // Should send update because health changed (client echoes state)
-      expect(mockNetwork.sendMovementUpdate).toHaveBeenCalled();
-      const call = mockNetwork.sendMovementUpdate.mock.calls[0][0];
+      expect(mockNetwork.broadcastPlayerStateUpdate).toHaveBeenCalled();
+      const call = mockNetwork.broadcastPlayerStateUpdate.mock.calls[0][0];
       expect(call.health).toBe(90);
     });
 
@@ -467,7 +466,7 @@ describe('Game', () => {
       game.update(0.016);
 
       // Should not send position update since change is negligible
-      expect(mockNetwork.sendMovementUpdate).not.toHaveBeenCalled();
+      expect(mockNetwork.broadcastPlayerStateUpdate).not.toHaveBeenCalled();
     });
 
     test('WhenSnapshotUpdated_ShouldNotAffectLocalPlayer', () => {

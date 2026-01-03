@@ -43,7 +43,6 @@ export class Network extends EventEmitter {
     this.sessionId = null;
     this.hostId = null; // Track host ID for authorization checks
     this.channel = null;
-    this.movementWriteInterval = null; // Interval for periodic DB writes (legacy)
     this.playerStateWriteInterval = null; // Interval for generic periodic DB writes
   }
 
@@ -248,6 +247,7 @@ export class Network extends EventEmitter {
     }
   }
 
+  // FUTURE: Host-authoritative health persistence (not yet implemented)
   send(type, data) {
     if (!this.channel || !this.connected) {
       console.warn('Cannot send message, channel not connected.');
@@ -267,111 +267,6 @@ export class Network extends EventEmitter {
 
     // Emit locally since Supabase Realtime doesn't echo messages back to sender
     this.emit(type, message);
-  }
-
-  sendMovementUpdate(movementData) {
-    if (!this.channel || !this.connected) {
-      console.warn('Cannot send message, channel not connected.');
-      return;
-    }
-    const message = {
-      type: 'movement_update',
-      from: this.playerId,
-      timestamp: Date.now(),
-      data: movementData,
-    };
-
-    // Broadcast to all other clients
-    this.channel.send({
-      type: 'broadcast',
-      event: 'message',
-      payload: message,
-    });
-
-    // Emit locally since Supabase Realtime doesn't echo messages back to sender
-    this.emit('movement_update', message);
-  }
-
-  async writeMovementToDB(position_x, position_y, rotation, velocity_x, velocity_y) {
-    if (!this.supabase || !this.sessionId || !this.playerId) {
-      console.error('Cannot write movement to DB: missing supabase, sessionId, or playerId');
-      return;
-    }
-
-    const { error } = await this.supabase
-      .from('session_players')
-      .update({
-        position_x,
-        position_y,
-        velocity_x,
-        velocity_y,
-        rotation,
-      })
-      .eq('session_id', this.sessionId)
-      .eq('player_id', this.playerId);
-
-    if (error) {
-      console.error('Failed to write movement to DB:', error.message);
-    }
-  }
-
-  // FUTURE: Host-authoritative health persistence (not yet implemented)
-  // Health changes are calculated by the host (combat, zone damage, healing)
-  // and persisted via this method, NOT by clients or SessionPlayersSnapshot
-  //
-  // async writeHealthToDB(playerId, health) {
-  //   if (!this.isHost) {
-  //     console.error('Only host can write health updates to DB');
-  //     return;
-  //   }
-  //
-  //   if (!this.supabase || !this.sessionId) {
-  //     console.error('Cannot write health to DB: missing supabase or sessionId');
-  //     return;
-  //   }
-  //
-  //   const { error } = await this.supabase
-  //     .from('session_players')
-  //     .update({ health: health })
-  //     .eq('session_id', this.sessionId)
-  //     .eq('player_id', playerId);
-  //
-  //   if (error) {
-  //     console.error('Failed to write health to DB:', error.message);
-  //   }
-  // }
-
-  startPeriodicMovementWrite(positionGetter, rotationGetter, velocityGetter) {
-    if (this.movementWriteInterval) return; // Already running
-
-    const performWrite = () => {
-      const position = typeof positionGetter === 'function' ? positionGetter() : positionGetter;
-      const rotation = typeof rotationGetter === 'function' ? rotationGetter() : rotationGetter;
-      const velocity = typeof velocityGetter === 'function' ? velocityGetter() : velocityGetter;
-
-      this.writeMovementToDB(
-        position.x,
-        position.y,
-        rotation,
-        velocity.x,
-        velocity.y
-      ).catch(err => {
-        console.error('Failed to perform movement write:', err);
-      });
-    };
-
-    // Write immediately
-    performWrite();
-
-    // Then write periodically at the same rate as snapshot refresh (60 seconds)
-    this.movementWriteInterval = setInterval(performWrite, 60000); // 60 seconds
-  }
-
-  stopPeriodicMovementWrite() {
-    if (this.movementWriteInterval) {
-      clearInterval(this.movementWriteInterval);
-      this.movementWriteInterval = null;
-    }
   }
 
   /**
@@ -491,7 +386,6 @@ export class Network extends EventEmitter {
   }
 
   disconnect() {
-    this.stopPeriodicMovementWrite();
     this.stopPeriodicPlayerStateWrite();
     if (this.channel) {
       this.supabase.removeChannel(this.channel);

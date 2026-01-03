@@ -21,8 +21,6 @@ describe('Game Throttling', () => {
     mockNetwork = {
       playerId: 'player-1',
       isHost: true,
-      on: jest.fn(),
-      sendMovementUpdate: jest.fn(),
       broadcastPlayerStateUpdate: jest.fn(),
     };
 
@@ -43,10 +41,10 @@ describe('Game Throttling', () => {
       game.handleInput({ moveX: 1, moveY: 0 });
       game.update(0.016);
       
-      expect(mockNetwork.sendMovementUpdate).toHaveBeenCalledTimes(1);
+      expect(mockNetwork.broadcastPlayerStateUpdate).toHaveBeenCalledTimes(1);
       
       // Clear mock to track new calls
-      mockNetwork.sendMovementUpdate.mockClear();
+      mockNetwork.broadcastPlayerStateUpdate.mockClear();
   
       // Advance time by slightly less than the update interval
       const intervalMs = CONFIG.NETWORK.GAME_SIMULATION_INTERVAL_MS; // 50ms
@@ -57,7 +55,7 @@ describe('Game Throttling', () => {
       game.update(0.016);
       
       // Should NOT send update yet due to throttling
-      expect(mockNetwork.sendMovementUpdate).not.toHaveBeenCalled();
+      expect(mockNetwork.broadcastPlayerStateUpdate).not.toHaveBeenCalled();
       
       // Advance time to pass the interval
       jest.setSystemTime(t0 + intervalMs + 5);
@@ -67,7 +65,7 @@ describe('Game Throttling', () => {
       game.update(0.016);
       
       // Should send update now
-      expect(mockNetwork.sendMovementUpdate).toHaveBeenCalledTimes(1);
+      expect(mockNetwork.broadcastPlayerStateUpdate).toHaveBeenCalledTimes(1);
     });
   });
 

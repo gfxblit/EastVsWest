@@ -35,11 +35,17 @@ describe('Camera Follow System Integration', () => {
     // Start the game
     await page.click('#start-game-btn');
     
-    // Wait for game canvas to be visible
-    await page.waitForSelector('#game-canvas', { timeout: 10000 });
+    // Wait for game screen to be active and visible
+    await page.waitForSelector('#game-screen.active', { visible: true, timeout: 15000 });
+    await page.waitForSelector('#game-canvas', { visible: true, timeout: 5000 });
         
     // Ensure focus on canvas for input
-    await page.click('#game-canvas');
+    try {
+      await page.click('#game-canvas');
+    } catch (e) {
+      console.warn('Canvas click failed, trying focus via evaluate', e.message);
+      await page.evaluate(() => document.getElementById('game-canvas').focus());
+    }
   }, 60000);
 
   afterAll(async () => {

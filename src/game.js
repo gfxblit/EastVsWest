@@ -405,8 +405,8 @@ export class Game {
       return; // No change, don't send
     }
 
-    // Send movement update (including health and velocity) using flattened format
-    this.network.sendMovementUpdate({
+    // Send player state update (including position, rotation, velocity, and health)
+    this.network.broadcastPlayerStateUpdate({
       position_x: this.localPlayer.x,
       position_y: this.localPlayer.y,
       rotation: this.localPlayer.rotation,

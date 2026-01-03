@@ -406,22 +406,21 @@ class App {
     // Listen to resize (covers most cases including orientation change)
     window.addEventListener('resize', this.handleResize);
 
-    // Start periodic movement DB writes if we have a session
+    // Start periodic player state DB writes if we have a session (for persistence)
     if (this.playersSnapshot && this.network) {
-      this.network.startPeriodicMovementWrite(
-        () => {
-          const localPlayer = this.game.getLocalPlayer();
-          return localPlayer ? { x: localPlayer.x, y: localPlayer.y } : { x: 0, y: 0 };
-        },
-        () => {
-          const localPlayer = this.game.getLocalPlayer();
-          return localPlayer ? localPlayer.rotation : 0;
-        },
-        () => {
-          const localPlayer = this.game.getLocalPlayer();
-          return localPlayer ? { x: localPlayer.velocity.x, y: localPlayer.velocity.y } : { x: 0, y: 0 };
-        }
-      );
+      this.network.startPeriodicPlayerStateWrite(() => {
+        const localPlayer = this.game.getLocalPlayer();
+        if (!localPlayer) return { player_id: this.network.playerId };
+        
+        return {
+          player_id: this.network.playerId,
+          position_x: localPlayer.x,
+          position_y: localPlayer.y,
+          rotation: localPlayer.rotation,
+          velocity_x: localPlayer.velocity.x,
+          velocity_y: localPlayer.velocity.y,
+        };
+      }, 60000); // 60 seconds
 
       // Host-authoritative periodic health persistence
       // Persist health for ALL players to DB every 60 seconds
@@ -479,7 +478,7 @@ class App {
     }
 
     // Render
-    this.renderer.render(this.game.getState(), this.game.getLocalPlayer(), this.playersSnapshot, this.camera);
+    this.renderer.render(this.game.getState(), this.game.getLocalPlayer(), this.playersSnapshot, this.camera, deltaTime);
 
     // Continue loop
     this.animationFrameId = requestAnimationFrame((timestamp) => this.gameLoop(timestamp));
