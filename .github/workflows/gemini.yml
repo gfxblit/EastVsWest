@@ -3,8 +3,6 @@ name: Gemini CLI
 on:
   issue_comment:
     types: [created]
-  pull_request_review_comment:
-    types: [created]
   issues:
     types: [opened, assigned]
   pull_request_review:
@@ -26,7 +24,6 @@ jobs:
       ) || (
         github.event_name == 'pull_request_review' &&
         (github.event.review.author_association == 'OWNER' || github.event.review.author_association == 'CONTRIBUTOR' || github.event.review.author_association == 'MEMBER' || github.event.review.author_association == 'COLLABORATOR') &&
-        contains(github.event.review.body, '@gemini-cli') &&
         !contains(github.event.review.body, '@gemini-cli /review')
       ) || (
         github.event_name == 'issues' &&
@@ -110,65 +107,52 @@ jobs:
             const payload = context.payload;
             let prompt = '';
             let discussionContext = '';
+            let triggerCommentId = '';
+            let reviewThreads = [];
             
-            if (eventName === 'issue_comment' || eventName === 'pull_request_review_comment') {
+            if (eventName === 'issue_comment') {
               prompt = payload.comment.body;
-              
-              if (eventName === 'pull_request_review_comment') {
-                discussionContext += `### File: ${payload.comment.path}\n`;
-                discussionContext += `### Diff Hunk:\n\`\`\`diff\n${payload.comment.diff_hunk}\n\`\`\`\n\n`;
-                
-                try {
-                  const { data: comments } = await github.rest.pulls.listReviewComments({
-                    owner: context.repo.owner,
-                    repo: context.repo.repo,
-                    pull_number: context.issue.number,
-                  });
-                  
-                  const currentComment = payload.comment;
-                  const threadComments = comments.filter(c => 
-                    c.path === currentComment.path && 
-                    (c.line === currentComment.line || c.original_line === currentComment.original_line || c.in_reply_to_id === currentComment.in_reply_to_id || c.id === currentComment.in_reply_to_id)
-                  ).sort((a, b) => new Date(a.created_at) - new Date(b.created_at));
-
-                  if (threadComments.length > 1) {
-                    discussionContext += `### Discussion Thread:\n`;
-                    for (const c of threadComments) {
-                      discussionContext += `**@${c.user.login}**: ${c.body}\n\n`;
-                    }
-                  }
-                } catch (e) {
-                  console.error("Error fetching review comments:", e);
-                }
-              }
+              triggerCommentId = payload.comment.id;
             } else if (eventName === 'issues') {
               prompt = payload.issue.body || payload.issue.title;
             } else if (eventName === 'pull_request_review') {
-              prompt = payload.review.body;
-              try {
-                const { data: comments } = await github.rest.pulls.listReviewCommentsForReview({
-                  owner: context.repo.owner,
-                  repo: context.repo.repo,
-                  pull_number: context.issue.number,
-                  review_id: payload.review.id,
-                });
-                if (comments.length > 0) {
-                  discussionContext += `### Review Comments:\n`;
-                  for (const c of comments) {
-                    discussionContext += `**${c.path}**:\n\`\`\`diff\n${c.diff_hunk}\n\`\`\`\n**@${c.user.login}**: ${c.body}\n\n`;
-                  }
+              const review = payload.review;
+              const { data: comments } = await github.rest.pulls.listReviewCommentsForReview({
+                owner: context.repo.owner,
+                repo: context.repo.repo,
+                pull_number: context.issue.number,
+                review_id: review.id,
+              });
+
+              let combinedPrompt = review.body ? review.body : '';
+              
+              // Find all comments mentioning @gemini-cli
+              const geminiComments = comments.filter(c => c.body.includes('@gemini-cli'));
+              
+              if (geminiComments.length > 0) {
+                combinedPrompt += "\n\n### Tasks from Review Comments:\n";
+                for (const c of geminiComments) {
+                  combinedPrompt += `- [ ] Comment in ${c.path}:${c.line || c.original_line}: ${c.body}\n`;
+                  reviewThreads.push({ id: c.id, path: c.path, body: c.body });
                 }
-              } catch (e) {
-                console.error("Error fetching review comments for review:", e);
               }
+              
+              prompt = combinedPrompt;
+              discussionContext = comments.map(c => `**${c.path}**:\n\`\`\`diff\n${c.diff_hunk}\n\`\`\`\n**@${c.user.login}**: ${c.body}`).join('\n\n');
             }
             
             const cleanPrompt = prompt.replace(/@gemini-cli/g, '').trim();
+            
+            // Critical check: if no mentions found in a review submission, we might want to skip
+            if (eventName === 'pull_request_review' && !prompt.includes('@gemini-cli') && !payload.review.body?.includes('@gemini-cli')) {
+               // If this was a review without a mention, it might have triggered if the IF condition was loose.
+               // But our IF condition currently requires it.
+            }
+
             core.setOutput('prompt', cleanPrompt);
             core.setOutput('discussion_context', discussionContext);
-            if (eventName === 'issue_comment' || eventName === 'pull_request_review_comment') {
-              core.setOutput('trigger_comment_id', payload.comment.id);
-            }
+            core.setOutput('trigger_comment_id', triggerCommentId);
+            core.setOutput('review_threads', JSON.stringify(reviewThreads));
 
       - name: Acknowledge request
         id: acknowledge
@@ -218,6 +202,7 @@ jobs:
           <issue_number>${{ github.event.issue.number || github.event.pull_request.number }}</issue_number>
           <gemini_comment_id>${{ steps.acknowledge.outputs.comment_id }}</gemini_comment_id>
           <trigger_comment_id>${{ steps.extract_prompt.outputs.trigger_comment_id }}</trigger_comment_id>
+          <review_threads>${{ steps.extract_prompt.outputs.review_threads }}</review_threads>
           <trigger_username>${{ github.actor }}</trigger_username>
           <trigger_display_name>${{ github.actor }}</trigger_display_name>
           <trigger_phrase>@gemini-cli</trigger_phrase>
@@ -227,8 +212,8 @@ jobs:
           Example of updating your progress comment body using `gh`:
           gh api -X PATCH /repos/${{ github.repository }}/issues/comments/${{ steps.acknowledge.outputs.comment_id }} -f body="Your updated comment text here"
 
-          Example of responding to an inline comment thread in a PR (using the trigger_comment_id):
-          gh api -X POST /repos/${{ github.repository }}/pulls/${{ github.event.pull_request.number }}/comments -f body="Your reply here" -f in_reply_to=${{ steps.extract_prompt.outputs.trigger_comment_id }}
+          Example of responding to an inline comment thread in a PR (using a comment ID from review_threads):
+          gh api -X POST /repos/${{ github.repository }}/pulls/${{ github.event.pull_request.number }}/comments -f body="Your reply here" -f in_reply_to=<COMMENT_ID>
           </comment_tool_info>
 
           Your task is to analyze the context, understand the request, and provide helpful responses and/or implement code changes as needed.
@@ -237,7 +222,9 @@ jobs:
           - When asked to "review" code, read the code and provide review feedback (do not implement changes unless explicitly asked)
           - Your console outputs and tool results are NOT visible to the user
           - PRIMARY communication happens through your main GitHub comment (id: ${{ steps.acknowledge.outputs.comment_id }}).
-          - CRITICAL: If you were triggered by an inline PR review comment (event_type: pull_request_review_comment), you MUST also post a reply to that specific comment thread with the results of your action (e.g., "I've implemented the changes you requested.") using the `gh api` command provided above.
+          - CRITICAL (BATCH PROCESSING): If you were triggered by a pull_request_review, you may have multiple tasks across different files (provided in <review_threads>). 
+            1. You must address ALL of them in one job run.
+            2. For EVERY thread ID listed in <review_threads>, you MUST post a reply to that specific thread (using the `gh api` command) once the task is finished, confirming what you did.
 
           Follow these steps:
 
