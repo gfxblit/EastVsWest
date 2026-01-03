@@ -17,6 +17,8 @@ describe('Combat Integration', () => {
   let hostSnapshot;
   let playerSnapshot;
   let testSessionId;
+  let hostUserId;
+  let playerUserId;
 
   if (!supabaseUrl || !supabaseAnonKey) {
     test('Supabase environment variables not set, skipping integration tests', () => {
@@ -31,22 +33,30 @@ describe('Combat Integration', () => {
 
     const { data: hostAuth } = await hostSupabase.auth.signInAnonymously();
     const { data: playerAuth } = await playerSupabase.auth.signInAnonymously();
+    
+    hostUserId = hostAuth.user.id;
+    playerUserId = playerAuth.user.id;
+  });
+
+  beforeEach(async () => {
+    // Small delay to allow Supabase Realtime to breathe between tests
+    await new Promise(resolve => setTimeout(resolve, 500));
 
     hostNetwork = new Network();
-    hostNetwork.initialize(hostSupabase, hostAuth.user.id);
+    hostNetwork.initialize(hostSupabase, hostUserId);
 
     playerNetwork = new Network();
-    playerNetwork.initialize(playerSupabase, playerAuth.user.id);
+    playerNetwork.initialize(playerSupabase, playerUserId);
   });
 
   afterAll(async () => {
-    if (hostNetwork) hostNetwork.disconnect();
-    if (playerNetwork) playerNetwork.disconnect();
     if (hostSupabase) await hostSupabase.auth.signOut();
     if (playerSupabase) await playerSupabase.auth.signOut();
   });
 
   afterEach(async () => {
+    if (hostNetwork) hostNetwork.disconnect();
+    if (playerNetwork) playerNetwork.disconnect();
     if (hostSnapshot) hostSnapshot.destroy();
     if (playerSnapshot) playerSnapshot.destroy();
     if (testSessionId) {
