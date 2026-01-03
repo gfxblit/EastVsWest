@@ -756,6 +756,123 @@ describe('SessionPlayersSnapshot (Built on Network)', () => {
     });
   });
 
+  describe('Interpolation', () => {
+    let mockNow;
+
+    beforeEach(() => {
+      mockNow = jest.spyOn(performance, 'now');
+    });
+
+    afterEach(() => {
+      mockNow.mockRestore();
+    });
+
+    test('WhenPlayerOrHistoryMissing_ShouldReturnDefaultOrCurrent', async () => {
+      const mockPlayers = [createMockPlayer({ position_x: 100, position_y: 200 })];
+      mockSupabaseClient.from().select().eq.mockResolvedValue({ data: mockPlayers, error: null });
+      snapshot = new SessionPlayersSnapshot(mockNetwork, TEST_SESSION_ID);
+      await snapshot.ready();
+
+      // Non-existent player
+      expect(snapshot.getInterpolatedPlayerState('unknown', 1000)).toBeNull();
+
+      // Player with no history
+      const result = snapshot.getInterpolatedPlayerState(TEST_PLAYER_ID, 1000);
+      expect(result).toEqual(expect.objectContaining({ x: 100, y: 200 }));
+    });
+
+    test('WhenTargetTimeAfterNewest_ShouldUseNewest', async () => {
+      const mockPlayers = [createMockPlayer()];
+      mockSupabaseClient.from().select().eq.mockResolvedValue({ data: mockPlayers, error: null });
+      snapshot = new SessionPlayersSnapshot(mockNetwork, TEST_SESSION_ID);
+      await snapshot.ready();
+      
+      const player = snapshot.getPlayers().get(TEST_PLAYER_ID);
+      player.positionHistory = [{ x: 10, y: 10, timestamp: 1000 }];
+
+      // Target time 1200 (minus 100 delay = 1100) > 1000
+      const result = snapshot.getInterpolatedPlayerState(TEST_PLAYER_ID, 1200);
+      expect(result.x).toBe(10);
+      expect(result.y).toBe(10);
+    });
+
+    test('WhenTargetTimeBeforeOldest_ShouldUseOldest', async () => {
+      const mockPlayers = [createMockPlayer()];
+      mockSupabaseClient.from().select().eq.mockResolvedValue({ data: mockPlayers, error: null });
+      snapshot = new SessionPlayersSnapshot(mockNetwork, TEST_SESSION_ID);
+      await snapshot.ready();
+      
+      const player = snapshot.getPlayers().get(TEST_PLAYER_ID);
+      player.positionHistory = [{ x: 10, y: 10, timestamp: 1000 }];
+
+      // Target time 1000 (minus 100 delay = 900) < 1000
+      const result = snapshot.getInterpolatedPlayerState(TEST_PLAYER_ID, 1000);
+      expect(result.x).toBe(10);
+      expect(result.y).toBe(10);
+    });
+
+    test('WhenTargetTimeBetweenSnapshots_ShouldInterpolate', async () => {
+      const mockPlayers = [createMockPlayer()];
+      mockSupabaseClient.from().select().eq.mockResolvedValue({ data: mockPlayers, error: null });
+      snapshot = new SessionPlayersSnapshot(mockNetwork, TEST_SESSION_ID);
+      await snapshot.ready();
+      
+      const player = snapshot.getPlayers().get(TEST_PLAYER_ID);
+      player.positionHistory = [
+        { x: 0, y: 0, velocity_x: 0, velocity_y: 0, rotation: 0, timestamp: 1000 },
+        { x: 100, y: 100, velocity_x: 10, velocity_y: 10, rotation: 1, timestamp: 2000 }
+      ];
+
+      // Delay is 100ms. We want target time to be 1500. So renderTime = 1600.
+      // t = (1500 - 1000) / (2000 - 1000) = 0.5
+      const result = snapshot.getInterpolatedPlayerState(TEST_PLAYER_ID, 1600);
+      
+      expect(result.x).toBeCloseTo(50);
+      expect(result.y).toBeCloseTo(50);
+      expect(result.vx).toBeCloseTo(5);
+      expect(result.vy).toBeCloseTo(5);
+      expect(result.rotation).toBeCloseTo(0.5);
+    });
+    
+    test('ShouldInterpolateRotationShortestPath', async () => {
+        const mockPlayers = [createMockPlayer()];
+        mockSupabaseClient.from().select().eq.mockResolvedValue({ data: mockPlayers, error: null });
+        snapshot = new SessionPlayersSnapshot(mockNetwork, TEST_SESSION_ID);
+        await snapshot.ready();
+        
+        const player = snapshot.getPlayers().get(TEST_PLAYER_ID);
+        // 350 degrees (approx 6.10 rad) to 10 degrees (approx 0.17 rad)
+        // Shortest path crosses 0.
+        const startRot = 350 * Math.PI / 180; 
+        const endRot = 10 * Math.PI / 180;
+        
+        player.positionHistory = [
+          { x: 0, y: 0, vx: 0, vy: 0, rotation: startRot, timestamp: 1000 },
+          { x: 0, y: 0, vx: 0, vy: 0, rotation: endRot, timestamp: 2000 }
+        ];
+  
+        // t = 0.5 (renderTime 1600)
+        const result = snapshot.getInterpolatedPlayerState(TEST_PLAYER_ID, 1600);
+        
+        // Expected: 0 degrees (0 rad)
+        // But since we normalize to 0-2PI, 0 is 0.
+        // Wait, 350 (-10) to 10 is 20 deg diff. Halfway is 0.
+        // Let's check boundaries.
+        // 350 is 6.10865
+        // 10 is 0.174533
+        // Diff is 0.17 - 6.10 = -5.93. 
+        // -5.93 < -PI, so add 2PI => -5.93 + 6.28 = 0.35 radians (approx 20 degrees positive diff)
+        // t=0.5 -> start + 0.35 * 0.5 = 6.108 + 0.175 = 6.283 (approx 2PI/0)
+        
+        const expectedRot = 0; // or 2PI
+        // Allow for floating point wrapping, so check if close to 0 OR close to 2PI
+        const isCloseToZero = Math.abs(result.rotation) < 0.01;
+        const isCloseToTwoPi = Math.abs(result.rotation - 2 * Math.PI) < 0.01;
+        
+        expect(isCloseToZero || isCloseToTwoPi).toBe(true);
+      });
+  });
+
   describe('Destroy', () => {
     test('WhenDestroyCalled_ShouldUnsubscribeFromNetworkEvents', async () => {
       snapshot = new SessionPlayersSnapshot(mockNetwork, TEST_SESSION_ID);

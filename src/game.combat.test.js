@@ -42,8 +42,9 @@ describe('Game Combat', () => {
 
   describe('Player Combat State', () => {
     test('WhenInitialized_ShouldHaveCooldownTimers', () => {
-      expect(game.localPlayer.lastAttackTime).toBe(0);
-      expect(game.localPlayer.lastSpecialTime).toBe(0);
+      const localPlayer = game.getLocalPlayer();
+      expect(localPlayer.lastAttackTime).toBe(0);
+      expect(localPlayer.lastSpecialTime).toBe(0);
     });
   });
 
@@ -85,7 +86,8 @@ describe('Game Combat', () => {
     });
 
     test('WhenAttackingOnCooldown_ShouldNotSendRequest', () => {
-      game.localPlayer.lastAttackTime = Date.now();
+      const localPlayer = game.getLocalPlayer();
+      localPlayer.lastAttackTime = Date.now();
       
       const inputState = { attack: true, specialAbility: false };
       game.handleInput(inputState);
@@ -97,6 +99,14 @@ describe('Game Combat', () => {
   describe('Host Attack Validation', () => {
     beforeEach(() => {
       game.network.isHost = true;
+      // Re-init to create HostCombatManager (since it checks isHost)
+      // Actually, HostCombatManager is created if network is present. 
+      // But we need to make sure handleAttackRequest uses the updated isHost flag or we mock the manager?
+      // The Game class creates HostCombatManager in init.
+      // game.network reference is updated, but HostCombatManager takes network in constructor.
+      // HostCombatManager constructor stores network. 
+      // So if we update game.network.isHost, does HostCombatManager see it?
+      // Yes, because it stores the reference.
     });
 
     test('WhenHostReceivesValidAttack_ShouldUpdateVictimHealth', () => {
@@ -111,8 +121,8 @@ describe('Game Combat', () => {
         }
       };
 
-      // Manually trigger the handler (which we'll implement)
-      game.handleAttackRequest(attackRequest);
+      // Manually trigger the handler on the HostCombatManager
+      game.hostCombatManager.handleAttackRequest(attackRequest, mockPlayersSnapshot);
 
       const players = mockPlayersSnapshot.getPlayers();
       const victim = players.get('player-2');
@@ -138,7 +148,7 @@ describe('Game Combat', () => {
         data: { weapon_id: 'spear', aim_x: 150, aim_y: 100, is_special: false }
       };
 
-      game.handleAttackRequest(attackRequest);
+      game.hostCombatManager.handleAttackRequest(attackRequest, mockPlayersSnapshot);
       expect(players.get('player-2').health).toBe(100);
     });
 
@@ -153,7 +163,7 @@ describe('Game Combat', () => {
         data: { weapon_id: 'spear', aim_x: 1000, aim_y: 100, is_special: false }
       };
 
-      game.handleAttackRequest(attackRequest);
+      game.hostCombatManager.handleAttackRequest(attackRequest, mockPlayersSnapshot);
       expect(players.get('player-2').health).toBe(100);
     });
   });
@@ -174,7 +184,7 @@ describe('Game Combat', () => {
         data: { weapon_id: 'spear', aim_x: 150, aim_y: 100, is_special: false }
       };
 
-      game.handleAttackRequest(attackRequest);
+      game.hostCombatManager.handleAttackRequest(attackRequest, mockPlayersSnapshot);
 
       // Spear base damage: 25. Plated resistance to piercing: 0.5.
       // Expected damage: 25 * 0.5 = 12.5. New health: 100 - 12.5 = 87.5.
@@ -193,7 +203,7 @@ describe('Game Combat', () => {
         data: { weapon_id: 'fist', aim_x: 150, aim_y: 100, is_special: false }
       };
 
-      game.handleAttackRequest(attackRequest);
+      game.hostCombatManager.handleAttackRequest(attackRequest, mockPlayersSnapshot);
 
       // Fist base damage: 15. Plated weakness to blunt: 1.5.
       // Expected damage: 15 * 1.5 = 22.5. New health: 100 - 22.5 = 77.5.

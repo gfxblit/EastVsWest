@@ -22,6 +22,8 @@ describe('Game Throttling', () => {
       playerId: 'player-1',
       isHost: true,
       broadcastPlayerStateUpdate: jest.fn(),
+      on: jest.fn(), // Added missing method
+      send: jest.fn(),
     };
 
     game.init(mockPlayersSnapshot, mockNetwork);
