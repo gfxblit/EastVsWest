@@ -274,6 +274,125 @@ describe('SessionPlayersSnapshot (Built on Network)', () => {
       expect(snapshot.getPlayers().has('player-to-keep')).toBe(true);
     });
 
+    test('WhenNetworkEmitsPostgresChangesForDeleteWithUnknownId_ShouldIgnore', async () => {
+      const playerToKeep = createMockPlayer({ player_id: 'player-to-keep', id: 'record-id-456' });
+      const mockPlayers = [playerToKeep];
+
+      mockSupabaseClient.from().select().eq.mockResolvedValue({
+        data: mockPlayers,
+        error: null,
+      });
+
+      let postgresChangesHandler;
+      mockNetwork.on.mockImplementation((event, handler) => {
+        if (event === 'postgres_changes') {
+          postgresChangesHandler = handler;
+        }
+      });
+
+      snapshot = new SessionPlayersSnapshot(mockNetwork, TEST_SESSION_ID);
+      await snapshot.ready();
+
+      // Simulate Network emitting postgres_changes for DELETE with UNKNOWN id
+      postgresChangesHandler({
+        eventType: 'DELETE',
+        new: null,
+        old: { id: 'unknown-id', session_id: TEST_SESSION_ID },
+        schema: 'public',
+        table: 'session_players',
+      });
+
+      // Should NOT remove anything
+      expect(snapshot.getPlayers().has('player-to-keep')).toBe(true);
+      expect(snapshot.getPlayers().size).toBe(1);
+    });
+
+    test('WhenNetworkEmitsPostgresChangesForUpdate_ShouldUpdateLocalMapAndPreserveLocalFields', async () => {
+      const player = createMockPlayer({ player_id: TEST_PLAYER_ID, id: 'record-id-123', health: 100 });
+      const mockPlayers = [player];
+
+      mockSupabaseClient.from().select().eq.mockResolvedValue({
+        data: mockPlayers,
+        error: null,
+      });
+
+      let postgresChangesHandler;
+      let playerStateUpdateHandler;
+      mockNetwork.on.mockImplementation((event, handler) => {
+        if (event === 'postgres_changes') postgresChangesHandler = handler;
+        if (event === 'player_state_update') playerStateUpdateHandler = handler;
+      });
+
+      snapshot = new SessionPlayersSnapshot(mockNetwork, TEST_SESSION_ID);
+      await snapshot.ready();
+
+      // First, add some local state (position history) via broadcast
+      playerStateUpdateHandler({
+        type: 'player_state_update',
+        from: TEST_PLAYER_ID,
+        data: { position_x: 10, position_y: 20 }
+      });
+
+      expect(snapshot.getPlayers().get(TEST_PLAYER_ID).positionHistory).toBeDefined();
+      expect(snapshot.getPlayers().get(TEST_PLAYER_ID).positionHistory.length).toBe(1);
+
+      // Simulate Network emitting postgres_changes for UPDATE (e.g., host updated health in DB)
+      // IMPORTANT: Simulate a FRESH object from DB that does NOT have local-only fields
+      const updatedPlayer = createMockPlayer({ 
+        player_id: TEST_PLAYER_ID, 
+        id: 'record-id-123', 
+        health: 80, 
+        position_x: 10, 
+        position_y: 20 
+      });
+      
+      postgresChangesHandler({
+        eventType: 'UPDATE',
+        new: updatedPlayer,
+        old: player,
+        schema: 'public',
+        table: 'session_players',
+      });
+
+      // Should update health but PRESERVE positionHistory
+      const localPlayer = snapshot.getPlayers().get(TEST_PLAYER_ID);
+      expect(localPlayer.health).toBe(80);
+      expect(localPlayer.positionHistory).toBeDefined();
+      expect(localPlayer.positionHistory.length).toBe(1);
+    });
+
+    test('WhenNetworkEmitsPostgresChangesForStatusUpdate_ShouldUpdateLocalMap', async () => {
+      const player = createMockPlayer({ player_id: TEST_PLAYER_ID, id: 'record-id-123', is_alive: true, is_connected: true });
+      const mockPlayers = [player];
+
+      mockSupabaseClient.from().select().eq.mockResolvedValue({
+        data: mockPlayers,
+        error: null,
+      });
+
+      let postgresChangesHandler;
+      mockNetwork.on.mockImplementation((event, handler) => {
+        if (event === 'postgres_changes') postgresChangesHandler = handler;
+      });
+
+      snapshot = new SessionPlayersSnapshot(mockNetwork, TEST_SESSION_ID);
+      await snapshot.ready();
+
+      // Simulate player being eliminated and disconnecting in DB
+      const updatedPlayer = { ...player, is_alive: false, is_connected: false };
+      postgresChangesHandler({
+        eventType: 'UPDATE',
+        new: updatedPlayer,
+        old: player,
+        schema: 'public',
+        table: 'session_players',
+      });
+
+      const localPlayer = snapshot.getPlayers().get(TEST_PLAYER_ID);
+      expect(localPlayer.is_alive).toBe(false);
+      expect(localPlayer.is_connected).toBe(false);
+    });
+
     test('WhenNetworkEmitsPostgresChangesForOtherTable_ShouldIgnore', async () => {
       const mockPlayers = [createMockPlayer()];
 
