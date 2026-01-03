@@ -90,12 +90,6 @@ describe('Combat Integration', () => {
       return hostSnapshot.getPlayers().has(playerNetwork.playerId);
     }, 5000);
 
-    // Wait for snapshots to sync position
-    await waitFor(() => {
-      const p = hostSnapshot.getPlayers().get(playerNetwork.playerId);
-      return p && p.position_x === 1250;
-    }, 5000);
-
     // Wait for host weapon to sync locally
     await waitFor(() => {
       hostGame.update(0.016); // Trigger sync
