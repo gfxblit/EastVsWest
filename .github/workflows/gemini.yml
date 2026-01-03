@@ -110,14 +110,18 @@ jobs:
             let triggerCommentId = '';
             let reviewThreads = [];
             
-            if (eventName === 'issue_comment') {
+            if (eventName === 'issue_comment' || eventName === 'pull_request_review_comment') {
               prompt = payload.comment.body;
               triggerCommentId = payload.comment.id;
+              if (eventName === 'pull_request_review_comment') {
+                const c = payload.comment;
+                discussionContext = `**${c.path}**:\n\`\`\`diff\n${c.diff_hunk}\n\`\`\`\n**@${c.user.login}**: ${c.body}`;
+              }
             } else if (eventName === 'issues') {
               prompt = payload.issue.body || payload.issue.title;
             } else if (eventName === 'pull_request_review') {
               const review = payload.review;
-              const { data: comments } = await github.rest.pulls.listReviewCommentsForReview({
+              const { data: comments } = await github.rest.pulls.listCommentsForReview({
                 owner: context.repo.owner,
                 repo: context.repo.repo,
                 pull_number: context.issue.number,
