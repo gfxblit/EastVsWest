@@ -183,6 +183,18 @@ export const CONFIG = {
     MAX_JOYSTICK_DISTANCE: 45, // Maximum distance for virtual joystick movement
   },
 
+  // Obstacles in the world
+  OBSTACLES: [
+    { id: 'pillar-1', type: 'rectangle', x: 800, y: 600, width: 100, height: 100, color: '#4a4a4a' },
+    { id: 'wall-1', type: 'rectangle', x: 1400, y: 800, width: 300, height: 80, color: '#3d3d3d' },
+    { id: 'rock-1', type: 'rectangle', x: 1000, y: 1100, width: 120, height: 120, color: '#525252' },
+  ],
+
+  // Collision Settings
+  COLLISION: {
+    PLAYER_HITBOX_RADIUS: 25, // Smaller than visual radius for better feel
+  },
+
   // Network Settings
   NETWORK: {
     GAME_SIMULATION_INTERVAL_MS: 50, // interval between position updates (20 Hz = 50ms)

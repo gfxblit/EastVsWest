@@ -5,6 +5,7 @@
 
 import { CONFIG } from './config.js';
 import { getDirectionFromVelocity, updateAnimationState } from './animationHelper.js';
+import { CollisionSystem } from './collision.js';
 
 export class Game {
   constructor() {
@@ -26,12 +27,16 @@ export class Game {
     this.lastSentState = null;
     this.healthUpdateAccumulator = 0;
     this.playerCooldowns = new Map(); // Track cooldowns independently of snapshot
+    this.collisionSystem = new CollisionSystem();
   }
 
   init(playersSnapshot = null, network = null) {
     this.playersSnapshot = playersSnapshot;
     this.network = network;
     this.state.isRunning = true;
+
+    // Initialize collision obstacles
+    CONFIG.OBSTACLES.forEach(obs => this.collisionSystem.addObstacle(obs));
 
     // Initialize local player
     if (playersSnapshot && network) {
@@ -52,6 +57,7 @@ export class Game {
           name: localPlayerData.player_name,
           x: localPlayerData.position_x,
           y: localPlayerData.position_y,
+          radius: CONFIG.COLLISION.PLAYER_HITBOX_RADIUS,
           rotation: localPlayerData.rotation,
           health: localPlayerData.health,
           weapon: localPlayerData.equipped_weapon || null,
@@ -87,6 +93,7 @@ export class Game {
         id: 'player-1',
         x: CONFIG.WORLD.WIDTH / 2,
         y: CONFIG.WORLD.HEIGHT / 2,
+        radius: CONFIG.COLLISION.PLAYER_HITBOX_RADIUS,
         health: 100,
         weapon: null,
         armor: null,
@@ -141,7 +148,23 @@ export class Game {
   }
 
   updateLocalPlayer(deltaTime) {
-    // Update player position based on velocity
+    // Apply collision resolution for each obstacle
+    for (const obstacle of this.collisionSystem.obstacles) {
+      // Check for collision at current position
+      const collision = this.collisionSystem.checkCollision(this.localPlayer, obstacle);
+      if (collision) {
+        // Resolve overlap (push out)
+        this.localPlayer.x += collision.normal.x * collision.overlap;
+        this.localPlayer.y += collision.normal.y * collision.overlap;
+        
+        // Resolve velocity (slide)
+        const newVelocity = this.collisionSystem.resolveCollisionVelocity(this.localPlayer, obstacle);
+        this.localPlayer.velocity.x = newVelocity.x;
+        this.localPlayer.velocity.y = newVelocity.y;
+      }
+    }
+
+    // Update player position based on (potentially adjusted) velocity
     this.localPlayer.x += this.localPlayer.velocity.x * deltaTime;
     this.localPlayer.y += this.localPlayer.velocity.y * deltaTime;
 

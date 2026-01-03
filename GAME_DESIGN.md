@@ -120,9 +120,15 @@ Loot distribution is randomized, but skewed to reward players who venture into h
 
 6. Technical & Audio
 6.1 Technical Requirements
- * Movement Model: Fluid, pixel-based movement. There is no underlying grid for movement or object placement.
+ * Movement Model: Fluid, pixel-based movement. Uses a "feet-first" physical model where hitboxes are centered on the entity's ground contact point.
  * Netcode: Peer-to-Peer (with a player acting as host/server) for a responsive, but casual action-RPG combat feel.
  * Input Buffer: Essential single-step buffer for accurate input registration during fast combat.
-6.2 Simple Audio
+
+6.2 Physics & Rendering
+ * Sprite Layering: Entities (players, loot, obstacles) are rendered using a Depth-Sorted (Y-sorted) queue. Objects with higher Y-coordinates are drawn last (in front), ensuring correct visual occlusion based on world position.
+ * Collision Resolution: Implements "Wall Sliding". When colliding with an obstacle, the velocity component moving into the wall is removed, allowing the player to glide along the surface rather than stopping abruptly.
+ * Visual Overlap: The "feet-first" model allows player torsos and heads to visually overlap with obstacles located "behind" them (lower Y-coordinate), while the physical hitbox at the feet is correctly blocked by the obstacle's base.
+
+6.3 Simple Audio
  * Directional Audio: Essential for tracking enemies (footsteps, reloads) due to the lack of Fog of War.
  * Weapon Contrast: Distinct sound profiles for metallic Western vs. organic Eastern weapons.

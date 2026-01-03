@@ -98,34 +98,31 @@ export class Renderer {
     // Render conflict zone (in world coordinates)
     this.renderConflictZone(gameState.conflictZone);
 
-    // Render all players (in world coordinates)
+    // Create a render queue for depth-sorted rendering (Y-sorting)
+    const renderQueue = [];
+
+    // Add all players to the render queue
     if (playersSnapshot) {
-      // Multiplayer mode: render remote players from snapshot
       const snapshotPlayers = playersSnapshot.getPlayers();
-      // Use performance.now() if renderTime not provided (fallback)
       const currentTime = performance.now();
       
       snapshotPlayers.forEach((playerData, playerId) => {
-        // Skip local player, we'll render it separately
+        // Skip local player, we'll handle it below to ensure we use the local state
         if (localPlayer && playerId === localPlayer.id) return;
 
-        // Interpolate position and velocity
         const interpolated = this.interpolatePosition(playerData, currentTime);
 
-        // Get or create persistent animation state for this remote player
         let animState = this.remoteAnimationStates.get(playerId);
         if (!animState) {
           animState = this.initAnimationState();
           this.remoteAnimationStates.set(playerId, animState);
         }
 
-        // Calculate animation state for remote player based on interpolated velocity
         const vx = interpolated.vx;
         const vy = interpolated.vy;
         const direction = getDirectionFromVelocity(vx, vy);
         const isMoving = Math.abs(vx) > 0.1 || Math.abs(vy) > 0.1;
 
-        // Update animation state using helper
         updateAnimationState(animState, deltaTime, isMoving, direction);
 
         const player = {
@@ -138,7 +135,13 @@ export class Renderer {
           isAttacking: playerData.is_attacking || false,
           animationState: animState,
         };
-        this.renderPlayer(player, false);
+        
+        renderQueue.push({
+          type: 'player',
+          y: player.y,
+          data: player,
+          isLocal: false
+        });
       });
 
       // Cleanup animation states for players who left
@@ -149,14 +152,46 @@ export class Renderer {
       }
     }
 
-    // Render local player last (on top, with visual distinction)
+    // Add local player to queue
     if (localPlayer) {
-      this.renderPlayer(localPlayer, true);
+      renderQueue.push({
+        type: 'player',
+        y: localPlayer.y,
+        data: localPlayer,
+        isLocal: true
+      });
     }
 
-    // Render loot (in world coordinates)
+    // Add loot to queue
     for (const loot of gameState.loot) {
-      this.renderLoot(loot);
+      renderQueue.push({
+        type: 'loot',
+        y: loot.y,
+        data: loot
+      });
+    }
+
+    // Add obstacles to queue
+    for (const obstacle of CONFIG.OBSTACLES) {
+      renderQueue.push({
+        type: 'obstacle',
+        y: obstacle.y + obstacle.height, // Sort by the BOTTOM of the obstacle
+        data: obstacle
+      });
+    }
+
+    // Sort queue by Y coordinate (bottom to top rendering)
+    renderQueue.sort((a, b) => a.y - b.y);
+
+    // Execute sorted rendering
+    for (const item of renderQueue) {
+      if (item.type === 'player') {
+        this.renderPlayer(item.data, item.isLocal);
+      } else if (item.type === 'loot') {
+        this.renderLoot(item.data);
+      } else if (item.type === 'obstacle') {
+        this.renderObstacle(item.data);
+      }
     }
 
     // Restore transform
@@ -168,6 +203,15 @@ export class Renderer {
     if (camera) {
       this.renderEdgeIndicators(playersSnapshot, localPlayer, camera, gameState.loot);
     }
+  }
+
+  renderObstacle(obstacle) {
+    this.ctx.fillStyle = obstacle.color || '#555';
+    this.ctx.fillRect(obstacle.x, obstacle.y, obstacle.width, obstacle.height);
+    
+    // Add a simple top highlight/depth effect
+    this.ctx.fillStyle = 'rgba(255, 255, 255, 0.1)';
+    this.ctx.fillRect(obstacle.x, obstacle.y, obstacle.width, 10);
   }
 
   renderConflictZone(zone) {

@@ -691,6 +691,84 @@ describe('Renderer', () => {
       }
     });
 
+    test('WhenRenderingMultipleEntities_ShouldSortByYCoordinate', () => {
+      // Arrange
+      const gameState = {
+        conflictZone: { centerX: 1200, centerY: 800, radius: 600 },
+        loot: [{ x: 1000, y: 1000 }] // Y = 1000
+      };
+
+      // Mock local player at Y = 900
+      const localPlayer = {
+        id: 'local',
+        x: 1000,
+        y: 900,
+        health: 100,
+        rotation: 0,
+        animationState: { currentFrame: 0, lastDirection: 0 }
+      };
+
+      // Mock remote player at Y = 1100
+      const playersSnapshot = {
+        getPlayers: () => new Map([
+          ['remote', {
+            player_id: 'remote',
+            position_x: 1000,
+            position_y: 1100,
+            health: 100,
+            positionHistory: []
+          }]
+        ])
+      };
+
+      // Obstacle at Y_bottom = 950 (y=900, height=50)
+      // CONFIG.OBSTACLES is used directly in Renderer.render
+      const originalObstacles = CONFIG.OBSTACLES;
+      CONFIG.OBSTACLES = [{ x: 900, y: 900, width: 100, height: 50 }]; 
+
+      const callOrder = [];
+      ctx.fillRect.mockImplementation((x, y, w, h) => {
+        // Distinguish between clearing canvas, loot, and obstacle
+        if (w === CONFIG.WORLD.WIDTH || w === canvas.width) return;
+        callOrder.push({ type: 'rect', y: y + h });
+      });
+      
+      // Mock renderPlayer calls to track them
+      const originalRenderPlayer = renderer.renderPlayer;
+      renderer.renderPlayer = (player, isLocal) => {
+        callOrder.push({ type: 'player', y: player.y, id: player.id });
+      };
+
+      // Act
+      renderer.render(gameState, localPlayer, playersSnapshot, null, 0.016);
+
+      // Assert
+      // Expected order by Y: 
+      // 1. localPlayer (Y=900)
+      // 2. obstacle (Y_bottom=950)
+      // 3. loot (Y=1000)
+      // 4. remotePlayer (Y=1100)
+      
+      expect(callOrder[0].type).toBe('player');
+      expect(callOrder[0].id).toBe('local');
+      
+      expect(callOrder[1].type).toBe('rect'); // Obstacle base
+      expect(callOrder[1].y).toBe(950);
+      
+      expect(callOrder[2].type).toBe('rect'); // Obstacle highlight
+      expect(callOrder[2].y).toBe(910);
+      
+      expect(callOrder[3].type).toBe('rect'); // Loot
+      expect(callOrder[3].y).toBe(1005); // loot.y + 5 (from renderLoot)
+      
+      expect(callOrder[4].type).toBe('player');
+      expect(callOrder[4].id).toBe('remote');
+
+      // Restore
+      CONFIG.OBSTACLES = originalObstacles;
+      renderer.renderPlayer = originalRenderPlayer;
+    });
+
     test('WhenRenderingLocalPlayer_ShouldRenderShadow', () => {
       // Arrange
       // Mock sprite sheet as loaded

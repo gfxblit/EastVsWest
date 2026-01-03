@@ -85,9 +85,11 @@ describe('Combat Integration', () => {
       .update({ position_x: 1250, position_y: 800, health: 100 })
       .eq('player_id', playerNetwork.playerId);
 
-    // Wait for player to appear in host snapshot
+    // Wait for player to appear in host snapshot with correct position
     await waitFor(() => {
-      return hostSnapshot.getPlayers().has(playerNetwork.playerId);
+      const p = hostSnapshot.getPlayers().get(playerNetwork.playerId);
+      const h = hostSnapshot.getPlayers().get(hostNetwork.playerId);
+      return p && p.position_x === 1250 && h && h.position_x === 1200;
     }, 5000);
 
     // Wait for host weapon to sync locally
