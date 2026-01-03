@@ -8,10 +8,8 @@ const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
 
 // Sprite sheet configuration
-const FRAME_WIDTH = 96;
-const FRAME_HEIGHT = 96;
-const COLUMNS = 6;
-const ROWS = 8;
+// COLUMNS is determined dynamically from frame count
+// ROWS is determined dynamically from direction count
 
 // Direction order for sprite sheet rows (top to bottom)
 const DIRECTION_ORDER = [
@@ -25,11 +23,13 @@ const DIRECTION_ORDER = [
   'south-west'
 ];
 
+const ROWS = DIRECTION_ORDER.length;
+
 /**
  * Validates that all animation frames exist and have correct dimensions
  * @param {Object} metadata - The metadata object from metadata.json
  * @param {string} pixelLabDir - Path to PixelLab character directory (containing metadata.json and animations/)
- * @returns {Promise<{valid: boolean, errors: string[], framePaths: Array}>}
+ * @returns {Promise<{valid: boolean, errors: string[], framePaths: Array, width: number, height: number, columns: number}>}
  */
 export async function validateFrames(metadata, pixelLabDir) {
   const errors = [];
@@ -38,14 +38,46 @@ export async function validateFrames(metadata, pixelLabDir) {
   const expectedHeight = metadata.character.size.height;
   const assetsDir = pixelLabDir;
 
-  const walkingAnimations = metadata.frames.animations.walking;
+  // Try to find a suitable walking animation
+  let walkingAnimations = metadata.frames.animations.walking;
+  if (!walkingAnimations) {
+    walkingAnimations = metadata.frames.animations['walking-6-frames'];
+  }
+
+  if (!walkingAnimations) {
+    return {
+      valid: false,
+      errors: ['No "walking" or "walking-6-frames" animation found in metadata'],
+      framePaths: [],
+      width: expectedWidth,
+      height: expectedHeight,
+      columns: 0
+    };
+  }
+
+  let columns = 0;
 
   // Process each direction in the specified order
   for (const direction of DIRECTION_ORDER) {
-    const frames = walkingAnimations[direction];
+    let frames = walkingAnimations[direction];
     if (!frames) {
       errors.push(`Missing animation frames for direction: ${direction}`);
       continue;
+    }
+
+    // Dedup frames (handle case where API returns duplicates)
+    frames = [...new Set(frames)];
+
+    if (frames.length === 0) {
+      errors.push(`No frames found for direction: ${direction}`);
+      continue;
+    }
+
+    // If we haven't set columns yet (first direction), set it now
+    if (columns === 0) {
+      columns = frames.length;
+    } else if (frames.length !== columns) {
+      errors.push(`Frame count mismatch for ${direction}: expected ${columns}, found ${frames.length}`);
     }
 
     const directionFrames = {
@@ -85,7 +117,10 @@ export async function validateFrames(metadata, pixelLabDir) {
   return {
     valid: errors.length === 0,
     errors,
-    framePaths
+    framePaths,
+    width: expectedWidth,
+    height: expectedHeight,
+    columns
   };
 }
 
@@ -93,12 +128,14 @@ export async function validateFrames(metadata, pixelLabDir) {
  * Generates a sprite sheet from individual frames
  * @param {Array} framePaths - Array of {direction, frames[]} objects
  * @param {string} outputPath - Path to output sprite sheet
- * @param {string} projectRoot - Path to project root (unused but kept for API consistency)
+ * @param {number} frameWidth - Width of a single frame
+ * @param {number} frameHeight - Height of a single frame
+ * @param {number} columns - Number of columns (frames per animation)
  * @returns {Promise<void>}
  */
-export async function generateSpriteSheet(framePaths, outputPath, projectRoot) {
-  const sheetWidth = FRAME_WIDTH * COLUMNS;
-  const sheetHeight = FRAME_HEIGHT * ROWS;
+export async function generateSpriteSheet(framePaths, outputPath, frameWidth, frameHeight, columns) {
+  const sheetWidth = frameWidth * columns;
+  const sheetHeight = frameHeight * ROWS;
 
   // Create a blank sprite sheet
   const spriteSheet = sharp({
@@ -118,8 +155,8 @@ export async function generateSpriteSheet(framePaths, outputPath, projectRoot) {
 
     for (let colIndex = 0; colIndex < frames.length; colIndex++) {
       const framePath = frames[colIndex];
-      const left = colIndex * FRAME_WIDTH;
-      const top = rowIndex * FRAME_HEIGHT;
+      const left = colIndex * frameWidth;
+      const top = rowIndex * frameHeight;
 
       compositeOperations.push({
         input: framePath,
@@ -139,13 +176,16 @@ export async function generateSpriteSheet(framePaths, outputPath, projectRoot) {
  * Generates metadata JSON for the sprite sheet
  * @param {string} outputPath - Path to output metadata file
  * @param {Array<string>} directions - Array of direction names in row order
+ * @param {number} frameWidth - Width of a single frame
+ * @param {number} frameHeight - Height of a single frame
+ * @param {number} columns - Number of columns
  * @returns {Promise<void>}
  */
-export async function generateMetadata(outputPath, directions) {
+export async function generateMetadata(outputPath, directions, frameWidth, frameHeight, columns) {
   const metadata = {
-    frameWidth: FRAME_WIDTH,
-    frameHeight: FRAME_HEIGHT,
-    columns: COLUMNS,
+    frameWidth,
+    frameHeight,
+    columns,
     rows: ROWS,
     directions
   };
@@ -177,14 +217,27 @@ export class SpriteSheetGenerator {
       throw new Error(errorMessage);
     }
 
-    console.log(`Validated ${validation.framePaths.length} directions with ${validation.framePaths[0].frames.length} frames each.`);
+    console.log(`Validated ${validation.framePaths.length} directions with ${validation.columns} frames each.`);
+    console.log(`Frame dimensions: ${validation.width}x${validation.height}`);
 
     console.log('Generating sprite sheet...');
-    await generateSpriteSheet(validation.framePaths, this.outputSpritePath, this.projectRoot);
+    await generateSpriteSheet(
+      validation.framePaths,
+      this.outputSpritePath,
+      validation.width,
+      validation.height,
+      validation.columns
+    );
 
     console.log('Generating metadata...');
     const directions = validation.framePaths.map(fp => fp.direction);
-    await generateMetadata(this.outputMetadataPath, directions);
+    await generateMetadata(
+      this.outputMetadataPath,
+      directions,
+      validation.width,
+      validation.height,
+      validation.columns
+    );
 
     console.log(`✓ Sprite sheet generated: ${this.outputSpritePath}`);
     console.log(`✓ Metadata generated: ${this.outputMetadataPath}`);

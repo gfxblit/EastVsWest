@@ -1,6 +1,6 @@
 {
-  "frameWidth": 96,
-  "frameHeight": 96,
+  "frameWidth": 48,
+  "frameHeight": 48,
   "columns": 6,
   "rows": 8,
   "directions": [

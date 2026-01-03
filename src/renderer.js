@@ -26,6 +26,9 @@ export class Renderer {
       return;
     }
 
+    // optimizing for pixel art
+    this.ctx.imageSmoothingEnabled = false;
+
     // Size canvas to fill viewport (for responsive mobile support)
     this.resizeCanvas();
 
