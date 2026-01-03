@@ -202,7 +202,7 @@ export const CONFIG = {
   // Animation Settings
   ANIMATION: {
     FPS: 15,
-    FRAMES_PER_DIRECTION: 6,
+    FRAMES_PER_DIRECTION: 4,
   },
 
   // Combat Settings

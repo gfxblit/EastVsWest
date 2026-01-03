@@ -65,6 +65,12 @@ describe('AnimationHelper', () => {
     });
   });
 
+  describe('Animation Configuration', () => {
+    test('ShouldHave4FramesPerDirection', () => {
+      expect(CONFIG.ANIMATION.FRAMES_PER_DIRECTION).toBe(4);
+    });
+  });
+
   describe('updateAnimationState', () => {
     test('WhenPlayerIsIdle_ShouldResetToFrame0', () => {
       const animState = { currentFrame: 3, timeAccumulator: 0.5, lastDirection: 2 };
@@ -126,13 +132,15 @@ describe('AnimationHelper', () => {
 
     test('WhenMultipleFramesWrapAround_ShouldLoopCorrectly', () => {
       const framesPerDirection = CONFIG.ANIMATION.FRAMES_PER_DIRECTION;
-      const animState = { currentFrame: 4, timeAccumulator: 0, lastDirection: 0 };
+      const animState = { currentFrame: 0, timeAccumulator: 0, lastDirection: 0 };
       const frameDuration = 1 / CONFIG.ANIMATION.FPS;
 
-      // Advance 5 frames: 4->5->0->1->2->3
+      // Advance 5 frames: 0 -> 1 -> 2 -> 3 -> 0 -> 1
       updateAnimationState(animState, frameDuration * 5, true, 3);
 
-      expect(animState.currentFrame).toBe(3); // (4 + 5) % 6 = 3
+      // With 4 frames: 5 % 4 = 1
+      // With 6 frames: 5 % 6 = 5
+      expect(animState.currentFrame).toBe(1);
     });
 
     test('WhenDirectionChanges_ShouldUpdateLastDirection', () => {
