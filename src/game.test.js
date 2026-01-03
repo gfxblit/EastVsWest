@@ -402,6 +402,7 @@ describe('Game', () => {
     mockNetwork = {
       playerId: 'player-1',
       broadcastPlayerStateUpdate: jest.fn(),
+      on: jest.fn(),
     };
     });
 

@@ -123,7 +123,7 @@ describe('Sprite Sheet Generator', () => {
       const metadata = JSON.parse(await fs.readFile(metadataPath, 'utf-8'));
       const validation = await validateFrames(metadata, pixelLabDir);
 
-      await generateSpriteSheet(validation.framePaths, outputSpritePath, projectRoot);
+      await generateSpriteSheet(validation.framePaths, outputSpritePath, 96, 96, 6);
 
       // Verify file exists
       const stats = await fs.stat(outputSpritePath);
@@ -140,7 +140,7 @@ describe('Sprite Sheet Generator', () => {
       const metadata = JSON.parse(await fs.readFile(metadataPath, 'utf-8'));
       const validation = await validateFrames(metadata, pixelLabDir);
 
-      await generateSpriteSheet(validation.framePaths, outputSpritePath, projectRoot);
+      await generateSpriteSheet(validation.framePaths, outputSpritePath, 96, 96, 6);
 
       // Extract a specific frame and verify it's not blank
       const image = sharp(outputSpritePath);
@@ -177,7 +177,7 @@ describe('Sprite Sheet Generator', () => {
         'south-west'
       ];
 
-      await generateMetadata(outputMetadataPath, expectedDirections);
+      await generateMetadata(outputMetadataPath, expectedDirections, 96, 96, 6);
 
       // Verify file exists
       const stats = await fs.stat(outputMetadataPath);
