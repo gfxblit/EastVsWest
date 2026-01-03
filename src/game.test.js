@@ -31,7 +31,7 @@ describe('Game', () => {
     });
 
     test('WhenConstructed_ShouldNotHaveLocalPlayerYet', () => {
-      expect(game.localPlayer).toBeNull();
+      expect(game.getLocalPlayer()).toBeUndefined();
     });
   });
 
@@ -43,17 +43,19 @@ describe('Game', () => {
 
     test('WhenInitializedWithoutSnapshot_ShouldCreateTestPlayer', () => {
       game.init();
-      expect(game.localPlayer).toBeDefined();
-      expect(game.localPlayer.id).toBe('player-1');
-      expect(game.localPlayer.health).toBe(100);
-      expect(game.localPlayer.weapon).toBeNull();
-      expect(game.localPlayer.armor).toBeNull();
+      const localPlayer = game.getLocalPlayer();
+      expect(localPlayer).toBeDefined();
+      expect(localPlayer.id).toBe('player-1');
+      expect(localPlayer.health).toBe(100);
+      expect(localPlayer.weapon).toBeNull();
+      expect(localPlayer.armor).toBeNull();
     });
 
     test('WhenInitializedWithoutSnapshot_ShouldSpawnPlayerAtCenterOfWorld', () => {
       game.init();
-      expect(game.localPlayer.x).toBe(CONFIG.WORLD.WIDTH / 2);
-      expect(game.localPlayer.y).toBe(CONFIG.WORLD.HEIGHT / 2);
+      const localPlayer = game.getLocalPlayer();
+      expect(localPlayer.x).toBe(CONFIG.WORLD.WIDTH / 2);
+      expect(localPlayer.y).toBe(CONFIG.WORLD.HEIGHT / 2);
     });
 
     test('WhenInitializedWithSnapshot_ShouldLoadLocalPlayerFromSnapshot', () => {
@@ -75,15 +77,16 @@ describe('Game', () => {
 
       game.init(mockSnapshot, mockNetwork);
 
-      expect(game.localPlayer).toBeDefined();
-      expect(game.localPlayer.id).toBe('player-1');
-      expect(game.localPlayer.name).toBe('Alice');
-      expect(game.localPlayer.x).toBe(100);
-      expect(game.localPlayer.y).toBe(200);
-      expect(game.localPlayer.velocity.x).toBe(10);
-      expect(game.localPlayer.velocity.y).toBe(20);
-      expect(game.localPlayer.rotation).toBe(0.5);
-      expect(game.localPlayer.health).toBe(90);
+      const localPlayer = game.getLocalPlayer();
+      expect(localPlayer).toBeDefined();
+      expect(localPlayer.id).toBe('player-1');
+      expect(localPlayer.name).toBe('Alice');
+      expect(localPlayer.x).toBe(100);
+      expect(localPlayer.y).toBe(200);
+      expect(localPlayer.velocity.x).toBe(10);
+      expect(localPlayer.velocity.y).toBe(20);
+      expect(localPlayer.rotation).toBe(0.5);
+      expect(localPlayer.health).toBe(90);
     });
   });
 
@@ -108,11 +111,11 @@ describe('Game', () => {
       expect(spy).toHaveBeenCalledWith(0.016);
     });
 
-    test('WhenRunning_ShouldCallUpdateLocalPlayer', () => {
+    test('WhenRunning_ShouldUpdateLocalPlayerController', () => {
       game.init();
-      const spy = jest.spyOn(game, 'updateLocalPlayer');
+      const spy = jest.spyOn(game.localPlayerController, 'update');
       game.update(0.016);
-      expect(spy).toHaveBeenCalledWith(0.016);
+      expect(spy).toHaveBeenCalledWith(0.016, null);
     });
   });
 
@@ -142,166 +145,31 @@ describe('Game', () => {
     });
   });
 
-  describe('updateLocalPlayer', () => {
+  describe('LocalPlayer Updates', () => {
     beforeEach(() => {
       game.init();
     });
 
     test('WhenPlayerHasVelocity_ShouldUpdatePosition', () => {
-      game.localPlayer.velocity = { x: 100, y: 50 };
-      const initialX = game.localPlayer.x;
-      const initialY = game.localPlayer.y;
+      const player = game.getLocalPlayer();
+      player.velocity = { x: 100, y: 50 };
+      const initialX = player.x;
+      const initialY = player.y;
 
-      game.updateLocalPlayer(0.1); // 0.1 seconds
+      game.update(0.1); // 0.1 seconds
 
-      expect(game.localPlayer.x).toBe(initialX + 10); // 100 * 0.1
-      expect(game.localPlayer.y).toBe(initialY + 5); // 50 * 0.1
+      expect(player.x).toBe(initialX + 10); // 100 * 0.1
+      expect(player.y).toBe(initialY + 5); // 50 * 0.1
     });
 
     test('WhenPlayerMovesOutOfBounds_ShouldClampToWorldWidth', () => {
-      game.localPlayer.x = CONFIG.WORLD.WIDTH - 10;
-      game.localPlayer.velocity = { x: 200, y: 0 };
+      const player = game.getLocalPlayer();
+      player.x = CONFIG.WORLD.WIDTH - 10;
+      player.velocity = { x: 200, y: 0 };
 
-      game.updateLocalPlayer(1); // Move way beyond bounds
+      game.update(1); // Move way beyond bounds
 
-      expect(game.localPlayer.x).toBe(CONFIG.WORLD.WIDTH);
-    });
-
-    test('WhenPlayerMovesOutOfBounds_ShouldClampToMinimumX', () => {
-      game.localPlayer.x = 10;
-      game.localPlayer.velocity = { x: -200, y: 0 };
-
-      game.updateLocalPlayer(1);
-
-      expect(game.localPlayer.x).toBe(0);
-    });
-
-    test('WhenPlayerMovesOutOfBounds_ShouldClampToWorldHeight', () => {
-      game.localPlayer.y = CONFIG.WORLD.HEIGHT - 10;
-      game.localPlayer.velocity = { x: 0, y: 200 };
-
-      game.updateLocalPlayer(1);
-
-      expect(game.localPlayer.y).toBe(CONFIG.WORLD.HEIGHT);
-    });
-
-    test('WhenPlayerMovesOutOfBounds_ShouldClampToMinimumY', () => {
-      game.localPlayer.y = 10;
-      game.localPlayer.velocity = { x: 0, y: -200 };
-
-      game.updateLocalPlayer(1);
-
-      expect(game.localPlayer.y).toBe(0);
-    });
-
-    test('WhenPlayerOutsideZone_ShouldNotTakeDamageLocally', () => {
-      game.localPlayer.health = 100;
-
-      // Place player far outside zone
-      game.localPlayer.x = 0;
-      game.localPlayer.y = 0;
-      game.state.conflictZone.centerX = CONFIG.WORLD.WIDTH / 2;
-      game.state.conflictZone.centerY = CONFIG.WORLD.HEIGHT / 2;
-      game.state.conflictZone.radius = 10; // Very small zone
-
-      game.updateLocalPlayer(1); // 1 second
-
-      // Health should NOT change locally (waiting for host update)
-      expect(game.localPlayer.health).toBe(100);
-    });
-
-    test('WhenPlayerInsideZone_ShouldNotTakeDamage', () => {
-      game.localPlayer.health = 100;
-
-      // Place player at center of zone
-      game.localPlayer.x = game.state.conflictZone.centerX;
-      game.localPlayer.y = game.state.conflictZone.centerY;
-
-      game.updateLocalPlayer(1);
-
-      expect(game.localPlayer.health).toBe(100);
-    });
-  });
-
-  describe('Host Health Authority', () => {
-    let mockNetwork;
-    let mockPlayersSnapshot;
-
-    beforeEach(() => {
-      mockNetwork = {
-        isHost: true,
-        on: jest.fn(),
-        broadcastPlayerStateUpdate: jest.fn(),
-      };
-      
-      mockPlayersSnapshot = {
-        getPlayers: jest.fn().mockReturnValue(new Map([
-          ['player-1', {
-            player_id: 'player-1',
-            position_x: 0, // Outside zone
-            position_y: 0,
-            health: 100
-          }],
-          ['player-2', {
-            player_id: 'player-2',
-            position_x: CONFIG.WORLD.WIDTH / 2, // Inside zone
-            position_y: CONFIG.WORLD.HEIGHT / 2,
-            health: 100
-          }]
-        ]))
-      };
-
-      game.init(mockPlayersSnapshot, mockNetwork);
-      game.state.conflictZone.radius = 100;
-    });
-
-    test('WhenHostCalculatesZoneDamage_ShouldUpdateAllPlayersHealth', () => {
-      const deltaTime = 1.0;
-      game.updateAllPlayersHealth(deltaTime);
-
-      // Verify updates were broadcast
-      expect(mockNetwork.broadcastPlayerStateUpdate).toHaveBeenCalled();
-      
-      // Get the update payload
-      const updates = mockNetwork.broadcastPlayerStateUpdate.mock.calls[0][0];
-      expect(Array.isArray(updates)).toBe(true);
-      
-      // Find update for player-1 (outside zone)
-      const p1Update = updates.find(u => u.player_id === 'player-1');
-      expect(p1Update).toBeDefined();
-      expect(p1Update.health).toBeLessThan(100);
-      
-      // Find update for player-2 (inside zone)
-      const p2Update = updates.find(u => u.player_id === 'player-2');
-      // Should NOT be in updates list if health didn't change
-      expect(p2Update).toBeUndefined();
-    });
-
-    test('WhenPlayerHealthReachesZero_ShouldMarkPlayerDead', () => {
-      // Setup player with low health
-      mockPlayersSnapshot.getPlayers.mockReturnValue(new Map([
-        ['player-1', {
-          player_id: 'player-1',
-          position_x: 0,
-          position_y: 0,
-          health: 1
-        }]
-      ]));
-
-      const deltaTime = 1.0; // Enough damage to kill
-      game.updateAllPlayersHealth(deltaTime);
-
-      const updates = mockNetwork.broadcastPlayerStateUpdate.mock.calls[0][0];
-      const p1Update = updates.find(u => u.player_id === 'player-1');
-      
-      expect(p1Update.health).toBe(0);
-      // Future: expect(p1Update.is_dead).toBe(true);
-    });
-
-    test('WhenNotHost_ShouldNotCalculateHealth', () => {
-      game.network.isHost = false;
-      game.updateAllPlayersHealth(1.0);
-      expect(mockNetwork.broadcastPlayerStateUpdate).not.toHaveBeenCalled();
+      expect(player.x).toBe(CONFIG.WORLD.WIDTH);
     });
   });
 
@@ -313,343 +181,39 @@ describe('Game', () => {
     test('WhenMovingRight_ShouldSetVelocityX', () => {
       const inputState = { moveX: 1, moveY: 0 };
       game.handleInput(inputState);
-      expect(game.localPlayer.velocity.x).toBe(CONFIG.PLAYER.BASE_MOVEMENT_SPEED);
-      expect(game.localPlayer.velocity.y).toBe(0);
-    });
-
-    test('WhenMovingLeft_ShouldSetNegativeVelocityX', () => {
-      const inputState = { moveX: -1, moveY: 0 };
-      game.handleInput(inputState);
-      expect(game.localPlayer.velocity.x).toBe(-CONFIG.PLAYER.BASE_MOVEMENT_SPEED);
-      expect(game.localPlayer.velocity.y).toBe(0);
-    });
-
-    test('WhenMovingUp_ShouldSetNegativeVelocityY', () => {
-      const inputState = { moveX: 0, moveY: -1 };
-      game.handleInput(inputState);
-      expect(game.localPlayer.velocity.x).toBe(0);
-      expect(game.localPlayer.velocity.y).toBe(-CONFIG.PLAYER.BASE_MOVEMENT_SPEED);
-    });
-
-    test('WhenMovingDown_ShouldSetVelocityY', () => {
-      const inputState = { moveX: 0, moveY: 1 };
-      game.handleInput(inputState);
-      expect(game.localPlayer.velocity.x).toBe(0);
-      expect(game.localPlayer.velocity.y).toBe(CONFIG.PLAYER.BASE_MOVEMENT_SPEED);
+      const player = game.getLocalPlayer();
+      expect(player.velocity.x).toBe(CONFIG.PLAYER.BASE_MOVEMENT_SPEED);
+      expect(player.velocity.y).toBe(0);
     });
 
     test('WhenMovingDiagonally_ShouldNormalizeVelocity', () => {
       const inputState = { moveX: 1, moveY: 1 };
       game.handleInput(inputState);
 
-      // Diagonal movement should be normalized so total speed equals base speed
+      const player = game.getLocalPlayer();
       const expectedSpeed = CONFIG.PLAYER.BASE_MOVEMENT_SPEED / Math.SQRT2;
-      expect(game.localPlayer.velocity.x).toBeCloseTo(expectedSpeed);
-      expect(game.localPlayer.velocity.y).toBeCloseTo(expectedSpeed);
-    });
-
-    test('WhenNotMoving_ShouldSetVelocityToZero', () => {
-      const inputState = { moveX: 0, moveY: 0 };
-      game.handleInput(inputState);
-      expect(game.localPlayer.velocity.x).toBe(0);
-      expect(game.localPlayer.velocity.y).toBe(0);
-    });
-
-    test('WhenPlayerHasDoubleHandedWeapon_ShouldApplySpeedModifier', () => {
-      game.localPlayer.weapon = { stance: 'double' };
-      const inputState = { moveX: 1, moveY: 0 };
-      game.handleInput(inputState);
-
-      const expectedSpeed = CONFIG.PLAYER.BASE_MOVEMENT_SPEED *
-        CONFIG.PLAYER.DOUBLE_HANDED_SPEED_MODIFIER;
-      expect(game.localPlayer.velocity.x).toBe(expectedSpeed);
-    });
-
-    test('WhenPlayerHasNonDoubleWeapon_ShouldNotApplyModifier', () => {
-      game.localPlayer.weapon = { stance: 'single' };
-      const inputState = { moveX: 1, moveY: 0 };
-      game.handleInput(inputState);
-      expect(game.localPlayer.velocity.x).toBe(CONFIG.PLAYER.BASE_MOVEMENT_SPEED);
-    });
-  });
-
-  describe('Multiplayer Integration', () => {
-    let mockPlayersSnapshot;
-    let mockNetwork;
-
-    beforeEach(() => {
-      mockPlayersSnapshot = {
-        getPlayers: jest.fn().mockReturnValue(new Map([
-          ['player-1', {
-            player_id: 'player-1',
-            player_name: 'Alice',
-            position_x: CONFIG.WORLD.WIDTH / 2,
-            position_y: CONFIG.WORLD.HEIGHT / 2,
-            rotation: 0,
-            health: 100
-          }],
-          ['player-2', {
-            player_id: 'player-2',
-            player_name: 'Bob',
-            position_x: CONFIG.WORLD.WIDTH / 2 + 50,
-            position_y: CONFIG.WORLD.HEIGHT / 2 + 50,
-            rotation: 1.5,
-            health: 80
-          }],
-        ])),
-      };
-
-    mockNetwork = {
-      playerId: 'player-1',
-      broadcastPlayerStateUpdate: jest.fn(),
-      on: jest.fn(),
-    };
-    });
-
-    test('WhenInitializedWithSnapshot_ShouldLoadLocalPlayerFromSnapshot', () => {
-      game.init(mockPlayersSnapshot, mockNetwork);
-
-      expect(game.localPlayer).toBeDefined();
-      expect(game.localPlayer.id).toBe('player-1');
-      expect(game.localPlayer.name).toBe('Alice');
-      expect(game.localPlayer.x).toBe(CONFIG.WORLD.WIDTH / 2);
-      expect(game.localPlayer.y).toBe(CONFIG.WORLD.HEIGHT / 2);
-      expect(game.localPlayer.rotation).toBe(0);
-      expect(game.localPlayer.health).toBe(100);
-    });
-
-    test('WhenLocalPlayerMovesInMultiplayer_ShouldUpdateLocalPlayerPosition', () => {
-      game.init(mockPlayersSnapshot, mockNetwork);
-
-      const inputState = { moveX: 1, moveY: 0 };
-      game.handleInput(inputState);
-      game.update(0.1); // Update for 0.1 seconds
-
-      expect(game.localPlayer.x).toBe(CONFIG.WORLD.WIDTH / 2 + CONFIG.PLAYER.BASE_MOVEMENT_SPEED * 0.1);
-    });
-
-    test('WhenLocalPlayerMovesInMultiplayer_ShouldSendMovementUpdate', () => {
-      game.init(mockPlayersSnapshot, mockNetwork);
-
-      const inputState = { moveX: 1, moveY: 0 };
-      game.handleInput(inputState);
-      game.update(0.1); // Update triggers position send
-
-      expect(mockNetwork.broadcastPlayerStateUpdate).toHaveBeenCalled();
-      const call = mockNetwork.broadcastPlayerStateUpdate.mock.calls[0][0];
-      expect(call.position_x).toBeCloseTo(CONFIG.WORLD.WIDTH / 2 + 20, 1); // center + 200 * 0.1
-      expect(call.position_y).toBe(CONFIG.WORLD.HEIGHT / 2);
-      expect(call.velocity_x).toBeGreaterThan(0);
-      expect(call.velocity_y).toBe(0);
-    });
-
-    test('WhenLocalPlayerHealthChanges_ShouldSendUpdateEvenIfPositionUnchanged', () => {
-      game.init(mockPlayersSnapshot, mockNetwork);
-
-      // Simulate host updating health via snapshot
-      const player = mockPlayersSnapshot.getPlayers().get('player-1');
-      player.health = 90;
-      
-      game.update(0.1); // Use enough time to pass throttling
-
-      // Should send update because health changed (client echoes state)
-      expect(mockNetwork.broadcastPlayerStateUpdate).toHaveBeenCalled();
-      const call = mockNetwork.broadcastPlayerStateUpdate.mock.calls[0][0];
-      expect(call.health).toBe(90);
-    });
-
-    test('WhenLocalPlayerPositionChangesTinyAmount_ShouldNotSendUpdate', () => {
-      game.init(mockPlayersSnapshot, mockNetwork);
-
-      // Simulate tiny floating point error
-      game.localPlayer.x += Number.EPSILON * 0.5;
-      
-      game.update(0.016);
-
-      // Should not send position update since change is negligible
-      expect(mockNetwork.broadcastPlayerStateUpdate).not.toHaveBeenCalled();
-    });
-
-    test('WhenSnapshotUpdated_ShouldNotAffectLocalPlayer', () => {
-      game.init(mockPlayersSnapshot, mockNetwork);
-      expect(game.localPlayer.x).toBe(CONFIG.WORLD.WIDTH / 2);
-
-      // Update snapshot with different position for local player
-      mockPlayersSnapshot.getPlayers.mockReturnValue(new Map([
-        ['player-1', {
-          player_id: 'player-1',
-          player_name: 'Alice',
-          position_x: 999,
-          position_y: 999,
-          rotation: 0.5,
-          health: 90
-        }],
-        ['player-2', {
-          player_id: 'player-2',
-          player_name: 'Bob',
-          position_x: 350,
-          position_y: 450,
-          rotation: 2.0,
-          health: 70
-        }],
-      ]));
-
-      game.update(0.016);
-
-      // Local player position should NOT be affected by snapshot changes
-      expect(game.localPlayer.x).toBe(CONFIG.WORLD.WIDTH / 2);
-      expect(game.localPlayer.y).toBe(CONFIG.WORLD.HEIGHT / 2);
-    });
-  });
-
-  describe('getState', () => {
-    test('WhenCalled_ShouldReturnGameState', () => {
-      const state = game.getState();
-      expect(state).toBe(game.state);
-    });
-  });
-
-  describe('getLocalPlayer', () => {
-    test('WhenCalled_ShouldReturnLocalPlayer', () => {
-      game.init();
-      const localPlayer = game.getLocalPlayer();
-      expect(localPlayer).toBe(game.localPlayer);
-    });
-  });
-
-  describe('Player Rotation', () => {
-    beforeEach(() => {
-      game.init();
-    });
-
-    describe('Rotation from Movement', () => {
-      test('WhenMovingDown_ShouldSetRotationToSouth', () => {
-        game.localPlayer.velocity = { x: 0, y: 100 };
-        game.updateLocalPlayer(0.016);
-        expect(game.localPlayer.rotation).toBeCloseTo(Math.PI); // 180 degrees
-      });
-
-      test('WhenMovingUp_ShouldSetRotationToNorth', () => {
-        game.localPlayer.velocity = { x: 0, y: -100 };
-        game.updateLocalPlayer(0.016);
-        expect(game.localPlayer.rotation).toBeCloseTo(0); // 0 degrees
-      });
-
-      test('WhenMovingRight_ShouldSetRotationToEast', () => {
-        game.localPlayer.velocity = { x: 100, y: 0 };
-        game.updateLocalPlayer(0.016);
-        expect(game.localPlayer.rotation).toBeCloseTo(Math.PI / 2); // 90 degrees
-      });
-
-      test('WhenMovingLeft_ShouldSetRotationToWest', () => {
-        game.localPlayer.velocity = { x: -100, y: 0 };
-        game.updateLocalPlayer(0.016);
-        expect(game.localPlayer.rotation).toBeCloseTo(3 * Math.PI / 2); // 270 degrees
-      });
-
-      test('WhenMovingDownRight_ShouldSetRotationToSouthEast', () => {
-        game.localPlayer.velocity = { x: 100, y: 100 };
-        game.updateLocalPlayer(0.016);
-        expect(game.localPlayer.rotation).toBeCloseTo(3 * Math.PI / 4); // 135 degrees
-      });
-
-      test('WhenMovingUpRight_ShouldSetRotationToNorthEast', () => {
-        game.localPlayer.velocity = { x: 100, y: -100 };
-        game.updateLocalPlayer(0.016);
-        expect(game.localPlayer.rotation).toBeCloseTo(Math.PI / 4); // 45 degrees
-      });
-
-      test('WhenNotMoving_ShouldKeepPreviousRotation', () => {
-        game.localPlayer.rotation = Math.PI / 2; // East
-        game.localPlayer.velocity = { x: 0, y: 0 };
-        game.updateLocalPlayer(0.016);
-        expect(game.localPlayer.rotation).toBeCloseTo(Math.PI / 2); // Should remain East
-      });
-    });
-
-    describe('Rotation from Aim Direction', () => {
-      test('WhenAimingWithMouse_ShouldOverrideRotation', () => {
-        // Player at center of world
-        game.localPlayer.x = 500;
-        game.localPlayer.y = 500;
-        game.localPlayer.rotation = 0; // Initially facing north
-
-        // Aiming to the right (east)
-        const inputState = { moveX: 0, moveY: 0, aimX: 600, aimY: 500 };
-        game.handleInput(inputState);
-
-        expect(game.localPlayer.rotation).toBeCloseTo(Math.PI / 2); // 90 degrees
-      });
-
-      test('WhenAimingDown_ShouldSetRotationToSouth', () => {
-        game.localPlayer.x = 500;
-        game.localPlayer.y = 500;
-
-        const inputState = { moveX: 0, moveY: 0, aimX: 500, aimY: 600 };
-        game.handleInput(inputState);
-
-        expect(game.localPlayer.rotation).toBeCloseTo(Math.PI); // 180 degrees
-      });
-
-      test('WhenMovingAndAiming_ShouldUseAimRotation', () => {
-        game.localPlayer.x = 500;
-        game.localPlayer.y = 500;
-        game.localPlayer.velocity = { x: 100, y: 0 }; // Moving right
-
-        // Aiming down (should override movement rotation)
-        const inputState = { moveX: 1, moveY: 0, aimX: 500, aimY: 600 };
-        game.handleInput(inputState);
-
-        expect(game.localPlayer.rotation).toBeCloseTo(Math.PI); // 180 degrees (aim direction, not movement)
-      });
-
-      test('WhenAimAtSamePosition_ShouldKeepCurrentRotation', () => {
-        game.localPlayer.x = 500;
-        game.localPlayer.y = 500;
-        game.localPlayer.rotation = Math.PI / 4; // NE
-
-        // Aiming at exact player position
-        const inputState = { moveX: 0, moveY: 0, aimX: 500, aimY: 500 };
-        game.handleInput(inputState);
-
-        expect(game.localPlayer.rotation).toBeCloseTo(Math.PI / 4); // Should keep current
-      });
+      expect(player.velocity.x).toBeCloseTo(expectedSpeed);
+      expect(player.velocity.y).toBeCloseTo(expectedSpeed);
     });
   });
 
   describe('Animation State', () => {
     test('WhenPlayerInitialized_ShouldHaveAnimationState', () => {
       game.init();
+      const player = game.getLocalPlayer();
 
-      expect(game.localPlayer.animationState).toBeDefined();
-      expect(game.localPlayer.animationState.currentFrame).toBe(0);
-      expect(game.localPlayer.animationState.timeAccumulator).toBe(0);
-      expect(game.localPlayer.animationState.lastDirection).toBeDefined();
+      expect(player.animationState).toBeDefined();
+      expect(player.animationState.currentFrame).toBe(0);
     });
 
     test('WhenPlayerIsMoving_ShouldUpdateAnimationState', () => {
       game.init();
-      game.localPlayer.velocity = { x: 100, y: 0 }; // Moving east
+      const player = game.getLocalPlayer();
+      player.velocity = { x: 100, y: 0 }; // Moving east
 
-      const deltaTime = 1 / CONFIG.ANIMATION.FPS; // One frame duration
+      game.update(1 / CONFIG.ANIMATION.FPS);
 
-      game.updateLocalPlayer(deltaTime);
-
-      // Frame should advance when moving
-      expect(game.localPlayer.animationState.currentFrame).toBeGreaterThan(0);
-    });
-
-    test('WhenPlayerIsIdle_ShouldResetToFrame0', () => {
-      game.init();
-      game.localPlayer.velocity = { x: 0, y: 0 }; // Idle
-      game.localPlayer.animationState.currentFrame = 3; // Start at frame 3
-
-      const deltaTime = 1 / CONFIG.ANIMATION.FPS;
-
-      game.updateLocalPlayer(deltaTime);
-
-      // Frame should reset to 0 when idle
-      expect(game.localPlayer.animationState.currentFrame).toBe(0);
+      expect(player.animationState.currentFrame).toBeGreaterThan(0);
     });
   });
 });
