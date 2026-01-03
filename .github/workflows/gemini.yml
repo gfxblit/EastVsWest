@@ -107,19 +107,65 @@ jobs:
         with:
           script: |
             const eventName = context.eventName;
+            const payload = context.payload;
             let prompt = '';
+            let discussionContext = '';
             
             if (eventName === 'issue_comment' || eventName === 'pull_request_review_comment') {
-              prompt = context.payload.comment.body;
+              prompt = payload.comment.body;
+              
+              if (eventName === 'pull_request_review_comment') {
+                discussionContext += `### File: ${payload.comment.path}\n`;
+                discussionContext += `### Diff Hunk:\n\`\`\`diff\n${payload.comment.diff_hunk}\n\`\`\`\n\n`;
+                
+                try {
+                  const { data: comments } = await github.rest.pulls.listReviewComments({
+                    owner: context.repo.owner,
+                    repo: context.repo.repo,
+                    pull_number: context.issue.number,
+                  });
+                  
+                  const currentComment = payload.comment;
+                  const threadComments = comments.filter(c => 
+                    c.path === currentComment.path && 
+                    (c.line === currentComment.line || c.original_line === currentComment.original_line || c.in_reply_to_id === currentComment.in_reply_to_id || c.id === currentComment.in_reply_to_id)
+                  ).sort((a, b) => new Date(a.created_at) - new Date(b.created_at));
+
+                  if (threadComments.length > 1) {
+                    discussionContext += `### Discussion Thread:\n`;
+                    for (const c of threadComments) {
+                      discussionContext += `**@${c.user.login}**: ${c.body}\n\n`;
+                    }
+                  }
+                } catch (e) {
+                  console.error("Error fetching review comments:", e);
+                }
+              }
             } else if (eventName === 'issues') {
-              prompt = context.payload.issue.body || context.payload.issue.title;
+              prompt = payload.issue.body || payload.issue.title;
             } else if (eventName === 'pull_request_review') {
-              prompt = context.payload.review.body;
+              prompt = payload.review.body;
+              try {
+                const { data: comments } = await github.rest.pulls.listReviewCommentsForReview({
+                  owner: context.repo.owner,
+                  repo: context.repo.repo,
+                  pull_number: context.issue.number,
+                  review_id: payload.review.id,
+                });
+                if (comments.length > 0) {
+                  discussionContext += `### Review Comments:\n`;
+                  for (const c of comments) {
+                    discussionContext += `**${c.path}**:\n\`\`\`diff\n${c.diff_hunk}\n\`\`\`\n**@${c.user.login}**: ${c.body}\n\n`;
+                  }
+                }
+              } catch (e) {
+                console.error("Error fetching review comments for review:", e);
+              }
             }
             
-            // Remove the @gemini-cli mention to get the clean instruction
             const cleanPrompt = prompt.replace(/@gemini-cli/g, '').trim();
             core.setOutput('prompt', cleanPrompt);
+            core.setOutput('discussion_context', discussionContext);
 
       - name: Acknowledge request
         id: acknowledge
@@ -145,6 +191,8 @@ jobs:
           Issue Title: ${{ github.event.issue.title || github.event.pull_request.title }}
           Issue Author: ${{ github.event.issue.user.login || github.event.pull_request.user.login }}
           Issue State: ${{ github.event.issue.state || github.event.pull_request.state }}
+          Issue/PR Body:
+          ${{ github.event.issue.body || github.event.pull_request.body }}
           </formatted_context>
 
           <pr_or_issue_body>
@@ -152,6 +200,7 @@ jobs:
           </pr_or_issue_body>
 
           <comments>
+          ${{ steps.extract_prompt.outputs.discussion_context }}
           </comments>
 
           <images_info>
