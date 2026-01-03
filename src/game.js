@@ -345,7 +345,7 @@ export class Game {
     const dy = victim.position_y - attacker.position_y;
     const distance = Math.sqrt(dx * dx + dy * dy);
 
-    if (distance > range + CONFIG.RENDER.PLAYER_RADIUS) {
+    if (distance > range + CONFIG.COMBAT.PLAYER_HITBOX_RADIUS) {
       return false;
     }
 
