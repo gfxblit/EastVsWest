@@ -99,17 +99,19 @@ jobs:
           GITHUB_TOKEN: ${{ steps.mint_identity_token.outputs.token || secrets.GITHUB_TOKEN || github.token }}
           PR_NUMBER: ${{ github.event.pull_request.number }}
           MESSAGE: |-
-            🤖 Hi @${{ github.actor }}, I've received your inline code requestt and I'm on it! You can track my progress [in the logs](${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}).
+            🤖 Hi @${{ github.actor }}, I've received your inline code request and I'm on it! You can track my progress [in the logs](${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}).
           REPOSITORY: ${{ github.repository }}
           TRIGGER_COMMENT_ID: ${{ steps.extract_prompt.outputs.trigger_comment_id }}
+          EVENT_NAME: ${{ github.event_name }}
         run: |-
-          COMMENT_URL=$(gh api -X POST "/repos/${REPOSITORY}/pulls/${PR_NUMBER}/comments" \
-            -f body="${MESSAGE}" \
-            -f in_reply_to="${TRIGGER_COMMENT_ID}" \
-            --jq '.html_url')
-          echo "comment_url=$COMMENT_URL" >> $GITHUB_OUTPUT
-          COMMENT_ID=$(echo $COMMENT_URL | grep -oE '[0-9]+$')
-          echo "comment_id=$COMMENT_ID" >> $GITHUB_OUTPUT
+          if [ "${EVENT_NAME}" == "pull_request_review_comment" ]; then
+            COMMENT_URL=$(gh api -X POST "/repos/${REPOSITORY}/pulls/${PR_NUMBER}/comments" \
+              -f body="${MESSAGE}" \
+              -F in_reply_to="${TRIGGER_COMMENT_ID}" \
+              --jq '.html_url')
+          else
+            COMMENT_URL=$(gh pr comment "${PR_NUMBER}" --body "${MESSAGE}" --repo "${REPOSITORY}")
+          fi
 
       - name: Set Gemini prompt
         run: |
@@ -374,4 +376,4 @@ jobs:
         run: |-
           gh api -X POST "/repos/${REPOSITORY}/pulls/${PR_NUMBER}/comments" \
             -f body="${MESSAGE}" \
-            -f in_reply_to="${TRIGGER_COMMENT_ID}"
+            -F in_reply_to="${TRIGGER_COMMENT_ID}"
