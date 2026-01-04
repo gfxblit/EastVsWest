@@ -143,7 +143,7 @@ describe('Client Interpolation Integration (Real Network)', () => {
     // To target 'midpoint' time, we must pass 'midpoint + delay' to interpolatePosition
     const renderTime = midpoint + CONFIG.NETWORK.INTERPOLATION_DELAY_MS;
     
-    const result = renderer.interpolatePosition(playerViewOfHost, renderTime);
+    const result = playerSnapshot.getInterpolatedPlayerState(hostUser.id, renderTime);
     
     // halfway between 0 and 5 is 2.5
     expect(result.x).toBeCloseTo(2.5, 1);

@@ -113,8 +113,8 @@ describe('Health Synchronization Integration', () => {
     for (let i = 0; i < iterations; i++) {
         // We need to access the method we are going to implement
         // Since it's not implemented yet, this test will fail
-        if (typeof hostGame.updateAllPlayersHealth === 'function') {
-            hostGame.updateAllPlayersHealth(deltaTime);
+        if (typeof hostGame.update === 'function') {
+            hostGame.update(deltaTime);
         }
     }
     
