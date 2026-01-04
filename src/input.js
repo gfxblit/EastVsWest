@@ -221,24 +221,34 @@ export class Input {
     }
   }
 
+  /**
+   * Checks if a touch event target is a UI button (attack/ability).
+   * @param {Touch|Event} targetObj - The touch or event object to check.
+   * @returns {boolean} - True if the touch is NOT on a button.
+   */
+  isValidJoystickTouch(targetObj) {
+    if (targetObj.target && targetObj.target.closest) {
+      return !targetObj.target.closest('#attack-button') && !targetObj.target.closest('#ability-button');
+    }
+    return true;
+  }
+
+  /**
+   * Handles touch start events to activate the joystick.
+   * @param {TouchEvent} event - The touch start event.
+   */
   handleTouchStart(event) {
     // Ignore if touch is on a button
-    if (event.target && event.target.closest) {
-      if (event.target.closest('#attack-button') || event.target.closest('#ability-button')) {
-        return;
-      }
+    if (!this.isValidJoystickTouch(event)) {
+      return;
     }
 
     event.preventDefault();
     
     // Find a touch that isn't on a button to start the joystick
     const changedTouches = event.changedTouches || [];
-    const touch = Array.from(changedTouches).find(t => {
-      if (t.target && t.target.closest) {
-        return !t.target.closest('#attack-button') && !t.target.closest('#ability-button');
-      }
-      return true;
-    }) || (event.touches && event.touches[0]);
+    const touch = Array.from(changedTouches).find(t => this.isValidJoystickTouch(t)) || 
+                  (event.touches && event.touches[0]);
 
     if (!touch) return;
 
@@ -269,6 +279,11 @@ export class Input {
     }
   }
 
+  /**
+   * Handles touch move events to update joystick position.
+   * Only responds to the touch ID that activated the joystick.
+   * @param {TouchEvent} event - The touch move event.
+   */
   handleTouchMove(event) {
     event.preventDefault();
     if (!this.touchState.active) return;
@@ -284,6 +299,11 @@ export class Input {
     this.updateMovement();
   }
 
+  /**
+   * Handles touch end events to deactivate the joystick.
+   * Only deactivates if the specific joystick touch ended.
+   * @param {TouchEvent} event - The touch end event.
+   */
   handleTouchEnd(event) {
     if (!this.touchState.active) return;
 

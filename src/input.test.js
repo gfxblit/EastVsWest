@@ -759,6 +759,14 @@ describe('Input', () => {
     });
 
     test('WhenSecondaryTouchEnds_ShouldNotDeactivateJoystickIfPrimaryTouchStillActive', () => {
+      // Helper to create mock TouchEvents with proper property definitions
+      const createMockTouchEvent = (type, touches = [], changedTouches = []) => {
+        const event = new TouchEvent(type, { cancelable: true });
+        Object.defineProperty(event, 'touches', { value: touches });
+        Object.defineProperty(event, 'changedTouches', { value: changedTouches });
+        return event;
+      };
+
       // Start primary touch (joystick)
       const primaryTouch = {
         identifier: 10,
@@ -766,13 +774,10 @@ describe('Input', () => {
         clientX: 100,
         clientY: 200,
       };
-      const startEvent = new TouchEvent('touchstart', {
-        cancelable: true,
-      });
-      Object.defineProperty(startEvent, 'touches', { value: [primaryTouch] });
-      Object.defineProperty(startEvent, 'changedTouches', { value: [primaryTouch] });
       
+      const startEvent = createMockTouchEvent('touchstart', [primaryTouch], [primaryTouch]);
       input.handleTouchStart(startEvent);
+      
       expect(input.touchState.active).toBe(true);
       expect(input.touchState.joystickTouchId).toBe(10);
 
@@ -783,9 +788,10 @@ describe('Input', () => {
         clientX: 150,
         clientY: 200,
       };
-      const moveEvent = new TouchEvent('touchmove', { cancelable: true });
-      Object.defineProperty(moveEvent, 'touches', { value: [movedPrimaryTouch] });
+      
+      const moveEvent = createMockTouchEvent('touchmove', [movedPrimaryTouch], []);
       input.handleTouchMove(moveEvent);
+      
       expect(input.inputState.moveX).toBeGreaterThan(0);
 
       // Start secondary touch
@@ -795,21 +801,20 @@ describe('Input', () => {
         clientX: 300,
         clientY: 400,
       };
-      const secondaryStartEvent = new TouchEvent('touchstart', {
-        cancelable: true,
-      });
-      Object.defineProperty(secondaryStartEvent, 'touches', { value: [primaryTouch, secondaryTouch] });
-      Object.defineProperty(secondaryStartEvent, 'changedTouches', { value: [secondaryTouch] });
       
+      const secondaryStartEvent = createMockTouchEvent(
+        'touchstart', 
+        [primaryTouch, secondaryTouch], 
+        [secondaryTouch]
+      );
       input.handleTouchStart(secondaryStartEvent);
 
       // End secondary touch (primary is still in 'touches')
-      const secondaryEndEvent = new TouchEvent('touchend', {
-        cancelable: true,
-      });
-      Object.defineProperty(secondaryEndEvent, 'touches', { value: [primaryTouch] });
-      Object.defineProperty(secondaryEndEvent, 'changedTouches', { value: [secondaryTouch] });
-      
+      const secondaryEndEvent = createMockTouchEvent(
+        'touchend', 
+        [primaryTouch], 
+        [secondaryTouch]
+      );
       input.handleTouchEnd(secondaryEndEvent);
 
       // ASSERT: Joystick should still be active!
