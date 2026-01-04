@@ -117,6 +117,12 @@ jobs:
             echo "comment_type=issue" >> $GITHUB_OUTPUT
           fi
           echo "comment_id=$COMMENT_ID" >> $GITHUB_OUTPUT
+          echo "GEMINI_COMMENT_ID=$COMMENT_ID" >> $GITHUB_ENV
+          if [ "${EVENT_NAME}" == "pull_request_review_comment" ]; then
+            echo "GEMINI_COMMENT_TYPE=pull" >> $GITHUB_ENV
+          else
+            echo "GEMINI_COMMENT_TYPE=issue" >> $GITHUB_ENV
+          fi
 
       - name: Set Gemini prompt
         run: |
@@ -308,6 +314,8 @@ jobs:
         id: gemini_3_flash
         continue-on-error: true
         env:
+          GEMINI_COMMENT_ID: ${{ env.GEMINI_COMMENT_ID }}
+          GEMINI_COMMENT_TYPE: ${{ env.GEMINI_COMMENT_TYPE }}
           # SUPABASE_URL: ${{ env.SUPABASE_URL }}
           # SUPABASE_ANON_KEY: ${{ env.SUPABASE_ANON_KEY }}
           # VITE_SUPABASE_URL: ${{ env.VITE_SUPABASE_URL }}
@@ -328,6 +336,8 @@ jobs:
         id: gemini_2_5_pro
         continue-on-error: true
         env:
+          GEMINI_COMMENT_ID: ${{ env.GEMINI_COMMENT_ID }}
+          GEMINI_COMMENT_TYPE: ${{ env.GEMINI_COMMENT_TYPE }}
           # SUPABASE_URL: ${{ env.SUPABASE_URL }}
           # SUPABASE_ANON_KEY: ${{ env.SUPABASE_ANON_KEY }}
           # VITE_SUPABASE_URL: ${{ env.VITE_SUPABASE_URL }}
@@ -347,6 +357,8 @@ jobs:
         uses: google-github-actions/run-gemini-cli@v0.1.18
         id: gemini_2_5_flash
         env:
+          GEMINI_COMMENT_ID: ${{ env.GEMINI_COMMENT_ID }}
+          GEMINI_COMMENT_TYPE: ${{ env.GEMINI_COMMENT_TYPE }}
           # SUPABASE_URL: ${{ env.SUPABASE_URL }}
           # SUPABASE_ANON_KEY: ${{ env.SUPABASE_ANON_KEY }}
           # VITE_SUPABASE_URL: ${{ env.VITE_SUPABASE_URL }}
