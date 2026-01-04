@@ -180,11 +180,14 @@ jobs:
              - For code changes: `git add <files>`, `git commit -m "<message>\n\nCo-authored-by: ${{ github.actor }} <${{ github.actor_id }}+${{ github.actor }}@users.noreply.github.com>"`, `git push origin HEAD`
 
           3. Final Summary:
-             - Remove the spinner and post a final summary in the same comment.
+             - Remove the spinner and post a final summary in the same comment using `gh api`.
+             - **MANDATORY**: You MUST execute the `gh api` command to make this summary visible. Just generating the text is not enough.
              - Always include: [View job run](${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }})
 
           Important Notes:
-          - Communicate ONLY by updating your single acknowledgement comment.
+          - **CRITICAL**: Your standard text output is NOT posted to GitHub. The user will NOT see anything you write unless you explicitly use the `gh api` command to update the comment.
+          - **ALWAYS** ends your execution by updating the comment one last time with the final result.
+          - Communicate ONLY by updating your single acknowledgement comment (ID: ${{ steps.acknowledge.outputs.comment_id }}).
           - REPOSITORY SETUP: Follow GEMINI.md for repo-specific setup and standards.
           PROMPT_CONTENT
           echo "EOF" >> $GITHUB_ENV
