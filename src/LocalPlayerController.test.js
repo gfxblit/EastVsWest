@@ -79,4 +79,43 @@ describe('LocalPlayerController', () => {
     expect(player.health).toBe(50);
     expect(player.weapon).toBe('spear');
   });
+
+  describe('getCooldownStatus', () => {
+    beforeEach(() => {
+      controller = new LocalPlayerController(mockNetwork, null);
+    });
+
+    test('WhenNoCooldown_ShouldReturnZeros', () => {
+      const status = controller.getCooldownStatus();
+      expect(status.attackPct).toBe(0);
+      expect(status.abilityPct).toBe(0);
+    });
+
+    test('WhenAttackOnCooldown_ShouldReturnPercentage', () => {
+      const player = controller.getPlayer();
+      const now = Date.now();
+      
+      // Mock weapon with 1.0 attack speed (1000ms cooldown)
+      player.weapon = 'spear'; 
+      player.lastAttackTime = now - 500; // Halfway through cooldown
+
+      const status = controller.getCooldownStatus();
+      
+      // Should be around 0.5 (50%)
+      expect(status.attackPct).toBeCloseTo(0.5, 1);
+    });
+
+    test('WhenSpecialOnCooldown_ShouldReturnPercentage', () => {
+      const player = controller.getPlayer();
+      const now = Date.now();
+      
+      // Special cooldown is 3000ms by default
+      const cooldown = CONFIG.COMBAT.SPECIAL_ABILITY_COOLDOWN_MS;
+      player.lastSpecialTime = now - (cooldown / 2); // Halfway
+
+      const status = controller.getCooldownStatus();
+      
+      expect(status.abilityPct).toBeCloseTo(0.5, 1);
+    });
+  });
 });

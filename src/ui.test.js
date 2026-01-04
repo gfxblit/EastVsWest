@@ -29,6 +29,12 @@ describe('UI', () => {
       <div id="spectator-controls" class="hidden">
         <span id="spectating-name"></span>
       </div>
+      <button id="attack-button" class="touch-btn attack-btn">
+        <div class="cooldown-overlay"></div>
+      </button>
+      <button id="ability-button" class="touch-btn ability-btn">
+        <div class="cooldown-overlay"></div>
+      </button>
     `;
 
     ui = new UI();
@@ -289,6 +295,64 @@ describe('UI', () => {
     test('WhenZoneWarningNotFound_ShouldNotThrowError', () => {
       document.body.innerHTML = '';
       expect(() => ui.showZoneWarning(true)).not.toThrow();
+    });
+  });
+
+  describe('updateActionButtons', () => {
+    let attackBtn, abilityBtn;
+
+    beforeEach(() => {
+      attackBtn = document.getElementById('attack-button');
+      abilityBtn = document.getElementById('ability-button');
+    });
+
+    test('WhenWeaponProvided_ShouldEnableButtons', () => {
+      ui.updateActionButtons({ id: 'spear' });
+      expect(attackBtn.disabled).toBe(false);
+      expect(abilityBtn.disabled).toBe(false);
+    });
+
+    test('WhenNoWeaponProvided_ShouldDisableButtons', () => {
+      ui.updateActionButtons(null);
+      expect(attackBtn.disabled).toBe(true);
+      expect(abilityBtn.disabled).toBe(true);
+    });
+  });
+
+  describe('updateCooldowns', () => {
+    let attackOverlay, abilityOverlay;
+
+    beforeEach(() => {
+        // Need to manually add overlay elements to DOM mock for this test
+        const attackBtn = document.getElementById('attack-button');
+        const abilityBtn = document.getElementById('ability-button');
+        
+        // Ensure overlays exist
+        if (!attackBtn.querySelector('.cooldown-overlay')) {
+            const overlay = document.createElement('div');
+            overlay.className = 'cooldown-overlay';
+            attackBtn.appendChild(overlay);
+        }
+        if (!abilityBtn.querySelector('.cooldown-overlay')) {
+             const overlay = document.createElement('div');
+             overlay.className = 'cooldown-overlay';
+             abilityBtn.appendChild(overlay);
+        }
+
+        attackOverlay = document.querySelector('#attack-button .cooldown-overlay');
+        abilityOverlay = document.querySelector('#ability-button .cooldown-overlay');
+    });
+
+    test('WhenCooldownActive_ShouldUpdateOverlayHeight', () => {
+      ui.updateCooldowns(0.5, 0.2);
+      expect(attackOverlay.style.height).toBe('50%');
+      expect(abilityOverlay.style.height).toBe('20%');
+    });
+
+    test('WhenCooldownComplete_ShouldResetOverlay', () => {
+      ui.updateCooldowns(0, 0);
+      expect(attackOverlay.style.height).toBe('0%');
+      expect(abilityOverlay.style.height).toBe('0%');
     });
   });
 });

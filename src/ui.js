@@ -140,4 +140,39 @@ export class UI {
       }
     }
   }
+
+  updateActionButtons(weapon) {
+    const attackBtn = document.getElementById('attack-button');
+    const abilityBtn = document.getElementById('ability-button');
+    
+    // Disable if no weapon or if weapon is 'fist' (if that's the desired logic, 
+    // but the issue says "if no weapon is equipped". 
+    // Assuming 'fist' is the default "no weapon" state in some contexts, 
+    // but typically "no weapon equipped" means null.
+    // However, looking at CONFIG, 'FIST' is a weapon.
+    // The issue says: "if no weapon is equipped the attack/special buttons should be disabled"
+    // I will interpret this as weapon == null. 
+    // Wait, LocalPlayerController initializes with null weapon if not provided?
+    // Let's check LocalPlayerController again. 
+    // It says: weapon: data?.equipped_weapon || null.
+    // So null means no weapon.
+    
+    const disabled = !weapon;
+
+    if (attackBtn) attackBtn.disabled = disabled;
+    if (abilityBtn) abilityBtn.disabled = disabled;
+  }
+
+  updateCooldowns(attackPct, abilityPct) {
+    const attackOverlay = document.querySelector('#attack-button .cooldown-overlay');
+    const abilityOverlay = document.querySelector('#ability-button .cooldown-overlay');
+
+    if (attackOverlay) {
+      attackOverlay.style.height = `${attackPct * 100}%`;
+    }
+    
+    if (abilityOverlay) {
+      abilityOverlay.style.height = `${abilityPct * 100}%`;
+    }
+  }
 }
