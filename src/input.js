@@ -23,6 +23,7 @@ export class Input {
     // Touch state
     this.touchState = {
       active: false,
+      joystickTouchId: null,
       startX: 0,
       startY: 0,
       currentX: 0,
@@ -229,7 +230,17 @@ export class Input {
     }
 
     event.preventDefault();
-    const touch = event.touches[0];
+    
+    // Find a touch that isn't on a button to start the joystick
+    const changedTouches = event.changedTouches || [];
+    const touch = Array.from(changedTouches).find(t => {
+      if (t.target && t.target.closest) {
+        return !t.target.closest('#attack-button') && !t.target.closest('#ability-button');
+      }
+      return true;
+    }) || (event.touches && event.touches[0]);
+
+    if (!touch) return;
 
     // Only activate joystick if not already active
     if (!this.touchState.active) {
@@ -238,10 +249,6 @@ export class Input {
       if (!canvas) return;
 
       const rect = canvas.getBoundingClientRect();
-
-      // Calculate position relative to canvas
-      const x = touch.clientX - rect.left;
-      const y = touch.clientY - rect.top;
 
       // Position the joystick base at touch point
       if (this.touchControls) {
@@ -252,6 +259,7 @@ export class Input {
       }
 
       this.touchState.active = true;
+      this.touchState.joystickTouchId = touch.identifier;
       this.touchState.startX = touch.clientX;
       this.touchState.startY = touch.clientY;
       this.touchState.currentX = touch.clientX;
@@ -265,7 +273,11 @@ export class Input {
     event.preventDefault();
     if (!this.touchState.active) return;
 
-    const touch = event.touches[0];
+    // Find the touch that started the joystick
+    const touches = event.touches || [];
+    const touch = Array.from(touches).find(t => t.identifier === this.touchState.joystickTouchId);
+    if (!touch) return;
+
     this.touchState.currentX = touch.clientX;
     this.touchState.currentY = touch.clientY;
 
@@ -275,8 +287,22 @@ export class Input {
   handleTouchEnd(event) {
     if (!this.touchState.active) return;
 
+    // Check if the joystick touch ended
+    const changedTouches = event.changedTouches || [];
+    let joystickTouchEnded = Array.from(changedTouches).some(t => t.identifier === this.touchState.joystickTouchId);
+    
+    // Fallback: if no touches remain, the joystick touch must have ended
+    if (!joystickTouchEnded && event.touches && event.touches.length === 0) {
+      joystickTouchEnded = true;
+    }
+
+    if (!joystickTouchEnded) {
+      return;
+    }
+
     event.preventDefault();
     this.touchState.active = false;
+    this.touchState.joystickTouchId = null;
     this.touchState.currentX = this.touchState.startX;
     this.touchState.currentY = this.touchState.startY;
 

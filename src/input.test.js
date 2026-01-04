@@ -757,6 +757,66 @@ describe('Input', () => {
 
       expect(mockTouchControls.style.opacity).toBe('0');
     });
+
+    test('WhenSecondaryTouchEnds_ShouldNotDeactivateJoystickIfPrimaryTouchStillActive', () => {
+      // Start primary touch (joystick)
+      const primaryTouch = {
+        identifier: 10,
+        target: mockCanvas,
+        clientX: 100,
+        clientY: 200,
+      };
+      const startEvent = new TouchEvent('touchstart', {
+        cancelable: true,
+      });
+      Object.defineProperty(startEvent, 'touches', { value: [primaryTouch] });
+      Object.defineProperty(startEvent, 'changedTouches', { value: [primaryTouch] });
+      
+      input.handleTouchStart(startEvent);
+      expect(input.touchState.active).toBe(true);
+      expect(input.touchState.joystickTouchId).toBe(10);
+
+      // Move primary touch to set movement
+      const movedPrimaryTouch = {
+        identifier: 10,
+        target: mockCanvas,
+        clientX: 150,
+        clientY: 200,
+      };
+      const moveEvent = new TouchEvent('touchmove', { cancelable: true });
+      Object.defineProperty(moveEvent, 'touches', { value: [movedPrimaryTouch] });
+      input.handleTouchMove(moveEvent);
+      expect(input.inputState.moveX).toBeGreaterThan(0);
+
+      // Start secondary touch
+      const secondaryTouch = {
+        identifier: 20,
+        target: mockCanvas,
+        clientX: 300,
+        clientY: 400,
+      };
+      const secondaryStartEvent = new TouchEvent('touchstart', {
+        cancelable: true,
+      });
+      Object.defineProperty(secondaryStartEvent, 'touches', { value: [primaryTouch, secondaryTouch] });
+      Object.defineProperty(secondaryStartEvent, 'changedTouches', { value: [secondaryTouch] });
+      
+      input.handleTouchStart(secondaryStartEvent);
+
+      // End secondary touch (primary is still in 'touches')
+      const secondaryEndEvent = new TouchEvent('touchend', {
+        cancelable: true,
+      });
+      Object.defineProperty(secondaryEndEvent, 'touches', { value: [primaryTouch] });
+      Object.defineProperty(secondaryEndEvent, 'changedTouches', { value: [secondaryTouch] });
+      
+      input.handleTouchEnd(secondaryEndEvent);
+
+      // ASSERT: Joystick should still be active!
+      expect(input.touchState.active).toBe(true);
+      expect(input.touchState.joystickTouchId).toBe(10);
+      expect(input.inputState.moveX).not.toBe(0);
+    });
   });
 
   describe('Touch Controls - Attack and Ability Buttons', () => {
