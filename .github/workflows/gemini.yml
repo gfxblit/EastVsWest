@@ -121,29 +121,18 @@ jobs:
           <trigger_phrase>@gemini</trigger_phrase>
 
           <comment_tool_info>
-          IMPORTANT: Use the `gh` tool via `run_shell_command` to update your progress and provide the final result.
-
-          ALWAYS update the single comment thread where you were triggered.
-
+          IMPORTANT: Use the `run_shell_command` tool to execute `gh api` and update your progress comment.
+          
           Your progress comment ID is: ${{ steps.acknowledge.outputs.comment_id }}
-          The type of your comment is: ${{ steps.acknowledge.outputs.comment_type }} (pull = PR review comment, issue = regular PR comment)
+          The type of your comment is: ${{ steps.acknowledge.outputs.comment_type }}
 
           To update your comment body robustly:
-          If type is 'pull':
-          printf "Your updated Markdown text" | gh api -X PATCH /repos/${{ github.repository }}/pulls/comments/${{ steps.acknowledge.outputs.comment_id }} --input -
-          If type is 'issue':
-          printf "Your updated Markdown text" | gh api -X PATCH /repos/${{ github.repository }}/issues/comments/${{ steps.acknowledge.outputs.comment_id }} --input -
+          gh api -X PATCH /repos/${{ github.repository }}/${{ steps.acknowledge.outputs.comment_type == 'pull' && 'pulls' || 'issues' }}/comments/${{ steps.acknowledge.outputs.comment_id }} -f body="Your updated Markdown text"
 
-          CRITICAL: Do not construct new top-level comments or PR URLs. Focus exclusively on the requested code changes or questions.
+          CRITICAL: You are already on the correct branch. DO NOT spend time finding branch names or constructing PR URLs. Focus exclusively on the code changes or questions.
           </comment_tool_info>
 
           Your task is to analyze the context, understand the request, and provide helpful responses and/or implement code changes as needed.
-
-          IMPORTANT CLARIFICATIONS:
-          - PRIMARY communication happens through your main GitHub comment (id: ${{ steps.acknowledge.outputs.comment_id }}).
-          - Use the `gh api` command provided above to update this comment immediately with a Todo List.
-          - DO NOT spend time finding branch names or constructing compare URLs.
-          - You are already on the correct branch. Just commit and push.
 
           Follow these steps:
 
@@ -152,25 +141,14 @@ jobs:
              - Format: ### Tasks\n- [ ] Task 1\n- [ ] Task 2\n...
              - Use the spinner: <img src="https://github.com/user-attachments/assets/5ac382c7-e004-429b-8e35-7feb3e8f9c6f" width="14px" height="14px" style="vertical-align: middle; margin-left: 4px;" />
 
-          2. Gather Context:
-             - Analyze the data and files.
-             - Mark as complete: [x] Gather context
-
-          3. Understand and Execute:
+          2. Understand and Execute:
              - Implement changes or answer questions.
              - Update the comment as you finish each task.
-             - For code changes:
-               - Stage: `git add <files>`
-               - Commit: `git commit -m "<message>\n\nCo-authored-by: ${{ github.actor }} <${{ github.actor_id }}+${{ github.actor }}@users.noreply.github.com>"`
-               - Push: `git push origin HEAD`
+             - For code changes: `git add <files>`, `git commit -m "<message>\n\nCo-authored-by: ${{ github.actor }} <${{ github.actor_id }}+${{ github.actor }}@users.noreply.github.com>"`, `git push origin HEAD`
 
-          4. Final Summary:
+          3. Final Summary:
              - Remove the spinner and post a final summary in the same comment.
              - Always include: [View job run](${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }})
-
-          Important Notes:
-          - Communicate ONLY by updating your single acknowledgement comment.
-          - REPOSITORY SETUP: Follow GEMINI.md for repo-specific setup and standards.
           PROMPT_CONTENT
           echo "EOF" >> $GITHUB_ENV
 
@@ -191,6 +169,52 @@ jobs:
           upload_artifacts: '${{ vars.UPLOAD_ARTIFACTS }}'
           workflow_name: 'gemini'
           prompt: ${{ env.GEMINI_PROMPT }}
+          settings: |-
+            {
+              "model": {
+                "maxSessionTurns": 25
+              },
+              "telemetry": {
+                "enabled": false,
+                "target": "local",
+                "outfile": ".gemini/telemetry.log"
+              },
+              "mcpServers": {
+                "github": {
+                  "command": "docker",
+                  "args": [
+                    "run",
+                    "-i",
+                    "--rm",
+                    "-e",
+                    "GITHUB_PERSONAL_ACCESS_TOKEN",
+                    "ghcr.io/github/github-mcp-server:v0.18.0"
+                  ],
+                  "includeTools": [
+                    "add_comment_to_pending_review",
+                    "create_pending_pull_request_review",
+                    "pull_request_read",
+                    "submit_pending_pull_request_review"
+                  ],
+                  "env": {
+                    "GITHUB_PERSONAL_ACCESS_TOKEN": "${GITHUB_TOKEN}"
+                  }
+                }
+              },
+              "tools": {
+                "core": [
+                  "run_shell_command(cat)",
+                  "run_shell_command(echo)",
+                  "run_shell_command(env)",
+                  "run_shell_command(gh)",
+                  "run_shell_command(git)",
+                  "run_shell_command(grep)",
+                  "run_shell_command(head)",
+                  "run_shell_command(ls)",
+                  "run_shell_command(tail)"
+                ]
+              }
+            }
 
       - name: Run Gemini CLI (gemini-2.5-pro)
         if: steps.gemini_3_flash.outcome != 'success'
@@ -210,6 +234,52 @@ jobs:
           upload_artifacts: '${{ vars.UPLOAD_ARTIFACTS }}'
           workflow_name: 'gemini'
           prompt: ${{ env.GEMINI_PROMPT }}
+          settings: |-
+            {
+              "model": {
+                "maxSessionTurns": 25
+              },
+              "telemetry": {
+                "enabled": false,
+                "target": "local",
+                "outfile": ".gemini/telemetry.log"
+              },
+              "mcpServers": {
+                "github": {
+                  "command": "docker",
+                  "args": [
+                    "run",
+                    "-i",
+                    "--rm",
+                    "-e",
+                    "GITHUB_PERSONAL_ACCESS_TOKEN",
+                    "ghcr.io/github/github-mcp-server:v0.18.0"
+                  ],
+                  "includeTools": [
+                    "add_comment_to_pending_review",
+                    "create_pending_pull_request_review",
+                    "pull_request_read",
+                    "submit_pending_pull_request_review"
+                  ],
+                  "env": {
+                    "GITHUB_PERSONAL_ACCESS_TOKEN": "${GITHUB_TOKEN}"
+                  }
+                }
+              },
+              "tools": {
+                "core": [
+                  "run_shell_command(cat)",
+                  "run_shell_command(echo)",
+                  "run_shell_command(env)",
+                  "run_shell_command(gh)",
+                  "run_shell_command(git)",
+                  "run_shell_command(grep)",
+                  "run_shell_command(head)",
+                  "run_shell_command(ls)",
+                  "run_shell_command(tail)"
+                ]
+              }
+            }
 
       - name: Run Gemini CLI (gemini-2.5-flash)
         if: steps.gemini_3_flash.outcome != 'success' && steps.gemini_2_5_pro.outcome != 'success'
@@ -228,6 +298,52 @@ jobs:
           upload_artifacts: '${{ vars.UPLOAD_ARTIFACTS }}'
           workflow_name: 'gemini'
           prompt: ${{ env.GEMINI_PROMPT }}
+          settings: |-
+            {
+              "model": {
+                "maxSessionTurns": 25
+              },
+              "telemetry": {
+                "enabled": false,
+                "target": "local",
+                "outfile": ".gemini/telemetry.log"
+              },
+              "mcpServers": {
+                "github": {
+                  "command": "docker",
+                  "args": [
+                    "run",
+                    "-i",
+                    "--rm",
+                    "-e",
+                    "GITHUB_PERSONAL_ACCESS_TOKEN",
+                    "ghcr.io/github/github-mcp-server:v0.18.0"
+                  ],
+                  "includeTools": [
+                    "add_comment_to_pending_review",
+                    "create_pending_pull_request_review",
+                    "pull_request_read",
+                    "submit_pending_pull_request_review"
+                  ],
+                  "env": {
+                    "GITHUB_PERSONAL_ACCESS_TOKEN": "${GITHUB_TOKEN}"
+                  }
+                }
+              },
+              "tools": {
+                "core": [
+                  "run_shell_command(cat)",
+                  "run_shell_command(echo)",
+                  "run_shell_command(env)",
+                  "run_shell_command(gh)",
+                  "run_shell_command(git)",
+                  "run_shell_command(grep)",
+                  "run_shell_command(head)",
+                  "run_shell_command(ls)",
+                  "run_shell_command(tail)"
+                ]
+              }
+            }
 
       - name: Expose Gemini Error Reports
         if: failure()
