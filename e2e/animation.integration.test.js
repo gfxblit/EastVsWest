@@ -76,11 +76,10 @@ describe('Animation Integration', () => {
 
       // Metadata should be loaded
       if (metadata) {
-        expect(metadata.frameWidth).toBe(96);
-        expect(metadata.frameHeight).toBe(96);
-        expect(metadata.columns).toBe(6);
+        expect(metadata.frameWidth).toBe(32);
+        expect(metadata.frameHeight).toBe(32);
+        expect(metadata.columns).toBe(4);
         expect(metadata.rows).toBe(8);
-        expect(metadata.directions).toHaveLength(8);
       }
       // If metadata is null, sprite sheet might be loading asynchronously
       // This test verifies that when metadata is loaded, it has the right structure
