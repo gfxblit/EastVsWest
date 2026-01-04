@@ -242,4 +242,36 @@ export class LocalPlayerController {
       this.player.rotation -= 2 * Math.PI;
     }
   }
+
+  getCooldownStatus() {
+    if (!this.player) return { attackPct: 0, abilityPct: 0 };
+
+    const now = Date.now();
+    const weaponId = this.player.weapon;
+    // Default to fist if weapon is null/invalid for cooldown calculation purposes, 
+    // although UI might disable buttons if weapon is null.
+    // However, if we do have a weapon (even fist), we want to show cooldowns.
+    const weaponConfig = Object.values(CONFIG.WEAPONS).find(w => w.id === weaponId) || CONFIG.WEAPONS.FIST;
+
+    const attackCooldown = 1000 / weaponConfig.attackSpeed;
+    const specialCooldown = CONFIG.COMBAT.SPECIAL_ABILITY_COOLDOWN_MS;
+
+    const attackElapsed = now - this.player.lastAttackTime;
+    const specialElapsed = now - this.player.lastSpecialTime;
+
+    let attackPct = 0;
+    if (attackElapsed < attackCooldown) {
+      attackPct = 1 - (attackElapsed / attackCooldown);
+    }
+
+    let abilityPct = 0;
+    if (specialElapsed < specialCooldown) {
+      abilityPct = 1 - (specialElapsed / specialCooldown);
+    }
+
+    return {
+      attackPct: Math.max(0, Math.min(1, attackPct)),
+      abilityPct: Math.max(0, Math.min(1, abilityPct))
+    };
+  }
 }

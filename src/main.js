@@ -43,6 +43,8 @@ class App {
     this.running = false;
     this.lastTimestamp = 0;
     this.animationFrameId = null;
+    this.lastWeaponId = null;
+    this.lastArmorId = null;
   }
 
   async init() {
@@ -475,6 +477,33 @@ class App {
     const localPlayer = this.game.getLocalPlayer();
     if (localPlayer && this.camera) {
       this.camera.update(localPlayer.x, localPlayer.y, CONFIG.CAMERA.LERP_FACTOR);
+    }
+
+    // Update UI
+    if (localPlayer) {
+      this.ui.updateHealth(localPlayer.health);
+      
+      // Update cooldowns
+      if (this.game.localPlayerController) {
+        const cooldowns = this.game.localPlayerController.getCooldownStatus();
+        this.ui.updateCooldowns(cooldowns.attackPct, cooldowns.abilityPct);
+      }
+
+      // Check for equipment changes
+      // We store the last known equipment on the App instance to avoid unnecessary DOM updates
+      const currentWeaponId = localPlayer.weapon;
+      const currentArmorId = localPlayer.armor;
+
+      if (this.lastWeaponId !== currentWeaponId || this.lastArmorId !== currentArmorId) {
+        const weaponConfig = currentWeaponId ? Object.values(CONFIG.WEAPONS).find(w => w.id === currentWeaponId) : null;
+        const armorConfig = currentArmorId ? Object.values(CONFIG.ARMOR).find(a => a.id === currentArmorId) : null;
+        
+        this.ui.updateEquipment(weaponConfig, armorConfig);
+        this.ui.updateActionButtons(weaponConfig);
+        
+        this.lastWeaponId = currentWeaponId;
+        this.lastArmorId = currentArmorId;
+      }
     }
 
     // Render
