@@ -83,7 +83,7 @@ jobs:
           script: |
             const payload = context.payload;
             const c = payload.comment;
-            const discussionContext = `**${c.path}**:\n\`\`\`diff\n${c.diff_hunk}\n\`\`\`\n**@${c.user.login}**: ${c.body}`;
+            const discussionContext = `**${c.path}**:\n` + '```diff\n' + `${c.diff_hunk}` + '\n```' + `\n**@${c.user.login}**: ${c.body}`;
             const reviewThreads = [{ id: c.id, path: c.path, body: c.body }];
             
             const cleanPrompt = c.body.replace(/@gemini/g, '').trim();
@@ -105,13 +105,17 @@ jobs:
           EVENT_NAME: ${{ github.event_name }}
         run: |-
           if [ "${EVENT_NAME}" == "pull_request_review_comment" ]; then
-            COMMENT_URL=$(gh api -X POST "/repos/${REPOSITORY}/pulls/${PR_NUMBER}/comments" \
+            COMMENT_ID=$(gh api -X POST "/repos/${REPOSITORY}/pulls/${PR_NUMBER}/comments" \
               -f body="${MESSAGE}" \
               -F in_reply_to="${TRIGGER_COMMENT_ID}" \
-              --jq '.html_url')
+              --jq '.id')
+            echo "comment_type=pull" >> $GITHUB_OUTPUT
           else
             COMMENT_URL=$(gh pr comment "${PR_NUMBER}" --body "${MESSAGE}" --repo "${REPOSITORY}")
+            COMMENT_ID=$(echo $COMMENT_URL | grep -oE '[0-9]+$')
+            echo "comment_type=issue" >> $GITHUB_OUTPUT
           fi
+          echo "comment_id=$COMMENT_ID" >> $GITHUB_OUTPUT
 
       - name: Set Gemini prompt
         run: |
@@ -144,6 +148,7 @@ jobs:
 
           <pr_number>${{ github.event.pull_request.number }}</pr_number>
           <gemini_comment_id>${{ steps.acknowledge.outputs.comment_id }}</gemini_comment_id>
+          <gemini_comment_type>${{ steps.acknowledge.outputs.comment_type }}</gemini_comment_type>
           <trigger_comment_id>${{ steps.extract_prompt.outputs.trigger_comment_id }}</trigger_comment_id>
           <review_threads>${{ steps.extract_prompt.outputs.review_threads }}</review_threads>
           <trigger_username>${{ github.actor }}</trigger_username>
@@ -151,12 +156,20 @@ jobs:
           <trigger_phrase>@gemini</trigger_phrase>
 
           <comment_tool_info>
-          IMPORTANT: You can use the `gh` CLI tool via `run_shell_command` to update your comment or respond to inline comments.
-          Example of updating your progress comment body using `gh`:
-          gh api -X PATCH /repos/${{ github.repository }}/pulls/comments/${{ steps.acknowledge.outputs.comment_id }} -f body="Your updated comment text here"
+          IMPORTANT: You can use the `gh` CLI tool via `run_shell_command` to update your progress and provide the final result.
+          
+          ALWAYS respond directly to the inline thread where you were triggered. 
+          
+          Your progress comment ID is: ${{ steps.acknowledge.outputs.comment_id }}
+          The type of your comment is: ${{ steps.acknowledge.outputs.comment_type }} (pull = PR review comment, issue = regular PR comment)
 
-          Example of responding to an inline comment thread in a PR (using a comment ID from review_threads):
-          gh api -X POST /repos/${{ github.repository }}/pulls/${{ github.event.pull_request.number }}/comments -f body="Your reply here" -f in_reply_to=<COMMENT_ID>
+          To update your comment body:
+          If type is 'pull':
+          gh api -X PATCH /repos/${{ github.repository }}/pulls/comments/${{ steps.acknowledge.outputs.comment_id }} -f body="Your updated Markdown text"
+          If type is 'issue':
+          gh api -X PATCH /repos/${{ github.repository }}/issues/comments/${{ steps.acknowledge.outputs.comment_id }} -f body="Your updated Markdown text"
+
+          CRITICAL: Do not create new top-level comments. Communicate ONLY by updating your single acknowledgement comment.
           </comment_tool_info>
 
           Your task is to analyze the context, understand the request, and provide helpful responses and/or implement code changes as needed.
@@ -165,7 +178,6 @@ jobs:
           - When asked to "review" code, read the code and provide review feedback (do not implement changes unless explicitly asked)
           - Your console outputs and tool results are NOT visible to the user
           - PRIMARY communication happens through your main GitHub comment (id: ${{ steps.acknowledge.outputs.comment_id }}).
-          - You must address the task in the trigger comment.
 
           Follow these steps:
 
@@ -373,7 +385,12 @@ jobs:
             🤖 I'm sorry @${{ github.actor }}, but I was unable to process your request. Please [see the logs](${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}) for more details.
           REPOSITORY: ${{ github.repository }}
           TRIGGER_COMMENT_ID: ${{ steps.extract_prompt.outputs.trigger_comment_id }}
+          EVENT_NAME: ${{ github.event_name }}
         run: |-
-          gh api -X POST "/repos/${REPOSITORY}/pulls/${PR_NUMBER}/comments" \
-            -f body="${MESSAGE}" \
-            -F in_reply_to="${TRIGGER_COMMENT_ID}"
+          if [ "${EVENT_NAME}" == "pull_request_review_comment" ]; then
+            gh api -X POST "/repos/${REPOSITORY}/pulls/${PR_NUMBER}/comments" \
+              -f body="${MESSAGE}" \
+              -F in_reply_to="${TRIGGER_COMMENT_ID}"
+          else
+            gh pr comment "${PR_NUMBER}" --body "${MESSAGE}" --repo "${REPOSITORY}"
+          fi
