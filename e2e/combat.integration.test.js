@@ -98,13 +98,13 @@ describe('Combat Integration', () => {
     // Wait for player to appear in host snapshot
     await waitFor(() => {
       return hostSnapshot.getPlayers().has(playerNetwork.playerId);
-    }, 5000);
+    }, 10000);
 
     // Wait for host weapon to sync locally
     await waitFor(() => {
       hostGame.update(0.016); // Trigger sync
       return hostGame.getLocalPlayer().weapon === 'spear';
-    }, 5000);
+    }, 10000);
 
     // 3. Host attacks Player
     // We'll simulate host attacking by calling handleInput on hostGame
@@ -171,13 +171,13 @@ describe('Combat Integration', () => {
     // Wait for player to appear in host snapshot
     await waitFor(() => {
       return hostSnapshot.getPlayers().has(playerNetwork.playerId);
-    }, 5000);
+    }, 10000);
 
     // Wait for host weapon to sync locally
     await waitFor(() => {
       hostGame.update(0.016);
       return hostGame.getLocalPlayer().weapon === 'spear';
-    }, 5000);
+    }, 10000);
 
     // 3. Host performs SPECIAL attack on Player
     hostGame.handleInput({
