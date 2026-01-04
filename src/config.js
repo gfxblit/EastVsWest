@@ -205,19 +205,10 @@ export const CONFIG = {
     FRAMES_PER_DIRECTION: 4,
   },
 
+  
   // Combat Settings
   COMBAT: {
-    SPECIAL_ABILITY_COOLDOWN_MS: 3000,
-    SPECIAL_DAMAGE_MULTIPLIER: 1.5,
-    ATTACK_ANIMATION_DURATION_SECONDS: 0.2, // 200ms animation
-    PLAYER_HITBOX_RADIUS: 60,
-    DEFAULT_THRUST_ARC: Math.PI / 4, // 45 degrees
-    DEFAULT_SWING_ARC: (120 * Math.PI) / 180, // 120 degrees
-    DEFAULT_SPIN_ARC: Math.PI * 2, // 360 degrees
-  },
-
-  // Combat Settings
-  COMBAT: {
+    ATTACK_AIM_DISTANCE: 100,
     SPECIAL_ABILITY_COOLDOWN_MS: 3000,
     SPECIAL_DAMAGE_MULTIPLIER: 1.5,
     ATTACK_ANIMATION_DURATION_SECONDS: 0.2, // 200ms animation
