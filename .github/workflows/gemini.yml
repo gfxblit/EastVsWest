@@ -6,11 +6,7 @@ on:
 
 jobs:
   gemini:
-    if: |-
-      github.event_name == 'pull_request_review_comment' &&
-      (github.event.comment.author_association == 'OWNER' || github.event.comment.author_association == 'CONTRIBUTOR' || github.event.comment.author_association == 'MEMBER' || github.event.comment.author_association == 'COLLABORATOR') &&
-      contains(github.event.comment.body, '@gemini') &&
-      !contains(github.event.comment.body, '@gemini /review')
+    if: github.event_name == 'pull_request_review_comment' && contains(fromJSON('["OWNER", "MEMBER", "COLLABORATOR", "CONTRIBUTOR"]'), github.event.comment.author_association) && contains(github.event.comment.body, '@gemini') && !contains(github.event.comment.body, '@gemini /review')
     runs-on: ubuntu-latest
     timeout-minutes: 7
     permissions:
@@ -21,8 +17,7 @@ jobs:
     steps:
       - name: Mint identity token
         id: mint_identity_token
-        if: |-
-          ${{ vars.APP_ID }}
+        if: ${{ vars.APP_ID }}
         uses: actions/create-github-app-token@v2
         with:
           app-id: ${{ vars.APP_ID }}
@@ -47,8 +42,8 @@ jobs:
 
       - name: Inject Gemini Credentials
         env:
-          GEMINI_SETTINGS_JSON: '${{ secrets.GEMINI_SETTINGS_JSON }}'
-          GEMINI_OAUTH_CREDS_JSON: '${{ secrets.GEMINI_OAUTH_CREDS_JSON }}'
+          GEMINI_SETTINGS_JSON: ${{ secrets.GEMINI_SETTINGS_JSON }}
+          GEMINI_OAUTH_CREDS_JSON: ${{ secrets.GEMINI_OAUTH_CREDS_JSON }}
         run: |
           if [ -n "$GEMINI_SETTINGS_JSON" ] && [ -n "$GEMINI_OAUTH_CREDS_JSON" ]; then
             mkdir -p ~/.gemini
@@ -64,14 +59,10 @@ jobs:
         uses: actions/github-script@v7
         with:
           script: |
-            const payload = context.payload;
-            const c = payload.comment;
-            const discussionContext = `**${c.path}**:\n` + '```diff\n' + `${c.diff_hunk}` + '\n```' + `\n**@${c.user.login}**: ${c.body}`;
+            const c = context.payload.comment;
+            const discussionContext = "**" + c.path + "**:\n```diff\n" + c.diff_hunk + "\n```\n**@" + c.user.login + "**: " + c.body;
             const reviewThreads = [{ id: c.id, path: c.path, body: c.body }];
-            
-            const cleanPrompt = c.body.replace(/@gemini/g, '').trim();
-            
-            core.setOutput('prompt', cleanPrompt);
+            core.setOutput('prompt', c.body.replace(/@gemini/g, '').trim());
             core.setOutput('discussion_context', discussionContext);
             core.setOutput('trigger_comment_id', c.id);
             core.setOutput('review_threads', JSON.stringify(reviewThreads));
@@ -85,116 +76,103 @@ jobs:
             🤖 Hi @${{ github.actor }}, I've received your inline code request and I'm on it! You can track my progress [in the logs](${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}).
           REPOSITORY: ${{ github.repository }}
           TRIGGER_COMMENT_ID: ${{ steps.extract_prompt.outputs.trigger_comment_id }}
-          EVENT_NAME: ${{ github.event_name }}
-        run: |-
-          if [ "${EVENT_NAME}" == "pull_request_review_comment" ]; then
-            COMMENT_ID=$(gh api -X POST "/repos/${REPOSITORY}/pulls/${PR_NUMBER}/comments" \
-              -f body="${MESSAGE}" \
-              -F in_reply_to="${TRIGGER_COMMENT_ID}" \
-              --jq '.id')
-            echo "comment_type=pull" >> $GITHUB_OUTPUT
-            echo "GEMINI_COMMENT_TYPE=pull" >> $GITHUB_ENV
-          else
-            # Fallback for other comment types if we ever add them back
-            COMMENT_URL=$(gh pr comment "${PR_NUMBER}" --body "${MESSAGE}" --repo "${REPOSITORY}")
-            COMMENT_ID=$(echo $COMMENT_URL | grep -oE '[0-9]+$')
-            echo "comment_type=issue" >> $GITHUB_OUTPUT
-            echo "GEMINI_COMMENT_TYPE=issue" >> $GITHUB_ENV
-          fi
+        run: |
+          COMMENT_ID=$(gh api -X POST "/repos/${REPOSITORY}/pulls/${PR_NUMBER}/comments" \
+            -f body="${MESSAGE}" \
+            -F in_reply_to="${TRIGGER_COMMENT_ID}" \
+            --jq '.id')
           echo "comment_id=$COMMENT_ID" >> $GITHUB_OUTPUT
           echo "GEMINI_COMMENT_ID=$COMMENT_ID" >> $GITHUB_ENV
+          echo "comment_type=pull" >> $GITHUB_OUTPUT
+          echo "GEMINI_COMMENT_TYPE=pull" >> $GITHUB_ENV
 
       - name: Set Gemini prompt
         run: |
-          cat << 'EOF' >> $GITHUB_ENV
-          GEMINI_PROMPT<<PROMPT_EOF
-You are Gemini, an AI assistant designed to help with pull requests. Think carefully as you analyze the context and respond appropriately. Here's the context for your current task:
+          echo "GEMINI_PROMPT<<EOF" >> $GITHUB_ENV
+          cat << 'PROMPT_CONTENT' >> $GITHUB_ENV
+          You are Gemini, an AI assistant designed to help with pull requests. Think carefully as you analyze the context and respond appropriately. Here's the context for your current task:
 
-<formatted_context>
-PR Title: ${{ github.event.pull_request.title }}
-PR Author: ${{ github.event.pull_request.user.login }}
-PR State: ${{ github.event.pull_request.state }}
-PR Body:
-${{ github.event.pull_request.body }}
-</formatted_context>
+          <formatted_context>
+          PR Title: ${{ github.event.pull_request.title }}
+          PR Author: ${{ github.event.pull_request.user.login }}
+          PR State: ${{ github.event.pull_request.state }}
+          PR Body:
+          ${{ github.event.pull_request.body }}
+          </formatted_context>
 
-<pr_comment_body>
-${{ steps.extract_prompt.outputs.prompt }}
-</pr_comment_body>
+          <pr_comment_body>
+          ${{ steps.extract_prompt.outputs.prompt }}
+          </pr_comment_body>
 
-<comments>
-${{ steps.extract_prompt.outputs.discussion_context }}
-</comments>
+          <comments>
+          ${{ steps.extract_prompt.outputs.discussion_context }}
+          </comments>
 
-<images_info>
-Images have been downloaded from GitHub comments and saved to disk. Their file paths are included in the formatted comments and body above. You can use the Read tool to view these images.
-</images_info>
+          <event_type>${{ github.event_name }}</event_type>
+          <repository>${{ github.repository }}</repository>
 
-<event_type>${{ github.event_name }}</event_type>
-<repository>${{ github.repository }}</repository>
+          <pr_number>${{ github.event.pull_request.number }}</pr_number>
+          <gemini_comment_id>${{ steps.acknowledge.outputs.comment_id }}</gemini_comment_id>
+          <gemini_comment_type>${{ steps.acknowledge.outputs.comment_type }}</gemini_comment_type>
+          <trigger_comment_id>${{ steps.extract_prompt.outputs.trigger_comment_id }}</trigger_comment_id>
+          <review_threads>${{ steps.extract_prompt.outputs.review_threads }}</review_threads>
+          <trigger_username>${{ github.actor }}</trigger_username>
+          <trigger_display_name>${{ github.actor }}</trigger_display_name>
+          <trigger_phrase>@gemini</trigger_phrase>
 
-<pr_number>${{ github.event.pull_request.number }}</pr_number>
-<gemini_comment_id>${{ steps.acknowledge.outputs.comment_id }}</gemini_comment_id>
-<gemini_comment_type>${{ steps.acknowledge.outputs.comment_type }}</gemini_comment_type>
-<trigger_comment_id>${{ steps.extract_prompt.outputs.trigger_comment_id }}</trigger_comment_id>
-<review_threads>${{ steps.extract_prompt.outputs.review_threads }}</review_threads>
-<trigger_username>${{ github.actor }}</trigger_username>
-<trigger_display_name>${{ github.actor }}</trigger_display_name>
-<trigger_phrase>@gemini</trigger_phrase>
+          <comment_tool_info>
+          IMPORTANT: Use the `gh` tool via `run_shell_command` to update your progress and provide the final result.
 
-<comment_tool_info>
-IMPORTANT: Use the `gh` tool via `run_shell_command` to update your progress and provide the final result. 
- 
-ALWAYS update the single comment thread where you were triggered. 
- 
-Your progress comment ID is: ${{ steps.acknowledge.outputs.comment_id }}
-The type of your comment is: ${{ steps.acknowledge.outputs.comment_type }} (pull = PR review comment, issue = regular PR comment)
+          ALWAYS update the single comment thread where you were triggered.
 
-To update your comment body robustly:
-If type is 'pull':
-printf "Your updated Markdown text" | gh api -X PATCH /repos/${{ github.repository }}/pulls/comments/${{ steps.acknowledge.outputs.comment_id }} --input -
-If type is 'issue':
-printf "Your updated Markdown text" | gh api -X PATCH /repos/${{ github.repository }}/issues/comments/${{ steps.acknowledge.outputs.comment_id }} --input -
+          Your progress comment ID is: ${{ steps.acknowledge.outputs.comment_id }}
+          The type of your comment is: ${{ steps.acknowledge.outputs.comment_type }} (pull = PR review comment, issue = regular PR comment)
 
-CRITICAL: Do not construct new top-level comments or PR URLs. Focus exclusively on the requested code changes or questions.
-</comment_tool_info>
+          To update your comment body robustly:
+          If type is 'pull':
+          printf "Your updated Markdown text" | gh api -X PATCH /repos/${{ github.repository }}/pulls/comments/${{ steps.acknowledge.outputs.comment_id }} --input -
+          If type is 'issue':
+          printf "Your updated Markdown text" | gh api -X PATCH /repos/${{ github.repository }}/issues/comments/${{ steps.acknowledge.outputs.comment_id }} --input -
 
-Your task is to analyze the context, understand the request, and provide helpful responses and/or implement code changes as needed.
+          CRITICAL: Do not construct new top-level comments or PR URLs. Focus exclusively on the requested code changes or questions.
+          </comment_tool_info>
 
-IMPORTANT CLARIFICATIONS:
-- PRIMARY communication happens through your main GitHub comment (id: ${{ steps.acknowledge.outputs.comment_id }}).
-- Use the `gh api` command provided above to update this comment immediately with a Todo List.
-- DO NOT spend time finding branch names or constructing compare URLs.
-- You are already on the correct branch. Just commit and push.
+          Your task is to analyze the context, understand the request, and provide helpful responses and/or implement code changes as needed.
 
-Follow these steps:
+          IMPORTANT CLARIFICATIONS:
+          - PRIMARY communication happens through your main GitHub comment (id: ${{ steps.acknowledge.outputs.comment_id }}).
+          - Use the `gh api` command provided above to update this comment immediately with a Todo List.
+          - DO NOT spend time finding branch names or constructing compare URLs.
+          - You are already on the correct branch. Just commit and push.
 
-1. Create a Todo List:
-   - IMMEDIATELY update your GitHub comment with a task list.
-   - Format: ### Tasks\n- [ ] Task 1\n- [ ] Task 2\n...
-   - Use the spinner: <img src="https://github.com/user-attachments/assets/5ac382c7-e004-429b-8e35-7feb3e8f9c6f" width="14px" height="14px" style="vertical-align: middle; margin-left: 4px;" />
+          Follow these steps:
 
-2. Gather Context:
-   - Analyze the data and files.
-   - Mark as complete: [x] Gather context
+          1. Create a Todo List:
+             - IMMEDIATELY update your GitHub comment with a task list.
+             - Format: ### Tasks\n- [ ] Task 1\n- [ ] Task 2\n...
+             - Use the spinner: <img src="https://github.com/user-attachments/assets/5ac382c7-e004-429b-8e35-7feb3e8f9c6f" width="14px" height="14px" style="vertical-align: middle; margin-left: 4px;" />
 
-3. Understand and Execute:
-   - Implement changes or answer questions.
-   - Update the comment as you finish each task.
-   - For code changes:
-     - Stage: `git add <files>`
-     - Commit: `git commit -m "<message>\n\nCo-authored-by: ${{ github.actor }} <${{ github.actor_id }}+${{ github.actor }}@users.noreply.github.com>"`
-     - Push: `git push origin HEAD`
+          2. Gather Context:
+             - Analyze the data and files.
+             - Mark as complete: [x] Gather context
 
-4. Final Summary:
-   - Remove the spinner and post a final summary in the same comment.
-   - Always include: [View job run](${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }})
+          3. Understand and Execute:
+             - Implement changes or answer questions.
+             - Update the comment as you finish each task.
+             - For code changes:
+               - Stage: `git add <files>`
+               - Commit: `git commit -m "<message>\n\nCo-authored-by: ${{ github.actor }} <${{ github.actor_id }}+${{ github.actor }}@users.noreply.github.com>"`
+               - Push: `git push origin HEAD`
 
-Important Notes:
-- Communicate ONLY by updating your single acknowledgement comment.
-- REPOSITORY SETUP: Follow GEMINI.md for repo-specific setup and standards.
-PROMPT_EOF
-          EOF
+          4. Final Summary:
+             - Remove the spinner and post a final summary in the same comment.
+             - Always include: [View job run](${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }})
+
+          Important Notes:
+          - Communicate ONLY by updating your single acknowledgement comment.
+          - REPOSITORY SETUP: Follow GEMINI.md for repo-specific setup and standards.
+          PROMPT_CONTENT
+          echo "EOF" >> $GITHUB_ENV
 
       - name: Run Gemini CLI (gemini-3-flash-preview)
         uses: google-github-actions/run-gemini-cli@v0.1.18
@@ -203,6 +181,7 @@ PROMPT_EOF
         env:
           GEMINI_COMMENT_ID: ${{ env.GEMINI_COMMENT_ID }}
           GEMINI_COMMENT_TYPE: ${{ env.GEMINI_COMMENT_TYPE }}
+          PR_NUMBER: ${{ github.event.pull_request.number }}
           GITHUB_TOKEN: ${{ steps.mint_identity_token.outputs.token || secrets.GITHUB_TOKEN || github.token }}
         with:
           gemini_api_key: ${{ secrets.GEMINI_API_KEY }}
@@ -221,6 +200,7 @@ PROMPT_EOF
         env:
           GEMINI_COMMENT_ID: ${{ env.GEMINI_COMMENT_ID }}
           GEMINI_COMMENT_TYPE: ${{ env.GEMINI_COMMENT_TYPE }}
+          PR_NUMBER: ${{ github.event.pull_request.number }}
           GITHUB_TOKEN: ${{ steps.mint_identity_token.outputs.token || secrets.GITHUB_TOKEN || github.token }}
         with:
           gemini_api_key: ${{ secrets.GEMINI_API_KEY }}
@@ -238,6 +218,7 @@ PROMPT_EOF
         env:
           GEMINI_COMMENT_ID: ${{ env.GEMINI_COMMENT_ID }}
           GEMINI_COMMENT_TYPE: ${{ env.GEMINI_COMMENT_TYPE }}
+          PR_NUMBER: ${{ github.event.pull_request.number }}
           GITHUB_TOKEN: ${{ steps.mint_identity_token.outputs.token || secrets.GITHUB_TOKEN || github.token }}
         with:
           gemini_api_key: ${{ secrets.GEMINI_API_KEY }}
@@ -269,16 +250,10 @@ PROMPT_EOF
         env:
           GITHUB_TOKEN: ${{ steps.mint_identity_token.outputs.token || secrets.GITHUB_TOKEN || github.token }}
           PR_NUMBER: ${{ github.event.pull_request.number }}
-          MESSAGE: |-
-            🤖 I'm sorry @${{ github.actor }}, but I was unable to process your request. Please [see the logs](${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}) for more details.
           REPOSITORY: ${{ github.repository }}
           TRIGGER_COMMENT_ID: ${{ steps.extract_prompt.outputs.trigger_comment_id }}
-          EVENT_NAME: ${{ github.event_name }}
-        run: |-
-          if [ "${EVENT_NAME}" == "pull_request_review_comment" ]; then
-            gh api -X POST "/repos/${REPOSITORY}/pulls/${PR_NUMBER}/comments" \
-              -f body="${MESSAGE}" \
-              -F in_reply_to="${TRIGGER_COMMENT_ID}"
-          else
-            gh pr comment "${PR_NUMBER}" --body "${MESSAGE}" --repo "${REPOSITORY}"
-          fi
+        run: |
+          MESSAGE="🤖 I'm sorry @${{ github.actor }}, but I was unable to process your request. Please [see the logs](${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}) for more details."
+          gh api -X POST "/repos/${REPOSITORY}/pulls/${PR_NUMBER}/comments" \
+            -f body="${MESSAGE}" \
+            -F in_reply_to="${TRIGGER_COMMENT_ID}"
