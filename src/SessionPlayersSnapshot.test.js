@@ -174,6 +174,226 @@ describe('SessionPlayersSnapshot (Built on Network)', () => {
       expect(players.get('player-2')).toEqual(newPlayer);
     });
 
+    test('WhenNetworkEmitsPostgresChangesForDelete_ShouldRemoveFromLocalMap', async () => {
+      const playerToRemove = createMockPlayer({ player_id: 'player-to-remove', id: 'record-id-123' });
+      const mockPlayers = [playerToRemove];
+
+      mockSupabaseClient.from().select().eq.mockResolvedValue({
+        data: mockPlayers,
+        error: null,
+      });
+
+      let postgresChangesHandler;
+      mockNetwork.on.mockImplementation((event, handler) => {
+        if (event === 'postgres_changes') {
+          postgresChangesHandler = handler;
+        }
+      });
+
+      snapshot = new SessionPlayersSnapshot(mockNetwork, TEST_SESSION_ID);
+      await snapshot.ready();
+
+      expect(snapshot.getPlayers().has('player-to-remove')).toBe(true);
+
+      // Simulate Network emitting postgres_changes for DELETE
+      // Note: Supabase Realtime DELETE only sends the primary key in 'old'
+      postgresChangesHandler({
+        eventType: 'DELETE',
+        new: null,
+        old: { id: 'record-id-123', session_id: TEST_SESSION_ID },
+        schema: 'public',
+        table: 'session_players',
+      });
+
+      // Should remove from local players map
+      expect(snapshot.getPlayers().has('player-to-remove')).toBe(false);
+    });
+
+    test('WhenNetworkEmitsPostgresChangesForDeleteWithMissingSessionId_ShouldStillRemoveIfPlayerExists', async () => {
+      const playerToRemove = createMockPlayer({ player_id: 'player-to-remove', id: 'record-id-123' });
+      const mockPlayers = [playerToRemove];
+
+      mockSupabaseClient.from().select().eq.mockResolvedValue({
+        data: mockPlayers,
+        error: null,
+      });
+
+      let postgresChangesHandler;
+      mockNetwork.on.mockImplementation((event, handler) => {
+        if (event === 'postgres_changes') {
+          postgresChangesHandler = handler;
+        }
+      });
+
+      snapshot = new SessionPlayersSnapshot(mockNetwork, TEST_SESSION_ID);
+      await snapshot.ready();
+      expect(snapshot.getPlayers().has('player-to-remove')).toBe(true);
+
+      // Simulate Network emitting postgres_changes for DELETE with MISSING session_id in old record
+      // as is common with some Supabase Realtime configurations
+      postgresChangesHandler({
+        eventType: 'DELETE',
+        new: null,
+        old: { id: 'record-id-123' }, // No session_id
+        schema: 'public',
+        table: 'session_players',
+      });
+
+      // Should remove from local players map
+      expect(snapshot.getPlayers().has('player-to-remove')).toBe(false);
+    });
+
+    test('WhenNetworkEmitsPostgresChangesForDeleteWithDifferentSession_ShouldIgnore', async () => {
+      const playerToKeep = createMockPlayer({ player_id: 'player-to-keep', id: 'record-id-456' });
+      const mockPlayers = [playerToKeep];
+
+      mockSupabaseClient.from().select().eq.mockResolvedValue({
+        data: mockPlayers,
+        error: null,
+      });
+
+      let postgresChangesHandler;
+      mockNetwork.on.mockImplementation((event, handler) => {
+        if (event === 'postgres_changes') {
+          postgresChangesHandler = handler;
+        }
+      });
+
+      snapshot = new SessionPlayersSnapshot(mockNetwork, TEST_SESSION_ID);
+      await snapshot.ready();
+
+      // Simulate Network emitting postgres_changes for DELETE with DIFFERENT session_id
+      postgresChangesHandler({
+        eventType: 'DELETE',
+        new: null,
+        old: { id: 'record-id-456', session_id: 'different-session-id' },
+        schema: 'public',
+        table: 'session_players',
+      });
+
+      // Should NOT remove from local players map
+      expect(snapshot.getPlayers().has('player-to-keep')).toBe(true);
+    });
+
+    test('WhenNetworkEmitsPostgresChangesForDeleteWithUnknownId_ShouldIgnore', async () => {
+      const playerToKeep = createMockPlayer({ player_id: 'player-to-keep', id: 'record-id-456' });
+      const mockPlayers = [playerToKeep];
+
+      mockSupabaseClient.from().select().eq.mockResolvedValue({
+        data: mockPlayers,
+        error: null,
+      });
+
+      let postgresChangesHandler;
+      mockNetwork.on.mockImplementation((event, handler) => {
+        if (event === 'postgres_changes') {
+          postgresChangesHandler = handler;
+        }
+      });
+
+      snapshot = new SessionPlayersSnapshot(mockNetwork, TEST_SESSION_ID);
+      await snapshot.ready();
+
+      // Simulate Network emitting postgres_changes for DELETE with UNKNOWN id
+      postgresChangesHandler({
+        eventType: 'DELETE',
+        new: null,
+        old: { id: 'unknown-id', session_id: TEST_SESSION_ID },
+        schema: 'public',
+        table: 'session_players',
+      });
+
+      // Should NOT remove anything
+      expect(snapshot.getPlayers().has('player-to-keep')).toBe(true);
+      expect(snapshot.getPlayers().size).toBe(1);
+    });
+
+    test('WhenNetworkEmitsPostgresChangesForUpdate_ShouldUpdateLocalMapAndPreserveLocalFields', async () => {
+      const player = createMockPlayer({ player_id: TEST_PLAYER_ID, id: 'record-id-123', health: 100 });
+      const mockPlayers = [player];
+
+      mockSupabaseClient.from().select().eq.mockResolvedValue({
+        data: mockPlayers,
+        error: null,
+      });
+
+      let postgresChangesHandler;
+      let playerStateUpdateHandler;
+      mockNetwork.on.mockImplementation((event, handler) => {
+        if (event === 'postgres_changes') postgresChangesHandler = handler;
+        if (event === 'player_state_update') playerStateUpdateHandler = handler;
+      });
+
+      snapshot = new SessionPlayersSnapshot(mockNetwork, TEST_SESSION_ID);
+      await snapshot.ready();
+
+      // First, add some local state (position history) via broadcast
+      playerStateUpdateHandler({
+        type: 'player_state_update',
+        from: TEST_PLAYER_ID,
+        data: { position_x: 10, position_y: 20 }
+      });
+
+      expect(snapshot.getPlayers().get(TEST_PLAYER_ID).positionHistory).toBeDefined();
+      expect(snapshot.getPlayers().get(TEST_PLAYER_ID).positionHistory.length).toBe(1);
+
+      // Simulate Network emitting postgres_changes for UPDATE (e.g., host updated health in DB)
+      // IMPORTANT: Simulate a FRESH object from DB that does NOT have local-only fields
+      const updatedPlayer = createMockPlayer({ 
+        player_id: TEST_PLAYER_ID, 
+        id: 'record-id-123', 
+        health: 80, 
+        position_x: 10, 
+        position_y: 20 
+      });
+      
+      postgresChangesHandler({
+        eventType: 'UPDATE',
+        new: updatedPlayer,
+        old: player,
+        schema: 'public',
+        table: 'session_players',
+      });
+
+      // Should update health but PRESERVE positionHistory
+      const localPlayer = snapshot.getPlayers().get(TEST_PLAYER_ID);
+      expect(localPlayer.health).toBe(80);
+      expect(localPlayer.positionHistory).toBeDefined();
+      expect(localPlayer.positionHistory.length).toBe(1);
+    });
+
+    test('WhenNetworkEmitsPostgresChangesForStatusUpdate_ShouldUpdateLocalMap', async () => {
+      const player = createMockPlayer({ player_id: TEST_PLAYER_ID, id: 'record-id-123', is_alive: true, is_connected: true });
+      const mockPlayers = [player];
+
+      mockSupabaseClient.from().select().eq.mockResolvedValue({
+        data: mockPlayers,
+        error: null,
+      });
+
+      let postgresChangesHandler;
+      mockNetwork.on.mockImplementation((event, handler) => {
+        if (event === 'postgres_changes') postgresChangesHandler = handler;
+      });
+
+      snapshot = new SessionPlayersSnapshot(mockNetwork, TEST_SESSION_ID);
+      await snapshot.ready();
+
+      // Simulate player being eliminated and disconnecting in DB
+      const updatedPlayer = { ...player, is_alive: false, is_connected: false };
+      postgresChangesHandler({
+        eventType: 'UPDATE',
+        new: updatedPlayer,
+        old: player,
+        schema: 'public',
+        table: 'session_players',
+      });
+
+      const localPlayer = snapshot.getPlayers().get(TEST_PLAYER_ID);
+      expect(localPlayer.is_alive).toBe(false);
+      expect(localPlayer.is_connected).toBe(false);
+    });
+
     test('WhenNetworkEmitsPostgresChangesForOtherTable_ShouldIgnore', async () => {
       const mockPlayers = [createMockPlayer()];
 
@@ -570,6 +790,160 @@ describe('SessionPlayersSnapshot (Built on Network)', () => {
       // Should update health (host can update host-auth fields)
       const player = snapshot.getPlayers().get(TEST_PLAYER_ID);
       expect(player.health).toBe(75);
+    });
+
+    test('WhenHostUpdatesEquippedItems_ShouldAccept', async () => {
+      const HOST_ID = 'host-id';
+      mockNetwork.hostId = HOST_ID;
+
+      const mockPlayers = [createMockPlayer({ player_id: TEST_PLAYER_ID })];
+      mockSupabaseClient.from().select().eq.mockResolvedValue({
+        data: mockPlayers,
+        error: null,
+      });
+
+      let playerStateUpdateHandler;
+      mockNetwork.on.mockImplementation((event, handler) => {
+        if (event === 'player_state_update') {
+          playerStateUpdateHandler = handler;
+        }
+      });
+
+      snapshot = new SessionPlayersSnapshot(mockNetwork, TEST_SESSION_ID);
+      await snapshot.ready();
+
+      // Host updates player equipment
+      playerStateUpdateHandler({
+        type: 'player_state_update',
+        from: HOST_ID,
+        data: {
+          player_id: TEST_PLAYER_ID,
+          equipped_weapon: 'shotgun',
+          equipped_armor: 'kevlar',
+        },
+      });
+
+      const player = snapshot.getPlayers().get(TEST_PLAYER_ID);
+      expect(player.equipped_weapon).toBe('shotgun');
+      expect(player.equipped_armor).toBe('kevlar');
+    });
+
+    test('WhenClientTriesToUpdateEquippedItems_ShouldReject', async () => {
+      const mockPlayers = [createMockPlayer({ player_id: TEST_PLAYER_ID, equipped_weapon: 'pistol' })];
+      mockSupabaseClient.from().select().eq.mockResolvedValue({
+        data: mockPlayers,
+        error: null,
+      });
+
+      let playerStateUpdateHandler;
+      mockNetwork.on.mockImplementation((event, handler) => {
+        if (event === 'player_state_update') {
+          playerStateUpdateHandler = handler;
+        }
+      });
+
+      snapshot = new SessionPlayersSnapshot(mockNetwork, TEST_SESSION_ID);
+      await snapshot.ready();
+
+      // Client tries to update their own equipment
+      playerStateUpdateHandler({
+        type: 'player_state_update',
+        from: TEST_PLAYER_ID,
+        data: {
+          player_id: TEST_PLAYER_ID,
+          equipped_weapon: 'rocket-launcher',
+        },
+      });
+
+      const player = snapshot.getPlayers().get(TEST_PLAYER_ID);
+      expect(player.equipped_weapon).toBe('pistol'); // Unchanged
+    });
+
+    test('WhenHostUpdatesExpandedWhitelistFields_ShouldAccept', async () => {
+      const HOST_ID = 'host-id';
+      mockNetwork.hostId = HOST_ID;
+
+      const mockPlayers = [createMockPlayer({ 
+        player_id: TEST_PLAYER_ID,
+        is_alive: true,
+        kills: 0,
+        damage_dealt: 0,
+        is_connected: true
+      })];
+      mockSupabaseClient.from().select().eq.mockResolvedValue({
+        data: mockPlayers,
+        error: null,
+      });
+
+      let playerStateUpdateHandler;
+      mockNetwork.on.mockImplementation((event, handler) => {
+        if (event === 'player_state_update') {
+          playerStateUpdateHandler = handler;
+        }
+      });
+
+      snapshot = new SessionPlayersSnapshot(mockNetwork, TEST_SESSION_ID);
+      await snapshot.ready();
+
+      // Host updates expanded whitelist fields
+      playerStateUpdateHandler({
+        type: 'player_state_update',
+        from: HOST_ID,
+        data: {
+          player_id: TEST_PLAYER_ID,
+          is_alive: false,
+          kills: 5,
+          damage_dealt: 1250.5,
+          is_connected: false,
+        },
+      });
+
+      const player = snapshot.getPlayers().get(TEST_PLAYER_ID);
+      expect(player.is_alive).toBe(false);
+      expect(player.kills).toBe(5);
+      expect(player.damage_dealt).toBe(1250.5);
+      expect(player.is_connected).toBe(false);
+    });
+
+    test('WhenClientTriesToUpdateExpandedWhitelistFields_ShouldReject', async () => {
+      const mockPlayers = [createMockPlayer({ 
+        player_id: TEST_PLAYER_ID,
+        is_alive: true,
+        kills: 0,
+        damage_dealt: 0,
+        is_connected: true
+      })];
+      mockSupabaseClient.from().select().eq.mockResolvedValue({
+        data: mockPlayers,
+        error: null,
+      });
+
+      let playerStateUpdateHandler;
+      mockNetwork.on.mockImplementation((event, handler) => {
+        if (event === 'player_state_update') {
+          playerStateUpdateHandler = handler;
+        }
+      });
+
+      snapshot = new SessionPlayersSnapshot(mockNetwork, TEST_SESSION_ID);
+      await snapshot.ready();
+
+      // Client tries to update expanded whitelist fields (host-auth)
+      playerStateUpdateHandler({
+        type: 'player_state_update',
+        from: TEST_PLAYER_ID,
+        data: {
+          player_id: TEST_PLAYER_ID,
+          is_alive: false,
+          kills: 99,
+          damage_dealt: 9999,
+        },
+      });
+
+      const player = snapshot.getPlayers().get(TEST_PLAYER_ID);
+      expect(player.is_alive).toBe(true); // Unchanged
+      expect(player.kills).toBe(0); // Unchanged
+      expect(player.damage_dealt).toBe(0); // Unchanged
     });
 
     test('WhenPlayerUpdatesOwnPosition_ShouldAccept', async () => {

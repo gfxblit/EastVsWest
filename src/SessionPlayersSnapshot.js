@@ -161,7 +161,14 @@ export class SessionPlayersSnapshot {
 
       case 'UPDATE':
         if (newRecord) {
-          this.players.set(newRecord.player_id, newRecord);
+          const existingPlayer = this.players.get(newRecord.player_id);
+          if (existingPlayer) {
+            // Merge new data into existing player object to preserve local state
+            // (like positionHistory, which isn't in the database)
+            Object.assign(existingPlayer, newRecord);
+          } else {
+            this.players.set(newRecord.player_id, newRecord);
+          }
         }
         break;
     }
@@ -202,6 +209,10 @@ export class SessionPlayersSnapshot {
       if (payload.health !== undefined) player.health = payload.health;
       if (payload.equipped_weapon !== undefined) player.equipped_weapon = payload.equipped_weapon;
       if (payload.equipped_armor !== undefined) player.equipped_armor = payload.equipped_armor;
+      if (payload.is_alive !== undefined) player.is_alive = payload.is_alive;
+      if (payload.kills !== undefined) player.kills = payload.kills;
+      if (payload.damage_dealt !== undefined) player.damage_dealt = payload.damage_dealt;
+      if (payload.is_connected !== undefined) player.is_connected = payload.is_connected;
     }
 
     // Update position history for interpolation
