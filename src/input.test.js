@@ -462,7 +462,26 @@ describe('Input', () => {
     });
 
     test('WhenDestroyed_ShouldRemoveAllEventListeners', () => {
+      const mockGameScreen = document.createElement('div');
+      mockGameScreen.id = 'game-screen';
+      const mockTouchControls = document.createElement('div');
+      mockTouchControls.id = 'touch-controls';
+      const mockJoystickBase = document.createElement('div');
+      mockJoystickBase.id = 'joystick-base';
+      const mockJoystickStick = document.createElement('div');
+      mockJoystickStick.id = 'joystick-stick';
+
+      document.body.appendChild(mockGameScreen);
+      document.body.appendChild(mockTouchControls);
+      document.body.appendChild(mockJoystickBase);
+      document.body.appendChild(mockJoystickStick);
+
+      // Re-init to attach to the new mockGameScreen
+      input.init(mockCallback);
+
       const removeEventListenerSpy = jest.spyOn(window, 'removeEventListener');
+      const screenRemoveEventListenerSpy = jest.spyOn(mockGameScreen, 'removeEventListener');
+      
       input.destroy();
 
       expect(removeEventListenerSpy).toHaveBeenCalledWith('keydown', input.boundHandlers.keydown);
@@ -471,7 +490,13 @@ describe('Input', () => {
       expect(removeEventListenerSpy).toHaveBeenCalledWith('mousedown', input.boundHandlers.mousedown);
       expect(removeEventListenerSpy).toHaveBeenCalledWith('mouseup', input.boundHandlers.mouseup);
 
+      expect(screenRemoveEventListenerSpy).toHaveBeenCalledWith('touchstart', input.boundHandlers.touchstart);
+
       removeEventListenerSpy.mockRestore();
+      mockGameScreen.remove();
+      mockTouchControls.remove();
+      mockJoystickBase.remove();
+      mockJoystickStick.remove();
     });
 
     test('WhenDestroyedMultipleTimes_ShouldNotThrowError', () => {
@@ -530,6 +555,7 @@ describe('Input', () => {
 
   describe('Touch Controls - Joystick Movement', () => {
     let mockCanvas;
+    let mockGameScreen;
     let mockTouchControls;
     let mockJoystickBase;
     let mockJoystickStick;
@@ -547,6 +573,9 @@ describe('Input', () => {
         height: 600,
       }));
 
+      mockGameScreen = document.createElement('div');
+      mockGameScreen.id = 'game-screen';
+
       mockTouchControls = document.createElement('div');
       mockTouchControls.id = 'touch-controls';
       mockTouchControls.style.opacity = '0';
@@ -559,7 +588,8 @@ describe('Input', () => {
       mockJoystickStick = document.createElement('div');
       mockJoystickStick.id = 'joystick-stick';
 
-      document.body.appendChild(mockCanvas);
+      document.body.appendChild(mockGameScreen);
+      mockGameScreen.appendChild(mockCanvas);
       document.body.appendChild(mockTouchControls);
       document.body.appendChild(mockJoystickBase);
       document.body.appendChild(mockJoystickStick);
@@ -568,7 +598,7 @@ describe('Input', () => {
     });
 
     afterEach(() => {
-      mockCanvas.remove();
+      mockGameScreen.remove();
       mockTouchControls.remove();
       mockJoystickBase.remove();
       mockJoystickStick.remove();

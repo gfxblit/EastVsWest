@@ -193,13 +193,13 @@ export class Input {
     this.boundHandlers.touchmove = this.handleTouchMove.bind(this);
     this.boundHandlers.touchend = this.handleTouchEnd.bind(this);
 
-    // Add touch event listeners to canvas
-    const canvas = document.getElementById('game-canvas');
-    if (canvas) {
-      canvas.addEventListener('touchstart', this.boundHandlers.touchstart, { passive: false });
-      canvas.addEventListener('touchmove', this.boundHandlers.touchmove, { passive: false });
-      canvas.addEventListener('touchend', this.boundHandlers.touchend, { passive: false });
-      canvas.addEventListener('touchcancel', this.boundHandlers.touchend, { passive: false });
+    // Add touch event listeners to game-screen to catch touches anywhere
+    const gameScreen = document.getElementById('game-screen');
+    if (gameScreen) {
+      gameScreen.addEventListener('touchstart', this.boundHandlers.touchstart, { passive: false });
+      gameScreen.addEventListener('touchmove', this.boundHandlers.touchmove, { passive: false });
+      gameScreen.addEventListener('touchend', this.boundHandlers.touchend, { passive: false });
+      gameScreen.addEventListener('touchcancel', this.boundHandlers.touchend, { passive: false });
     }
 
     // Setup attack button
@@ -291,6 +291,7 @@ export class Input {
     // Find the touch that started the joystick
     const touches = event.touches || [];
     const touch = Array.from(touches).find(t => t.identifier === this.touchState.joystickTouchId);
+    
     if (!touch) return;
 
     this.touchState.currentX = touch.clientX;
@@ -389,12 +390,12 @@ export class Input {
     window.removeEventListener('mouseup', this.boundHandlers.mouseup);
 
     // Remove touch event listeners
-    const canvas = document.getElementById('game-canvas');
-    if (canvas && this.boundHandlers.touchstart) {
-      canvas.removeEventListener('touchstart', this.boundHandlers.touchstart);
-      canvas.removeEventListener('touchmove', this.boundHandlers.touchmove);
-      canvas.removeEventListener('touchend', this.boundHandlers.touchend);
-      canvas.removeEventListener('touchcancel', this.boundHandlers.touchend);
+    const gameScreen = document.getElementById('game-screen');
+    if (gameScreen && this.boundHandlers.touchstart) {
+      gameScreen.removeEventListener('touchstart', this.boundHandlers.touchstart);
+      gameScreen.removeEventListener('touchmove', this.boundHandlers.touchmove);
+      gameScreen.removeEventListener('touchend', this.boundHandlers.touchend);
+      gameScreen.removeEventListener('touchcancel', this.boundHandlers.touchend);
     }
 
     // Remove button event listeners
