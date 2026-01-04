@@ -216,7 +216,7 @@ export class LocalPlayerController {
       if (this.network) {
         // Calculate aim position based on current rotation
         const attackAngle = this.player.rotation - Math.PI / 2;
-        const aimDistance = 100; // Arbitrary distance for direction vector
+        const aimDistance = CONFIG.COMBAT.ATTACK_AIM_DISTANCE; // Arbitrary distance for direction vector
         const aimX = this.player.x + Math.cos(attackAngle) * aimDistance;
         const aimY = this.player.y + Math.sin(attackAngle) * aimDistance;
 
