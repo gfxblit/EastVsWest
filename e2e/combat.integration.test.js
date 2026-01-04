@@ -95,15 +95,20 @@ describe('Combat Integration', () => {
       .update({ position_x: 1250, position_y: 800, health: 100 })
       .eq('player_id', playerNetwork.playerId);
 
-    // Wait for player to appear in host snapshot
+    // Wait for player to appear in host snapshot AND have correct position
     await waitFor(() => {
-      return hostSnapshot.getPlayers().has(playerNetwork.playerId);
+      const p = hostSnapshot.getPlayers().get(playerNetwork.playerId);
+      return p && Math.abs(p.position_x - 1250) < 1 && Math.abs(p.position_y - 800) < 1;
     }, 10000);
 
-    // Wait for host weapon to sync locally
+    // Wait for host weapon AND position to sync locally
     await waitFor(() => {
       hostGame.update(0.016); // Trigger sync
-      return hostGame.getLocalPlayer().weapon === 'spear';
+      // Also ensure host position in snapshot is correct (used by HostCombatManager)
+      const hostInSnapshot = hostSnapshot.getPlayers().get(hostNetwork.playerId);
+      const positionSynced = hostInSnapshot && Math.abs(hostInSnapshot.position_x - 1200) < 1;
+      
+      return hostGame.getLocalPlayer().weapon === 'spear' && positionSynced;
     }, 10000);
 
     // 3. Host attacks Player
@@ -166,15 +171,19 @@ describe('Combat Integration', () => {
       .update({ position_x: 1250, position_y: 800, health: 100 })
       .eq('player_id', playerNetwork.playerId);
 
-    // Wait for player to appear in host snapshot
+    // Wait for player to appear in host snapshot AND have correct position
     await waitFor(() => {
-      return hostSnapshot.getPlayers().has(playerNetwork.playerId);
+      const p = hostSnapshot.getPlayers().get(playerNetwork.playerId);
+      return p && Math.abs(p.position_x - 1250) < 1 && Math.abs(p.position_y - 800) < 1;
     }, 10000);
 
-    // Wait for host weapon to sync locally
+    // Wait for host weapon AND position to sync locally
     await waitFor(() => {
       hostGame.update(0.016);
-      return hostGame.getLocalPlayer().weapon === 'spear';
+      const hostInSnapshot = hostSnapshot.getPlayers().get(hostNetwork.playerId);
+      const positionSynced = hostInSnapshot && Math.abs(hostInSnapshot.position_x - 1200) < 1;
+      
+      return hostGame.getLocalPlayer().weapon === 'spear' && positionSynced;
     }, 10000);
 
     // 3. Host performs SPECIAL attack on Player
