@@ -96,6 +96,7 @@ jobs:
             core.setOutput('prompt', c.body.replace(/@gemini/g, '').trim());
             core.setOutput('discussion_context', discussionContext);
             core.setOutput('trigger_comment_id', c.id);
+            core.setOutput('root_comment_id', rootId);
             core.setOutput('review_threads', JSON.stringify(thread.map(com => ({ id: com.id, path: com.path, body: com.body }))));
 
       - name: Acknowledge request
@@ -107,10 +108,11 @@ jobs:
             🤖 Hi @${{ github.actor }}, I've received your inline code request and I'm on it! You can track my progress [in the logs](${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}).
           REPOSITORY: ${{ github.repository }}
           TRIGGER_COMMENT_ID: ${{ steps.extract_prompt.outputs.trigger_comment_id }}
+          ROOT_COMMENT_ID: ${{ steps.extract_prompt.outputs.root_comment_id }}
         run: |
           COMMENT_ID=$(gh api -X POST "/repos/${REPOSITORY}/pulls/${PR_NUMBER}/comments" \
             -f body="${MESSAGE}" \
-            -F in_reply_to="${TRIGGER_COMMENT_ID}" \
+            -F in_reply_to="${ROOT_COMMENT_ID}" \
             --jq '.id')
           echo "comment_id=$COMMENT_ID" >> $GITHUB_OUTPUT
           echo "GEMINI_COMMENT_ID=$COMMENT_ID" >> $GITHUB_ENV
@@ -429,8 +431,9 @@ jobs:
           PR_NUMBER: ${{ github.event.pull_request.number }}
           REPOSITORY: ${{ github.repository }}
           TRIGGER_COMMENT_ID: ${{ steps.extract_prompt.outputs.trigger_comment_id }}
+          ROOT_COMMENT_ID: ${{ steps.extract_prompt.outputs.root_comment_id }}
         run: |
           MESSAGE="🤖 I'm sorry @${{ github.actor }}, but I was unable to process your request. Please [see the logs](${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}) for more details."
           gh api -X POST "/repos/${REPOSITORY}/pulls/${PR_NUMBER}/comments" \
             -f body="${MESSAGE}" \
-            -F in_reply_to="${TRIGGER_COMMENT_ID}"
+            -F in_reply_to="${ROOT_COMMENT_ID}"
