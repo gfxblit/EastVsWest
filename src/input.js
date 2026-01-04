@@ -289,8 +289,13 @@ export class Input {
     if (!this.touchState.active) return;
 
     // Find the touch that started the joystick
-    const touches = event.touches || [];
-    const touch = Array.from(touches).find(t => t.identifier === this.touchState.joystickTouchId);
+    let touch = null;
+    for (const t of event.touches) {
+      if (t.identifier === this.touchState.joystickTouchId) {
+        touch = t;
+        break;
+      }
+    }
     
     if (!touch) return;
 
