@@ -1,8 +1,8 @@
 name: Gemini
 
 on:
-#  pull_request_review_comment:
-#    types: [created, edited]
+  pull_request_review_comment:
+    types: [created, edited]
 
 jobs:
   gemini:
