@@ -107,8 +107,6 @@ describe('Combat Integration', () => {
     }, 10000);
 
     // 3. Host attacks Player
-    // We'll simulate host attacking by calling handleInput on hostGame
-    // with an aim direction towards the player (at 1250, 800)
     hostGame.handleInput({
       attack: true,
       specialAbility: false,
@@ -121,8 +119,8 @@ describe('Combat Integration', () => {
     // 4. Verify player health reduction
     // Spear damage is 25.
     await waitFor(() => {
-      hostGame.update(0.016);
-      playerGame.update(0.016);
+      hostGame.update(0.05);
+      playerGame.update(0.05);
       const p = playerSnapshot.getPlayers().get(playerNetwork.playerId);
       return p && p.health < 100;
     }, 10000);
@@ -192,14 +190,14 @@ describe('Combat Integration', () => {
     // 4. Verify player health reduction
     // Spear special damage = 25 * 1.5 = 37.5
     await waitFor(() => {
-      hostGame.update(0.016);
-      playerGame.update(0.016);
+      hostGame.update(0.05);
+      playerGame.update(0.05);
       const p = playerSnapshot.getPlayers().get(playerNetwork.playerId);
       return p && p.health < 100;
     }, 10000);
 
-    hostGame.update(0.016);
-    playerGame.update(0.016);
+    hostGame.update(0.05);
+    playerGame.update(0.05);
 
     const victimAtHost = hostSnapshot.getPlayers().get(playerNetwork.playerId);
     const victimAtPlayer = playerSnapshot.getPlayers().get(playerNetwork.playerId);
