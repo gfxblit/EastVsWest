@@ -4,8 +4,8 @@
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
   <title>Conflict Zone: East vs West</title>
-  <script type="module" crossorigin src="./assets/index-CGhN9QPT.js"></script>
-  <link rel="stylesheet" crossorigin href="./assets/index-CL7B7cjg.css">
+  <script type="module" crossorigin src="./assets/index-CCTTAjjY.js"></script>
+  <link rel="stylesheet" crossorigin href="./assets/index-CKj9h4u7.css">
 </head>
 <body>
   <div id="app">
@@ -23,7 +23,7 @@
         <h3>Controls</h3>
         <p><strong>Movement:</strong> WASD or Touch Joystick</p>
         <p><strong>Attack:</strong> Left Mouse or Touch Button</p>
-        <p><strong>Special Ability:</strong> Q Key or Touch Button</p>
+        <p><strong>Special Ability:</strong> <span>Q</span> Key or Touch Button</p>
         <p><strong>Interact:</strong> F Key or Touch</p>
       </div>
     </div>
@@ -71,8 +71,14 @@
       </div>
 
       <div id="touch-buttons" class="touch-buttons">
-        <button id="attack-button" class="touch-btn attack-btn">ATK</button>
-        <button id="ability-button" class="touch-btn ability-btn">Q</button>
+        <button id="attack-button" class="touch-btn attack-btn">
+          <span>ATK</span>
+          <div class="cooldown-overlay"></div>
+        </button>
+        <button id="ability-button" class="touch-btn ability-btn">
+          <span>Q</span>
+          <div class="cooldown-overlay"></div>
+        </button>
       </div>
     </div>
   </div>
