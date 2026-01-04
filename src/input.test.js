@@ -462,7 +462,26 @@ describe('Input', () => {
     });
 
     test('WhenDestroyed_ShouldRemoveAllEventListeners', () => {
+      const mockGameScreen = document.createElement('div');
+      mockGameScreen.id = 'game-screen';
+      const mockTouchControls = document.createElement('div');
+      mockTouchControls.id = 'touch-controls';
+      const mockJoystickBase = document.createElement('div');
+      mockJoystickBase.id = 'joystick-base';
+      const mockJoystickStick = document.createElement('div');
+      mockJoystickStick.id = 'joystick-stick';
+
+      document.body.appendChild(mockGameScreen);
+      document.body.appendChild(mockTouchControls);
+      document.body.appendChild(mockJoystickBase);
+      document.body.appendChild(mockJoystickStick);
+
+      // Re-init to attach to the new mockGameScreen
+      input.init(mockCallback);
+
       const removeEventListenerSpy = jest.spyOn(window, 'removeEventListener');
+      const screenRemoveEventListenerSpy = jest.spyOn(mockGameScreen, 'removeEventListener');
+      
       input.destroy();
 
       expect(removeEventListenerSpy).toHaveBeenCalledWith('keydown', input.boundHandlers.keydown);
@@ -471,7 +490,13 @@ describe('Input', () => {
       expect(removeEventListenerSpy).toHaveBeenCalledWith('mousedown', input.boundHandlers.mousedown);
       expect(removeEventListenerSpy).toHaveBeenCalledWith('mouseup', input.boundHandlers.mouseup);
 
+      expect(screenRemoveEventListenerSpy).toHaveBeenCalledWith('touchstart', input.boundHandlers.touchstart);
+
       removeEventListenerSpy.mockRestore();
+      mockGameScreen.remove();
+      mockTouchControls.remove();
+      mockJoystickBase.remove();
+      mockJoystickStick.remove();
     });
 
     test('WhenDestroyedMultipleTimes_ShouldNotThrowError', () => {
@@ -530,6 +555,7 @@ describe('Input', () => {
 
   describe('Touch Controls - Joystick Movement', () => {
     let mockCanvas;
+    let mockGameScreen;
     let mockTouchControls;
     let mockJoystickBase;
     let mockJoystickStick;
@@ -547,6 +573,9 @@ describe('Input', () => {
         height: 600,
       }));
 
+      mockGameScreen = document.createElement('div');
+      mockGameScreen.id = 'game-screen';
+
       mockTouchControls = document.createElement('div');
       mockTouchControls.id = 'touch-controls';
       mockTouchControls.style.opacity = '0';
@@ -559,7 +588,8 @@ describe('Input', () => {
       mockJoystickStick = document.createElement('div');
       mockJoystickStick.id = 'joystick-stick';
 
-      document.body.appendChild(mockCanvas);
+      document.body.appendChild(mockGameScreen);
+      mockGameScreen.appendChild(mockCanvas);
       document.body.appendChild(mockTouchControls);
       document.body.appendChild(mockJoystickBase);
       document.body.appendChild(mockJoystickStick);
@@ -568,7 +598,7 @@ describe('Input', () => {
     });
 
     afterEach(() => {
-      mockCanvas.remove();
+      mockGameScreen.remove();
       mockTouchControls.remove();
       mockJoystickBase.remove();
       mockJoystickStick.remove();
@@ -756,6 +786,71 @@ describe('Input', () => {
       input.handleTouchEnd(endEvent);
 
       expect(mockTouchControls.style.opacity).toBe('0');
+    });
+
+    test('WhenSecondaryTouchEnds_ShouldNotDeactivateJoystickIfPrimaryTouchStillActive', () => {
+      // Helper to create mock TouchEvents with proper property definitions
+      const createMockTouchEvent = (type, touches = [], changedTouches = []) => {
+        const event = new TouchEvent(type, { cancelable: true });
+        Object.defineProperty(event, 'touches', { value: touches });
+        Object.defineProperty(event, 'changedTouches', { value: changedTouches });
+        return event;
+      };
+
+      // Start primary touch (joystick)
+      const primaryTouch = {
+        identifier: 10,
+        target: mockCanvas,
+        clientX: 100,
+        clientY: 200,
+      };
+      
+      const startEvent = createMockTouchEvent('touchstart', [primaryTouch], [primaryTouch]);
+      input.handleTouchStart(startEvent);
+      
+      expect(input.touchState.active).toBe(true);
+      expect(input.touchState.joystickTouchId).toBe(10);
+
+      // Move primary touch to set movement
+      const movedPrimaryTouch = {
+        identifier: 10,
+        target: mockCanvas,
+        clientX: 150,
+        clientY: 200,
+      };
+      
+      const moveEvent = createMockTouchEvent('touchmove', [movedPrimaryTouch], []);
+      input.handleTouchMove(moveEvent);
+      
+      expect(input.inputState.moveX).toBeGreaterThan(0);
+
+      // Start secondary touch
+      const secondaryTouch = {
+        identifier: 20,
+        target: mockCanvas,
+        clientX: 300,
+        clientY: 400,
+      };
+      
+      const secondaryStartEvent = createMockTouchEvent(
+        'touchstart', 
+        [primaryTouch, secondaryTouch], 
+        [secondaryTouch]
+      );
+      input.handleTouchStart(secondaryStartEvent);
+
+      // End secondary touch (primary is still in 'touches')
+      const secondaryEndEvent = createMockTouchEvent(
+        'touchend', 
+        [primaryTouch], 
+        [secondaryTouch]
+      );
+      input.handleTouchEnd(secondaryEndEvent);
+
+      // ASSERT: Joystick should still be active!
+      expect(input.touchState.active).toBe(true);
+      expect(input.touchState.joystickTouchId).toBe(10);
+      expect(input.inputState.moveX).not.toBe(0);
     });
   });
 

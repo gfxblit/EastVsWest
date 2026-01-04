@@ -23,6 +23,7 @@ export class Input {
     // Touch state
     this.touchState = {
       active: false,
+      joystickTouchId: null,
       startX: 0,
       startY: 0,
       currentX: 0,
@@ -192,13 +193,13 @@ export class Input {
     this.boundHandlers.touchmove = this.handleTouchMove.bind(this);
     this.boundHandlers.touchend = this.handleTouchEnd.bind(this);
 
-    // Add touch event listeners to canvas
-    const canvas = document.getElementById('game-canvas');
-    if (canvas) {
-      canvas.addEventListener('touchstart', this.boundHandlers.touchstart, { passive: false });
-      canvas.addEventListener('touchmove', this.boundHandlers.touchmove, { passive: false });
-      canvas.addEventListener('touchend', this.boundHandlers.touchend, { passive: false });
-      canvas.addEventListener('touchcancel', this.boundHandlers.touchend, { passive: false });
+    // Add touch event listeners to game-screen to catch touches anywhere
+    const gameScreen = document.getElementById('game-screen');
+    if (gameScreen) {
+      gameScreen.addEventListener('touchstart', this.boundHandlers.touchstart, { passive: false });
+      gameScreen.addEventListener('touchmove', this.boundHandlers.touchmove, { passive: false });
+      gameScreen.addEventListener('touchend', this.boundHandlers.touchend, { passive: false });
+      gameScreen.addEventListener('touchcancel', this.boundHandlers.touchend, { passive: false });
     }
 
     // Setup attack button
@@ -220,16 +221,36 @@ export class Input {
     }
   }
 
+  /**
+   * Checks if a touch event target is a UI button (attack/ability).
+   * @param {Touch|Event} targetObj - The touch or event object to check.
+   * @returns {boolean} - True if the touch is NOT on a button.
+   */
+  isValidJoystickTouch(targetObj) {
+    if (targetObj.target && targetObj.target.closest) {
+      return !targetObj.target.closest('#attack-button') && !targetObj.target.closest('#ability-button');
+    }
+    return true;
+  }
+
+  /**
+   * Handles touch start events to activate the joystick.
+   * @param {TouchEvent} event - The touch start event.
+   */
   handleTouchStart(event) {
     // Ignore if touch is on a button
-    if (event.target && event.target.closest) {
-      if (event.target.closest('#attack-button') || event.target.closest('#ability-button')) {
-        return;
-      }
+    if (!this.isValidJoystickTouch(event)) {
+      return;
     }
 
     event.preventDefault();
-    const touch = event.touches[0];
+    
+    // Find a touch that isn't on a button to start the joystick
+    const changedTouches = event.changedTouches || [];
+    const touch = Array.from(changedTouches).find(t => this.isValidJoystickTouch(t)) || 
+                  (event.touches && event.touches[0]);
+
+    if (!touch) return;
 
     // Only activate joystick if not already active
     if (!this.touchState.active) {
@@ -238,10 +259,6 @@ export class Input {
       if (!canvas) return;
 
       const rect = canvas.getBoundingClientRect();
-
-      // Calculate position relative to canvas
-      const x = touch.clientX - rect.left;
-      const y = touch.clientY - rect.top;
 
       // Position the joystick base at touch point
       if (this.touchControls) {
@@ -252,6 +269,7 @@ export class Input {
       }
 
       this.touchState.active = true;
+      this.touchState.joystickTouchId = touch.identifier;
       this.touchState.startX = touch.clientX;
       this.touchState.startY = touch.clientY;
       this.touchState.currentX = touch.clientX;
@@ -261,22 +279,56 @@ export class Input {
     }
   }
 
+  /**
+   * Handles touch move events to update joystick position.
+   * Only responds to the touch ID that activated the joystick.
+   * @param {TouchEvent} event - The touch move event.
+   */
   handleTouchMove(event) {
     event.preventDefault();
     if (!this.touchState.active) return;
 
-    const touch = event.touches[0];
+    // Find the touch that started the joystick
+    let touch = null;
+    for (const t of event.touches) {
+      if (t.identifier === this.touchState.joystickTouchId) {
+        touch = t;
+        break;
+      }
+    }
+    
+    if (!touch) return;
+
     this.touchState.currentX = touch.clientX;
     this.touchState.currentY = touch.clientY;
 
     this.updateMovement();
   }
 
+  /**
+   * Handles touch end events to deactivate the joystick.
+   * Only deactivates if the specific joystick touch ended.
+   * @param {TouchEvent} event - The touch end event.
+   */
   handleTouchEnd(event) {
     if (!this.touchState.active) return;
 
+    // Check if the joystick touch ended
+    const changedTouches = event.changedTouches || [];
+    let joystickTouchEnded = Array.from(changedTouches).some(t => t.identifier === this.touchState.joystickTouchId);
+    
+    // Fallback: if no touches remain, the joystick touch must have ended
+    if (!joystickTouchEnded && event.touches && event.touches.length === 0) {
+      joystickTouchEnded = true;
+    }
+
+    if (!joystickTouchEnded) {
+      return;
+    }
+
     event.preventDefault();
     this.touchState.active = false;
+    this.touchState.joystickTouchId = null;
     this.touchState.currentX = this.touchState.startX;
     this.touchState.currentY = this.touchState.startY;
 
@@ -343,12 +395,12 @@ export class Input {
     window.removeEventListener('mouseup', this.boundHandlers.mouseup);
 
     // Remove touch event listeners
-    const canvas = document.getElementById('game-canvas');
-    if (canvas && this.boundHandlers.touchstart) {
-      canvas.removeEventListener('touchstart', this.boundHandlers.touchstart);
-      canvas.removeEventListener('touchmove', this.boundHandlers.touchmove);
-      canvas.removeEventListener('touchend', this.boundHandlers.touchend);
-      canvas.removeEventListener('touchcancel', this.boundHandlers.touchend);
+    const gameScreen = document.getElementById('game-screen');
+    if (gameScreen && this.boundHandlers.touchstart) {
+      gameScreen.removeEventListener('touchstart', this.boundHandlers.touchstart);
+      gameScreen.removeEventListener('touchmove', this.boundHandlers.touchmove);
+      gameScreen.removeEventListener('touchend', this.boundHandlers.touchend);
+      gameScreen.removeEventListener('touchcancel', this.boundHandlers.touchend);
     }
 
     // Remove button event listeners
