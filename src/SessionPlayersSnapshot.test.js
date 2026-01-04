@@ -227,6 +227,7 @@ describe('SessionPlayersSnapshot (Built on Network)', () => {
 
       snapshot = new SessionPlayersSnapshot(mockNetwork, TEST_SESSION_ID);
       await snapshot.ready();
+      expect(snapshot.getPlayers().has('player-to-remove')).toBe(true);
 
       // Simulate Network emitting postgres_changes for DELETE with MISSING session_id in old record
       // as is common with some Supabase Realtime configurations
