@@ -132,7 +132,7 @@ export const CONFIG = {
       damageType: 'blunt',
       range: 50,
       baseDamage: 15,
-      attackSpeed: 2.0,
+      attackSpeed: 4.0,
       specialAbility: 'grab_throw',
     },
   },

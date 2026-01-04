@@ -111,9 +111,6 @@ export class LocalPlayerController {
       if (snapshotData.equipped_armor !== undefined) {
         this.player.armor = snapshotData.equipped_armor;
       }
-      if (snapshotData.is_attacking !== undefined) {
-        this.player.isAttacking = snapshotData.is_attacking;
-      }
     }
   }
 
