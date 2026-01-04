@@ -8,7 +8,7 @@ jobs:
   gemini:
     if: github.event_name == 'pull_request_review_comment' && contains(fromJSON('["OWNER", "MEMBER", "COLLABORATOR", "CONTRIBUTOR"]'), github.event.comment.author_association) && contains(github.event.comment.body, '@gemini') && !contains(github.event.comment.body, '@gemini /review')
     runs-on: ubuntu-latest
-    timeout-minutes: 7
+    timeout-minutes: 10
     permissions:
       contents: write
       pull-requests: write
@@ -122,12 +122,14 @@ jobs:
 
           <comment_tool_info>
           IMPORTANT: Use the `run_shell_command` tool to execute `gh api` and update your progress comment.
-          
+
+          ALWAYS update the single comment thread where you were triggered.
+
           Your progress comment ID is: ${{ steps.acknowledge.outputs.comment_id }}
           The type of your comment is: ${{ steps.acknowledge.outputs.comment_type }}
 
-          To update your comment body robustly:
-          gh api -X PATCH /repos/${{ github.repository }}/${{ steps.acknowledge.outputs.comment_type == 'pull' && 'pulls' || 'issues' }}/comments/${{ steps.acknowledge.outputs.comment_id }} -f body="Your updated Markdown text"
+          To update your comment body robustly (always include the View job run link):
+          printf 'Your updated Markdown text with job run link' | gh api -X PATCH /repos/${{ github.repository }}/${{ steps.acknowledge.outputs.comment_type == 'pull' && 'pulls' || 'issues' }}/comments/${{ steps.acknowledge.outputs.comment_id }} --input -
 
           CRITICAL: You are already on the correct branch. DO NOT spend time finding branch names or constructing PR URLs. Focus exclusively on the code changes or questions.
           </comment_tool_info>
@@ -149,6 +151,10 @@ jobs:
           3. Final Summary:
              - Remove the spinner and post a final summary in the same comment.
              - Always include: [View job run](${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }})
+
+          Important Notes:
+          - Communicate ONLY by updating your single acknowledgement comment.
+          - REPOSITORY SETUP: Follow GEMINI.md for repo-specific setup and standards.
           PROMPT_CONTENT
           echo "EOF" >> $GITHUB_ENV
 
@@ -172,7 +178,7 @@ jobs:
           settings: |-
             {
               "model": {
-                "maxSessionTurns": 25
+                "maxSessionTurns": 50
               },
               "telemetry": {
                 "enabled": false,
@@ -203,6 +209,7 @@ jobs:
               },
               "tools": {
                 "core": [
+                  "run_shell_command(bash)",
                   "run_shell_command(cat)",
                   "run_shell_command(echo)",
                   "run_shell_command(env)",
@@ -211,6 +218,12 @@ jobs:
                   "run_shell_command(grep)",
                   "run_shell_command(head)",
                   "run_shell_command(ls)",
+                  "run_shell_command(node)",
+                  "run_shell_command(npm)",
+                  "run_shell_command(npx)",
+                  "run_shell_command(printf)",
+                  "run_shell_command(sh)",
+                  "run_shell_command(supabase)",
                   "run_shell_command(tail)"
                 ]
               }
@@ -237,7 +250,7 @@ jobs:
           settings: |-
             {
               "model": {
-                "maxSessionTurns": 25
+                "maxSessionTurns": 50
               },
               "telemetry": {
                 "enabled": false,
@@ -268,6 +281,7 @@ jobs:
               },
               "tools": {
                 "core": [
+                  "run_shell_command(bash)",
                   "run_shell_command(cat)",
                   "run_shell_command(echo)",
                   "run_shell_command(env)",
@@ -276,6 +290,12 @@ jobs:
                   "run_shell_command(grep)",
                   "run_shell_command(head)",
                   "run_shell_command(ls)",
+                  "run_shell_command(node)",
+                  "run_shell_command(npm)",
+                  "run_shell_command(npx)",
+                  "run_shell_command(printf)",
+                  "run_shell_command(sh)",
+                  "run_shell_command(supabase)",
                   "run_shell_command(tail)"
                 ]
               }
@@ -301,7 +321,7 @@ jobs:
           settings: |-
             {
               "model": {
-                "maxSessionTurns": 25
+                "maxSessionTurns": 50
               },
               "telemetry": {
                 "enabled": false,
@@ -332,6 +352,7 @@ jobs:
               },
               "tools": {
                 "core": [
+                  "run_shell_command(bash)",
                   "run_shell_command(cat)",
                   "run_shell_command(echo)",
                   "run_shell_command(env)",
@@ -340,6 +361,12 @@ jobs:
                   "run_shell_command(grep)",
                   "run_shell_command(head)",
                   "run_shell_command(ls)",
+                  "run_shell_command(node)",
+                  "run_shell_command(npm)",
+                  "run_shell_command(npx)",
+                  "run_shell_command(printf)",
+                  "run_shell_command(sh)",
+                  "run_shell_command(supabase)",
                   "run_shell_command(tail)"
                 ]
               }
