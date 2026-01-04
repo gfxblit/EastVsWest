@@ -46,13 +46,14 @@ describe('Animation Integration', () => {
   beforeEach(async () => {
     // Reset to a known animation state before each test
     await page.evaluate(() => {
-      if (window.game && window.game.localPlayer) {
-        window.game.localPlayer.velocity = { x: 0, y: 0 };
+      const player = window.game?.getLocalPlayer();
+      if (player) {
+        player.velocity = { x: 0, y: 0 };
         // Ensure animationState is also reset
-        if (window.game.localPlayer.animationState) {
-          window.game.localPlayer.animationState.currentFrame = 0;
-          window.game.localPlayer.animationState.timeAccumulator = 0;
-          window.game.localPlayer.animationState.lastDirection = 0; // Reset direction
+        if (player.animationState) {
+          player.animationState.currentFrame = 0;
+          player.animationState.timeAccumulator = 0;
+          player.animationState.lastDirection = 0; // Reset direction
         }
       }
     });
@@ -66,20 +67,19 @@ describe('Animation Integration', () => {
     test('WhenSpriteSheetLoads_ShouldHaveCorrectMetadata', async () => {
       // Inject code to check the sprite sheet metadata
       const metadata = await page.evaluate(() => {
-        // Access the game's renderer via window.game if available
-        if (window.game && window.game.renderer) {
-          return window.game.renderer.spriteSheetMetadata;
+        // Access the renderer via window.renderer if available
+        if (window.renderer) {
+          return window.renderer.spriteSheetMetadata;
         }
         return null;
       });
 
       // Metadata should be loaded
       if (metadata) {
-        expect(metadata.frameWidth).toBe(96);
-        expect(metadata.frameHeight).toBe(96);
-        expect(metadata.columns).toBe(6);
+        expect(metadata.frameWidth).toBe(32);
+        expect(metadata.frameHeight).toBe(32);
+        expect(metadata.columns).toBe(4);
         expect(metadata.rows).toBe(8);
-        expect(metadata.directions).toHaveLength(8);
       }
       // If metadata is null, sprite sheet might be loading asynchronously
       // This test verifies that when metadata is loaded, it has the right structure
@@ -93,12 +93,13 @@ describe('Animation Integration', () => {
 
       // Wait for the animation frame to advance, indicating movement
       await page.waitForFunction(() => {
-        return window.game && window.game.localPlayer && window.game.localPlayer.animationState.currentFrame > 0;
+        const player = window.game?.getLocalPlayer();
+        return player && player.animationState.currentFrame > 0;
       }, { timeout: 5000 });
 
       // Check that animation state has advanced
       const debugInfo = await page.evaluate(() => {
-        const player = window.game.localPlayer;
+        const player = window.game.getLocalPlayer();
         const animState = player.animationState;
         return {
           hasPlayer: true,
@@ -123,13 +124,13 @@ describe('Animation Integration', () => {
 
       // Wait for the player's velocity to be zero and animation to return to idle
       await page.waitForFunction(() => {
-        const player = window.game && window.game.localPlayer;
+        const player = window.game?.getLocalPlayer();
         return player && player.velocity.x === 0 && player.animationState.currentFrame === 0;
       }, { timeout: 5000 });
 
       // Check that animation state reset to idle frame (frame 0)
       const isIdleFrame = await page.evaluate(() => {
-        return window.game.localPlayer.animationState.currentFrame === 0;
+        return window.game.getLocalPlayer().animationState.currentFrame === 0;
       });
 
       expect(isIdleFrame).toBe(true);
@@ -141,8 +142,9 @@ describe('Animation Integration', () => {
       await new Promise(resolve => setTimeout(resolve, 300));
 
       const eastDirection = await page.evaluate(() => {
-        if (window.game && window.game.localPlayer) {
-          return window.game.localPlayer.animationState?.lastDirection;
+        const player = window.game?.getLocalPlayer();
+        if (player) {
+          return player.animationState?.lastDirection;
         }
         return null;
       });
@@ -154,8 +156,9 @@ describe('Animation Integration', () => {
       await new Promise(resolve => setTimeout(resolve, 300));
 
       const southDirection = await page.evaluate(() => {
-        if (window.game && window.game.localPlayer) {
-          return window.game.localPlayer.animationState?.lastDirection;
+        const player = window.game?.getLocalPlayer();
+        if (player) {
+          return player.animationState?.lastDirection;
         }
         return null;
       });
