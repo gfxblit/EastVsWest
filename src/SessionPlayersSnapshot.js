@@ -137,6 +137,7 @@ export class SessionPlayersSnapshot {
    * Handle database change events
    */
   #handleDbEvent(payload) {
+    console.log(`[Snapshot] DB Event: ${payload.eventType} for table ${payload.table}`);
     const { eventType, new: newRecord, old: oldRecord } = payload;
 
     switch (eventType) {
