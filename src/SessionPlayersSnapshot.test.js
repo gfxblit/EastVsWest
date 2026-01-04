@@ -858,6 +858,93 @@ describe('SessionPlayersSnapshot (Built on Network)', () => {
       expect(player.equipped_weapon).toBe('pistol'); // Unchanged
     });
 
+    test('WhenHostUpdatesExpandedWhitelistFields_ShouldAccept', async () => {
+      const HOST_ID = 'host-id';
+      mockNetwork.hostId = HOST_ID;
+
+      const mockPlayers = [createMockPlayer({ 
+        player_id: TEST_PLAYER_ID,
+        is_alive: true,
+        kills: 0,
+        damage_dealt: 0,
+        is_connected: true
+      })];
+      mockSupabaseClient.from().select().eq.mockResolvedValue({
+        data: mockPlayers,
+        error: null,
+      });
+
+      let playerStateUpdateHandler;
+      mockNetwork.on.mockImplementation((event, handler) => {
+        if (event === 'player_state_update') {
+          playerStateUpdateHandler = handler;
+        }
+      });
+
+      snapshot = new SessionPlayersSnapshot(mockNetwork, TEST_SESSION_ID);
+      await snapshot.ready();
+
+      // Host updates expanded whitelist fields
+      playerStateUpdateHandler({
+        type: 'player_state_update',
+        from: HOST_ID,
+        data: {
+          player_id: TEST_PLAYER_ID,
+          is_alive: false,
+          kills: 5,
+          damage_dealt: 1250.5,
+          is_connected: false,
+        },
+      });
+
+      const player = snapshot.getPlayers().get(TEST_PLAYER_ID);
+      expect(player.is_alive).toBe(false);
+      expect(player.kills).toBe(5);
+      expect(player.damage_dealt).toBe(1250.5);
+      expect(player.is_connected).toBe(false);
+    });
+
+    test('WhenClientTriesToUpdateExpandedWhitelistFields_ShouldReject', async () => {
+      const mockPlayers = [createMockPlayer({ 
+        player_id: TEST_PLAYER_ID,
+        is_alive: true,
+        kills: 0,
+        damage_dealt: 0,
+        is_connected: true
+      })];
+      mockSupabaseClient.from().select().eq.mockResolvedValue({
+        data: mockPlayers,
+        error: null,
+      });
+
+      let playerStateUpdateHandler;
+      mockNetwork.on.mockImplementation((event, handler) => {
+        if (event === 'player_state_update') {
+          playerStateUpdateHandler = handler;
+        }
+      });
+
+      snapshot = new SessionPlayersSnapshot(mockNetwork, TEST_SESSION_ID);
+      await snapshot.ready();
+
+      // Client tries to update expanded whitelist fields (host-auth)
+      playerStateUpdateHandler({
+        type: 'player_state_update',
+        from: TEST_PLAYER_ID,
+        data: {
+          player_id: TEST_PLAYER_ID,
+          is_alive: false,
+          kills: 99,
+          damage_dealt: 9999,
+        },
+      });
+
+      const player = snapshot.getPlayers().get(TEST_PLAYER_ID);
+      expect(player.is_alive).toBe(true); // Unchanged
+      expect(player.kills).toBe(0); // Unchanged
+      expect(player.damage_dealt).toBe(0); // Unchanged
+    });
+
     test('WhenPlayerUpdatesOwnPosition_ShouldAccept', async () => {
       const mockPlayers = [createMockPlayer({ player_id: TEST_PLAYER_ID, position_x: 100, position_y: 200 })];
 
