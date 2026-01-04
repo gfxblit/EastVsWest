@@ -53,16 +53,18 @@ describe('Game Combat', () => {
       const inputState = { 
         attack: true, 
         specialAbility: false,
-        aimX: 200,
-        aimY: 100
+        aimX: 200, // Should be ignored
+        aimY: 100  // Should be ignored
       };
 
+      // Player is at 100,100 with rotation 0 (North). 
+      // Attack vector (0, -1) * 100 = (0, -100). Target: 100, 0.
       game.handleInput(inputState);
 
       expect(mockNetwork.send).toHaveBeenCalledWith('attack_request', expect.objectContaining({
         weapon_id: 'spear',
-        aim_x: 200,
-        aim_y: 100,
+        aim_x: 100,
+        aim_y: 0,
         is_special: false
       }));
     });
@@ -71,16 +73,16 @@ describe('Game Combat', () => {
       const inputState = { 
         attack: false, 
         specialAbility: true,
-        aimX: 200,
-        aimY: 100
+        aimX: 200, // Should be ignored
+        aimY: 100  // Should be ignored
       };
 
       game.handleInput(inputState);
 
       expect(mockNetwork.send).toHaveBeenCalledWith('attack_request', expect.objectContaining({
         weapon_id: 'spear',
-        aim_x: 200,
-        aim_y: 100,
+        aim_x: 100,
+        aim_y: 0,
         is_special: true
       }));
     });

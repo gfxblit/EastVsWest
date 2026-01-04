@@ -185,17 +185,6 @@ export class LocalPlayerController {
       y: velocityY,
     };
 
-    // Update rotation based on aim direction (if aiming)
-    if (inputState.aimX !== undefined && inputState.aimY !== undefined) {
-      const aimDeltaX = inputState.aimX - this.player.x;
-      const aimDeltaY = inputState.aimY - this.player.y;
-
-      if (Math.abs(aimDeltaX) > 0.01 || Math.abs(aimDeltaY) > 0.01) {
-        this.player.rotation = Math.atan2(aimDeltaY, aimDeltaX) + Math.PI / 2;
-        this.#normalizeRotation();
-      }
-    }
-
     // Handle Attack
     if (inputState.attack || inputState.specialAbility) {
       this.#handleAttack(inputState);
@@ -225,10 +214,16 @@ export class LocalPlayerController {
       this.player.attackAnimTime = CONFIG.COMBAT.ATTACK_ANIMATION_DURATION_SECONDS;
 
       if (this.network) {
+        // Calculate aim position based on current rotation
+        const attackAngle = this.player.rotation - Math.PI / 2;
+        const aimDistance = 100; // Arbitrary distance for direction vector
+        const aimX = this.player.x + Math.cos(attackAngle) * aimDistance;
+        const aimY = this.player.y + Math.sin(attackAngle) * aimDistance;
+
         this.network.send('attack_request', {
           weapon_id: weaponConfig.id,
-          aim_x: inputState.aimX,
-          aim_y: inputState.aimY,
+          aim_x: aimX,
+          aim_y: aimY,
           is_special: isSpecial
         });
       }
