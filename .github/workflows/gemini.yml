@@ -45,25 +45,6 @@ jobs:
       - name: Install dependencies
         run: npm ci
 
-#      - name: Setup Supabase CLI
-#        uses: supabase/setup-cli@v1
-#        with:
-#          version: latest
-
-#      - name: Start Supabase
-#        run: supabase start --exclude studio,storage-api,imgproxy,mailpit,edge-runtime,logflare,vector,supavisor,postgres-meta
-#
-#      - name: Export Supabase credentials
-#        run: |
-#          STATUS=$(supabase status --output json)
-#          API_URL=$(echo $STATUS | jq -r '.API_URL')
-#          ANON_KEY=$(echo $STATUS | jq -r '.ANON_KEY')
-#
-#          echo "SUPABASE_URL=$API_URL" >> $GITHUB_ENV
-#          echo "SUPABASE_ANON_KEY=$ANON_KEY" >> $GITHUB_ENV
-#          echo "VITE_SUPABASE_URL=$API_URL" >> $GITHUB_ENV
-#          echo "VITE_SUPABASE_ANON_KEY=$ANON_KEY" >> $GITHUB_ENV
-
       - name: Inject Gemini Credentials
         env:
           GEMINI_SETTINGS_JSON: '${{ secrets.GEMINI_SETTINGS_JSON }}'
@@ -112,18 +93,16 @@ jobs:
               -F in_reply_to="${TRIGGER_COMMENT_ID}" \
               --jq '.id')
             echo "comment_type=pull" >> $GITHUB_OUTPUT
+            echo "GEMINI_COMMENT_TYPE=pull" >> $GITHUB_ENV
           else
+            # Fallback for other comment types if we ever add them back
             COMMENT_URL=$(gh pr comment "${PR_NUMBER}" --body "${MESSAGE}" --repo "${REPOSITORY}")
             COMMENT_ID=$(echo $COMMENT_URL | grep -oE '[0-9]+$')
             echo "comment_type=issue" >> $GITHUB_OUTPUT
+            echo "GEMINI_COMMENT_TYPE=issue" >> $GITHUB_ENV
           fi
           echo "comment_id=$COMMENT_ID" >> $GITHUB_OUTPUT
           echo "GEMINI_COMMENT_ID=$COMMENT_ID" >> $GITHUB_ENV
-          if [ "${EVENT_NAME}" == "pull_request_review_comment" ]; then
-            echo "GEMINI_COMMENT_TYPE=pull" >> $GITHUB_ENV
-          else
-            echo "GEMINI_COMMENT_TYPE=issue" >> $GITHUB_ENV
-          fi
 
       - name: Set Gemini prompt
         run: |
@@ -164,9 +143,9 @@ Images have been downloaded from GitHub comments and saved to disk. Their file p
 <trigger_phrase>@gemini</trigger_phrase>
 
 <comment_tool_info>
-IMPORTANT: Use the `gh` tool via `run_shell_command` to update your progress and provide the final result.
+IMPORTANT: Use the `gh` tool via `run_shell_command` to update your progress and provide the final result. 
  
-ALWAYS update the single comment thread where you were triggered.
+ALWAYS update the single comment thread where you were triggered. 
  
 Your progress comment ID is: ${{ steps.acknowledge.outputs.comment_id }}
 The type of your comment is: ${{ steps.acknowledge.outputs.comment_type }} (pull = PR review comment, issue = regular PR comment)
