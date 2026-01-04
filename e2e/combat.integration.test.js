@@ -70,16 +70,16 @@ describe('Combat Integration', () => {
     const { session: hostSession } = await hostNetwork.hostGame('Host');
     testSessionId = hostSession.id;
 
+    // Set host weapon to spear for the test
+    await hostSupabase.from('session_players')
+      .update({ equipped_weapon: 'spear', position_x: 1200, position_y: 800 })
+      .eq('player_id', hostNetwork.playerId);
+
     hostSnapshot = new SessionPlayersSnapshot(hostNetwork, hostSession.id);
     await hostSnapshot.ready();
     
     hostGame = new Game();
     hostGame.init(hostSnapshot, hostNetwork);
-
-    // Set host weapon to spear for the test
-    await hostSupabase.from('session_players')
-      .update({ equipped_weapon: 'spear', position_x: 1200, position_y: 800 })
-      .eq('player_id', hostNetwork.playerId);
 
     // 2. Player joins game
     await playerNetwork.joinGame(hostSession.join_code, 'Player');
@@ -111,12 +111,28 @@ describe('Combat Integration', () => {
       return hostGame.getLocalPlayer().weapon === 'spear' && positionSynced;
     }, 10000);
 
-    // 3. Host attacks Player
+    // 3. Move Host East to set rotation
+    hostGame.handleInput({
+      moveX: 1,
+      moveY: 0,
+      attack: false,
+      specialAbility: false
+    });
+    hostGame.update(0.05); // Move slightly
+
+    // Stop moving
+    hostGame.handleInput({
+      moveX: 0,
+      moveY: 0,
+      attack: false,
+      specialAbility: false
+    });
+    hostGame.update(0.05);
+
+    // Attack (now facing East)
     hostGame.handleInput({
       attack: true,
       specialAbility: false,
-      aimX: 1250,
-      aimY: 800,
       moveX: 0,
       moveY: 0
     });
@@ -146,16 +162,16 @@ describe('Combat Integration', () => {
     const { session: hostSession } = await hostNetwork.hostGame('Host');
     testSessionId = hostSession.id;
 
+    // Set host weapon to spear for the test
+    await hostSupabase.from('session_players')
+      .update({ equipped_weapon: 'spear', position_x: 1200, position_y: 800 })
+      .eq('player_id', hostNetwork.playerId);
+
     hostSnapshot = new SessionPlayersSnapshot(hostNetwork, hostSession.id);
     await hostSnapshot.ready();
     
     hostGame = new Game();
     hostGame.init(hostSnapshot, hostNetwork);
-
-    // Set host weapon to spear for the test
-    await hostSupabase.from('session_players')
-      .update({ equipped_weapon: 'spear', position_x: 1200, position_y: 800 })
-      .eq('player_id', hostNetwork.playerId);
 
     // 2. Player joins game
     await playerNetwork.joinGame(hostSession.join_code, 'Player');
@@ -186,12 +202,28 @@ describe('Combat Integration', () => {
       return hostGame.getLocalPlayer().weapon === 'spear' && positionSynced;
     }, 10000);
 
-    // 3. Host performs SPECIAL attack on Player
+    // 3. Move Host East to set rotation
+    hostGame.handleInput({
+      moveX: 1,
+      moveY: 0,
+      attack: false,
+      specialAbility: false
+    });
+    hostGame.update(0.05); // Move slightly
+
+    // Stop moving
+    hostGame.handleInput({
+      moveX: 0,
+      moveY: 0,
+      attack: false,
+      specialAbility: false
+    });
+    hostGame.update(0.05);
+
+    // Special Attack (now facing East)
     hostGame.handleInput({
       attack: false,
       specialAbility: true,
-      aimX: 1250,
-      aimY: 800,
       moveX: 0,
       moveY: 0
     });
