@@ -5,8 +5,12 @@ on:
     types: [created]
   issues:
     types: [opened, assigned]
+  pull_request:
+    types: [opened]
   pull_request_review:
     types: [submitted]
+  pull_request_review_comment:
+    types: [created]
 
 jobs:
   gemini:
@@ -24,12 +28,18 @@ jobs:
       ) || (
         github.event_name == 'pull_request_review' &&
         (github.event.review.author_association == 'OWNER' || github.event.review.author_association == 'CONTRIBUTOR' || github.event.review.author_association == 'MEMBER' || github.event.review.author_association == 'COLLABORATOR') &&
+        contains(github.event.review.body, '@gemini') &&
         !contains(github.event.review.body, '@gemini /review')
       ) || (
         github.event_name == 'issues' &&
         (github.event.issue.author_association == 'OWNER' || github.event.issue.author_association == 'CONTRIBUTOR' || github.event.issue.author_association == 'MEMBER' || github.event.issue.author_association == 'COLLABORATOR') &&
-        (contains(github.event.issue.body, '@gemini') || contains(github.event.issue.title, '@gemini')) &&
+        (startsWith(github.event.issue.body, '@gemini') || startsWith(github.event.issue.title, '@gemini')) &&
         !contains(github.event.issue.body, '@gemini /review')
+      ) || (
+        github.event_name == 'pull_request' &&
+        (github.event.pull_request.author_association == 'OWNER' || github.event.pull_request.author_association == 'CONTRIBUTOR' || github.event.pull_request.author_association == 'MEMBER' || github.event.pull_request.author_association == 'COLLABORATOR') &&
+        (startsWith(github.event.pull_request.body, '@gemini') || startsWith(github.event.pull_request.title, '@gemini')) &&
+        !contains(github.event.pull_request.body, '@gemini /review')
       )
     runs-on: ubuntu-latest
     permissions:
@@ -116,9 +126,10 @@ jobs:
               if (eventName === 'pull_request_review_comment') {
                 const c = payload.comment;
                 discussionContext = `**${c.path}**:\n\`\`\`diff\n${c.diff_hunk}\n\`\`\`\n**@${c.user.login}**: ${c.body}`;
+                reviewThreads.push({ id: c.id, path: c.path, body: c.body });
               }
-            } else if (eventName === 'issues') {
-              prompt = payload.issue.body || payload.issue.title;
+            } else if (eventName === 'issues' || eventName === 'pull_request') {
+              prompt = (payload.issue || payload.pull_request).body || (payload.issue || payload.pull_request).title;
             } else if (eventName === 'pull_request_review') {
               const review = payload.review;
               const { data: comments } = await github.rest.pulls.listCommentsForReview({
@@ -147,12 +158,6 @@ jobs:
             
             const cleanPrompt = prompt.replace(/@gemini/g, '').trim();
             
-            // Critical check: if no mentions found in a review submission, we might want to skip
-            if (eventName === 'pull_request_review' && !prompt.includes('@gemini') && !payload.review.body?.includes('@gemini')) {
-               // If this was a review without a mention, it might have triggered if the IF condition was loose.
-               // But our IF condition currently requires it.
-            }
-
             core.setOutput('prompt', cleanPrompt);
             core.setOutput('discussion_context', discussionContext);
             core.setOutput('trigger_comment_id', triggerCommentId);
@@ -166,8 +171,17 @@ jobs:
           MESSAGE: |-
             🤖 Hi @${{ github.actor }}, I've received your request and I'm on it! You can track my progress [in the logs](${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}).
           REPOSITORY: ${{ github.repository }}
+          TRIGGER_COMMENT_ID: ${{ steps.extract_prompt.outputs.trigger_comment_id }}
+          EVENT_NAME: ${{ github.event_name }}
         run: |-
-          COMMENT_URL=$(gh issue comment "${ISSUE_NUMBER}" --body "${MESSAGE}" --repo "${REPOSITORY}")
+          if [ "${EVENT_NAME}" == "pull_request_review_comment" ]; then
+            COMMENT_URL=$(gh api -X POST "/repos/${REPOSITORY}/pulls/${ISSUE_NUMBER}/comments" \
+              -f body="${MESSAGE}" \
+              -f in_reply_to="${TRIGGER_COMMENT_ID}" \
+              --jq '.html_url')
+          else
+            COMMENT_URL=$(gh issue comment "${ISSUE_NUMBER}" --body "${MESSAGE}" --repo "${REPOSITORY}")
+          fi
           echo "comment_url=$COMMENT_URL" >> $GITHUB_OUTPUT
           COMMENT_ID=$(echo $COMMENT_URL | grep -oE '[0-9]+$')
           echo "comment_id=$COMMENT_ID" >> $GITHUB_OUTPUT
@@ -442,7 +456,15 @@ jobs:
           MESSAGE: |-
             🤖 I'm sorry @${{ github.actor }}, but I was unable to process your request. Please [see the logs](${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}) for more details.
           REPOSITORY: ${{ github.repository }}
+          EVENT_NAME: ${{ github.event_name }}
+          TRIGGER_COMMENT_ID: ${{ steps.extract_prompt.outputs.trigger_comment_id }}
         run: |-
-          gh issue comment "${ISSUE_NUMBER}" \
-            --body "${MESSAGE}" \
-            --repo "${REPOSITORY}"
+          if [ "${EVENT_NAME}" == "pull_request_review_comment" ]; then
+            gh api -X POST "/repos/${REPOSITORY}/pulls/${ISSUE_NUMBER}/comments" \
+              -f body="${MESSAGE}" \
+              -f in_reply_to="${TRIGGER_COMMENT_ID}"
+          else
+            gh issue comment "${ISSUE_NUMBER}" \
+              --body "${MESSAGE}" \
+              --repo "${REPOSITORY}"
+          fi
