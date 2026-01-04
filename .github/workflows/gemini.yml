@@ -2,7 +2,7 @@ name: Gemini
 
 on:
   pull_request_review_comment:
-    types: [created]
+    types: [created, edited]
 
 jobs:
   gemini:
