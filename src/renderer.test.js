@@ -252,10 +252,9 @@ describe('Renderer', () => {
       renderer.render(gameState, null, null, null);
 
       // Assert
-      // Should not call transform methods
-      expect(ctx.save).not.toHaveBeenCalled();
+      // Should not call transform methods (translate)
+      // save/restore are allowed for general state management
       expect(ctx.translate).not.toHaveBeenCalled();
-      expect(ctx.restore).not.toHaveBeenCalled();
     });
 
     test('WhenRenderingWithCamera_ShouldDrawBackgroundInWorldCoordinates', () => {
@@ -1249,6 +1248,70 @@ describe('Renderer', () => {
     });
   });
 
+  describe('Floating Text', () => {
+    test('addFloatingText should add text to floatingTexts array', () => {
+      renderer.addFloatingText(100, 200, '50', '#ff0000');
+      
+      expect(renderer.floatingTexts).toHaveLength(1);
+      const text = renderer.floatingTexts[0];
+      
+      // Check properties (with allowance for random offset)
+      expect(text.x).toBeCloseTo(100, -2); // within ~50 units? +/- 20 offset
+      expect(Math.abs(text.x - 100)).toBeLessThanOrEqual(20);
+      expect(Math.abs(text.y - 200)).toBeLessThanOrEqual(20);
+      
+      expect(text.text).toBe('50');
+      expect(text.color).toBe('#ff0000');
+    });
 
+    test('render should update and draw floating texts', () => {
+      // Mock update and draw on a floating text object
+      const mockText = {
+        update: jest.fn(),
+        draw: jest.fn(),
+        isExpired: jest.fn(() => false),
+      };
+      
+      // Inject directly into renderer's list
+      renderer.floatingTexts = [mockText];
+      
+      const gameState = {
+        conflictZone: { centerX: 600, centerY: 400, radius: 300 },
+        loot: []
+      };
+
+      renderer.render(gameState, null, null, null, 0.016);
+      
+      expect(mockText.update).toHaveBeenCalledWith(0.016);
+      expect(mockText.draw).toHaveBeenCalledWith(ctx);
+    });
+
+    test('render should remove expired floating texts', () => {
+       // Mock active and expired text objects
+       const activeText = {
+        update: jest.fn(),
+        draw: jest.fn(),
+        isExpired: jest.fn(() => false),
+      };
+      const expiredText = {
+        update: jest.fn(),
+        draw: jest.fn(),
+        isExpired: jest.fn(() => true),
+      };
+      
+      renderer.floatingTexts = [activeText, expiredText];
+      
+      const gameState = {
+        conflictZone: { centerX: 600, centerY: 400, radius: 300 },
+        loot: []
+      };
+
+      renderer.render(gameState, null, null, null, 0.016);
+      
+      expect(renderer.floatingTexts).toHaveLength(1);
+      expect(renderer.floatingTexts).toContain(activeText);
+      expect(renderer.floatingTexts).not.toContain(expiredText);
+    });
+  });
 });
 

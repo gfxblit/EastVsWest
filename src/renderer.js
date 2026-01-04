@@ -5,6 +5,7 @@
 
 import { CONFIG } from './config.js';
 import { getDirectionFromVelocity, updateAnimationState } from './animationHelper.js';
+import { FloatingText } from './FloatingText.js';
 
 export class Renderer {
   constructor(canvas) {
@@ -17,6 +18,7 @@ export class Renderer {
     this.spriteSheetLoaded = false;
     this.shadowImage = null;
     this.remoteAnimationStates = new Map(); // Store animation state for remote players
+    this.floatingTexts = [];
   }
 
   init() {
@@ -69,22 +71,28 @@ export class Renderer {
     this.canvas.height = window.innerHeight;
   }
 
-  render(gameState, localPlayer = null, playersSnapshot = null, camera = null, deltaTime = 0) {
+  addFloatingText(x, y, text, color) {
+    // Add random offset to start position (-20 to +20 px)
+    // This prevents text from overlapping exactly if spawned at same frame/location
+    const offsetX = (Math.random() - 0.5) * 40;
+    const offsetY = (Math.random() - 0.5) * 20;
+    this.floatingTexts.push(new FloatingText(x + offsetX, y + offsetY, text, color));
+  }
+
+  render(gameState, localPlayer = null, playersSnapshot = null, camera = null, deltaTime = 0.016) {
     if (!this.ctx) return;
 
-    // Clear canvas
+    if (camera) {
+      this.ctx.save();
+    }
+    
+    // Clear the canvas
     this.ctx.fillStyle = CONFIG.CANVAS.BACKGROUND_COLOR;
     this.ctx.fillRect(0, 0, this.canvas.width, this.canvas.height);
 
     // Apply camera transform if provided
     if (camera) {
-      this.ctx.save();
-      // Transform: translate screen center to camera position
-      // This makes the camera position appear at the center of the viewport
-      this.ctx.translate(
-        this.canvas.width / 2 - camera.x,
-        this.canvas.height / 2 - camera.y
-      );
+      this.ctx.translate(this.canvas.width / 2 - camera.x, this.canvas.height / 2 - camera.y);
     }
 
     // Draw background in world coordinates (after camera transform)
@@ -154,22 +162,32 @@ export class Renderer {
       }
     }
 
-    // Render local player last (on top, with visual distinction)
-    if (localPlayer) {
-      this.renderPlayer(localPlayer, true);
-    }
-
-    // Render loot (in world coordinates)
-    for (const loot of gameState.loot) {
-      this.renderLoot(loot);
-    }
-
-    // Restore transform
-    if (camera) {
-      this.ctx.restore();
-    }
-
-    // Render edge indicators (in screen space, after camera transform)
+        // Render Local Player
+        if (localPlayer) {
+          this.renderPlayer(localPlayer, true);
+        }
+        
+        // Render Loot
+        if (gameState && gameState.loot) {
+          this.renderLoot(gameState.loot);
+        }
+        
+        // Update and Render Floating Texts
+        // Iterate backwards to allow removal
+        for (let i = this.floatingTexts.length - 1; i >= 0; i--) {
+          const text = this.floatingTexts[i];
+          text.update(deltaTime);
+          if (text.isExpired()) {
+            this.floatingTexts.splice(i, 1);
+          } else {
+            text.draw(this.ctx);
+          }
+        }
+    
+            // Restore context transform (for UI elements that should be fixed to screen)
+            if (camera) {
+              this.ctx.restore();
+            }    // Render edge indicators (in screen space, after camera transform)
     if (camera) {
       this.renderEdgeIndicators(playersSnapshot, localPlayer, camera, gameState.loot);
     }

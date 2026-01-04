@@ -24,11 +24,14 @@ export class Game {
     this.hostCombatManager = null;
     this.playersSnapshot = null;
     this.network = null;
+    this.renderer = null;
+    this.previousPlayerHealth = new Map();
   }
 
-  init(playersSnapshot = null, network = null) {
+  init(playersSnapshot = null, network = null, renderer = null) {
     this.playersSnapshot = playersSnapshot;
     this.network = network;
+    this.renderer = renderer;
     this.state.isRunning = true;
 
     // Initialize Host Combat Manager
@@ -51,6 +54,15 @@ export class Game {
     }
     
     this.localPlayerController = new LocalPlayerController(network, localPlayerData);
+
+    // Initialize previous health for all players to current values
+    if (this.playersSnapshot) {
+      this.playersSnapshot.getPlayers().forEach(player => {
+        if (player.health !== undefined) {
+          this.previousPlayerHealth.set(player.player_id, player.health);
+        }
+      });
+    }
   }
 
   update(deltaTime) {
@@ -69,6 +81,26 @@ export class Game {
     // Host-authoritative updates
     if (this.hostCombatManager) {
       this.hostCombatManager.update(deltaTime, this.playersSnapshot);
+    }
+
+    // Check for health changes to spawn floating text
+    if (this.playersSnapshot && this.renderer) {
+      const players = this.playersSnapshot.getPlayers();
+      players.forEach(player => {
+        const prevHealth = this.previousPlayerHealth.get(player.player_id);
+        const currentHealth = player.health;
+
+        if (prevHealth !== undefined && currentHealth !== prevHealth) {
+          const diff = currentHealth - prevHealth;
+          if (Math.abs(diff) >= 0.1) { // Ignore tiny floating point diffs
+            const text = Math.abs(Math.round(diff)).toString();
+            const color = diff < 0 ? '#ff0000' : '#00ff00';
+            this.renderer.addFloatingText(player.position_x, player.position_y - CONFIG.RENDER.PLAYER_RADIUS * 2, text, color);
+          }
+        }
+
+        this.previousPlayerHealth.set(player.player_id, currentHealth);
+      });
     }
   }
 

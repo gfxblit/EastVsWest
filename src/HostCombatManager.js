@@ -14,8 +14,8 @@ export class HostCombatManager {
     // Accumulate time since last update
     this.healthUpdateAccumulator += deltaTime;
 
-    // Throttle updates to match network simulation interval
-    const updateIntervalSeconds = CONFIG.NETWORK.GAME_SIMULATION_INTERVAL_MS / 1000;
+    // Throttle updates to match zone damage interval
+    const updateIntervalSeconds = CONFIG.ZONE.DAMAGE_INTERVAL_SECONDS;
     if (this.healthUpdateAccumulator < updateIntervalSeconds) {
       return;
     }

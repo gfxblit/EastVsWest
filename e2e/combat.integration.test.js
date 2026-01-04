@@ -1,4 +1,5 @@
 import { createClient } from '@supabase/supabase-js';
+import { jest } from '@jest/globals';
 import { Network } from '../src/network';
 import { Game } from '../src/game';
 import { SessionPlayersSnapshot } from '../src/SessionPlayersSnapshot';
@@ -246,5 +247,85 @@ describe('Combat Integration', () => {
     expect(victimAtHost.health).toBe(62.5); // 100 - 37.5
     expect(victimAtPlayer.health).toBe(62.5);
     expect(playerGame.getLocalPlayer().health).toBe(62.5);
+  }, 30000);
+
+  test('should spawn floating text on damage', async () => {
+    // 1. Host creates game
+    const { session: hostSession } = await hostNetwork.hostGame('Host');
+    testSessionId = hostSession.id;
+
+    // Set host weapon to spear for the test
+    await hostSupabase.from('session_players')
+      .update({ equipped_weapon: 'spear', position_x: 1200, position_y: 800 })
+      .eq('player_id', hostNetwork.playerId);
+
+    hostSnapshot = new SessionPlayersSnapshot(hostNetwork, hostSession.id);
+    await hostSnapshot.ready();
+    
+    hostGame = new Game();
+    hostGame.init(hostSnapshot, hostNetwork);
+
+    // 2. Player joins game
+    await playerNetwork.joinGame(hostSession.join_code, 'Player');
+    
+    playerSnapshot = new SessionPlayersSnapshot(playerNetwork, hostSession.id);
+    await playerSnapshot.ready();
+
+    playerGame = new Game();
+    playerGame.init(playerSnapshot, playerNetwork);
+    
+    // Mock the renderer and addFloatingText
+    playerGame.renderer = {
+      addFloatingText: jest.fn(),
+      render: jest.fn(),
+      init: jest.fn(),
+      loadSpriteSheet: jest.fn(),
+      resizeCanvas: jest.fn(),
+    };
+
+    // Set player position near host
+    await playerSupabase.from('session_players')
+      .update({ position_x: 1250, position_y: 800, health: 100 })
+      .eq('player_id', playerNetwork.playerId);
+
+    // Wait for player to appear in host snapshot AND have correct position
+    await waitFor(() => {
+      const p = hostSnapshot.getPlayers().get(playerNetwork.playerId);
+      return p && Math.abs(p.position_x - 1250) < 1 && Math.abs(p.position_y - 800) < 1;
+    }, 10000);
+
+    // Wait for host weapon AND position to sync locally
+    await waitFor(() => {
+      hostGame.update(0.016);
+      const hostInSnapshot = hostSnapshot.getPlayers().get(hostNetwork.playerId);
+      const positionSynced = hostInSnapshot && Math.abs(hostInSnapshot.position_x - 1200) < 1;
+      return hostGame.getLocalPlayer().weapon === 'spear' && positionSynced;
+    }, 10000);
+
+    // 3. Host attacks Player
+    hostGame.handleInput({
+      attack: true,
+      specialAbility: false,
+      aimX: 1250,
+      aimY: 800,
+      moveX: 1, // Face east
+      moveY: 0
+    });
+
+    // 4. Verify player health reduction AND floating text spawn
+    await waitFor(() => {
+      hostGame.update(0.05);
+      playerGame.update(0.05); // This should detect health change and call addFloatingText
+      const p = playerSnapshot.getPlayers().get(playerNetwork.playerId);
+      return p && p.health < 100;
+    }, 20000);
+
+    // Check if addFloatingText was called
+    // We expect 25 damage from spear
+    expect(playerGame.renderer.addFloatingText).toHaveBeenCalled();
+    const calls = playerGame.renderer.addFloatingText.mock.calls;
+    const damageTextCall = calls.find(call => call[2] === '25'); // Verify text is damage amount
+    expect(damageTextCall).toBeDefined();
+    expect(damageTextCall[3]).toBe('#ff0000'); // Verify color is red
   }, 30000);
 });

@@ -368,7 +368,7 @@ class App {
 
     // Initialize components
     this.renderer.init();
-    this.game.init(this.playersSnapshot, this.network);
+    this.game.init(this.playersSnapshot, this.network, this.renderer);
 
     // Initialize camera with actual canvas dimensions (after renderer.init)
     this.camera = new Camera(

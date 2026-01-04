@@ -168,11 +168,11 @@ export class LocalPlayerController {
       : 1.0;
     const speed = CONFIG.PLAYER.BASE_MOVEMENT_SPEED * speedModifier;
 
-    let velocityX = inputState.moveX * speed;
-    let velocityY = inputState.moveY * speed;
+    let velocityX = (inputState.moveX || 0) * speed;
+    let velocityY = (inputState.moveY || 0) * speed;
 
     // Normalize diagonal movement
-    if (inputState.moveX !== 0 && inputState.moveY !== 0) {
+    if ((inputState.moveX || 0) !== 0 && (inputState.moveY || 0) !== 0) {
       velocityX /= Math.SQRT2;
       velocityY /= Math.SQRT2;
     }
@@ -181,6 +181,12 @@ export class LocalPlayerController {
       x: velocityX,
       y: velocityY,
     };
+
+    // Update rotation immediately if moving, so attacks in the same frame use correct direction
+    if (velocityX !== 0 || velocityY !== 0) {
+      this.player.rotation = Math.atan2(velocityY, velocityX) + Math.PI / 2;
+      this.#normalizeRotation();
+    }
 
     // Handle Attack
     if (inputState.attack || inputState.specialAbility) {
