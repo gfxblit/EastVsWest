@@ -60,12 +60,43 @@ jobs:
         with:
           script: |
             const c = context.payload.comment;
-            const discussionContext = "**" + c.path + "**:\n```diff\n" + c.diff_hunk + "\n```\n**@" + c.user.login + "**: " + c.body;
-            const reviewThreads = [{ id: c.id, path: c.path, body: c.body }];
+            const repo = context.repo;
+            const pull_number = context.payload.pull_request.number;
+
+            // Fetch all comments for this PR to reconstruct the thread
+            const { data: allComments } = await github.rest.pulls.listReviewComments({
+              ...repo,
+              pull_number,
+            });
+
+            // Find the root of the current thread
+            let rootId = c.id;
+            let parent = allComments.find(com => com.id === c.in_reply_to_id);
+            while (parent) {
+              rootId = parent.id;
+              parent = allComments.find(com => com.id === parent.in_reply_to_id);
+            }
+
+            // Get all comments in this thread
+            const thread = allComments.filter(com => {
+              if (com.id === rootId) return true;
+              let p = allComments.find(x => x.id === com.in_reply_to_id);
+              while (p) {
+                if (p.id === rootId) return true;
+                p = allComments.find(x => x.id === p.in_reply_to_id);
+              }
+              return false;
+            }).sort((a, b) => new Date(a.created_at) - new Date(b.created_at));
+
+            const discussionContext = "**File: " + c.path + "**\n" +
+                                     "```diff\n" + c.diff_hunk + "\n```\n\n" +
+                                     "### Conversation Thread\n\n" +
+                                     thread.map(com => "**@" + com.user.login + "**: " + com.body).join("\n\n");
+
             core.setOutput('prompt', c.body.replace(/@gemini/g, '').trim());
             core.setOutput('discussion_context', discussionContext);
             core.setOutput('trigger_comment_id', c.id);
-            core.setOutput('review_threads', JSON.stringify(reviewThreads));
+            core.setOutput('review_threads', JSON.stringify(thread.map(com => ({ id: com.id, path: com.path, body: com.body }))));
 
       - name: Acknowledge request
         id: acknowledge
@@ -129,7 +160,7 @@ jobs:
           The type of your comment is: ${{ steps.acknowledge.outputs.comment_type }}
 
           To update your comment body robustly (always include the View job run link):
-          printf 'Your updated Markdown text with job run link' | gh api -X PATCH /repos/${{ github.repository }}/${{ steps.acknowledge.outputs.comment_type == 'pull' && 'pulls' || 'issues' }}/comments/${{ steps.acknowledge.outputs.comment_id }} --input -
+          printf '%s' 'Your updated Markdown text with job run link' | gh api -X PATCH /repos/${{ github.repository }}/${{ steps.acknowledge.outputs.comment_type == 'pull' && 'pulls' || 'issues' }}/comments/${{ steps.acknowledge.outputs.comment_id }} --input -
 
           CRITICAL: You are already on the correct branch. DO NOT spend time finding branch names or constructing PR URLs. Focus exclusively on the code changes or questions.
           </comment_tool_info>
