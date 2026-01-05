@@ -47,7 +47,7 @@ describe('Game', () => {
       expect(localPlayer).toBeDefined();
       expect(localPlayer.id).toBe('player-1');
       expect(localPlayer.health).toBe(100);
-      expect(localPlayer.weapon).toBeNull();
+      expect(localPlayer.weapon).toBe('fist');
       expect(localPlayer.armor).toBeNull();
     });
 

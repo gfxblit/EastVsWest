@@ -87,6 +87,7 @@ export class Network extends EventEmitter {
         is_host: true,
         position_x: CONFIG.WORLD.WIDTH / 2,
         position_y: CONFIG.WORLD.HEIGHT / 2,
+        equipped_weapon: 'fist',
       })
       .select()
       .single();
@@ -129,6 +130,7 @@ export class Network extends EventEmitter {
         is_host: false,
         position_x: CONFIG.WORLD.WIDTH / 2,
         position_y: CONFIG.WORLD.HEIGHT / 2,
+        equipped_weapon: 'fist',
       })
       .select()
       .single();

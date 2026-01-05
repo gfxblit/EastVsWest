@@ -38,7 +38,7 @@ export class LocalPlayerController {
       y: data?.position_y !== undefined ? data.position_y : CONFIG.WORLD.HEIGHT / 2,
       rotation: data?.rotation || 0,
       health: data?.health !== undefined ? data.health : 100,
-      weapon: data?.equipped_weapon || null,
+      weapon: data?.equipped_weapon || 'fist',
       armor: data?.equipped_armor || null,
       lastAttackTime: 0,
       lastSpecialTime: 0,

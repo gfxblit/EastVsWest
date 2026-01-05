@@ -137,4 +137,42 @@ describe('HostCombatManager', () => {
     expect(victimUpdate).toBeDefined();
     expect(victimUpdate.health).toBe(85); // 100 - 15 (fist base damage)
   });
+
+  test('ShouldUseAuthoritativeWeaponFromSnapshotIgnoringMessageWeaponId', () => {
+    const attacker = {
+       id: 'attacker',
+       position_x: 0,
+       position_y: 0,
+       health: 100,
+       equipped_weapon: 'spear' // Authoritative weapon
+   };
+   const victim = {
+       id: 'victim',
+       position_x: 10,
+       position_y: 0,
+       health: 100,
+       equipped_armor: null
+   };
+
+   mockSnapshot.getPlayers.mockReturnValue(new Map([
+       ['attacker', attacker],
+       ['victim', victim]
+   ]));
+
+   const msg = {
+       from: 'attacker',
+       data: { weapon_id: 'fist', aim_x: 10, aim_y: 0, is_special: false } // Client tries to spoof fist
+   };
+
+   manager.handleAttackRequest(msg, mockSnapshot);
+
+   expect(mockNetwork.broadcastPlayerStateUpdate).toHaveBeenCalled();
+   const updates = mockNetwork.broadcastPlayerStateUpdate.mock.calls[0][0];
+   const victimUpdate = updates.find(u => u.player_id === 'victim');
+   
+   expect(victimUpdate).toBeDefined();
+   // Spear base damage is 25, Fist is 15.
+   // If it uses authoritative spear, health should be 75.
+   expect(victimUpdate.health).toBe(75); 
+ });
 });

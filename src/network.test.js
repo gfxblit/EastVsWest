@@ -86,7 +86,8 @@ describe('Network', () => {
       expect(mockSupabaseClient.from).toHaveBeenCalledWith('session_players');
       expect(mockSessionPlayersInsert).toHaveBeenCalledWith(expect.objectContaining({
         position_x: 1200,
-        position_y: 800
+        position_y: 800,
+        equipped_weapon: 'fist'
       }));
       expect(result.session.join_code).toBe(mockJoinCode);
       expect(result.player.id).toBe(mockPlayerRecord.id);
@@ -190,7 +191,8 @@ describe('Network', () => {
       expect(mockSupabaseClient.from).toHaveBeenCalledWith('session_players');
       expect(mockSessionPlayersInsert).toHaveBeenCalledWith(expect.objectContaining({
         position_x: 1200,
-        position_y: 800
+        position_y: 800,
+        equipped_weapon: 'fist'
       }));
       
       expect(network.sessionId).toBe(MOCK_SESSION_ID);

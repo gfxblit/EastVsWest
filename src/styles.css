@@ -346,6 +346,15 @@ button:active {
   font-size: 0.9rem;
 }
 
+.equipment-slot {
+  background-color: rgba(61, 40, 23, 0.4);
+  border: 1px solid #3d2817;
+  padding: 0.5rem;
+  border-radius: 4px;
+  color: #f4e8c1;
+  font-weight: bold;
+}
+
 #spectator-controls {
   position: fixed;
   bottom: 20px;

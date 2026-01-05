@@ -7,6 +7,7 @@ import { CONFIG } from './config.js';
 
 export class Input {
   constructor() {
+    this.events = {};
     this.inputState = {
       moveX: 0,
       moveY: 0,
@@ -72,6 +73,8 @@ export class Input {
     } else if (key === CONFIG.INPUT.INTERACT_KEY) {
       this.inputState.interact = true;
       this.notifyChange();
+    } else if (key === 'KeyT') {
+      this.emit('cycle_weapon');
     }
   }
 
@@ -173,6 +176,17 @@ export class Input {
   notifyChange() {
     if (this.onInputChange) {
       this.onInputChange(this.inputState);
+    }
+  }
+
+  on(event, callback) {
+    if (!this.events[event]) this.events[event] = [];
+    this.events[event].push(callback);
+  }
+
+  emit(event, data) {
+    if (this.events[event]) {
+      this.events[event].forEach(cb => cb(data));
     }
   }
 

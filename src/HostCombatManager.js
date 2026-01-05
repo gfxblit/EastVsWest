@@ -66,7 +66,7 @@ export class HostCombatManager {
     if (!this.network?.isHost || !playersSnapshot) return;
 
     const attackerId = message.from;
-    const { weapon_id, aim_x, aim_y, is_special } = message.data;
+    const { aim_x, aim_y, is_special } = message.data;
     const players = playersSnapshot.getPlayers();
     const attacker = players.get(attackerId);
 
@@ -74,7 +74,8 @@ export class HostCombatManager {
 
     // Server-side cooldown validation
     const now = Date.now();
-    const weaponConfig = Object.values(CONFIG.WEAPONS).find(w => w.id === weapon_id) || CONFIG.WEAPONS.FIST;
+    const weaponId = attacker.equipped_weapon;
+    const weaponConfig = Object.values(CONFIG.WEAPONS).find(w => w.id === weaponId) || CONFIG.WEAPONS.FIST;
     const cooldown = is_special ? CONFIG.COMBAT.SPECIAL_ABILITY_COOLDOWN_MS : (1000 / weaponConfig.attackSpeed);
     
     // Use independent cooldown tracking
