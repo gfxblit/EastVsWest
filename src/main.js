@@ -158,6 +158,7 @@ class App {
     const joinBtn = document.getElementById('join-game-btn');
     const startBtn = document.getElementById('start-game-btn');
     const leaveBtn = document.getElementById('leave-lobby-btn');
+    const leaveSpectateBtn = document.getElementById('leave-spectate-btn');
 
     if (hostBtn) {
       hostBtn.addEventListener('click', () => this.hostGame());
@@ -173,6 +174,10 @@ class App {
 
     if (leaveBtn) {
       leaveBtn.addEventListener('click', () => this.leaveGame());
+    }
+
+    if (leaveSpectateBtn) {
+      leaveSpectateBtn.addEventListener('click', () => this.leaveGame());
     }
   }
 
@@ -483,6 +488,13 @@ class App {
     if (localPlayer) {
       this.ui.updateHealth(localPlayer.health);
       
+      // Check for death/spectator mode
+      if (this.game.localPlayerController && this.game.localPlayerController.isDead()) {
+        this.ui.showSpectatorControls(true, localPlayer.name);
+      } else {
+        this.ui.showSpectatorControls(false);
+      }
+      
       // Update cooldowns
       if (this.game.localPlayerController) {
         const cooldowns = this.game.localPlayerController.getCooldownStatus();
@@ -545,5 +557,6 @@ class App {
 // Initialize app when DOM is ready
 document.addEventListener('DOMContentLoaded', async () => {
   const app = new App();
+  window.app = app;
   await app.init();
 });
