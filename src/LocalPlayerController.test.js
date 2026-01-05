@@ -119,7 +119,6 @@ describe('LocalPlayerController', () => {
     });
   });
 
-<<<<<<< HEAD
   describe('Auto-Attack', () => {
     beforeEach(() => {
       controller = new LocalPlayerController(mockNetwork, null);
@@ -202,8 +201,9 @@ describe('LocalPlayerController', () => {
       }));
 
       jest.restoreAllMocks();
-||||||| parent of 58026ed (feat: implement initial game over screen and spectator mode (#132))
-=======
+    });
+  });
+
   describe('Death Behavior', () => {
     beforeEach(() => {
       controller = new LocalPlayerController(mockNetwork, null);
@@ -250,7 +250,6 @@ describe('LocalPlayerController', () => {
 
       player.health = -1;
       expect(controller.isDead()).toBe(true);
->>>>>>> 58026ed (feat: implement initial game over screen and spectator mode (#132))
     });
   });
 });
