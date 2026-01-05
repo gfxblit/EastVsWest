@@ -84,24 +84,17 @@ describe('Game Throttling', () => {
         // Initial update
         game.update(0.016);
         
-        // Should have sent one update (or zero if accumulating)
-        // With throttling, it won't send on first frame if accumulator starts at 0 and 16ms < 50ms.
-        
         const initialCallCount = mockNetwork.broadcastPlayerStateUpdate.mock.calls.length;
         
-        // Advance time by slightly less than the update interval
-        // 2 * 16ms = 32ms. Total accumulated = 16 (initial) + 32 = 48ms < 50ms
-        const steps = 2; 
-        
-        for (let i = 0; i < steps; i++) {
-            game.update(0.016);
-        }
+        // Advance time by slightly less than the update interval (5 seconds)
+        const interval = CONFIG.ZONE.DAMAGE_INTERVAL_SECONDS;
+        game.update(interval - 0.1);
         
         // Should stay at initialCallCount (threshold not reached)
         expect(mockNetwork.broadcastPlayerStateUpdate).toHaveBeenCalledTimes(initialCallCount);
         
         // Now advance enough to cross the threshold
-        game.update(0.016); // Total ~64ms
+        game.update(0.2); 
         
         // Should trigger an update now
         expect(mockNetwork.broadcastPlayerStateUpdate).toHaveBeenCalledTimes(initialCallCount + 1);

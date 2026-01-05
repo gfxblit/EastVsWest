@@ -46,8 +46,8 @@ describe('HostCombatManager', () => {
         ['p2', playerInside]
     ]));
 
-    // Accumulate enough time ( > GAME_SIMULATION_INTERVAL_MS)
-    const deltaTime = 1.0; // 1 second
+    // Accumulate enough time ( > ZONE.DAMAGE_INTERVAL_SECONDS)
+    const deltaTime = 6.0; // 6 seconds
     manager.update(deltaTime, mockSnapshot);
 
     expect(mockNetwork.broadcastPlayerStateUpdate).toHaveBeenCalled();
