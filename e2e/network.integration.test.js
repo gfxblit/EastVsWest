@@ -89,6 +89,8 @@ describe('Network Module Integration with Supabase', () => {
     expect(playerDbData).not.toBeNull();
     expect(playerDbData.player_name).toBe(hostName);
     expect(playerDbData.is_host).toBe(true);
+    expect(playerDbData.position_x).toBe(1200);
+    expect(playerDbData.position_y).toBe(800);
 
     // Store the ID for cleanup
     testSessionId = data.id;
@@ -143,6 +145,8 @@ describe('Network Module Integration with Supabase', () => {
     expect(playerData.player_name).toBe(playerName);
     expect(playerData.is_host).toBe(false);
     expect(playerData.is_connected).toBe(true);
+    expect(playerData.position_x).toBe(1200);
+    expect(playerData.position_y).toBe(800);
 
     // Clean up: disconnect and sign out the player
     playerNetwork.disconnect();
