@@ -69,7 +69,7 @@ jobs:
       - name: Save Supabase Docker Images
         if: steps.cache-supabase.outputs.cache-hit != 'true'
         run: |
-          docker save $(docker ps --format '{{.Image}}') -o /tmp/supabase-images.tar
+          docker save $(docker ps --format '{{.Image}}' | sort -u) -o /tmp/supabase-images.tar
 
       - name: Inject Gemini Credentials
         env:
