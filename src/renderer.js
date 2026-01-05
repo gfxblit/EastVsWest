@@ -194,16 +194,18 @@ export class Renderer {
   }
 
   renderConflictZone(zone) {
-    // Draw danger area outside zone (in world coordinates)
-    this.ctx.fillStyle = 'rgba(255, 107, 107, 0.2)';
-    this.ctx.fillRect(0, 0, CONFIG.WORLD.WIDTH, CONFIG.WORLD.HEIGHT);
-
-    // Clear the safe zone
-    this.ctx.globalCompositeOperation = 'destination-out';
+    // Draw danger area outside zone (in world coordinates) using a path with a hole
+    // This avoids destination-out which clears the background pattern
+    this.ctx.save();
+    this.ctx.fillStyle = 'rgba(0, 0, 0, 0.5)'; // Dark gray dimming
+    
     this.ctx.beginPath();
-    this.ctx.arc(zone.centerX, zone.centerY, zone.radius, 0, Math.PI * 2);
+    // Outer rectangle (entire world)
+    this.ctx.rect(0, 0, CONFIG.WORLD.WIDTH, CONFIG.WORLD.HEIGHT);
+    // Inner circle (safe zone) - drawn counter-clockwise to create a hole
+    this.ctx.arc(zone.centerX, zone.centerY, zone.radius, 0, Math.PI * 2, true);
     this.ctx.fill();
-    this.ctx.globalCompositeOperation = 'source-over';
+    this.ctx.restore();
 
     // Draw zone boundary stroke
     this.ctx.strokeStyle = '#ff6b6b';
