@@ -445,9 +445,9 @@ describe('Renderer', () => {
 
       // Assert
       // Danger overlay should cover entire world, not just viewport
-      // Find the fillRect call that draws the danger overlay
-      const fillRectCalls = ctx.fillRect.mock.calls;
-      const dangerOverlayCall = fillRectCalls.find(
+      // Find the rect call that draws the danger overlay
+      const rectCalls = ctx.rect.mock.calls;
+      const dangerOverlayCall = rectCalls.find(
         call => call[0] === 0 && call[1] === 0 && call[2] > 1200 && call[3] > 800
       );
 
