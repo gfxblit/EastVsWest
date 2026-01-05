@@ -85,6 +85,8 @@ export class Network extends EventEmitter {
         player_id: this.playerId,
         player_name: playerName,
         is_host: true,
+        position_x: CONFIG.WORLD.WIDTH / 2,
+        position_y: CONFIG.WORLD.HEIGHT / 2,
       })
       .select()
       .single();
@@ -125,6 +127,8 @@ export class Network extends EventEmitter {
         player_id: this.playerId,
         player_name: playerName,
         is_host: false,
+        position_x: CONFIG.WORLD.WIDTH / 2,
+        position_y: CONFIG.WORLD.HEIGHT / 2,
       })
       .select()
       .single();

@@ -277,6 +277,8 @@ describe('SessionPlayersSnapshot Integration with Network', () => {
       // Initial position might vary depending on DB defaults or initialization
       const initialX = hostPlayerBefore.position_x;
       const initialY = hostPlayerBefore.position_y;
+      expect(hostPlayerBefore.position_x).toBe(1200);
+      expect(hostPlayerBefore.position_y).toBe(800);
 
       // Track player_state_update events received by playerNetwork
       const receivedEvents = [];

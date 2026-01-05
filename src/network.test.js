@@ -58,6 +58,12 @@ describe('Network', () => {
       mockSupabaseClient.channel.mockReturnValue(mockChannel);
 
       // Mock two separate insert operations
+      const mockSessionPlayersInsert = jest.fn().mockReturnValue({
+        select: jest.fn().mockReturnValue({
+          single: jest.fn().mockResolvedValue({ data: mockPlayerRecord, error: null })
+        })
+      });
+
       mockSupabaseClient.from = jest.fn((table) => {
         if (table === 'game_sessions') {
           return {
@@ -69,11 +75,7 @@ describe('Network', () => {
           };
         } else if (table === 'session_players') {
           return {
-            insert: jest.fn().mockReturnValue({
-              select: jest.fn().mockReturnValue({
-                single: jest.fn().mockResolvedValue({ data: mockPlayerRecord, error: null })
-              })
-            })
+            insert: mockSessionPlayersInsert
           };
         }
       });
@@ -82,6 +84,10 @@ describe('Network', () => {
 
       expect(mockSupabaseClient.from).toHaveBeenCalledWith('game_sessions');
       expect(mockSupabaseClient.from).toHaveBeenCalledWith('session_players');
+      expect(mockSessionPlayersInsert).toHaveBeenCalledWith(expect.objectContaining({
+        position_x: 1200,
+        position_y: 800
+      }));
       expect(result.session.join_code).toBe(mockJoinCode);
       expect(result.player.id).toBe(mockPlayerRecord.id);
       expect(network.isHost).toBe(true);
@@ -158,17 +164,19 @@ describe('Network', () => {
       mockSupabaseClient.channel.mockReturnValue(mockChannel);
 
       // 3. Mock table interactions
+      const mockSessionPlayersInsert = jest.fn().mockReturnValue({
+        select: jest.fn().mockReturnValue({
+          single: jest.fn().mockResolvedValue({ data: mockNewPlayer, error: null })
+        })
+      });
+
       mockSupabaseClient.from = jest.fn((table) => {
         if (table === 'session_players') {
           return {
             select: jest.fn().mockReturnValue({
               eq: jest.fn().mockResolvedValue({ data: [mockExistingPlayer], error: null })
             }),
-            insert: jest.fn().mockReturnValue({
-              select: jest.fn().mockReturnValue({
-                single: jest.fn().mockResolvedValue({ data: mockNewPlayer, error: null })
-              })
-            })
+            insert: mockSessionPlayersInsert
           };
         }
       });
@@ -180,6 +188,10 @@ describe('Network', () => {
       expect(mockSupabaseClient.channel).toHaveBeenCalledWith(mockSession.realtime_channel_name, expect.any(Object));
       expect(mockChannel.on).toHaveBeenCalledWith('postgres_changes', expect.any(Object), expect.any(Function));
       expect(mockSupabaseClient.from).toHaveBeenCalledWith('session_players');
+      expect(mockSessionPlayersInsert).toHaveBeenCalledWith(expect.objectContaining({
+        position_x: 1200,
+        position_y: 800
+      }));
       
       expect(network.sessionId).toBe(MOCK_SESSION_ID);
       expect(network.isHost).toBe(false);

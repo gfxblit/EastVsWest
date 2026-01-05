@@ -10,8 +10,8 @@ CREATE TABLE session_players (
   is_alive BOOLEAN DEFAULT TRUE,
 
   -- Player state
-  position_x REAL DEFAULT 0,
-  position_y REAL DEFAULT 0,
+  position_x REAL DEFAULT 1200,
+  position_y REAL DEFAULT 800,
   velocity_x REAL DEFAULT 0,
   velocity_y REAL DEFAULT 0,
   rotation REAL DEFAULT 0,
