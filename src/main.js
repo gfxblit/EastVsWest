@@ -312,6 +312,7 @@ class App {
     }
 
     this.stopGame();
+    this.ui.showSpectatorControls(false);
     this.ui.showScreen('intro');
   }
 
