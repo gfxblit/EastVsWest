@@ -1,12 +1,12 @@
 name: Gemini
 
 on:
-  pull_request_review_comment:
-    types: [created, edited]
+  issue_comment:
+    types: [created]
 
 jobs:
   gemini:
-    if: github.event_name == 'pull_request_review_comment' && contains(fromJSON('["OWNER", "MEMBER", "COLLABORATOR", "CONTRIBUTOR"]'), github.event.comment.author_association) && contains(github.event.comment.body, '@gemini') && !contains(github.event.comment.body, '@gemini /review')
+    if: github.event.issue.pull_request && contains(fromJSON('["OWNER", "MEMBER", "COLLABORATOR", "CONTRIBUTOR"]'), github.event.comment.author_association) && contains(github.event.comment.body, '@gemini') && !contains(github.event.comment.body, '@gemini /review')
     runs-on: ubuntu-latest
     timeout-minutes: 10
     permissions:
@@ -61,63 +61,33 @@ jobs:
           script: |
             const c = context.payload.comment;
             const repo = context.repo;
-            const pull_number = context.payload.pull_request.number;
+            const issue_number = context.payload.issue.number;
 
-            // Fetch all comments for this PR to reconstruct the thread
-            const { data: allComments } = await github.rest.pulls.listReviewComments({
-              ...repo,
-              pull_number,
-            });
-
-            // Find the root of the current thread
-            let rootId = c.id;
-            let parent = allComments.find(com => com.id === c.in_reply_to_id);
-            while (parent) {
-              rootId = parent.id;
-              parent = allComments.find(com => com.id === parent.in_reply_to_id);
-            }
-
-            // Get all comments in this thread
-            const thread = allComments.filter(com => {
-              if (com.id === rootId) return true;
-              let p = allComments.find(x => x.id === com.in_reply_to_id);
-              while (p) {
-                if (p.id === rootId) return true;
-                p = allComments.find(x => x.id === p.in_reply_to_id);
-              }
-              return false;
-            }).sort((a, b) => new Date(a.created_at) - new Date(b.created_at));
-
-            const discussionContext = "**File: " + c.path + "**\n" +
-                                     "```diff\n" + c.diff_hunk + "\n```\n\n" +
-                                     "### Conversation Thread\n\n" +
-                                     thread.map(com => "**@" + com.user.login + "**: " + com.body).join("\n\n");
+            const discussionContext = "### Conversation Thread\n\n**@" + c.user.login + "**: " + c.body;
 
             core.setOutput('prompt', c.body.replace(/@gemini/g, '').trim());
             core.setOutput('discussion_context', discussionContext);
             core.setOutput('trigger_comment_id', c.id);
-            core.setOutput('root_comment_id', rootId);
-            core.setOutput('review_threads', JSON.stringify(thread.map(com => ({ id: com.id, path: com.path, body: com.body }))));
+            core.setOutput('root_comment_id', c.id);
+            core.setOutput('review_threads', JSON.stringify([{ id: c.id, body: c.body }]));
 
       - name: Acknowledge request
         id: acknowledge
         env:
           GITHUB_TOKEN: ${{ steps.mint_identity_token.outputs.token || secrets.GITHUB_TOKEN || github.token }}
-          PR_NUMBER: ${{ github.event.pull_request.number }}
+          PR_NUMBER: ${{ github.event.issue.number }}
           MESSAGE: |-
-            🤖 Hi @${{ github.actor }}, I've received your inline code request and I'm on it! You can track my progress [in the logs](${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}).
+            🤖 Hi @${{ github.actor }}, I've received your request and I'm on it! You can track my progress [in the logs](${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}).
           REPOSITORY: ${{ github.repository }}
           TRIGGER_COMMENT_ID: ${{ steps.extract_prompt.outputs.trigger_comment_id }}
-          ROOT_COMMENT_ID: ${{ steps.extract_prompt.outputs.root_comment_id }}
         run: |
-          COMMENT_ID=$(gh api -X POST "/repos/${REPOSITORY}/pulls/${PR_NUMBER}/comments" \
+          COMMENT_ID=$(gh api -X POST "/repos/${REPOSITORY}/issues/${PR_NUMBER}/comments" \
             -f body="${MESSAGE}" \
-            -F in_reply_to="${ROOT_COMMENT_ID}" \
             --jq '.id')
           echo "comment_id=$COMMENT_ID" >> $GITHUB_OUTPUT
           echo "GEMINI_COMMENT_ID=$COMMENT_ID" >> $GITHUB_ENV
-          echo "comment_type=pull" >> $GITHUB_OUTPUT
-          echo "GEMINI_COMMENT_TYPE=pull" >> $GITHUB_ENV
+          echo "comment_type=issue" >> $GITHUB_OUTPUT
+          echo "GEMINI_COMMENT_TYPE=issue" >> $GITHUB_ENV
 
       - name: Set Gemini prompt
         run: |
@@ -126,11 +96,11 @@ jobs:
           You are Gemini, an AI assistant designed to help with pull requests. Think carefully as you analyze the context and respond appropriately. Here's the context for your current task:
 
           <formatted_context>
-          PR Title: ${{ github.event.pull_request.title }}
-          PR Author: ${{ github.event.pull_request.user.login }}
-          PR State: ${{ github.event.pull_request.state }}
+          PR Title: ${{ github.event.issue.title }}
+          PR Author: ${{ github.event.issue.user.login }}
+          PR State: ${{ github.event.issue.state }}
           PR Body:
-          ${{ github.event.pull_request.body }}
+          ${{ github.event.issue.body }}
           </formatted_context>
 
           <pr_comment_body>
@@ -144,7 +114,7 @@ jobs:
           <event_type>${{ github.event_name }}</event_type>
           <repository>${{ github.repository }}</repository>
 
-          <pr_number>${{ github.event.pull_request.number }}</pr_number>
+          <pr_number>${{ github.event.issue.number }}</pr_number>
           <gemini_comment_id>${{ steps.acknowledge.outputs.comment_id }}</gemini_comment_id>
           <gemini_comment_type>${{ steps.acknowledge.outputs.comment_type }}</gemini_comment_type>
           <trigger_comment_id>${{ steps.extract_prompt.outputs.trigger_comment_id }}</trigger_comment_id>
@@ -168,6 +138,9 @@ jobs:
           </comment_tool_info>
 
           Your task is to analyze the context, understand the request, and provide helpful responses and/or implement code changes as needed.
+
+          SPECIAL COMMAND:
+          - `@gemini /resolve`: If the user asks you to resolve something, you should execute the necessary work to address the open issues in the PR and then summarize the actions taken in your final response.
 
           Follow these steps:
 
@@ -201,7 +174,7 @@ jobs:
         env:
           GEMINI_COMMENT_ID: ${{ env.GEMINI_COMMENT_ID }}
           GEMINI_COMMENT_TYPE: ${{ env.GEMINI_COMMENT_TYPE }}
-          PR_NUMBER: ${{ github.event.pull_request.number }}
+          PR_NUMBER: ${{ github.event.issue.number }}
           GITHUB_TOKEN: ${{ steps.mint_identity_token.outputs.token || secrets.GITHUB_TOKEN || github.token }}
         with:
           gemini_api_key: ${{ secrets.GEMINI_API_KEY }}
@@ -273,7 +246,7 @@ jobs:
         env:
           GEMINI_COMMENT_ID: ${{ env.GEMINI_COMMENT_ID }}
           GEMINI_COMMENT_TYPE: ${{ env.GEMINI_COMMENT_TYPE }}
-          PR_NUMBER: ${{ github.event.pull_request.number }}
+          PR_NUMBER: ${{ github.event.issue.number }}
           GITHUB_TOKEN: ${{ steps.mint_identity_token.outputs.token || secrets.GITHUB_TOKEN || github.token }}
         with:
           gemini_api_key: ${{ secrets.GEMINI_API_KEY }}
@@ -344,7 +317,7 @@ jobs:
         env:
           GEMINI_COMMENT_ID: ${{ env.GEMINI_COMMENT_ID }}
           GEMINI_COMMENT_TYPE: ${{ env.GEMINI_COMMENT_TYPE }}
-          PR_NUMBER: ${{ github.event.pull_request.number }}
+          PR_NUMBER: ${{ github.event.issue.number }}
           GITHUB_TOKEN: ${{ steps.mint_identity_token.outputs.token || secrets.GITHUB_TOKEN || github.token }}
         with:
           gemini_api_key: ${{ secrets.GEMINI_API_KEY }}
@@ -428,12 +401,10 @@ jobs:
         if: always() && (failure() || cancelled())
         env:
           GITHUB_TOKEN: ${{ steps.mint_identity_token.outputs.token || secrets.GITHUB_TOKEN || github.token }}
-          PR_NUMBER: ${{ github.event.pull_request.number }}
+          PR_NUMBER: ${{ github.event.issue.number }}
           REPOSITORY: ${{ github.repository }}
           TRIGGER_COMMENT_ID: ${{ steps.extract_prompt.outputs.trigger_comment_id }}
-          ROOT_COMMENT_ID: ${{ steps.extract_prompt.outputs.root_comment_id }}
         run: |
           MESSAGE="🤖 I'm sorry @${{ github.actor }}, but I was unable to process your request. Please [see the logs](${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}) for more details."
-          gh api -X POST "/repos/${REPOSITORY}/pulls/${PR_NUMBER}/comments" \
-            -f body="${MESSAGE}" \
-            -F in_reply_to="${ROOT_COMMENT_ID}"
+          gh api -X POST "/repos/${REPOSITORY}/issues/${PR_NUMBER}/comments" \
+            -f body="${MESSAGE}"
