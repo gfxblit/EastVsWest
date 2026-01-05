@@ -88,6 +88,7 @@ export class HostCombatManager {
     if (now - lastTime < cooldown - 50) { // 50ms buffer for network jitter
       return;
     }
+    
     cooldowns[lastTimeKey] = now;
 
     const aimAngle = Math.atan2(aim_y - attacker.position_y, aim_x - attacker.position_x);

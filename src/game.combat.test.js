@@ -60,6 +60,7 @@ describe('Game Combat', () => {
       // Player is at 100,100 with rotation 0 (North). 
       // Attack vector (0, -1) * 100 = (0, -100). Target: 100, 0.
       game.handleInput(inputState);
+      game.update(0.016);
 
       expect(mockNetwork.send).toHaveBeenCalledWith('attack_request', expect.objectContaining({
         weapon_id: 'spear',
@@ -78,6 +79,7 @@ describe('Game Combat', () => {
       };
 
       game.handleInput(inputState);
+      game.update(0.016);
 
       expect(mockNetwork.send).toHaveBeenCalledWith('attack_request', expect.objectContaining({
         weapon_id: 'spear',
@@ -93,6 +95,7 @@ describe('Game Combat', () => {
       
       const inputState = { attack: true, specialAbility: false };
       game.handleInput(inputState);
+      game.update(0.016);
 
       expect(mockNetwork.send).not.toHaveBeenCalledWith('attack_request', expect.any(Object));
     });

@@ -328,4 +328,142 @@ describe('Combat Integration', () => {
     expect(damageTextCall).toBeDefined();
     expect(damageTextCall[3]).toBe('#ff0000'); // Verify color is red
   }, 30000);
+
+  test('should auto-attack when holding the attack button', async () => {
+    // 1. Host creates game
+    const { session: hostSession } = await hostNetwork.hostGame('Host');
+    testSessionId = hostSession.id;
+
+    // Set host weapon to spear for the test
+    await hostSupabase.from('session_players')
+      .update({ equipped_weapon: 'spear', position_x: 1200, position_y: 800 })
+      .eq('player_id', hostNetwork.playerId);
+
+    hostSnapshot = new SessionPlayersSnapshot(hostNetwork, hostSession.id);
+    await hostSnapshot.ready();
+    
+    hostGame = new Game();
+    hostGame.init(hostSnapshot, hostNetwork);
+
+    // 2. Player joins game
+    await playerNetwork.joinGame(hostSession.join_code, 'Player');
+    
+    playerSnapshot = new SessionPlayersSnapshot(playerNetwork, hostSession.id);
+    await playerSnapshot.ready();
+
+    playerGame = new Game();
+    playerGame.init(playerSnapshot, playerNetwork);
+
+    // Set player position near host
+    await playerSupabase.from('session_players')
+      .update({ position_x: 1250, position_y: 800, health: 100 })
+      .eq('player_id', playerNetwork.playerId);
+
+    // Wait for player to appear in host snapshot
+    await waitFor(() => {
+      const p = hostSnapshot.getPlayers().get(playerNetwork.playerId);
+      return p && Math.abs(p.position_x - 1250) < 1;
+    }, 10000);
+
+    // Wait for host weapon sync
+    await waitFor(() => {
+      hostGame.update(0.016);
+      return hostGame.getLocalPlayer().weapon === 'spear';
+    }, 10000);
+
+    // 3. Face East
+    hostGame.handleInput({ moveX: 1, moveY: 0, attack: false });
+    hostGame.update(0.016);
+    hostGame.handleInput({ moveX: 0, moveY: 0, attack: false });
+    hostGame.update(0.016);
+
+    // 4. Hold attack button and update over time
+    // Spear cooldown is 1000ms. We want to see at least 2 attacks.
+    const startTime = Date.now();
+    hostGame.handleInput({ attack: true, moveX: 0, moveY: 0 });
+    
+    // Loop for 2.5 seconds
+    const duration = 2500;
+    while (Date.now() - startTime < duration) {
+      hostGame.update(0.05);
+      await new Promise(resolve => setTimeout(resolve, 50));
+    }
+
+    // 5. Verify health reduction (2 attacks = 50 damage)
+    await waitFor(() => {
+        const victimAtHost = hostSnapshot.getPlayers().get(playerNetwork.playerId);
+        return victimAtHost && victimAtHost.health <= 50;
+    }, 5000);
+
+    const victimAtHost = hostSnapshot.getPlayers().get(playerNetwork.playerId);
+    expect(victimAtHost.health).toBeLessThanOrEqual(50);
+  }, 30000);
+
+  test('should auto-special when holding the special button', async () => {
+    // 1. Host creates game
+    const { session: hostSession } = await hostNetwork.hostGame('Host');
+    testSessionId = hostSession.id;
+
+    // Set host weapon to spear for the test
+    await hostSupabase.from('session_players')
+      .update({ equipped_weapon: 'spear', position_x: 1200, position_y: 800 })
+      .eq('player_id', hostNetwork.playerId);
+
+    hostSnapshot = new SessionPlayersSnapshot(hostNetwork, hostSession.id);
+    await hostSnapshot.ready();
+    
+    hostGame = new Game();
+    hostGame.init(hostSnapshot, hostNetwork);
+
+    // 2. Player joins game
+    await playerNetwork.joinGame(hostSession.join_code, 'Player');
+    
+    playerSnapshot = new SessionPlayersSnapshot(playerNetwork, hostSession.id);
+    await playerSnapshot.ready();
+
+    playerGame = new Game();
+    playerGame.init(playerSnapshot, playerNetwork);
+
+    // Set player position near host
+    await playerSupabase.from('session_players')
+      .update({ position_x: 1250, position_y: 800, health: 100 })
+      .eq('player_id', playerNetwork.playerId);
+
+    // Wait for player to appear in host snapshot
+    await waitFor(() => {
+      const p = hostSnapshot.getPlayers().get(playerNetwork.playerId);
+      return p && Math.abs(p.position_x - 1250) < 1;
+    }, 10000);
+
+    // Wait for host weapon sync
+    await waitFor(() => {
+      hostGame.update(0.016);
+      return hostGame.getLocalPlayer().weapon === 'spear';
+    }, 10000);
+
+    // 3. Face East
+    hostGame.handleInput({ moveX: 1, moveY: 0, specialAbility: false });
+    hostGame.update(0.016);
+
+    // 4. Hold special button and update over time
+    // Spear special cooldown is 3000ms. We want to see 2 specials.
+    const startTime = Date.now();
+    hostGame.handleInput({ specialAbility: true, moveX: 0, moveY: 0 });
+    
+    // Loop for 4.5 seconds
+    const duration = 4500;
+    while (Date.now() - startTime < duration) {
+      hostGame.update(0.1); 
+      await new Promise(resolve => setTimeout(resolve, 100));
+    }
+
+    // 5. Verify health reduction (2 specials = 75 damage)
+    await waitFor(() => {
+        const victimAtHost = hostSnapshot.getPlayers().get(playerNetwork.playerId);
+        return victimAtHost && victimAtHost.health <= 25;
+    }, 5000);
+
+    const victimAtHost = hostSnapshot.getPlayers().get(playerNetwork.playerId);
+    expect(victimAtHost.health).toBeLessThanOrEqual(25);
+  }, 40000);
 });

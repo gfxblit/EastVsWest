@@ -118,4 +118,89 @@ describe('LocalPlayerController', () => {
       expect(status.abilityPct).toBeCloseTo(0.5, 1);
     });
   });
+
+  describe('Auto-Attack', () => {
+    beforeEach(() => {
+      controller = new LocalPlayerController(mockNetwork, null);
+    });
+
+    test('WhenAttackButtonHeld_ShouldTriggerMultipleAttacksOverTime', () => {
+      const player = controller.getPlayer();
+      player.weapon = 'spear'; // 1.0 attack speed = 1000ms cooldown
+      
+      let now = 10000;
+      jest.spyOn(Date, 'now').mockImplementation(() => now);
+
+      // 1. First attack
+      controller.handleInput({ attack: true });
+      controller.update(0.016, null);
+      expect(mockNetwork.send).toHaveBeenCalledTimes(1);
+
+      // 2. Wait 500ms, update (should not attack)
+      now += 500;
+      controller.update(0.5, null);
+      expect(mockNetwork.send).toHaveBeenCalledTimes(1);
+
+      // 3. Wait another 600ms (total 1100ms), update (should attack again)
+      now += 600;
+      controller.update(0.6, null);
+      expect(mockNetwork.send).toHaveBeenCalledTimes(2);
+
+      jest.restoreAllMocks();
+    });
+
+    test('WhenSpecialAbilityButtonHeld_ShouldTriggerMultipleAttacksOverTime', () => {
+      const player = controller.getPlayer();
+      const cooldown = CONFIG.COMBAT.SPECIAL_ABILITY_COOLDOWN_MS;
+      
+      let now = 10000;
+      jest.spyOn(Date, 'now').mockImplementation(() => now);
+
+      // 1. First special
+      controller.handleInput({ specialAbility: true });
+      controller.update(0.016, null);
+      expect(mockNetwork.send).toHaveBeenCalledTimes(1);
+
+      // 2. Wait halfway, update (should not attack)
+      now += cooldown / 2;
+      controller.update(cooldown / 2000, null);
+      expect(mockNetwork.send).toHaveBeenCalledTimes(1);
+
+      // 3. Wait past cooldown, update (should attack again)
+      now += (cooldown / 2) + 100;
+      controller.update((cooldown / 2000) + 0.1, null);
+      expect(mockNetwork.send).toHaveBeenCalledTimes(2);
+
+      jest.restoreAllMocks();
+    });
+
+    test('WhenMovingWhileAutoAttacking_ShouldUpdateAttackDirection', () => {
+      const player = controller.getPlayer();
+      player.weapon = 'spear';
+      
+      let now = 10000;
+      jest.spyOn(Date, 'now').mockImplementation(() => now);
+
+      // 1. Attack while moving East
+      controller.handleInput({ attack: true, moveX: 1, moveY: 0 });
+      controller.update(0.016, null);
+      expect(mockNetwork.send).toHaveBeenLastCalledWith('attack_request', expect.objectContaining({
+        aim_x: expect.any(Number),
+        aim_y: player.y // Should be East (aim_y same as player.y)
+      }));
+
+      // 2. Wait for cooldown and change movement to South
+      now += 1100;
+      controller.handleInput({ attack: true, moveX: 0, moveY: 1 });
+      controller.update(1.1, null);
+
+      expect(mockNetwork.send).toHaveBeenCalledTimes(2);
+      expect(mockNetwork.send).toHaveBeenLastCalledWith('attack_request', expect.objectContaining({
+        aim_x: player.x, // Should be South (aim_x same as player.x)
+        aim_y: expect.any(Number)
+      }));
+
+      jest.restoreAllMocks();
+    });
+  });
 });
