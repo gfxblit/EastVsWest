@@ -6,20 +6,25 @@
 import { spawn } from 'child_process';
 import { fileURLToPath } from 'url';
 import { dirname, join } from 'path';
+import { getAvailablePort } from '../../scripts/port-utils.js';
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = dirname(__filename);
 const projectRoot = join(__dirname, '..', '..');
 
 let viteProcess = null;
-const VITE_PORT = 5174; // Use a different port than default to avoid conflicts
-const VITE_URL = `http://localhost:${VITE_PORT}`;
+let currentViteUrl = null;
 
 /**
  * Start the Vite dev server
  * @returns {Promise<string>} The URL of the server
  */
 export async function startViteServer() {
+  if (currentViteUrl) return currentViteUrl;
+
+  const port = await getAvailablePort(5000);
+  const url = `http://localhost:${port}`;
+
   return new Promise((resolve, reject) => {
     const env = { ...process.env };
     // Only set VITE_ env vars if they are provided in the process environment.
@@ -31,7 +36,7 @@ export async function startViteServer() {
       env.VITE_SUPABASE_ANON_KEY = process.env.SUPABASE_ANON_KEY;
     }
 
-    viteProcess = spawn('npm', ['run', 'dev', '--', '--port', String(VITE_PORT), '--strictPort'], {
+    viteProcess = spawn('npm', ['run', 'dev', '--', '--port', String(port), '--strictPort'], {
       cwd: projectRoot,
       stdio: 'pipe',
       env
@@ -43,14 +48,17 @@ export async function startViteServer() {
     viteProcess.stdout.on('data', (data) => {
       output += data.toString();
       // Look for the server ready message
-      if (output.includes('Local:') || output.includes(`localhost:${VITE_PORT}`)) {
+      if (output.includes('Local:') || output.includes(`localhost:${port}`)) {
         // Clear the timeout as soon as we know it's starting
         if (startTimeout) {
           clearTimeout(startTimeout);
           startTimeout = null;
         }
         // Give it a moment to fully start
-        setTimeout(() => resolve(VITE_URL), 1000);
+        setTimeout(() => {
+          currentViteUrl = url;
+          resolve(url);
+        }, 1000);
       }
     });
 
@@ -107,6 +115,7 @@ export async function stopViteServer() {
           forceKillTimeout = null;
         }
         viteProcess = null;
+        currentViteUrl = null;
         resolve();
       };
 
