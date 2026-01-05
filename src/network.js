@@ -389,6 +389,45 @@ export class Network extends EventEmitter {
     }
   }
 
+  /**
+   * Leave the current game session and clean up database records
+   */
+  async leaveGame() {
+    if (!this.supabase || !this.sessionId) {
+      this.disconnect();
+      return;
+    }
+
+    try {
+      if (this.isHost) {
+        // Broadcast session termination to all clients before deleting
+        this.send('session_terminated', {
+          reason: 'host_left',
+          message: 'The host has left the game. The session has ended.'
+        });
+
+        // Host leaving deletes the entire session (cascades to players)
+        const { error } = await this.supabase
+          .from('game_sessions')
+          .delete()
+          .eq('id', this.sessionId);
+        if (error) throw error;
+      } else {
+        // Non-host player leaving deletes only their own record
+        const { error } = await this.supabase
+          .from('session_players')
+          .delete()
+          .eq('session_id', this.sessionId)
+          .eq('player_id', this.playerId);
+        if (error) throw error;
+      }
+    } catch (error) {
+      console.error('Error leaving game:', error.message);
+    } finally {
+      this.disconnect();
+    }
+  }
+
   disconnect() {
     this.stopPeriodicPlayerStateWrite();
     if (this.channel) {

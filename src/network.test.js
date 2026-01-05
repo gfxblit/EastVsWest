@@ -764,4 +764,84 @@ describe('Network', () => {
       });
     });
   });
+
+  describe('leaveGame', () => {
+    const MOCK_PLAYER_ID = 'test-player-id';
+    const MOCK_SESSION_ID = 'test-session-id';
+
+    beforeEach(() => {
+      jest.clearAllMocks();
+      network = new Network();
+      network.initialize(mockSupabaseClient, MOCK_PLAYER_ID);
+      network.sessionId = MOCK_SESSION_ID;
+      network.connected = true;
+    });
+
+    it('should delete player record when a non-host player leaves', async () => {
+      network.isHost = false;
+      const deleteMock = jest.fn().mockReturnValue({
+        eq: jest.fn().mockReturnValue({
+          eq: jest.fn().mockResolvedValue({ error: null })
+        })
+      });
+      mockSupabaseClient.from = jest.fn((table) => {
+        if (table === 'session_players') {
+          return { delete: deleteMock };
+        }
+      });
+
+      const disconnectSpy = jest.spyOn(network, 'disconnect');
+
+      await network.leaveGame();
+
+      expect(mockSupabaseClient.from).toHaveBeenCalledWith('session_players');
+      expect(deleteMock).toHaveBeenCalled();
+      expect(disconnectSpy).toHaveBeenCalled();
+    });
+
+    it('should delete session record and broadcast session_terminated when the host leaves', async () => {
+      network.isHost = true;
+      const deleteMock = jest.fn().mockReturnValue({
+        eq: jest.fn().mockResolvedValue({ error: null })
+      });
+      mockSupabaseClient.from = jest.fn((table) => {
+        if (table === 'game_sessions') {
+          return { delete: deleteMock };
+        }
+      });
+
+      const disconnectSpy = jest.spyOn(network, 'disconnect');
+      const sendSpy = jest.spyOn(network, 'send').mockImplementation();
+
+      await network.leaveGame();
+
+      expect(sendSpy).toHaveBeenCalledWith('session_terminated', expect.objectContaining({
+        reason: 'host_left'
+      }));
+      expect(mockSupabaseClient.from).toHaveBeenCalledWith('game_sessions');
+      expect(deleteMock).toHaveBeenCalled();
+      expect(disconnectSpy).toHaveBeenCalled();
+    });
+
+    it('should always call disconnect even if database delete fails', async () => {
+      network.isHost = false;
+      mockSupabaseClient.from = jest.fn(() => ({
+        delete: jest.fn().mockReturnValue({
+          eq: jest.fn().mockReturnValue({
+            eq: jest.fn().mockResolvedValue({ error: new Error('DB error') })
+          })
+        })
+      }));
+
+      const disconnectSpy = jest.spyOn(network, 'disconnect');
+      const consoleErrorSpy = jest.spyOn(console, 'error').mockImplementation();
+
+      await network.leaveGame();
+
+      expect(disconnectSpy).toHaveBeenCalled();
+      expect(consoleErrorSpy).toHaveBeenCalled();
+      
+      consoleErrorSpy.mockRestore();
+    });
+  });
 });
