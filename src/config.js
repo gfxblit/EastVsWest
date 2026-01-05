@@ -46,9 +46,9 @@ export const CONFIG = {
     MIN_RADIUS: 50, // Minimum zone size
     BASE_SHRINK_RATE: 10, // Base shrink rate in pixels per second
     SHRINK_RATE_MULTIPLIER: 1.5, // Increases each phase
-    DAMAGE_PER_SECOND: 2, // Effective DPS (applied in intervals)
+    DAMAGE_PER_SECOND: 1, // Effective DPS (applied in intervals)
     DAMAGE_INCREASE_PER_PHASE: 1,
-    DAMAGE_INTERVAL_SECONDS: 5, // Apply damage every 5 seconds
+    DAMAGE_INTERVAL_SECONDS: 2.5, // Apply damage every 2.5 seconds
   },
 
   // Rendering Settings

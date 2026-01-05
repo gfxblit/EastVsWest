@@ -347,7 +347,7 @@ button:active {
 }
 
 #spectator-controls {
-  position: absolute;
+  position: fixed;
   bottom: 20px;
   left: 50%;
   transform: translateX(-50%);
@@ -355,6 +355,7 @@ button:active {
   padding: 1rem;
   border-radius: 8px;
   border: 2px solid #4ecdc4;
+  z-index: 1001;
 }
 
 #spectating-name {
