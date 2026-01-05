@@ -6,7 +6,7 @@ on:
 
 jobs:
   gemini:
-    if: github.event.issue.pull_request && contains(fromJSON('["OWNER", "MEMBER", "COLLABORATOR", "CONTRIBUTOR"]'), github.event.comment.author_association) && contains(github.event.comment.body, '@gemini') && !contains(github.event.comment.body, '@gemini /review')
+    if: github.event.issue.pull_request && contains(fromJSON('["OWNER", "MEMBER", "COLLABORATOR", "CONTRIBUTOR"]'), github.event.comment.author_association) && contains(github.event.comment.body, '@gemini /resolve')
     runs-on: ubuntu-latest
     timeout-minutes: 10
     permissions:
@@ -65,7 +65,7 @@ jobs:
 
             const discussionContext = "### Conversation Thread\n\n**@" + c.user.login + "**: " + c.body;
 
-            core.setOutput('prompt', c.body.replace(/@gemini/g, '').trim());
+            core.setOutput('prompt', 'Your task is to resolve all open issues and feedback in this Pull Request. Analyze the PR description, the code changes, and the conversation thread to identify what needs to be fixed or improved, then implement the changes.');
             core.setOutput('discussion_context', discussionContext);
             core.setOutput('trigger_comment_id', c.id);
             core.setOutput('root_comment_id', c.id);
@@ -137,13 +137,9 @@ jobs:
           CRITICAL: You are already on the correct branch. DO NOT spend time finding branch names or constructing PR URLs. Focus exclusively on the code changes or questions.
           </comment_tool_info>
 
-          Your task is to analyze the context, understand the request, and provide helpful responses and/or implement code changes as needed.
-
-          SPECIAL COMMAND:
-          - `@gemini /resolve`: If the user asks you to resolve something, you should execute the necessary work to address the open issues in the PR and then summarize the actions taken in your final response.
-
-          Follow these steps:
-
+                    Your task is to analyze the context, understand the request, and provide helpful responses and/or implement code changes as needed.
+          
+                    Follow these steps:
           1. Create a Todo List:
              - IMMEDIATELY update your GitHub comment with a task list.
              - Format: ### Tasks\n- [ ] Task 1\n- [ ] Task 2\n...
