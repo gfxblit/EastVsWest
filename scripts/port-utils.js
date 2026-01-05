@@ -12,12 +12,7 @@ export function getBranchHash() {
   try {
     name = execSync('git branch --show-current', { encoding: 'utf8', stdio: ['ignore', 'pipe', 'ignore'] }).trim();
   } catch (e) {
-    // Fallback to directory name if not in a git repo or git fails
-    try {
-      name = path.basename(process.cwd());
-    } catch (err) {
-      name = 'default';
-    }
+    // Ignore error, will fallback below
   }
   
   if (!name) {
@@ -66,7 +61,8 @@ export async function isPortAvailable(port) {
  */
 export async function getAvailablePort(basePort) {
   const hash = getBranchHash();
-  let port = basePort + hash;
+  const startPort = basePort + hash;
+  let port = startPort;
   
   // Try up to 100 ports to find a free one
   for (let i = 0; i < 100; i++) {
@@ -76,5 +72,5 @@ export async function getAvailablePort(basePort) {
     port++;
   }
   
-  return basePort + hash; // Fallback to original hashed port if all fail
+  throw new Error(`Could not find an available port after 100 tries starting from ${startPort}.`);
 }

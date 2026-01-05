@@ -68,5 +68,26 @@ describe('Port Utilities', () => {
         await new Promise((resolve) => server.close(resolve));
       }
     });
+
+    test('should throw an error if no port is available', async () => {
+      const basePort = 21000;
+      const hash = getBranchHash();
+      const startPort = basePort + hash;
+      const servers = [];
+
+      // Occupy all 100 ports that will be checked
+      for (let i = 0; i < 100; i++) {
+        const portToOccupy = startPort + i;
+        const server = net.createServer();
+        await new Promise(resolve => server.listen(portToOccupy, '0.0.0.0', resolve));
+        servers.push(server);
+      }
+
+      try {
+        await expect(getAvailablePort(basePort)).rejects.toThrow(/Could not find an available port/);
+      } finally {
+        await Promise.all(servers.map(s => new Promise(resolve => s.close(resolve))));
+      }
+    });
   });
 });
