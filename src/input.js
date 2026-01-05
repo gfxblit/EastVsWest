@@ -228,7 +228,10 @@ export class Input {
    */
   isValidJoystickTouch(targetObj) {
     if (targetObj.target && targetObj.target.closest) {
-      return !targetObj.target.closest('#attack-button') && !targetObj.target.closest('#ability-button');
+      // Don't start joystick if touch is on any button or UI element
+      return !targetObj.target.closest('button') && 
+             !targetObj.target.closest('.touch-btn') &&
+             !targetObj.target.closest('#spectator-controls');
     }
     return true;
   }

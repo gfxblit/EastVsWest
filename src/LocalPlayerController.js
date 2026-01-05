@@ -60,11 +60,21 @@ export class LocalPlayerController {
     return this.player;
   }
 
+  isDead() {
+    return this.player && this.player.health <= 0;
+  }
+
   update(deltaTime, playersSnapshot) {
     if (!this.player) return;
 
-    this.#updatePhysics(deltaTime);
-    this.#updateAnimation(deltaTime);
+    // If dead, ensure velocity is zero and skip movement/animation updates
+    if (this.isDead()) {
+      this.player.velocity = { x: 0, y: 0 };
+      this.player.isAttacking = false;
+    } else {
+      this.#updatePhysics(deltaTime);
+      this.#updateAnimation(deltaTime);
+    }
     
     // Handle Attack/Special Ability continuously if button is held
     if (this.inputState.attack || this.inputState.specialAbility) {
@@ -178,6 +188,12 @@ export class LocalPlayerController {
 
     // Update stored input state
     this.inputState = { ...this.inputState, ...inputState };
+    // Disable input if dead
+    if (this.isDead()) {
+      this.inputState.attack = false;
+      this.inputState.specialAbility = false;
+      return;
+    }
 
     // Update player velocity based on input
     const speedModifier = this.player.weapon?.stance === 'double'

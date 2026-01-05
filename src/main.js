@@ -153,11 +153,11 @@ class App {
   }
 
   setupHandlers() {
-    console.log('Setting up handlers...');
     const hostBtn = document.getElementById('host-game-btn');
     const joinBtn = document.getElementById('join-game-btn');
     const startBtn = document.getElementById('start-game-btn');
     const leaveBtn = document.getElementById('leave-lobby-btn');
+    const leaveSpectateBtn = document.getElementById('leave-spectate-btn');
 
     if (hostBtn) {
       hostBtn.addEventListener('click', () => this.hostGame());
@@ -173,6 +173,10 @@ class App {
 
     if (leaveBtn) {
       leaveBtn.addEventListener('click', () => this.leaveGame());
+    }
+
+    if (leaveSpectateBtn) {
+      leaveSpectateBtn.addEventListener('click', () => this.leaveGame());
     }
   }
 
@@ -298,8 +302,6 @@ class App {
   }
 
   leaveGame() {
-    console.log('Leaving game...');
-
     // Stop lobby polling
     this.stopLobbyPolling();
 
@@ -310,6 +312,7 @@ class App {
     }
 
     this.stopGame();
+    this.ui.showSpectatorControls(false);
     this.ui.showScreen('intro');
   }
 
@@ -483,6 +486,13 @@ class App {
     if (localPlayer) {
       this.ui.updateHealth(localPlayer.health);
       
+      // Check for death/spectator mode
+      if (this.game.localPlayerController && this.game.localPlayerController.isDead()) {
+        this.ui.showSpectatorControls(true, localPlayer.name);
+      } else {
+        this.ui.showSpectatorControls(false);
+      }
+      
       // Update cooldowns
       if (this.game.localPlayerController) {
         const cooldowns = this.game.localPlayerController.getCooldownStatus();
@@ -539,11 +549,16 @@ class App {
     if (this.network) {
       this.network.disconnect();
     }
+    this.game = null;
+    this.playersSnapshot = null;
+    this.lastWeaponId = null;
+    this.lastArmorId = null;
   }
 }
 
 // Initialize app when DOM is ready
 document.addEventListener('DOMContentLoaded', async () => {
   const app = new App();
+  window.app = app;
   await app.init();
 });

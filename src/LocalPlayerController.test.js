@@ -203,4 +203,53 @@ describe('LocalPlayerController', () => {
       jest.restoreAllMocks();
     });
   });
+
+  describe('Death Behavior', () => {
+    beforeEach(() => {
+      controller = new LocalPlayerController(mockNetwork, null);
+    });
+
+    test('WhenHealthIsZero_ShouldDisableMovementInput', () => {
+      const player = controller.getPlayer();
+      player.health = 0;
+
+      controller.handleInput({ moveX: 1, moveY: 0 });
+
+      expect(player.velocity.x).toBe(0);
+      expect(player.velocity.y).toBe(0);
+    });
+
+    test('WhenHealthIsNegative_ShouldDisableMovementInput', () => {
+      const player = controller.getPlayer();
+      player.health = -10;
+
+      controller.handleInput({ moveX: 0, moveY: 1 });
+
+      expect(player.velocity.x).toBe(0);
+      expect(player.velocity.y).toBe(0);
+    });
+
+    test('WhenHealthIsZero_ShouldDisableAttack', () => {
+      const player = controller.getPlayer();
+      player.health = 0;
+
+      controller.handleInput({ attack: true });
+
+      expect(mockNetwork.send).not.toHaveBeenCalledWith('attack_request', expect.any(Object));
+      expect(player.isAttacking).toBe(false);
+    });
+
+    test('isDead_ShouldReturnTrueWhenHealthIsZeroOrLess', () => {
+      const player = controller.getPlayer();
+      
+      player.health = 100;
+      expect(controller.isDead()).toBe(false);
+
+      player.health = 0;
+      expect(controller.isDead()).toBe(true);
+
+      player.health = -1;
+      expect(controller.isDead()).toBe(true);
+    });
+  });
 });
