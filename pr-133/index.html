@@ -1,0 +1,87 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
+  <title>Conflict Zone: East vs West</title>
+  <script type="module" crossorigin src="./assets/index-Cadko3Fp.js"></script>
+  <link rel="stylesheet" crossorigin href="./assets/index-CKj9h4u7.css">
+</head>
+<body>
+  <div id="app">
+    <div id="intro-screen" class="screen active">
+      <h1>Conflict Zone: East vs West</h1>
+      <div class="intro-controls">
+        <button id="host-game-btn">Host Game</button>
+        <div class="join-game">
+          <input type="text" id="join-code-input" placeholder="Enter Join Code" />
+          <button id="join-game-btn">Join Game</button>
+        </div>
+        <div id="lobby-error" class="error-message hidden"></div>
+      </div>
+      <div id="controls-info">
+        <h3>Controls</h3>
+        <p><strong>Movement:</strong> WASD or Touch Joystick</p>
+        <p><strong>Attack:</strong> Left Mouse or Touch Button</p>
+        <p><strong>Special Ability:</strong> <span>Q</span> Key or Touch Button</p>
+        <p><strong>Interact:</strong> F Key or Touch</p>
+      </div>
+    </div>
+
+    <div id="lobby-screen" class="screen">
+      <h2 id="lobby-title">Game Lobby</h2>
+      <div id="match-summary-container" class="hidden">
+        <h3>Last Match Summary</h3>
+        <div id="match-summary"></div>
+      </div>
+      <div id="join-code-display">
+        <p>Join Code: <strong id="join-code"></strong></p>
+      </div>
+      <div id="player-list-container">
+        <h3>Players</h3>
+        <ul id="player-list"></ul>
+      </div>
+      <div class="lobby-actions">
+        <button id="start-game-btn" class="hidden">Start Game</button>
+        <p id="waiting-msg">Waiting for host to start...</p>
+        <button id="leave-lobby-btn">Leave Game</button>
+      </div>
+    </div>
+
+    <div id="game-screen" class="screen">
+      <canvas id="game-canvas"></canvas>
+      <div id="game-ui">
+        <div id="player-stats">
+          <div id="health-bar"></div>
+          <div id="equipment-display"></div>
+        </div>
+        <div id="zone-warning" class="hidden">CONFLICT ZONE APPROACHING</div>
+        <div id="spectator-controls" class="hidden">
+          <p>Spectating: <span id="spectating-name"></span></p>
+          <button id="next-spectate-btn">Next Player</button>
+          <button id="leave-spectate-btn">Leave Match</button>
+        </div>
+      </div>
+
+      <!-- Touch Controls -->
+      <div id="touch-controls" class="touch-controls">
+        <div id="joystick-base" class="joystick-base">
+          <div id="joystick-stick" class="joystick-stick"></div>
+        </div>
+      </div>
+
+      <div id="touch-buttons" class="touch-buttons">
+        <button id="attack-button" class="touch-btn attack-btn">
+          <span>ATK</span>
+          <div class="cooldown-overlay"></div>
+        </button>
+        <button id="ability-button" class="touch-btn ability-btn">
+          <span>Q</span>
+          <div class="cooldown-overlay"></div>
+        </button>
+      </div>
+    </div>
+  </div>
+
+</body>
+</html>
