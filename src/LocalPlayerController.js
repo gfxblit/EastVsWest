@@ -7,6 +7,15 @@ export class LocalPlayerController {
     this.player = this.#initializePlayer(initialData);
     this.lastPositionSendTime = 0;
     this.lastSentState = null;
+    this.inputState = {
+      moveX: 0,
+      moveY: 0,
+      aimX: 0,
+      aimY: 0,
+      attack: false,
+      specialAbility: false,
+      interact: false,
+    };
 
     // Initialize lastSentState to prevent unnecessary initial send
     if (this.player) {
@@ -56,6 +65,11 @@ export class LocalPlayerController {
 
     this.#updatePhysics(deltaTime);
     this.#updateAnimation(deltaTime);
+    
+    // Handle Attack/Special Ability continuously if button is held
+    if (this.inputState.attack || this.inputState.specialAbility) {
+      this.#handleAttack(this.inputState);
+    }
     
     if (playersSnapshot) {
         this.#syncWithSnapshot(playersSnapshot);
@@ -162,6 +176,9 @@ export class LocalPlayerController {
   handleInput(inputState) {
     if (!this.player) return;
 
+    // Update stored input state
+    this.inputState = { ...this.inputState, ...inputState };
+
     // Update player velocity based on input
     const speedModifier = this.player.weapon?.stance === 'double'
       ? CONFIG.PLAYER.DOUBLE_HANDED_SPEED_MODIFIER
@@ -186,11 +203,6 @@ export class LocalPlayerController {
     if (velocityX !== 0 || velocityY !== 0) {
       this.player.rotation = Math.atan2(velocityY, velocityX) + Math.PI / 2;
       this.#normalizeRotation();
-    }
-
-    // Handle Attack
-    if (inputState.attack || inputState.specialAbility) {
-      this.#handleAttack(inputState);
     }
   }
 

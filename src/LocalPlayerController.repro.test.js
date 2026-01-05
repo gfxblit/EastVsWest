@@ -62,6 +62,7 @@ describe('LocalPlayerController - Attack Direction Fix', () => {
     player.lastAttackTime = 0;
     
     controller.handleInput(inputState);
+    controller.update(0.016, null);
 
     // 4. Verify Network Payload
     // The player is facing East (Right). 
