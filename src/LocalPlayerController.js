@@ -190,6 +190,8 @@ export class LocalPlayerController {
     this.inputState = { ...this.inputState, ...inputState };
     // Disable input if dead
     if (this.isDead()) {
+      this.inputState.attack = false;
+      this.inputState.specialAbility = false;
       return;
     }
 
