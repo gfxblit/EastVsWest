@@ -1,3 +1,4 @@
+# Improved Supabase caching logic
 name: Gemini
 
 on:
@@ -45,31 +46,42 @@ jobs:
         with:
           version: latest
 
-      - name: Cache Supabase Docker Images
-        id: cache-supabase
-        uses: actions/cache@v4
+      - name: Get Supabase version
+        id: supabase-version
+        run: echo "version=$(supabase --version | awk '{print $NF}')" >> $GITHUB_OUTPUT
+
+      - name: Restore Supabase Docker Images Cache
+        id: cache-supabase-restore
+        uses: actions/cache/restore@v4
         with:
           path: /tmp/supabase-images.tar
-          key: ${{ runner.os }}-supabase-images-${{ hashFiles('supabase/config.toml') }}
+          key: ${{ runner.os }}-supabase-images-${{ steps.supabase-version.outputs.version }}-${{ hashFiles('supabase/config.toml') }}
 
       - name: Load Supabase Docker Images
-        if: steps.cache-supabase.outputs.cache-hit == 'true'
+        if: steps.cache-supabase-restore.outputs.cache-hit == 'true'
         run: docker load -i /tmp/supabase-images.tar
 
       - name: Start Supabase
         run: |
           supabase start --exclude studio,storage-api,imgproxy,mailpit,edge-runtime,logflare,vector,supavisor,postgres-meta
 
+      - name: Save Supabase Docker Images to Cache
+        if: steps.cache-supabase-restore.outputs.cache-hit != 'true'
+        run: |
+          docker save $(docker ps --format '{{.Image}}' | sort -u) -o /tmp/supabase-images.tar
+
+      - name: Cache Supabase Docker Images
+        if: steps.cache-supabase-restore.outputs.cache-hit != 'true'
+        uses: actions/cache/save@v4
+        with:
+          path: /tmp/supabase-images.tar
+          key: ${{ runner.os }}-supabase-images-${{ steps.supabase-version.outputs.version }}-${{ hashFiles('supabase/config.toml') }}
+
       - name: Export Supabase credentials
         run: |
           STATUS=$(supabase status -o json)
           echo "SUPABASE_URL=$(echo $STATUS | jq -r '.api_url')" >> $GITHUB_ENV
           echo "SUPABASE_ANON_KEY=$(echo $STATUS | jq -r '.anon_key')" >> $GITHUB_ENV
-
-      - name: Save Supabase Docker Images
-        if: steps.cache-supabase.outputs.cache-hit != 'true'
-        run: |
-          docker save $(docker ps --format '{{.Image}}' | sort -u) -o /tmp/supabase-images.tar
 
       - name: Inject Gemini Credentials
         env:
