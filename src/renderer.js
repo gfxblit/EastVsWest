@@ -4,7 +4,7 @@
  */
 
 import { CONFIG } from './config.js';
-import { getDirectionFromVelocity, updateAnimationState } from './animationHelper.js';
+import { getDirectionFromVelocity, AnimationState } from './animationHelper.js';
 import { FloatingText } from './FloatingText.js';
 
 export class Renderer {
@@ -128,7 +128,7 @@ export class Renderer {
         // Get or create persistent animation state for this remote player
         let animState = this.remoteAnimationStates.get(playerId);
         if (!animState) {
-          animState = this.initAnimationState();
+          animState = new AnimationState();
           this.remoteAnimationStates.set(playerId, animState);
         }
 
@@ -138,8 +138,8 @@ export class Renderer {
         const direction = getDirectionFromVelocity(vx, vy);
         const isMoving = Math.abs(vx) > 0.1 || Math.abs(vy) > 0.1;
 
-        // Update animation state using helper
-        updateAnimationState(animState, deltaTime, isMoving, direction);
+        // Update animation state
+        animState.update(deltaTime, isMoving, direction);
 
         const player = {
           id: playerId,
@@ -213,59 +213,6 @@ export class Renderer {
     this.ctx.beginPath();
     this.ctx.arc(zone.centerX, zone.centerY, zone.radius, 0, Math.PI * 2);
     this.ctx.stroke();
-  }
-
-  getFrameFromRotation(rotation) {
-    // Map rotation (0-2π) to frame (0-7)
-    // Frame 0: South (π)
-    // Frame 1: South-East (3π/4)
-    // Frame 2: East (π/2)
-    // Frame 3: North-East (π/4)
-    // Frame 4: North (0)
-    // Frame 5: North-West (7π/4 or -π/4)
-    // Frame 6: West (3π/2 or -π/2)
-    // Frame 7: South-West (5π/4 or -3π/4)
-
-    // Each frame covers π/4 radians (45 degrees)
-    // Frame boundaries: [North-22.5°, North+22.5°), [NE-22.5°, NE+22.5°), etc.
-
-    // Normalize rotation to 0-2π
-    let normalizedRotation = rotation % (2 * Math.PI);
-    if (normalizedRotation < 0) {
-      normalizedRotation += 2 * Math.PI;
-    }
-
-    // Convert rotation to degrees for easier calculation
-    const degrees = (normalizedRotation * 180) / Math.PI;
-
-    // Map degrees to frame
-    // North (0°) ± 22.5° = [-22.5°, 22.5°] → frame 4
-    // NE (45°) ± 22.5° = [22.5°, 67.5°] → frame 3
-    // East (90°) ± 22.5° = [67.5°, 112.5°] → frame 2
-    // SE (135°) ± 22.5° = [112.5°, 157.5°] → frame 1
-    // South (180°) ± 22.5° = [157.5°, 202.5°] → frame 0
-    // SW (225°) ± 22.5° = [202.5°, 247.5°] → frame 7
-    // West (270°) ± 22.5° = [247.5°, 292.5°] → frame 6
-    // NW (315°) ± 22.5° = [292.5°, 337.5°] → frame 5
-    // North wrap-around [337.5°, 360°] → frame 4
-
-    if (degrees >= 337.5 || degrees < 22.5) {
-      return 4; // North
-    } else if (degrees >= 22.5 && degrees < 67.5) {
-      return 3; // North-East
-    } else if (degrees >= 67.5 && degrees < 112.5) {
-      return 2; // East
-    } else if (degrees >= 112.5 && degrees < 157.5) {
-      return 1; // South-East
-    } else if (degrees >= 157.5 && degrees < 202.5) {
-      return 0; // South
-    } else if (degrees >= 202.5 && degrees < 247.5) {
-      return 7; // South-West
-    } else if (degrees >= 247.5 && degrees < 292.5) {
-      return 6; // West
-    } else { // degrees >= 292.5 && degrees < 337.5
-      return 5; // North-West
-    }
   }
 
   renderPlayer(player, isLocal = false) {
@@ -363,18 +310,6 @@ export class Renderer {
       this.spriteSheetLoaded = false;
       throw error;
     }
-  }
-
-  /**
-   * Initialize animation state for a player
-   * @returns {Object} Animation state { currentFrame, timeAccumulator, lastDirection }
-   */
-  initAnimationState() {
-    return {
-      currentFrame: 0,
-      timeAccumulator: 0,
-      lastDirection: 0, // Default to South
-    };
   }
 
   /**

@@ -6,7 +6,7 @@ import { jest } from '@jest/globals';
 
 import { Renderer } from './renderer.js';
 import { CONFIG } from './config.js';
-import { updateAnimationState } from './animationHelper.js';
+import { updateAnimationState, getDirectionFromRotation } from './animationHelper.js';
 
 describe('Renderer', () => {
   let canvas;
@@ -784,58 +784,58 @@ describe('Renderer', () => {
       ctx.drawImage = jest.fn();
     });
 
-    describe('Frame Selection', () => {
+    describe('Frame Selection (using helper)', () => {
       test('WhenRotationIsSouth_ShouldSelectFrame0', () => {
-        const frame = renderer.getFrameFromRotation(Math.PI); // 180 degrees
+        const frame = getDirectionFromRotation(Math.PI); // 180 degrees
         expect(frame).toBe(0);
       });
 
       test('WhenRotationIsSouthEast_ShouldSelectFrame1', () => {
-        const frame = renderer.getFrameFromRotation(3 * Math.PI / 4); // 135 degrees
+        const frame = getDirectionFromRotation(3 * Math.PI / 4); // 135 degrees
         expect(frame).toBe(1);
       });
 
       test('WhenRotationIsEast_ShouldSelectFrame2', () => {
-        const frame = renderer.getFrameFromRotation(Math.PI / 2); // 90 degrees
+        const frame = getDirectionFromRotation(Math.PI / 2); // 90 degrees
         expect(frame).toBe(2);
       });
 
       test('WhenRotationIsNorthEast_ShouldSelectFrame3', () => {
-        const frame = renderer.getFrameFromRotation(Math.PI / 4); // 45 degrees
+        const frame = getDirectionFromRotation(Math.PI / 4); // 45 degrees
         expect(frame).toBe(3);
       });
 
       test('WhenRotationIsNorth_ShouldSelectFrame4', () => {
-        const frame = renderer.getFrameFromRotation(0); // 0 degrees
+        const frame = getDirectionFromRotation(0); // 0 degrees
         expect(frame).toBe(4);
       });
 
       test('WhenRotationIsNorthWest_ShouldSelectFrame5', () => {
-        const frame = renderer.getFrameFromRotation(7 * Math.PI / 4); // 315 degrees
+        const frame = getDirectionFromRotation(7 * Math.PI / 4); // 315 degrees
         expect(frame).toBe(5);
       });
 
       test('WhenRotationIsWest_ShouldSelectFrame6', () => {
-        const frame = renderer.getFrameFromRotation(3 * Math.PI / 2); // 270 degrees
+        const frame = getDirectionFromRotation(3 * Math.PI / 2); // 270 degrees
         expect(frame).toBe(6);
       });
 
       test('WhenRotationIsSouthWest_ShouldSelectFrame7', () => {
-        const frame = renderer.getFrameFromRotation(5 * Math.PI / 4); // 225 degrees
+        const frame = getDirectionFromRotation(5 * Math.PI / 4); // 225 degrees
         expect(frame).toBe(7);
       });
 
       test('WhenRotationIsBetweenDirections_ShouldSelectNearestFrame', () => {
         // Test rotation slightly past north (5 degrees)
-        const frame = renderer.getFrameFromRotation(5 * Math.PI / 180);
+        const frame = getDirectionFromRotation(5 * Math.PI / 180);
         expect(frame).toBe(4); // Should round to North
 
         // Test rotation between North and NE (20 degrees)
-        const frame2 = renderer.getFrameFromRotation(20 * Math.PI / 180);
+        const frame2 = getDirectionFromRotation(20 * Math.PI / 180);
         expect(frame2).toBe(4); // Should round to North (closer than NE at 45)
 
         // Test rotation between North and NE (30 degrees)
-        const frame3 = renderer.getFrameFromRotation(30 * Math.PI / 180);
+        const frame3 = getDirectionFromRotation(30 * Math.PI / 180);
         expect(frame3).toBe(3); // Should round to NE (closer than North)
       });
     });
@@ -1066,16 +1066,6 @@ describe('Renderer', () => {
       });
     });
 
-    describe('initAnimationState', () => {
-      test('WhenInitializingAnimationState_ShouldSetDefaultValues', () => {
-        const animState = renderer.initAnimationState();
-
-        expect(animState).toBeDefined();
-        expect(animState.currentFrame).toBe(0);
-        expect(animState.timeAccumulator).toBe(0);
-        expect(animState.lastDirection).toBe(0); // Default to South
-      });
-    });
 
     describe('updateAnimationState', () => {
       test('WhenPlayerIsMoving_ShouldAdvanceFrame', () => {
