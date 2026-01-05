@@ -153,7 +153,6 @@ class App {
   }
 
   setupHandlers() {
-    console.log('Setting up handlers...');
     const hostBtn = document.getElementById('host-game-btn');
     const joinBtn = document.getElementById('join-game-btn');
     const startBtn = document.getElementById('start-game-btn');
@@ -303,8 +302,6 @@ class App {
   }
 
   leaveGame() {
-    console.log('Leaving game...');
-
     // Stop lobby polling
     this.stopLobbyPolling();
 
@@ -551,6 +548,10 @@ class App {
     if (this.network) {
       this.network.disconnect();
     }
+    this.game = null;
+    this.playersSnapshot = null;
+    this.lastWeaponId = null;
+    this.lastArmorId = null;
   }
 }
 
