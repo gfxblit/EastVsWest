@@ -40,6 +40,37 @@ jobs:
       - name: Install dependencies
         run: npm ci
 
+      - name: Setup Supabase CLI
+        uses: supabase/setup-cli@v1
+        with:
+          version: latest
+
+      - name: Cache Supabase Docker Images
+        id: cache-supabase
+        uses: actions/cache@v4
+        with:
+          path: /tmp/supabase-images.tar
+          key: ${{ runner.os }}-supabase-images-${{ hashFiles('supabase/config.toml') }}
+
+      - name: Load Supabase Docker Images
+        if: steps.cache-supabase.outputs.cache-hit == 'true'
+        run: docker load -i /tmp/supabase-images.tar
+
+      - name: Start Supabase
+        run: |
+          supabase start --exclude studio,storage-api,imgproxy,mailpit,edge-runtime,logflare,vector,supavisor,postgres-meta
+
+      - name: Export Supabase credentials
+        run: |
+          STATUS=$(supabase status -o json)
+          echo "SUPABASE_URL=$(echo $STATUS | jq -r '.api_url')" >> $GITHUB_ENV
+          echo "SUPABASE_ANON_KEY=$(echo $STATUS | jq -r '.anon_key')" >> $GITHUB_ENV
+
+      - name: Save Supabase Docker Images
+        if: steps.cache-supabase.outputs.cache-hit != 'true'
+        run: |
+          docker save $(docker ps --format '{{.Image}}' | sort -u) -o /tmp/supabase-images.tar
+
       - name: Inject Gemini Credentials
         env:
           GEMINI_SETTINGS_JSON: ${{ secrets.GEMINI_SETTINGS_JSON }}
@@ -172,6 +203,8 @@ jobs:
           GEMINI_COMMENT_TYPE: ${{ env.GEMINI_COMMENT_TYPE }}
           PR_NUMBER: ${{ github.event.issue.number }}
           GITHUB_TOKEN: ${{ steps.mint_identity_token.outputs.token || secrets.GITHUB_TOKEN || github.token }}
+          SUPABASE_URL: ${{ env.SUPABASE_URL }}
+          SUPABASE_ANON_KEY: ${{ env.SUPABASE_ANON_KEY }}
         with:
           gemini_api_key: ${{ secrets.GEMINI_API_KEY }}
           gemini_model: 'gemini-3-flash-preview'
@@ -244,6 +277,8 @@ jobs:
           GEMINI_COMMENT_TYPE: ${{ env.GEMINI_COMMENT_TYPE }}
           PR_NUMBER: ${{ github.event.issue.number }}
           GITHUB_TOKEN: ${{ steps.mint_identity_token.outputs.token || secrets.GITHUB_TOKEN || github.token }}
+          SUPABASE_URL: ${{ env.SUPABASE_URL }}
+          SUPABASE_ANON_KEY: ${{ env.SUPABASE_ANON_KEY }}
         with:
           gemini_api_key: ${{ secrets.GEMINI_API_KEY }}
           gemini_model: 'gemini-2.5-pro'
@@ -315,6 +350,8 @@ jobs:
           GEMINI_COMMENT_TYPE: ${{ env.GEMINI_COMMENT_TYPE }}
           PR_NUMBER: ${{ github.event.issue.number }}
           GITHUB_TOKEN: ${{ steps.mint_identity_token.outputs.token || secrets.GITHUB_TOKEN || github.token }}
+          SUPABASE_URL: ${{ env.SUPABASE_URL }}
+          SUPABASE_ANON_KEY: ${{ env.SUPABASE_ANON_KEY }}
         with:
           gemini_api_key: ${{ secrets.GEMINI_API_KEY }}
           gemini_model: 'gemini-2.5-flash'
