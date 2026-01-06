@@ -1,5 +1,12 @@
 # Test-Driven Development Workflow for Gemini
 
+## Setup
+Before starting any development work, ensure the environment is correctly configured by running:
+```bash
+npm run setup
+```
+This script installs dependencies, sets up environment variables, and checks for required tools.
+
 ## Overview
 Start by reading README.md
 
