@@ -106,13 +106,27 @@ class App {
         clearTimeout(id);
         
         if (!response.ok) {
+           if (response.status === 401 || response.status === 403) {
+             const msg = 'Supabase API Key (Anon Key) is invalid. Check .env.local';
+             console.error(msg);
+             this.showError(msg);
+             return;
+           }
            console.warn('Supabase connectivity check returned non-OK status:', response.status);
         } else {
            console.log('Supabase is reachable.');
         }
       } catch (netErr) {
         console.error('Failed to reach Supabase server:', netErr);
-        this.showError(`Cannot reach server at ${supabaseUrl}. Check Firewall/Wi-Fi.`);
+        let errorMsg = `Cannot reach server at ${supabaseUrl}.`;
+        
+        if (import.meta.env.DEV) {
+          errorMsg += ' Is Supabase running? Try: npm run supabase:start';
+        } else {
+          errorMsg += ' Check your internet connection.';
+        }
+        
+        this.showError(errorMsg);
         return;
       }
 

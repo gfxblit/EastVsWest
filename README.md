@@ -33,62 +33,51 @@ Here's the dev flow:
 
 - Once the PR is approved and Claude merges the PR to main, this will kickoff a gh-pages main deployment to https://<username>.github.io/<project-name>/, e.g. `https://gfxblit.github.io/EastVsWest`.
 
+## Quick Start
+
+1.  **Clone the repository**:
+    ```bash
+    git clone https://github.com/gfxblit/EastVsWest.git
+    cd EastVsWest
+    ```
+
+2.  **Run the setup script**:
+    This will check dependencies, install NPM packages, and set up your local environment.
+    ```bash
+    npm run setup
+    ```
+
+3.  **Start development**:
+    ```bash
+    npm run dev
+    ```
+
 ## Testing
 
 ### End-to-end Testing
 
 Running the end-to-end tests requires a running Supabase instance.
 
-1.  Start the local Supabase development environment:
-
+1.  **Ensure Supabase is running**:
     ```bash
-    npx supabase start
+    npm run supabase:start
     ```
 
-    Wait for the Docker dependencies to load.
-
-2.  Get the Supabase credentials by running:
-
+2.  **Run the tests**:
     ```bash
-    npx supabase status
+    npm run test:e2e
     ```
 
-    This will output the `Project URL` and look for the anon key. The default local Supabase anon key is:
-
-    ```
-    eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZS1kZW1vIiwicm9sZSI6ImFub24iLCJleHAiOjE5ODM4MTI5OTZ9.CRXP1A7WOeoJeXxjNni43kdQwgnWNReilDMblYTn_I0
-    ```
-
-3.  Set the environment variables and run the tests. For example, to run the lobby E2E tests:
-
+    You can also run specific test files:
     ```bash
-    SUPABASE_URL="http://127.0.0.1:54321" SUPABASE_ANON_KEY="eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZS1kZW1vIiwicm9sZSI6ImFub24iLCJleHAiOjE5ODM4MTI5OTZ9.CRXP1A7WOeoJeXxjNni43kdQwgnWNReilDMblYTn_I0" npm run test:e2e e2e/lobby.test.js
-    ```
-
-    **Note:** For Puppeteer to use the bundled Chromium instead of the system Chrome, set `PUPPETEER_EXECUTABLE_PATH=""`:
-
-    ```bash
-    PUPPETEER_EXECUTABLE_PATH="" SUPABASE_URL="http://127.0.0.1:54321" SUPABASE_ANON_KEY="eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZS1kZW1vIiwicm9sZSI6ImFub24iLCJleHAiOjE5ODM4MTI5OTZ9.CRXP1A7WOeoJeXxjNni43kdQwgnWNReilDMblYTn_I0" npm run test:e2e e2e/lobby.test.js
+    npm run test:e2e e2e/lobby.test.js
     ```
 
 #### Resetting the Local Database
 
-If you modify an existing migration file or encounter issues with the local database state, you will need to reset it. This ensures all migrations are re-applied from a clean state.
-
-To reset the database, you can run the provided script:
-
+If you modify migrations or need a clean slate:
 ```bash
-./supabase/reset.sh
-```
-
-Or run the following commands manually:
-
-```bash
-# Stop the Supabase instance and delete all local data
-npx supabase stop --no-backup
-
-# Restart the instance to re-apply all migrations
-npx supabase start
+npm run supabase:reset
 ```
 
 ## Build Workflow
