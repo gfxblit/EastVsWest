@@ -411,18 +411,26 @@ export class Renderer {
       );
     }
 
-    // Determine which sprite sheet to use
-    let currentSpriteSheet = this.spriteSheet;
-    let currentMetadata = this.spriteSheetMetadata;
-    let isAttacking = player.isAttacking;
+    // 1. Render Character Base (Always)
+    if (this.spriteSheet && this.spriteSheet.complete && this.spriteSheetMetadata) {
+      const { currentFrame, lastDirection } = player.animationState;
+      const { frameWidth, frameHeight } = this.spriteSheetMetadata;
+      
+      const sourceX = currentFrame * frameWidth;
+      const sourceY = lastDirection * frameHeight;
 
-    if (isAttacking && this.attackSpriteSheet && this.attackSpriteSheetMetadata) {
-      currentSpriteSheet = this.attackSpriteSheet;
-      currentMetadata = this.attackSpriteSheetMetadata;
-    }
-
-    // Check if current sprite sheet is loaded
-    if (!currentSpriteSheet || !currentSpriteSheet.complete || !currentMetadata) {
+      this.ctx.drawImage(
+        this.spriteSheet,
+        sourceX,
+        sourceY,
+        frameWidth,
+        frameHeight,
+        spriteX,
+        spriteY,
+        size,
+        size
+      );
+    } else {
       // Fallback: render pink rectangle
       this.ctx.fillStyle = '#ff69b4'; // Pink
       this.ctx.fillRect(
@@ -431,23 +439,18 @@ export class Renderer {
         size,
         size
       );
-      return;
     }
 
-    const { currentFrame, lastDirection } = player.animationState;
-    const { frameWidth, frameHeight } = currentMetadata;
+    // 2. Render Attack Overlay (If Attacking)
+    if (player.isAttacking && this.attackSpriteSheet && this.attackSpriteSheetMetadata) {
+      const { frameWidth, frameHeight } = this.attackSpriteSheetMetadata;
+      const { lastDirection } = player.animationState;
+      
+      // Cardinal Snapping for attacks
+      let renderDirection = lastDirection;
+      let renderFrame = 0;
 
-    // Cardinal Snapping for attacks
-    let renderDirection = lastDirection;
-    let renderFrame = currentFrame;
-
-    if (isAttacking) {
       // 0: South, 1: SE, 2: East, 3: NE, 4: North, 5: NW, 6: West, 7: SW
-      // Snapping rules:
-      // SE (1) -> East (2)
-      // NE (3) -> East (2)
-      // NW (5) -> North (4)
-      // SW (7) -> West (6)
       if (renderDirection === 1) renderDirection = 2;
       else if (renderDirection === 3) renderDirection = 2;
       else if (renderDirection === 5) renderDirection = 4;
@@ -457,38 +460,30 @@ export class Renderer {
       if (player.attackStartTime) {
         const elapsed = (performance.now() - player.attackStartTime) / 1000; // seconds
         const duration = CONFIG.COMBAT.ATTACK_ANIMATION_DURATION_SECONDS;
-        const totalFrames = 4; // Assuming 4 frames for attack
+        const totalFrames = 4; 
         
-        // Calculate frame (0 to 3)
         let frame = Math.floor((elapsed / duration) * totalFrames);
-        
-        // Clamp to valid range
         if (frame < 0) frame = 0;
         if (frame >= totalFrames) frame = totalFrames - 1;
         
         renderFrame = frame;
-      } else {
-        // Fallback if no start time (shouldn't happen with updated logic)
-        renderFrame = 0; 
       }
+
+      const sourceX = renderFrame * frameWidth;
+      const sourceY = renderDirection * frameHeight;
+
+      this.ctx.drawImage(
+        this.attackSpriteSheet,
+        sourceX,
+        sourceY,
+        frameWidth,
+        frameHeight,
+        spriteX,
+        spriteY,
+        size,
+        size
+      );
     }
-
-    // Calculate source rectangle (which frame to draw from sprite sheet)
-    const sourceX = renderFrame * frameWidth;
-    const sourceY = renderDirection * frameHeight;
-
-    // Draw frame from sprite sheet, centered on player position
-    this.ctx.drawImage(
-      currentSpriteSheet,
-      sourceX,
-      sourceY,
-      frameWidth,
-      frameHeight,
-      spriteX,
-      spriteY,
-      size,
-      size
-    );
 
     // Add white outline for local player
     if (isLocal) {

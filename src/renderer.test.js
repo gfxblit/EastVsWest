@@ -1291,8 +1291,15 @@ describe('Renderer', () => {
 
       renderer.renderPlayerWithSpriteSheet(player, false);
 
-      // Should use attackSpriteSheet
-      expect(ctx.drawImage).toHaveBeenCalledWith(
+      // Should draw base sprite AND attack sprite (overlay)
+      // Calls: Shadow (if loaded), Base Sprite, Attack Sprite
+      const calls = ctx.drawImage.mock.calls;
+      
+      // Filter for attack sprite sheet
+      const attackCalls = calls.filter(call => call[0] === renderer.attackSpriteSheet);
+      expect(attackCalls.length).toBe(1);
+
+      expect(attackCalls[0]).toEqual(expect.arrayContaining([
         renderer.attackSpriteSheet,
         expect.any(Number),
         expect.any(Number),
@@ -1302,7 +1309,7 @@ describe('Renderer', () => {
         expect.any(Number),
         expect.any(Number),
         expect.any(Number)
-      );
+      ]));
     });
 
     test('WhenAttackingDiagonally_ShouldSnapToCardinalDirection', () => {
@@ -1333,17 +1340,13 @@ describe('Renderer', () => {
         // sourceY = snappedDirection * frameHeight
         const expectedSourceY = expectedDir * 32;
         
-        expect(ctx.drawImage).toHaveBeenCalledWith(
-          expect.anything(),
-          expect.any(Number),
-          expectedSourceY,
-          expect.any(Number),
-          expect.any(Number),
-          expect.any(Number),
-          expect.any(Number),
-          expect.any(Number),
-          expect.any(Number)
-        );
+        // Check attack sprite call
+        const calls = ctx.drawImage.mock.calls;
+        const attackCall = calls.find(call => call[0] === renderer.attackSpriteSheet);
+        
+        expect(attackCall).toBeDefined();
+        // Check sourceY (3rd argument, index 2)
+        expect(attackCall[2]).toBe(expectedSourceY);
       });
     });
 
@@ -1367,17 +1370,12 @@ describe('Renderer', () => {
         renderer.renderPlayerWithSpriteSheet(player, false);
 
         const expectedSourceY = dir * 32;
-        expect(ctx.drawImage).toHaveBeenCalledWith(
-          expect.anything(),
-          expect.any(Number),
-          expectedSourceY,
-          expect.any(Number),
-          expect.any(Number),
-          expect.any(Number),
-          expect.any(Number),
-          expect.any(Number),
-          expect.any(Number)
-        );
+        
+        const calls = ctx.drawImage.mock.calls;
+        const attackCall = calls.find(call => call[0] === renderer.attackSpriteSheet);
+        
+        expect(attackCall).toBeDefined();
+        expect(attackCall[2]).toBe(expectedSourceY);
       });
     });
 
@@ -1403,17 +1401,11 @@ describe('Renderer', () => {
       renderer.renderPlayerWithSpriteSheet(player, false);
 
       // sourceX = frame * 32 = 1 * 32 = 32
-      expect(ctx.drawImage).toHaveBeenCalledWith(
-        expect.anything(),
-        32, // expectedSourceX
-        expect.any(Number),
-        expect.any(Number),
-        expect.any(Number),
-        expect.any(Number),
-        expect.any(Number),
-        expect.any(Number),
-        expect.any(Number)
-      );
+      const calls = ctx.drawImage.mock.calls;
+      const attackCall = calls.find(call => call[0] === renderer.attackSpriteSheet);
+      
+      expect(attackCall).toBeDefined();
+      expect(attackCall[1]).toBe(32); // sourceX
     });
   });
 
