@@ -253,7 +253,6 @@ export class Network extends EventEmitter {
     }
   }
 
-  // FUTURE: Host-authoritative health persistence (not yet implemented)
   send(type, data) {
     if (!this.channel || !this.connected) {
       console.warn('Cannot send message, channel not connected.');
@@ -381,6 +380,39 @@ export class Network extends EventEmitter {
 
     // Then write periodically
     this.playerStateWriteInterval = setInterval(performWrite, intervalMs);
+  }
+
+  /**
+   * Enable host-authoritative health persistence
+   * Persists health for ALL players to DB periodically (every 60s)
+   * @param {Function} playersStateGetter - Function that returns the players Map or Array
+   */
+  enableHostHealthPersistence(playersStateGetter) {
+    if (!this.isHost) {
+      console.warn('Host health persistence can only be enabled by the host.');
+      return;
+    }
+
+    // Persist health for ALL players to DB every 60 seconds
+    this.startPeriodicPlayerStateWrite(() => {
+      const players = playersStateGetter();
+      if (!players) return [];
+
+      const updates = [];
+      // Handle both Map (from SessionPlayersSnapshot) and Array
+      const playerList = players instanceof Map ? players.values() : players;
+
+      for (const player of playerList) {
+        // Only write if health is defined
+        if (player.health !== undefined) {
+          updates.push({
+            player_id: player.player_id || player.id,
+            health: player.health
+          });
+        }
+      }
+      return updates;
+    }, 60000); // 60 seconds
   }
 
   /**

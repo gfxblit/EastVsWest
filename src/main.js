@@ -495,21 +495,7 @@ class App {
       // Host-authoritative periodic health persistence
       // Persist health for ALL players to DB every 60 seconds
       if (this.network.isHost) {
-        this.network.startPeriodicPlayerStateWrite(() => {
-          if (!this.playersSnapshot) return [];
-
-          const updates = [];
-          for (const [playerId, player] of this.playersSnapshot.getPlayers()) {
-            // Only write if health is defined
-            if (player.health !== undefined) {
-              updates.push({
-                player_id: playerId,
-                health: player.health
-              });
-            }
-          }
-          return updates;
-        }, 60000); // 60 seconds
+        this.network.enableHostHealthPersistence(() => this.playersSnapshot?.getPlayers());
       }
     }
 
