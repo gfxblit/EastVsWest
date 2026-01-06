@@ -173,6 +173,15 @@ describe('Input', () => {
 
       expect(input.inputState.moveX).toBe(1);
     });
+
+    test('WhenDebugCycleWeaponKeyPressed_ShouldEmitCycleWeaponEvent', () => {
+      const emitSpy = jest.spyOn(input, 'emit');
+      const event = new KeyboardEvent('keydown', { code: CONFIG.INPUT.DEBUG_CYCLE_WEAPON_KEY });
+      input.handleKeyDown(event);
+
+      expect(emitSpy).toHaveBeenCalledWith('cycle_weapon');
+      emitSpy.mockRestore();
+    });
   });
 
   describe('handleKeyUp', () => {
@@ -931,6 +940,33 @@ describe('Input', () => {
       input.handleAbilityButtonTouchEnd(event);
 
       expect(input.inputState.specialAbility).toBe(false);
+    });
+
+    test('WhenCycleWeaponButtonTouchStart_ShouldEmitCycleWeaponEvent', () => {
+      const mockCycleWeaponButton = document.createElement('button');
+      mockCycleWeaponButton.id = 'cycle-weapon-button';
+      document.body.appendChild(mockCycleWeaponButton);
+
+      input.init(mockCallback);
+      const emitSpy = jest.spyOn(input, 'emit');
+
+      const touch = new Touch({
+        identifier: 0,
+        target: mockCycleWeaponButton,
+        clientX: 0,
+        clientY: 0,
+      });
+      const event = new TouchEvent('touchstart', {
+        touches: [touch],
+        cancelable: true,
+      });
+
+      input.handleCycleWeaponButtonTouchStart(event);
+
+      expect(emitSpy).toHaveBeenCalledWith('cycle_weapon');
+
+      mockCycleWeaponButton.remove();
+      emitSpy.mockRestore();
     });
   });
 
