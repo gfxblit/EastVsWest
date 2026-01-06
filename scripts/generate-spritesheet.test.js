@@ -169,8 +169,8 @@ describe('Sprite Sheet Generator', () => {
       expect(result.errors.length).toBeGreaterThan(0);
       expect(result.errors[0]).toContain('wrong-size.png');
       expect(result.errors[0]).toContain('96x96');
-      
-      // Cleanup is handled by afterAll (parent dir removal), but we can be nice
+      // Cleanup
+      await fs.rm(testDir, { recursive: true, force: true });
     });
 
     test('WhenAllFramesValid_ShouldReturnFramePaths', async () => {
