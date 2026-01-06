@@ -506,6 +506,36 @@ class App {
       }
     });
 
+    if (import.meta.env.DEV) {
+      this.input.on('cycle_weapon', () => {
+        if (this.game && this.game.localPlayerController) {
+          const player = this.game.localPlayerController.getPlayer();
+          const currentWeaponId = player.weapon;
+          const weaponIds = Object.keys(CONFIG.WEAPONS).map(k => CONFIG.WEAPONS[k].id);
+          const currentIndex = weaponIds.indexOf(currentWeaponId);
+          const nextIndex = (currentIndex + 1) % weaponIds.length;
+          const nextWeaponId = weaponIds[nextIndex];
+          
+          console.log(`Debug: Cycling weapon to ${nextWeaponId}`);
+          
+          // Update local state
+          player.weapon = nextWeaponId;
+          
+          // Persist to DB and broadcast (Host-authoritative fields usually handled by Host, 
+          // but for debug we can force it from client if we want)
+          // Actually, we should just let the broadcast system handle it if we want it to sync.
+          if (this.network) {
+            this.network.broadcastPlayerStateUpdate({
+              equipped_weapon: nextWeaponId
+            });
+            this.network.writePlayerStateToDB(this.network.playerId, {
+              equipped_weapon: nextWeaponId
+            });
+          }
+        }
+      });
+    }
+
     // Expose game, camera, and renderer on window for integration tests
     window.game = this.game;
     window.camera = this.camera;

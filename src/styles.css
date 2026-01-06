@@ -346,6 +346,15 @@ button:active {
   font-size: 0.9rem;
 }
 
+.equipment-slot {
+  background-color: rgba(61, 40, 23, 0.4);
+  border: 1px solid #3d2817;
+  padding: 0.5rem;
+  border-radius: 4px;
+  color: #f4e8c1;
+  font-weight: bold;
+}
+
 #spectator-controls {
   position: fixed;
   bottom: 20px;
@@ -553,6 +562,10 @@ button:active {
 
 .ability-btn {
   background: linear-gradient(to bottom, #7fb069 0%, #5a8f4f 100%);
+}
+
+.cycle-weapon-btn {
+  background: linear-gradient(to bottom, #d4a574 0%, #b8865a 100%);
 }
 
 .ability-btn:active {

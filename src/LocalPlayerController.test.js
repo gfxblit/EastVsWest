@@ -21,6 +21,7 @@ describe('LocalPlayerController', () => {
     expect(player.id).toBe('test-player');
     expect(player.x).toBe(CONFIG.WORLD.WIDTH / 2);
     expect(player.y).toBe(CONFIG.WORLD.HEIGHT / 2);
+    expect(player.weapon).toBe('fist');
   });
 
   test('ShouldUpdatePositionBasedOnVelocity', () => {

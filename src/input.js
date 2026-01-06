@@ -7,6 +7,7 @@ import { CONFIG } from './config.js';
 
 export class Input {
   constructor() {
+    this.events = {};
     this.inputState = {
       moveX: 0,
       moveY: 0,
@@ -36,6 +37,7 @@ export class Input {
     this.joystickStick = null;
     this.attackButton = null;
     this.abilityButton = null;
+    this.cycleWeaponButton = null;
   }
 
   init(onInputChange) {
@@ -72,6 +74,8 @@ export class Input {
     } else if (key === CONFIG.INPUT.INTERACT_KEY) {
       this.inputState.interact = true;
       this.notifyChange();
+    } else if (key === CONFIG.INPUT.DEBUG_CYCLE_WEAPON_KEY) {
+      this.emit('cycle_weapon');
     }
   }
 
@@ -176,6 +180,17 @@ export class Input {
     }
   }
 
+  on(event, callback) {
+    if (!this.events[event]) this.events[event] = [];
+    this.events[event].push(callback);
+  }
+
+  emit(event, data) {
+    if (this.events[event]) {
+      this.events[event].forEach(cb => cb(data));
+    }
+  }
+
   setupTouchControls() {
     // Get touch UI elements
     this.touchControls = document.getElementById('touch-controls');
@@ -183,9 +198,15 @@ export class Input {
     this.joystickStick = document.getElementById('joystick-stick');
     this.attackButton = document.getElementById('attack-button');
     this.abilityButton = document.getElementById('ability-button');
+    this.cycleWeaponButton = document.getElementById('cycle-weapon-button');
 
     if (!this.touchControls || !this.joystickBase || !this.joystickStick) {
       return;
+    }
+
+    // Show debug weapon cycle button in development
+    if (this.cycleWeaponButton && import.meta.env.DEV) {
+      this.cycleWeaponButton.classList.remove('hidden');
     }
 
     // Bind touch event handlers
@@ -218,6 +239,12 @@ export class Input {
 
       this.abilityButton.addEventListener('touchstart', this.boundHandlers.abilityTouchStart, { passive: false });
       this.abilityButton.addEventListener('touchend', this.boundHandlers.abilityTouchEnd, { passive: false });
+    }
+
+    // Setup cycle weapon button (debug)
+    if (this.cycleWeaponButton) {
+      this.boundHandlers.cycleWeaponTouchStart = this.handleCycleWeaponButtonTouchStart.bind(this);
+      this.cycleWeaponButton.addEventListener('touchstart', this.boundHandlers.cycleWeaponTouchStart, { passive: false });
     }
   }
 
@@ -375,6 +402,11 @@ export class Input {
     this.notifyChange();
   }
 
+  handleCycleWeaponButtonTouchStart(event) {
+    event.preventDefault();
+    this.emit('cycle_weapon');
+  }
+
   detectTouchDevice() {
     const isTouchDevice = ('ontouchstart' in window) ||
                           (navigator.maxTouchPoints > 0) ||
@@ -415,6 +447,10 @@ export class Input {
     if (this.abilityButton && this.boundHandlers.abilityTouchStart) {
       this.abilityButton.removeEventListener('touchstart', this.boundHandlers.abilityTouchStart);
       this.abilityButton.removeEventListener('touchend', this.boundHandlers.abilityTouchEnd);
+    }
+
+    if (this.cycleWeaponButton && this.boundHandlers.cycleWeaponTouchStart) {
+      this.cycleWeaponButton.removeEventListener('touchstart', this.boundHandlers.cycleWeaponTouchStart);
     }
   }
 }
