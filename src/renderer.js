@@ -18,6 +18,7 @@ export class Renderer {
     this.spriteSheetLoaded = false;
     this.shadowImage = null;
     this.remoteAnimationStates = new Map(); // Store animation state for remote players
+    this.previousPlayerHealth = new Map(); // Store previous health for floating text detection
     this.floatingTexts = [];
   }
 
@@ -79,8 +80,55 @@ export class Renderer {
     this.floatingTexts.push(new FloatingText(x + offsetX, y + offsetY, text, color));
   }
 
+  triggerAttackAnimation(playerId) {
+    // Get or create persistent animation state
+    let animState = this.remoteAnimationStates.get(playerId);
+    if (!animState) {
+      animState = new AnimationState();
+      this.remoteAnimationStates.set(playerId, animState);
+    }
+
+    // Set attacking flag
+    animState.isAttacking = true;
+
+    // Reset after animation time
+    setTimeout(() => {
+      // Check if state still exists
+      const currentAnimState = this.remoteAnimationStates.get(playerId);
+      if (currentAnimState === animState) {
+        currentAnimState.isAttacking = false;
+      }
+    }, CONFIG.COMBAT.ATTACK_ANIMATION_DURATION_SECONDS * 1000);
+  }
+
+  checkHealthChanges(playersSnapshot) {
+    if (!playersSnapshot) return;
+
+    const players = playersSnapshot.getPlayers();
+    players.forEach(player => {
+      const prevHealth = this.previousPlayerHealth.get(player.player_id);
+      const currentHealth = player.health;
+
+      if (prevHealth !== undefined && currentHealth !== prevHealth) {
+        const diff = currentHealth - prevHealth;
+        if (Math.abs(diff) >= 0.1) { // Ignore tiny floating point diffs
+          const text = Math.abs(Math.round(diff)).toString();
+          const color = diff < 0 ? '#ff0000' : '#00ff00';
+          this.addFloatingText(player.position_x, player.position_y - CONFIG.RENDER.PLAYER_RADIUS * 2, text, color);
+        }
+      }
+
+      this.previousPlayerHealth.set(player.player_id, currentHealth);
+    });
+  }
+
   render(gameState, localPlayer = null, playersSnapshot = null, camera = null, deltaTime = 0.016) {
     if (!this.ctx) return;
+
+    // Check for health changes to spawn floating text
+    if (playersSnapshot) {
+      this.checkHealthChanges(playersSnapshot);
+    }
 
     if (camera) {
       this.ctx.save();
@@ -148,16 +196,21 @@ export class Renderer {
           y: interpolated.y,
           rotation: interpolated.rotation,
           health: playerData.health,
-          isAttacking: playerData.is_attacking || false,
+          isAttacking: animState.isAttacking || false, // Use internal state
           animationState: animState,
         };
         this.renderPlayer(player, false);
       });
 
-      // Cleanup animation states for players who left
+      // Cleanup animation states and health tracking for players who left
       for (const playerId of this.remoteAnimationStates.keys()) {
         if (!snapshotPlayers.has(playerId)) {
           this.remoteAnimationStates.delete(playerId);
+        }
+      }
+      for (const playerId of this.previousPlayerHealth.keys()) {
+        if (!snapshotPlayers.has(playerId)) {
+          this.previousPlayerHealth.delete(playerId);
         }
       }
     }

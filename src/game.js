@@ -27,7 +27,6 @@ export class Game {
     this.playersSnapshot = null;
     this.network = null;
     this.renderer = null;
-    this.previousPlayerHealth = new Map();
   }
 
   init(playersSnapshot = null, network = null, renderer = null) {
@@ -76,15 +75,6 @@ export class Game {
     }
     
     this.localPlayerController = new LocalPlayerController(network, localPlayerData);
-
-    // Initialize previous health for all players to current values
-    if (this.playersSnapshot) {
-      this.playersSnapshot.getPlayers().forEach(player => {
-        if (player.health !== undefined) {
-          this.previousPlayerHealth.set(player.player_id, player.health);
-        }
-      });
-    }
   }
 
   update(deltaTime) {
@@ -104,26 +94,6 @@ export class Game {
     if (this.hostCombatManager) {
       this.hostCombatManager.update(deltaTime, this.playersSnapshot);
     }
-
-    // Check for health changes to spawn floating text
-    if (this.playersSnapshot && this.renderer) {
-      const players = this.playersSnapshot.getPlayers();
-      players.forEach(player => {
-        const prevHealth = this.previousPlayerHealth.get(player.player_id);
-        const currentHealth = player.health;
-
-        if (prevHealth !== undefined && currentHealth !== prevHealth) {
-          const diff = currentHealth - prevHealth;
-          if (Math.abs(diff) >= 0.1) { // Ignore tiny floating point diffs
-            const text = Math.abs(Math.round(diff)).toString();
-            const color = diff < 0 ? '#ff0000' : '#00ff00';
-            this.renderer.addFloatingText(player.position_x, player.position_y - CONFIG.RENDER.PLAYER_RADIUS * 2, text, color);
-          }
-        }
-
-        this.previousPlayerHealth.set(player.player_id, currentHealth);
-      });
-    }
   }
 
   updateConflictZone(deltaTime) {
@@ -138,26 +108,15 @@ export class Game {
   }
 
   handleAttackAnimation(message) {
-    if (!this.playersSnapshot) return;
+    if (!this.renderer) return;
     const attackerId = message.from;
     
     // Skip local player (already handled in LocalPlayerController)
     const localPlayer = this.localPlayerController?.getPlayer();
     if (localPlayer && attackerId === localPlayer.id) return;
 
-    const players = this.playersSnapshot.getPlayers();
-    const attacker = players.get(attackerId);
-    
-    if (attacker) {
-      attacker.is_attacking = true;
-      // Reset after animation time
-      setTimeout(() => {
-        // Check if player still exists
-        if (players.get(attackerId) === attacker) {
-          attacker.is_attacking = false;
-        }
-      }, CONFIG.COMBAT.ATTACK_ANIMATION_DURATION_SECONDS * 1000);
-    }
+    // Trigger visual animation in renderer
+    this.renderer.triggerAttackAnimation(attackerId);
   }
 
   handleLootSpawned(message) {
