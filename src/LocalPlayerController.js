@@ -1,5 +1,5 @@
 import { CONFIG } from './config.js';
-import { getDirectionFromVelocity, updateAnimationState } from './animationHelper.js';
+import { getDirectionFromVelocity, AnimationState } from './animationHelper.js';
 
 export class LocalPlayerController {
   constructor(network, initialData) {
@@ -48,11 +48,7 @@ export class LocalPlayerController {
         x: data?.velocity_x || 0,
         y: data?.velocity_y || 0
       },
-      animationState: {
-        currentFrame: 0,
-        timeAccumulator: 0,
-        lastDirection: 0, // Default to South
-      },
+      animationState: new AnimationState(),
     };
   }
 
@@ -102,8 +98,8 @@ export class LocalPlayerController {
     const isMoving = this.player.velocity.x !== 0 || this.player.velocity.y !== 0;
     const direction = getDirectionFromVelocity(this.player.velocity.x, this.player.velocity.y);
 
-    // Update animation state using helper function
-    updateAnimationState(this.player.animationState, deltaTime, isMoving, direction);
+    // Update animation state
+    this.player.animationState.update(deltaTime, isMoving, direction);
 
     // Update rotation based on velocity (if moving)
     if (this.player.velocity.x !== 0 || this.player.velocity.y !== 0) {
