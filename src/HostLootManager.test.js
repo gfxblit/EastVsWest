@@ -143,4 +143,23 @@ describe('HostLootManager', () => {
       item_id: 'bo'
     }));
   });
+
+  test('WhenSpawnRandomLootCalled_ShouldSpawnMultipleItems', () => {
+    // Act
+    lootManager.spawnRandomLoot(5);
+
+    // Assert
+    expect(state.loot).toHaveLength(5);
+    expect(mockNetwork.send).toHaveBeenCalledTimes(5);
+    expect(mockNetwork.send).toHaveBeenCalledWith('loot_spawned', expect.any(Object));
+    
+    // Check that items are within bounds
+    state.loot.forEach(item => {
+        expect(item.x).toBeGreaterThanOrEqual(50);
+        expect(item.x).toBeLessThanOrEqual(CONFIG.WORLD.WIDTH - 50);
+        expect(item.y).toBeGreaterThanOrEqual(50);
+        expect(item.y).toBeLessThanOrEqual(CONFIG.WORLD.HEIGHT - 50);
+        expect(item.item_id).not.toBe('fist');
+    });
+  });
 });

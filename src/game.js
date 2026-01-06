@@ -43,6 +43,11 @@ export class Game {
         
         network.on('attack_request', (msg) => this.hostCombatManager.handleAttackRequest(msg, this.playersSnapshot));
         network.on('pickup_request', (msg) => this.hostLootManager.handlePickupRequest(msg, this.playersSnapshot));
+
+        // Initial loot spawn
+        if (this.state.loot.length === 0) {
+          this.hostLootManager.spawnRandomLoot(CONFIG.GAME.INITIAL_LOOT_COUNT);
+        }
     }
 
     if (network) {

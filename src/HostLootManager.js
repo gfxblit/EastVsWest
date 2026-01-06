@@ -24,6 +24,23 @@ export class HostLootManager {
     return lootItem;
   }
 
+  spawnRandomLoot(count) {
+    if (!this.network?.isHost) return;
+
+    const weaponTypes = Object.values(CONFIG.WEAPONS).filter(w => w.id !== 'fist');
+    
+    for (let i = 0; i < count; i++) {
+      const randomWeapon = weaponTypes[Math.floor(Math.random() * weaponTypes.length)];
+      
+      // Random position with some padding from edges
+      const padding = 50;
+      const x = padding + Math.random() * (CONFIG.WORLD.WIDTH - padding * 2);
+      const y = padding + Math.random() * (CONFIG.WORLD.HEIGHT - padding * 2);
+
+      this.spawnLoot(randomWeapon.id, x, y);
+    }
+  }
+
   removeLoot(lootId) {
     const index = this.state.loot.findIndex(item => item.id === lootId);
     if (index !== -1) {

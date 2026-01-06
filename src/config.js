@@ -11,6 +11,7 @@ export const CONFIG = {
     MAX_PLAYERS: 12,
     MATCH_DURATION_SECONDS: 300, // 5 minutes
     INITIAL_ZONE_SHRINK_DELAY_SECONDS: 60, // 1 minute before shrinking starts
+    INITIAL_LOOT_COUNT: 20,
   },
 
   // Canvas Settings
