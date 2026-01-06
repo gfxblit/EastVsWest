@@ -11,6 +11,7 @@ export const CONFIG = {
     MAX_PLAYERS: 12,
     MATCH_DURATION_SECONDS: 300, // 5 minutes
     INITIAL_ZONE_SHRINK_DELAY_SECONDS: 60, // 1 minute before shrinking starts
+    INITIAL_LOOT_COUNT: 20,
   },
 
   // Canvas Settings
@@ -218,5 +219,10 @@ export const CONFIG = {
     DEFAULT_THRUST_ARC: Math.PI / 4, // 45 degrees
     DEFAULT_SWING_ARC: (120 * Math.PI) / 180, // 120 degrees
     DEFAULT_SPIN_ARC: Math.PI * 2, // 360 degrees
+  },
+
+  // Loot Settings
+  LOOT: {
+    PICKUP_RADIUS: 80,
   },
 };

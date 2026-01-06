@@ -6,6 +6,7 @@
 import { CONFIG } from './config.js';
 import { LocalPlayerController } from './LocalPlayerController.js';
 import { HostCombatManager } from './HostCombatManager.js';
+import { HostLootManager } from './HostLootManager.js';
 
 export class Game {
   constructor() {
@@ -22,6 +23,7 @@ export class Game {
     };
     this.localPlayerController = null;
     this.hostCombatManager = null;
+    this.hostLootManager = null;
     this.playersSnapshot = null;
     this.network = null;
     this.renderer = null;
@@ -34,9 +36,36 @@ export class Game {
     this.renderer = renderer;
     this.state.isRunning = true;
 
-    // Initialize Host Combat Manager
-    if (network) {
+    // Initialize Host Managers
+    if (network && network.isHost) {
         this.hostCombatManager = new HostCombatManager(network, this.state);
+        this.hostLootManager = new HostLootManager(network, this.state);
+        
+        network.on('attack_request', (msg) => this.hostCombatManager.handleAttackRequest(msg, this.playersSnapshot));
+        network.on('pickup_request', (msg) => this.hostLootManager.handlePickupRequest(msg, this.playersSnapshot));
+        
+        // Listen for new players joining to sync game state
+        network.on('postgres_changes', (payload) => {
+          if (payload.eventType === 'INSERT' && payload.table === 'session_players') {
+            const newPlayerId = payload.new.player_id;
+            if (newPlayerId !== network.playerId) {
+              console.log(`Host: New player ${newPlayerId} joined, syncing loot...`);
+              this.hostLootManager.syncLootToPlayer(newPlayerId);
+            }
+          }
+        });
+
+        // Initial loot spawn
+        if (this.state.loot.length === 0) {
+          this.hostLootManager.spawnRandomLoot(CONFIG.GAME.INITIAL_LOOT_COUNT);
+        }
+    }
+
+    if (network) {
+      // Listen for network events
+      network.on('attack_request', (msg) => this.handleAttackAnimation(msg));
+      network.on('loot_spawned', (msg) => this.handleLootSpawned(msg));
+      network.on('loot_picked_up', (msg) => this.handleLootPickedUp(msg));
     }
 
     // Initialize Local Player Controller
@@ -44,13 +73,6 @@ export class Game {
     if (playersSnapshot && network) {
       const snapshotPlayersMap = playersSnapshot.getPlayers();
       localPlayerData = snapshotPlayersMap.get(network.playerId);
-
-      if (network.isHost) {
-        network.on('attack_request', (msg) => this.hostCombatManager.handleAttackRequest(msg, this.playersSnapshot));
-      }
-
-      // Listen for attack requests to trigger animations on remote players
-      network.on('attack_request', (msg) => this.handleAttackAnimation(msg));
     }
     
     this.localPlayerController = new LocalPlayerController(network, localPlayerData);
@@ -75,7 +97,7 @@ export class Game {
 
     // Update local player
     if (this.localPlayerController) {
-      this.localPlayerController.update(deltaTime, this.playersSnapshot);
+      this.localPlayerController.update(deltaTime, this.playersSnapshot, this.state.loot);
     }
 
     // Host-authoritative updates
@@ -136,6 +158,19 @@ export class Game {
         }
       }, CONFIG.COMBAT.ATTACK_ANIMATION_DURATION_SECONDS * 1000);
     }
+  }
+
+  handleLootSpawned(message) {
+    const lootItem = message.data;
+    // Avoid duplicates
+    if (!this.state.loot.find(item => item.id === lootItem.id)) {
+      this.state.loot.push(lootItem);
+    }
+  }
+
+  handleLootPickedUp(message) {
+    const { loot_id } = message.data;
+    this.state.loot = this.state.loot.filter(item => item.id !== loot_id);
   }
 
   handleInput(inputState) {

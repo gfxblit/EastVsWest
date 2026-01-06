@@ -47,7 +47,7 @@ describe('Game', () => {
       expect(localPlayer).toBeDefined();
       expect(localPlayer.id).toBe('player-1');
       expect(localPlayer.health).toBe(100);
-      expect(localPlayer.weapon).toBe('fist');
+      expect(localPlayer.equipped_weapon).toBe('fist');
       expect(localPlayer.armor).toBeNull();
     });
 
@@ -115,7 +115,7 @@ describe('Game', () => {
       game.init();
       const spy = jest.spyOn(game.localPlayerController, 'update');
       game.update(0.016);
-      expect(spy).toHaveBeenCalledWith(0.016, null);
+      expect(spy).toHaveBeenCalledWith(0.016, null, []);
     });
   });
 
@@ -214,6 +214,44 @@ describe('Game', () => {
       game.update(1 / CONFIG.ANIMATION.FPS);
 
       expect(player.animationState.currentFrame).toBeGreaterThan(0);
+    });
+  });
+
+  describe('Loot Management', () => {
+    let mockNetwork;
+    let mockSnapshot;
+
+    beforeEach(() => {
+      mockNetwork = { 
+        playerId: 'player-1', 
+        on: jest.fn(), 
+        isHost: false 
+      };
+      mockSnapshot = { 
+        getPlayers: jest.fn().mockReturnValue(new Map()) 
+      };
+      game.init(mockSnapshot, mockNetwork);
+    });
+
+    test('WhenLootSpawnedMessageReceived_ShouldAddLootToState', () => {
+      // Find the loot_spawned handler
+      const lootSpawnedHandler = mockNetwork.on.mock.calls.find(call => call[0] === 'loot_spawned')[1];
+      
+      const lootItem = { id: 'loot-1', type: 'weapon', item_id: 'spear', x: 100, y: 100 };
+      lootSpawnedHandler({ data: lootItem });
+
+      expect(game.state.loot).toContainEqual(lootItem);
+    });
+
+    test('WhenLootPickedUpMessageReceived_ShouldRemoveLootFromState', () => {
+      game.state.loot = [{ id: 'loot-1', type: 'weapon', item_id: 'spear', x: 100, y: 100 }];
+      
+      // Find the loot_picked_up handler
+      const lootPickedUpHandler = mockNetwork.on.mock.calls.find(call => call[0] === 'loot_picked_up')[1];
+      
+      lootPickedUpHandler({ data: { loot_id: 'loot-1', player_id: 'player-2' } });
+
+      expect(game.state.loot).toHaveLength(0);
     });
   });
 });

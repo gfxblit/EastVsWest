@@ -496,7 +496,9 @@ button:active {
   bottom: 40px;
   right: 30px;
   z-index: 1000;
-  flex-direction: column;
+  display: flex;
+  flex-direction: row-reverse;
+  align-items: flex-end;
   gap: 15px;
 }
 
@@ -547,6 +549,8 @@ button:active {
 }
 
 .attack-btn {
+  width: 90px;
+  height: 90px;
   background: linear-gradient(to bottom, #c86a5a 0%, #a84a3d 100%);
 }
 
@@ -564,12 +568,11 @@ button:active {
   background: linear-gradient(to bottom, #7fb069 0%, #5a8f4f 100%);
 }
 
-.cycle-weapon-btn {
-  background: linear-gradient(to bottom, #d4a574 0%, #b8865a 100%);
+.interact-btn {
+  background: linear-gradient(to bottom, #74a5d4 0%, #5a86b8 100%);
 }
 
-.ability-btn:active {
-  background: linear-gradient(to bottom, #5a8f4f 0%, #47723d 100%);
+.ability-btn:active, .interact-btn:active {
   transform: scale(0.95);
   box-shadow:
     inset 0 2px 0 rgba(0, 0, 0, 0.2),

@@ -14,7 +14,8 @@ describe('Game Combat', () => {
       on: jest.fn(),
       emit: jest.fn(),
       broadcastPlayerStateUpdate: jest.fn(),
-      isHost: false,
+      writePlayerStateToDB: jest.fn().mockResolvedValue({}),
+      isHost: true,
     };
 
     mockPlayersSnapshot = {

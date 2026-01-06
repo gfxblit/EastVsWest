@@ -39,6 +39,7 @@ describe('LocalPlayerController - Attack Direction Fix', () => {
 
   test('ShouldSendAttackBasedOnRotationNotMouse', () => {
     const player = controller.getPlayer();
+    player.equipped_weapon = 'spear';
     
     // 1. Move Right (East). Rotation = PI/2.
     controller.handleInput({ moveX: 1, moveY: 0 });
