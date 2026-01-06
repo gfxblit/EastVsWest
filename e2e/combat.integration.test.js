@@ -221,6 +221,7 @@ describe('Combat Integration', () => {
     const calls = playerGame.renderer.addFloatingText.mock.calls;
     const damageTextCall = calls.find(call => call[2] === '25');
     expect(damageTextCall).toBeDefined();
+    expect(damageTextCall[3]).toBe('#ff0000');
     
     playerGame.renderer = null; // Clean up mock
   }, 10000);
