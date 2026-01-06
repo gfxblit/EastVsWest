@@ -194,6 +194,18 @@ class App {
       this.stopGameLoop();
       this.ui.showLobby('Match Ended', payload.data.summary);
     });
+
+    this.network.on('session_terminated', (payload) => {
+      console.log('Session terminated:', payload.data.reason);
+      
+      // If we are not the one who initiated the leave (host), show a message
+      if (payload.from !== this.network.playerId) {
+        this.showError(payload.data.message || 'The host has left the game.');
+      }
+      
+      // Clean up and return to intro
+      this.handleHostLeft();
+    });
   }
 
   showError(message) {
@@ -301,7 +313,12 @@ class App {
     this.startGame();
   }
 
-  leaveGame() {
+  async leaveGame() {
+    if (this.network?.isHost) {
+      const confirmed = window.confirm("Leaving as host will end the game for all players. Are you sure?");
+      if (!confirmed) return;
+    }
+
     // Stop lobby polling
     this.stopLobbyPolling();
 
@@ -311,7 +328,41 @@ class App {
       this.playersSnapshot = null;
     }
 
-    this.stopGame();
+    if (this.network) {
+      await this.network.leaveGame();
+    }
+
+    this.stopGameLoop();
+    this.game = null;
+    this.lastWeaponId = null;
+    this.lastArmorId = null;
+
+    this.ui.showSpectatorControls(false);
+    this.ui.showScreen('intro');
+  }
+
+  /**
+   * Specifically handle the case where the host leaves and terminates the session.
+   * Similar to leaveGame but doesn't prompt for confirmation and doesn't
+   * need to call network.leaveGame() (as the session is already being deleted).
+   */
+  handleHostLeft() {
+    this.stopLobbyPolling();
+    
+    if (this.playersSnapshot) {
+      this.playersSnapshot.destroy();
+      this.playersSnapshot = null;
+    }
+
+    if (this.network) {
+      this.network.disconnect();
+    }
+
+    this.stopGameLoop();
+    this.game = null;
+    this.lastWeaponId = null;
+    this.lastArmorId = null;
+
     this.ui.showSpectatorControls(false);
     this.ui.showScreen('intro');
   }
