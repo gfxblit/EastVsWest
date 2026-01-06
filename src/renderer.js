@@ -18,6 +18,8 @@ export class Renderer {
     this.spriteSheetLoaded = false;
     this.shadowImage = null;
     this.remoteAnimationStates = new Map(); // Store animation state for remote players
+    this.visualStates = new Map(); // Store visual state (like attack animations) for remote players
+    this.previousPlayerHealth = new Map(); // Store previous health for floating text diffs
     this.floatingTexts = [];
   }
 
@@ -79,6 +81,37 @@ export class Renderer {
     this.floatingTexts.push(new FloatingText(x + offsetX, y + offsetY, text, color));
   }
 
+  checkForHealthChanges(playersSnapshot) {
+    if (!playersSnapshot) return;
+
+    const players = playersSnapshot.getPlayers();
+    players.forEach(player => {
+      const prevHealth = this.previousPlayerHealth.get(player.player_id);
+      const currentHealth = player.health;
+
+      if (prevHealth !== undefined && currentHealth !== prevHealth) {
+        const diff = currentHealth - prevHealth;
+        if (Math.abs(diff) >= 0.1) { // Ignore tiny floating point diffs
+          const text = Math.abs(Math.round(diff)).toString();
+          const color = diff < 0 ? '#ff0000' : '#00ff00';
+          this.addFloatingText(player.position_x, player.position_y - CONFIG.RENDER.PLAYER_RADIUS * 2, text, color);
+        }
+      }
+
+      this.previousPlayerHealth.set(player.player_id, currentHealth);
+    });
+  }
+
+  triggerAttackAnimation(playerId) {
+    let state = this.visualStates.get(playerId);
+    if (!state) {
+      state = { isAttacking: false, attackTimer: 0 };
+      this.visualStates.set(playerId, state);
+    }
+    state.isAttacking = true;
+    state.attackTimer = CONFIG.COMBAT.ATTACK_ANIMATION_DURATION_SECONDS;
+  }
+
   render(gameState, localPlayer = null, playersSnapshot = null, camera = null, deltaTime = 0.016) {
     if (!this.ctx) return;
 
@@ -108,6 +141,21 @@ export class Renderer {
 
     // Render conflict zone (in world coordinates)
     this.renderConflictZone(gameState.conflictZone);
+
+    // Update visual states (attack animations)
+    this.visualStates.forEach((state, id) => {
+      if (state.isAttacking) {
+        state.attackTimer -= deltaTime;
+        if (state.attackTimer <= 0) {
+          state.isAttacking = false;
+        }
+      }
+    });
+
+    // Check for health changes to spawn floating text
+    if (playersSnapshot) {
+      this.checkForHealthChanges(playersSnapshot);
+    }
 
     // Render all players (in world coordinates)
     if (playersSnapshot) {
@@ -141,6 +189,10 @@ export class Renderer {
         // Update animation state
         animState.update(deltaTime, isMoving, direction);
 
+        // Get visual state (attack animation)
+        const visualState = this.visualStates.get(playerId);
+        const isAttacking = (visualState && visualState.isAttacking) || playerData.is_attacking || false;
+
         const player = {
           id: playerId,
           name: playerData.player_name,
@@ -148,16 +200,21 @@ export class Renderer {
           y: interpolated.y,
           rotation: interpolated.rotation,
           health: playerData.health,
-          isAttacking: playerData.is_attacking || false,
+          isAttacking: isAttacking,
           animationState: animState,
         };
         this.renderPlayer(player, false);
       });
 
-      // Cleanup animation states for players who left
+      // Cleanup animation states and visual states for players who left
       for (const playerId of this.remoteAnimationStates.keys()) {
         if (!snapshotPlayers.has(playerId)) {
           this.remoteAnimationStates.delete(playerId);
+        }
+      }
+      for (const playerId of this.visualStates.keys()) {
+        if (!snapshotPlayers.has(playerId)) {
+          this.visualStates.delete(playerId);
         }
       }
     }
