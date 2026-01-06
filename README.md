@@ -148,15 +148,15 @@ https://gfxblit.github.io/EastVsWest/?debug=true
 
 ### Local Development
 
-For local development, create a `.env.local` file in the root of the project with your local Supabase credentials.
+For local development, run the setup script which handles environment variables and dependencies:
 
 **Quick Setup:**
 
 ```bash
-cp .env.local.example .env.local
+npm run setup
 ```
 
-The default configuration in `.env.local.example` uses the standard local Supabase development credentials:
+The default configuration in `.env.local.example` (used by the setup script) uses the standard local Supabase development credentials:
 
 ```bash
 VITE_SUPABASE_URL=http://127.0.0.1:54321
