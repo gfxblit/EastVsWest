@@ -38,7 +38,7 @@ export class LocalPlayerController {
       y: data?.position_y !== undefined ? data.position_y : CONFIG.WORLD.HEIGHT / 2,
       rotation: data?.rotation || 0,
       health: data?.health !== undefined ? data.health : 100,
-      weapon: data?.equipped_weapon || 'fist',
+      equipped_weapon: data?.equipped_weapon || 'fist',
       armor: data?.equipped_armor || null,
       lastAttackTime: 0,
       lastSpecialTime: 0,
@@ -60,7 +60,7 @@ export class LocalPlayerController {
     return this.player && this.player.health <= 0;
   }
 
-  update(deltaTime, playersSnapshot) {
+  update(deltaTime, playersSnapshot, loot = []) {
     if (!this.player) return;
 
     // If dead, ensure velocity is zero and skip movement/animation updates
@@ -70,6 +70,7 @@ export class LocalPlayerController {
     } else {
       this.#updatePhysics(deltaTime);
       this.#updateAnimation(deltaTime);
+      this.#handleLootInteraction(loot);
     }
     
     // Handle Attack/Special Ability continuously if button is held
@@ -80,6 +81,29 @@ export class LocalPlayerController {
     if (playersSnapshot) {
         this.#syncWithSnapshot(playersSnapshot);
         this.#broadcastPosition();
+    }
+  }
+
+  #handleLootInteraction(loot) {
+    if (!this.network || !loot || loot.length === 0) return;
+
+    for (const item of loot) {
+      const dx = this.player.x - item.x;
+      const dy = this.player.y - item.y;
+      const distance = Math.sqrt(dx * dx + dy * dy);
+
+      if (distance <= CONFIG.LOOT.PICKUP_RADIUS) {
+        const isUnarmed = this.player.equipped_weapon === 'fist' || !this.player.equipped_weapon;
+        const wantsToSwap = this.inputState.interact;
+
+        if (isUnarmed || wantsToSwap) {
+          this.network.send('pickup_request', {
+            loot_id: item.id
+          });
+          // Only process one pickup per frame to avoid spamming multiple items if stacked
+          break;
+        }
+      }
     }
   }
 
@@ -126,7 +150,7 @@ export class LocalPlayerController {
         this.player.health = snapshotData.health;
       }
       if (snapshotData.equipped_weapon !== undefined) {
-        this.player.weapon = snapshotData.equipped_weapon;
+        this.player.equipped_weapon = snapshotData.equipped_weapon;
       }
       if (snapshotData.equipped_armor !== undefined) {
         this.player.armor = snapshotData.equipped_armor;
@@ -192,7 +216,7 @@ export class LocalPlayerController {
     }
 
     // Update player velocity based on input
-    const speedModifier = this.player.weapon?.stance === 'double'
+    const speedModifier = this.player.equipped_weapon?.stance === 'double'
       ? CONFIG.PLAYER.DOUBLE_HANDED_SPEED_MODIFIER
       : 1.0;
     const speed = CONFIG.PLAYER.BASE_MOVEMENT_SPEED * speedModifier;
@@ -223,7 +247,7 @@ export class LocalPlayerController {
     const now = Date.now();
     
     // Get weapon config
-    const weaponId = this.player.weapon;
+    const weaponId = this.player.equipped_weapon;
     const weaponConfig = Object.values(CONFIG.WEAPONS).find(w => w.id === weaponId) || CONFIG.WEAPONS.FIST;
     
     const cooldown = isSpecial ? CONFIG.COMBAT.SPECIAL_ABILITY_COOLDOWN_MS : (1000 / weaponConfig.attackSpeed);
@@ -269,7 +293,7 @@ export class LocalPlayerController {
     if (!this.player) return { attackPct: 0, abilityPct: 0 };
 
     const now = Date.now();
-    const weaponId = this.player.weapon;
+    const weaponId = this.player.equipped_weapon;
     // Default to fist if weapon is null/invalid for cooldown calculation purposes, 
     // although UI might disable buttons if weapon is null.
     // However, if we do have a weapon (even fist), we want to show cooldowns.

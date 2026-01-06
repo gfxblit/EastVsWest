@@ -1,8 +1,14 @@
 import '@jest/globals';
 import fetch, { Response } from 'node-fetch';
+import crypto from 'node:crypto';
 
 global.fetch = fetch;
 global.Response = Response;
+Object.defineProperty(global, 'crypto', {
+  value: {
+    randomUUID: () => crypto.randomUUID()
+  }
+});
 
 // Mock Touch and TouchEvent for JSDOM
 class Touch {

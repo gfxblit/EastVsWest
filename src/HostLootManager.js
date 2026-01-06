@@ -1,0 +1,89 @@
+import { CONFIG } from './config.js';
+
+export class HostLootManager {
+  constructor(network, state) {
+    this.network = network;
+    this.state = state; // Shared game state
+  }
+
+  spawnLoot(itemId, x, y, type = 'weapon') {
+    const lootItem = {
+      id: crypto.randomUUID(),
+      type,
+      item_id: itemId,
+      x,
+      y,
+    };
+
+    this.state.loot.push(lootItem);
+    
+    if (this.network?.isHost) {
+      this.network.send('loot_spawned', lootItem);
+    }
+    
+    return lootItem;
+  }
+
+  removeLoot(lootId) {
+    const index = this.state.loot.findIndex(item => item.id === lootId);
+    if (index !== -1) {
+      this.state.loot.splice(index, 1);
+      return true;
+    }
+    return false;
+  }
+
+  handlePickupRequest(message, playersSnapshot) {
+    if (!this.network?.isHost || !playersSnapshot) return;
+
+    const playerId = message.from;
+    const { loot_id } = message.data;
+    
+    const players = playersSnapshot.getPlayers();
+    const player = players.get(playerId);
+    const lootItem = this.state.loot.find(item => item.id === loot_id);
+
+    if (!player || !lootItem || player.health <= 0) return;
+
+    // Validate distance
+    const dx = player.position_x - lootItem.x;
+    const dy = player.position_y - lootItem.y;
+    const distance = Math.sqrt(dx * dx + dy * dy);
+
+    if (distance > CONFIG.LOOT.PICKUP_RADIUS) {
+      return;
+    }
+
+    // Handle pickup
+    const oldWeapon = player.equipped_weapon;
+    
+    // Update player weapon
+    player.equipped_weapon = lootItem.item_id;
+
+    const playerUpdate = {
+      player_id: playerId,
+      equipped_weapon: player.equipped_weapon
+    };
+
+    // Broadcast player update
+    this.network.broadcastPlayerStateUpdate([playerUpdate]);
+
+    // Also write to DB for persistence/initial sync of new joiners
+    this.network.writePlayerStateToDB(playerId, { equipped_weapon: player.equipped_weapon })
+      .catch(err => console.error('Host: DB update failed', err));
+
+    // Remove loot item from state
+    this.removeLoot(loot_id);
+
+    // Notify clients loot is gone
+    this.network.send('loot_picked_up', {
+      loot_id: loot_id,
+      player_id: playerId
+    });
+
+    // If player had a real weapon (not fist), drop it
+    if (oldWeapon && oldWeapon !== 'fist') {
+      this.spawnLoot(oldWeapon, player.position_x, player.position_y);
+    }
+  }
+}

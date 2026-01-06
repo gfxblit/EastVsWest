@@ -126,7 +126,7 @@ describe('Combat Integration', () => {
     // Ensure local controller is aware of weapon
     await waitFor(() => {
         hostGame.update(0.016);
-        return hostGame.getLocalPlayer().weapon === 'spear';
+        return hostGame.getLocalPlayer().equipped_weapon === 'spear';
     }, 2000);
   });
 

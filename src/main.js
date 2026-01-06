@@ -524,7 +524,7 @@ class App {
       this.input.on('cycle_weapon', () => {
         if (this.game && this.game.localPlayerController) {
           const player = this.game.localPlayerController.getPlayer();
-          const currentWeaponId = player.weapon;
+          const currentWeaponId = player.equipped_weapon;
           const weaponIds = Object.keys(CONFIG.WEAPONS).map(k => CONFIG.WEAPONS[k].id);
           const currentIndex = weaponIds.indexOf(currentWeaponId);
           const nextIndex = (currentIndex + 1) % weaponIds.length;
@@ -533,7 +533,7 @@ class App {
           console.log(`Debug: Cycling weapon to ${nextWeaponId}`);
           
           // Update local state
-          player.weapon = nextWeaponId;
+          player.equipped_weapon = nextWeaponId;
           
           // Persist to DB and broadcast (Host-authoritative fields usually handled by Host, 
           // but for debug we can force it from client if we want)
@@ -596,7 +596,7 @@ class App {
 
       // Check for equipment changes
       // We store the last known equipment on the App instance to avoid unnecessary DOM updates
-      const currentWeaponId = localPlayer.weapon;
+      const currentWeaponId = localPlayer.equipped_weapon;
       const currentArmorId = localPlayer.armor;
 
       if (this.lastWeaponId !== currentWeaponId || this.lastArmorId !== currentArmorId) {

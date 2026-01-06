@@ -219,4 +219,9 @@ export const CONFIG = {
     DEFAULT_SWING_ARC: (120 * Math.PI) / 180, // 120 degrees
     DEFAULT_SPIN_ARC: Math.PI * 2, // 360 degrees
   },
+
+  // Loot Settings
+  LOOT: {
+    PICKUP_RADIUS: 80,
+  },
 };
