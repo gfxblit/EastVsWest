@@ -193,15 +193,20 @@ export class SessionPlayersSnapshot {
     }
 
     const isFromHost = senderId === this.network.hostId;
-    const isFromSelf = senderId === player_id;
+    const isFromSelf = senderId === this.network.playerId;
 
     // Client-authoritative fields: only accept from the player themselves OR the host
-    if (isFromSelf || isFromHost) {
+    if (senderId === player_id || isFromHost) {
       if (payload.position_x !== undefined) player.position_x = payload.position_x;
       if (payload.position_y !== undefined) player.position_y = payload.position_y;
       if (payload.rotation !== undefined) player.rotation = payload.rotation;
       if (payload.velocity_x !== undefined) player.velocity_x = payload.velocity_x;
       if (payload.velocity_y !== undefined) player.velocity_y = payload.velocity_y;
+      
+      // Allow self-broadcast of health
+      if (isFromSelf && payload.health !== undefined) {
+        player.health = payload.health;
+      }
     }
 
     // Host-authoritative fields: ONLY accept from the host
