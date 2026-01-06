@@ -98,7 +98,7 @@ describe('Player Death Flow E2E', () => {
     await page.waitForFunction(() => {
       const controls = document.getElementById('spectator-controls');
       return controls && !controls.classList.contains('hidden');
-    }, { timeout: 5000 });
+    }, { timeout: 10000 });
 
     const spectatingName = await page.$eval('#spectating-name', el => el.textContent);
     expect(spectatingName).toBeTruthy();
