@@ -439,6 +439,8 @@ export class Renderer {
 
     // Cardinal Snapping for attacks
     let renderDirection = lastDirection;
+    let renderFrame = currentFrame;
+
     if (isAttacking) {
       // 0: South, 1: SE, 2: East, 3: NE, 4: North, 5: NW, 6: West, 7: SW
       // Snapping rules:
@@ -450,10 +452,29 @@ export class Renderer {
       else if (renderDirection === 3) renderDirection = 2;
       else if (renderDirection === 5) renderDirection = 4;
       else if (renderDirection === 7) renderDirection = 6;
+
+      // Calculate attack frame based on time
+      if (player.attackStartTime) {
+        const elapsed = (performance.now() - player.attackStartTime) / 1000; // seconds
+        const duration = CONFIG.COMBAT.ATTACK_ANIMATION_DURATION_SECONDS;
+        const totalFrames = 4; // Assuming 4 frames for attack
+        
+        // Calculate frame (0 to 3)
+        let frame = Math.floor((elapsed / duration) * totalFrames);
+        
+        // Clamp to valid range
+        if (frame < 0) frame = 0;
+        if (frame >= totalFrames) frame = totalFrames - 1;
+        
+        renderFrame = frame;
+      } else {
+        // Fallback if no start time (shouldn't happen with updated logic)
+        renderFrame = 0; 
+      }
     }
 
     // Calculate source rectangle (which frame to draw from sprite sheet)
-    const sourceX = currentFrame * frameWidth;
+    const sourceX = renderFrame * frameWidth;
     const sourceY = renderDirection * frameHeight;
 
     // Draw frame from sprite sheet, centered on player position

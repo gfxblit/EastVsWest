@@ -268,6 +268,7 @@ export class LocalPlayerController {
 
       // Set local animation state
       this.player.isAttacking = true;
+      this.player.attackStartTime = now;
       this.player.attackAnimTime = CONFIG.COMBAT.ATTACK_ANIMATION_DURATION_SECONDS;
 
       if (this.network) {

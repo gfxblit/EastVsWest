@@ -1380,6 +1380,41 @@ describe('Renderer', () => {
         );
       });
     });
+
+    test('WhenAttacking_ShouldCalculateFrameBasedOnTime', () => {
+      const now = performance.now();
+      const player = {
+        id: 'player-1',
+        x: 100,
+        y: 100,
+        health: 100,
+        isAttacking: true,
+        attackStartTime: now - 50, // 50ms elapsed
+        animationState: {
+          currentFrame: 0, // Should be ignored
+          lastDirection: 0,
+        },
+      };
+
+      // Duration is 0.2s (200ms). 4 frames.
+      // 50ms is 25% of 200ms. Should be frame 1 (0-25% -> 0, 25-50% -> 1)
+      // frame = floor((0.05 / 0.2) * 4) = floor(0.25 * 4) = floor(1) = 1
+      
+      renderer.renderPlayerWithSpriteSheet(player, false);
+
+      // sourceX = frame * 32 = 1 * 32 = 32
+      expect(ctx.drawImage).toHaveBeenCalledWith(
+        expect.anything(),
+        32, // expectedSourceX
+        expect.any(Number),
+        expect.any(Number),
+        expect.any(Number),
+        expect.any(Number),
+        expect.any(Number),
+        expect.any(Number),
+        expect.any(Number)
+      );
+    });
   });
 
   describe('Floating Text', () => {

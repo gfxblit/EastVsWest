@@ -150,6 +150,7 @@ export class Game {
     
     if (attacker) {
       attacker.is_attacking = true;
+      attacker.attackStartTime = performance.now();
       // Reset after animation time
       setTimeout(() => {
         // Check if player still exists
