@@ -16,6 +16,7 @@ export class LocalPlayerController {
       specialAbility: false,
       interact: false,
     };
+    this.wasInteracting = false;
 
     // Initialize lastSentState to prevent unnecessary initial send
     if (this.player) {
@@ -82,6 +83,8 @@ export class LocalPlayerController {
         this.#syncWithSnapshot(playersSnapshot);
         this.#broadcastPosition();
     }
+
+    this.wasInteracting = this.inputState.interact;
   }
 
   #handleLootInteraction(loot) {
@@ -94,7 +97,8 @@ export class LocalPlayerController {
 
       if (distance <= CONFIG.LOOT.PICKUP_RADIUS) {
         const isUnarmed = this.player.equipped_weapon === 'fist' || !this.player.equipped_weapon;
-        const wantsToSwap = this.inputState.interact;
+        // Only swap on initial key press (rising edge) to avoid flickering/looping
+        const wantsToSwap = this.inputState.interact && !this.wasInteracting;
 
         if (isUnarmed || wantsToSwap) {
           this.network.send('pickup_request', {
@@ -243,6 +247,8 @@ export class LocalPlayerController {
   }
 
   #handleAttack(inputState) {
+    if (!this.player.equipped_weapon) return;
+
     const isSpecial = inputState.specialAbility;
     const now = Date.now();
     

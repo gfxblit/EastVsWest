@@ -152,6 +152,7 @@ describe('LocalPlayerController', () => {
 
     test('WhenSpecialAbilityButtonHeld_ShouldTriggerMultipleAttacksOverTime', () => {
       const player = controller.getPlayer();
+      player.equipped_weapon = 'spear';
       const cooldown = CONFIG.COMBAT.SPECIAL_ABILITY_COOLDOWN_MS;
       
       let now = 10000;
@@ -266,7 +267,7 @@ describe('LocalPlayerController', () => {
 
     test('WhenUnarmedAndCollidingWithLoot_ShouldSendPickupRequest', () => {
       const player = controller.getPlayer();
-      player.equipped_weapon = 'fist';
+      player.equipped_weapon = null;
       
       // Move player into range
       player.x = mockLoot[0].x;
@@ -307,6 +308,36 @@ describe('LocalPlayerController', () => {
       expect(mockNetwork.send).toHaveBeenCalledWith('pickup_request', {
         loot_id: 'loot-1'
       });
+    });
+
+    test('WhenHoldingF_ShouldOnlySendOnePickupRequest', () => {
+      const player = controller.getPlayer();
+      player.equipped_weapon = 'bo';
+      player.x = mockLoot[0].x;
+      player.y = mockLoot[0].y;
+
+      // Frame 1: Press F
+      controller.handleInput({ interact: true });
+      controller.update(0.016, null, mockLoot);
+      expect(mockNetwork.send).toHaveBeenCalledTimes(1);
+      
+      // Clear mock
+      mockNetwork.send.mockClear();
+
+      // Frame 2: Still holding F
+      controller.handleInput({ interact: true });
+      controller.update(0.016, null, mockLoot);
+      expect(mockNetwork.send).not.toHaveBeenCalled();
+
+      // Frame 3: Release F
+      controller.handleInput({ interact: false });
+      controller.update(0.016, null, mockLoot);
+      expect(mockNetwork.send).not.toHaveBeenCalled();
+
+      // Frame 4: Press F again
+      controller.handleInput({ interact: true });
+      controller.update(0.016, null, mockLoot);
+      expect(mockNetwork.send).toHaveBeenCalledTimes(1);
     });
   });
 });

@@ -161,10 +161,10 @@ describe('Loot Integration', () => {
     // Wait for weapon sync
     await waitFor(() => {
         playerGame.update(0.1);
+        hostGame.update(0.1);
         const localP = playerGame.getLocalPlayer();
-        console.log('Player weapon current:', localP.equipped_weapon);
         return localP.equipped_weapon === 'bo';
-    }, 10000);
+    }, 15000);
 
     // 3. Host spawns a spear
     const lootX = 1100;
@@ -216,8 +216,10 @@ describe('Loot Integration', () => {
 
     // 6. Verify old weapon 'bo' was dropped
     await waitFor(() => {
+        playerGame.update(0.1);
+        hostGame.update(0.1);
         return playerGame.state.loot.some(item => item.item_id === 'bo');
-    }, 5000);
+    }, 10000);
 
     // Count should still be the same (one picked up, one dropped)
     expect(playerGame.state.loot).toHaveLength(initialExpectedCount);

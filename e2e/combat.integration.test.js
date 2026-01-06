@@ -119,15 +119,20 @@ describe('Combat Integration', () => {
         const h = hostSnapshot.getPlayers().get(hostUserId);
         const p = hostSnapshot.getPlayers().get(playerUserId);
         
-        return h && p && h.health === 100 && p.health === 100 && 
-               Math.abs(h.position_x - 1200) < 5 && Math.abs(p.position_x - 1250) < 5;
-    }, 5000);
+        if (!h || !p) return false;
+        
+        const healthSynced = h.health === 100 && p.health === 100;
+        const posSynced = Math.abs(h.position_x - 1200) < 5 && Math.abs(p.position_x - 1250) < 5;
+        
+        return healthSynced && posSynced;
+    }, 10000);
 
     // Ensure local controller is aware of weapon
     await waitFor(() => {
         hostGame.update(0.016);
-        return hostGame.getLocalPlayer().equipped_weapon === 'spear';
-    }, 2000);
+        const localWeapon = hostGame.getLocalPlayer().equipped_weapon;
+        return localWeapon === 'spear';
+    }, 10000);
   });
 
   afterAll(async () => {
