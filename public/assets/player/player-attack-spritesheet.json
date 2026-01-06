@@ -1,0 +1,13 @@
+{
+  "frameWidth": 32,
+  "frameHeight": 32,
+  "columns": 4,
+  "rows": 8,
+  "animations": {
+    "attack": {
+      "frames": 4,
+      "duration": 0.25,
+      "loop": false
+    }
+  }
+}

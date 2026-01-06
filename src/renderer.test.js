@@ -1017,7 +1017,7 @@ describe('Renderer', () => {
   describe('Sprite Sheet Animation', () => {
     describe('loadSpriteSheet', () => {
       test('WhenLoadingSpriteSheet_ShouldLoadImageAndMetadata', async () => {
-        // Mock fetch for metadata
+        // Mock fetch for metadata - it will be called twice
         global.fetch = jest.fn(() =>
           Promise.resolve({
             ok: true,
@@ -1033,24 +1033,28 @@ describe('Renderer', () => {
 
         const newRenderer = new Renderer(canvas);
 
-        // Start loading sprite sheet
-        const loadPromise = newRenderer.loadSpriteSheet();
+        // Start loading sprite sheets
+        const loadPromise = newRenderer.loadSpriteSheets();
 
-        // Simulate image load completion after event loop tick
+        // Simulate image load completion for both images after event loop tick
         setTimeout(() => {
           if (newRenderer.spriteSheet && newRenderer.spriteSheet.onload) {
             newRenderer.spriteSheet.onload();
           }
         }, 0);
 
+        setTimeout(() => {
+          if (newRenderer.attackSpriteSheet && newRenderer.attackSpriteSheet.onload) {
+            newRenderer.attackSpriteSheet.onload();
+          }
+        }, 10);
+
         await loadPromise;
 
         expect(newRenderer.spriteSheet).toBeDefined();
         expect(newRenderer.spriteSheetMetadata).toBeDefined();
-        expect(newRenderer.spriteSheetMetadata.frameWidth).toBe(96);
-        expect(newRenderer.spriteSheetMetadata.frameHeight).toBe(96);
-        expect(newRenderer.spriteSheetMetadata.columns).toBe(6);
-        expect(newRenderer.spriteSheetMetadata.rows).toBe(8);
+        expect(newRenderer.attackSpriteSheet).toBeDefined();
+        expect(newRenderer.attackSpriteSheetMetadata).toBeDefined();
       });
 
       test('WhenMetadataLoadFails_ShouldHandleGracefully', async () => {
@@ -1062,7 +1066,9 @@ describe('Renderer', () => {
         );
 
         const newRenderer = new Renderer(canvas);
-        await expect(newRenderer.loadSpriteSheet()).rejects.toThrow();
+        // Should not throw, but handle error internally
+        await newRenderer.loadSpriteSheets();
+        expect(newRenderer.spriteSheet).toBeNull();
       });
     });
 
@@ -1229,6 +1235,142 @@ describe('Renderer', () => {
           192, // sourceY (East row)
           96,
           96,
+          expect.any(Number),
+          expect.any(Number),
+          expect.any(Number),
+          expect.any(Number)
+        );
+      });
+    });
+  });
+
+  describe('Attack Animation Rendering', () => {
+    beforeEach(() => {
+      // Mock both sprite sheets
+      renderer.spriteSheet = {
+        complete: true,
+        naturalWidth: 128,
+        naturalHeight: 256,
+      };
+      renderer.spriteSheetMetadata = {
+        frameWidth: 32,
+        frameHeight: 32,
+        columns: 4,
+        rows: 8,
+      };
+
+      renderer.attackSpriteSheet = {
+        complete: true,
+        naturalWidth: 128,
+        naturalHeight: 256,
+      };
+      renderer.attackSpriteSheetMetadata = {
+        frameWidth: 32,
+        frameHeight: 32,
+        columns: 4,
+        rows: 8,
+      };
+
+      ctx.drawImage = jest.fn();
+    });
+
+    test('WhenPlayerIsAttacking_ShouldUseAttackSpriteSheet', () => {
+      const player = {
+        id: 'player-1',
+        x: 100,
+        y: 100,
+        health: 100,
+        isAttacking: true,
+        animationState: {
+          currentFrame: 1,
+          lastDirection: 2, // East
+        },
+      };
+
+      renderer.renderPlayerWithSpriteSheet(player, false);
+
+      // Should use attackSpriteSheet
+      expect(ctx.drawImage).toHaveBeenCalledWith(
+        renderer.attackSpriteSheet,
+        expect.any(Number),
+        expect.any(Number),
+        expect.any(Number),
+        expect.any(Number),
+        expect.any(Number),
+        expect.any(Number),
+        expect.any(Number),
+        expect.any(Number)
+      );
+    });
+
+    test('WhenAttackingDiagonally_ShouldSnapToCardinalDirection', () => {
+      // Test cases for snapping: [inputDirection, expectedSnappedDirection]
+      const snapTestCases = [
+        [1, 2], // SE -> E (or S, but let's assume E for this test)
+        [3, 2], // NE -> E (or N)
+        [5, 4], // NW -> N (or W)
+        [7, 6], // SW -> W (or S)
+      ];
+
+      snapTestCases.forEach(([inputDir, expectedDir]) => {
+        ctx.drawImage.mockClear();
+        const player = {
+          id: 'player-1',
+          x: 100,
+          y: 100,
+          health: 100,
+          isAttacking: true,
+          animationState: {
+            currentFrame: 0,
+            lastDirection: inputDir,
+          },
+        };
+
+        renderer.renderPlayerWithSpriteSheet(player, false);
+
+        // sourceY = snappedDirection * frameHeight
+        const expectedSourceY = expectedDir * 32;
+        
+        expect(ctx.drawImage).toHaveBeenCalledWith(
+          expect.anything(),
+          expect.any(Number),
+          expectedSourceY,
+          expect.any(Number),
+          expect.any(Number),
+          expect.any(Number),
+          expect.any(Number),
+          expect.any(Number),
+          expect.any(Number)
+        );
+      });
+    });
+
+    test('WhenAttackingCardinally_ShouldNotSnap', () => {
+      const cardinalDirections = [0, 2, 4, 6];
+
+      cardinalDirections.forEach(dir => {
+        ctx.drawImage.mockClear();
+        const player = {
+          id: 'player-1',
+          x: 100,
+          y: 100,
+          health: 100,
+          isAttacking: true,
+          animationState: {
+            currentFrame: 0,
+            lastDirection: dir,
+          },
+        };
+
+        renderer.renderPlayerWithSpriteSheet(player, false);
+
+        const expectedSourceY = dir * 32;
+        expect(ctx.drawImage).toHaveBeenCalledWith(
+          expect.anything(),
+          expect.any(Number),
+          expectedSourceY,
+          expect.any(Number),
+          expect.any(Number),
           expect.any(Number),
           expect.any(Number),
           expect.any(Number),

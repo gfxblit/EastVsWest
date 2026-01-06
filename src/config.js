@@ -199,6 +199,10 @@ export const CONFIG = {
       PATH: 'assets/player/player-walk-spritesheet.png',
       METADATA: 'assets/player/player-walk-spritesheet.json',
     },
+    ATTACK_SPRITE_SHEET: {
+      PATH: 'assets/player/player-attack-spritesheet.png',
+      METADATA: 'assets/player/player-attack-spritesheet.json',
+    },
   },
 
   // Animation Settings

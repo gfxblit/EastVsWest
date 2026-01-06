@@ -15,6 +15,8 @@ export class Renderer {
     this.bgPattern = null;
     this.spriteSheet = null;
     this.spriteSheetMetadata = null;
+    this.attackSpriteSheet = null;
+    this.attackSpriteSheetMetadata = null;
     this.spriteSheetLoaded = false;
     this.shadowImage = null;
     this.remoteAnimationStates = new Map(); // Store animation state for remote players
@@ -43,9 +45,9 @@ export class Renderer {
     // Load shadow image
     this.shadowImage = this.createImage('shadow.png');
 
-    // Load sprite sheet for animations
-    this.loadSpriteSheet().catch(err => {
-      console.warn('Failed to load sprite sheet, using fallback rendering:', err.message);
+    // Load sprite sheets for animations
+    this.loadSpriteSheets().catch(err => {
+      console.warn('Failed to load sprite sheets, using fallback rendering:', err.message);
     });
 
     console.log('Renderer initialized');
@@ -274,40 +276,43 @@ export class Renderer {
   }
 
   /**
-   * Load sprite sheet image and metadata
+   * Load sprite sheet images and metadata
    * @returns {Promise<void>}
    */
-  async loadSpriteSheet() {
+  async loadSpriteSheets() {
     const baseUrl = CONFIG.ASSETS.BASE_URL;
     const normalizedBase = baseUrl.endsWith('/') ? baseUrl : `${baseUrl}/`;
 
     try {
-      // Load metadata
+      // Load Walk Metadata
       const metadataPath = `${normalizedBase}${CONFIG.ASSETS.SPRITE_SHEET.METADATA}`;
       const response = await fetch(metadataPath);
-
-      if (!response.ok) {
-        throw new Error(`Failed to load sprite sheet metadata: ${response.statusText}`);
+      if (response.ok) {
+        this.spriteSheetMetadata = await response.json();
+        this.spriteSheet = this.createImage(CONFIG.ASSETS.SPRITE_SHEET.PATH);
+        await new Promise((resolve, reject) => {
+          this.spriteSheet.onload = resolve;
+          this.spriteSheet.onerror = reject;
+        });
       }
 
-      this.spriteSheetMetadata = await response.json();
+      // Load Attack Metadata
+      const attackMetadataPath = `${normalizedBase}${CONFIG.ASSETS.ATTACK_SPRITE_SHEET.METADATA}`;
+      const attackResponse = await fetch(attackMetadataPath);
+      if (attackResponse.ok) {
+        this.attackSpriteSheetMetadata = await attackResponse.json();
+        this.attackSpriteSheet = this.createImage(CONFIG.ASSETS.ATTACK_SPRITE_SHEET.PATH);
+        await new Promise((resolve, reject) => {
+          this.attackSpriteSheet.onload = resolve;
+          this.attackSpriteSheet.onerror = reject;
+        });
+      }
 
-      // Load sprite sheet image
-      this.spriteSheet = this.createImage(CONFIG.ASSETS.SPRITE_SHEET.PATH);
-
-      // Wait for image to load
-      await new Promise((resolve, reject) => {
-        this.spriteSheet.onload = resolve;
-        this.spriteSheet.onerror = reject;
-      });
-
-      // Mark sprite sheet as loaded
-      this.spriteSheetLoaded = true;
+      // Mark sprite sheets as loaded if at least the walk one is there
+      this.spriteSheetLoaded = !!this.spriteSheet;
     } catch (error) {
-      // Ensure sprite sheet stays null for fallback rendering
-      this.spriteSheet = null;
-      this.spriteSheetMetadata = null;
-      this.spriteSheetLoaded = false;
+      console.error('Error loading sprite sheets:', error);
+      // Fallback is handled by render checks
       throw error;
     }
   }
@@ -333,8 +338,18 @@ export class Renderer {
       );
     }
 
-    // Check if sprite sheet is loaded
-    if (!this.spriteSheet || !this.spriteSheet.complete || !this.spriteSheetMetadata) {
+    // Determine which sprite sheet to use
+    let currentSpriteSheet = this.spriteSheet;
+    let currentMetadata = this.spriteSheetMetadata;
+    let isAttacking = player.isAttacking;
+
+    if (isAttacking && this.attackSpriteSheet && this.attackSpriteSheetMetadata) {
+      currentSpriteSheet = this.attackSpriteSheet;
+      currentMetadata = this.attackSpriteSheetMetadata;
+    }
+
+    // Check if current sprite sheet is loaded
+    if (!currentSpriteSheet || !currentSpriteSheet.complete || !currentMetadata) {
       // Fallback: render pink rectangle
       this.ctx.fillStyle = '#ff69b4'; // Pink
       this.ctx.fillRect(
@@ -347,15 +362,30 @@ export class Renderer {
     }
 
     const { currentFrame, lastDirection } = player.animationState;
-    const { frameWidth, frameHeight } = this.spriteSheetMetadata;
+    const { frameWidth, frameHeight } = currentMetadata;
+
+    // Cardinal Snapping for attacks
+    let renderDirection = lastDirection;
+    if (isAttacking) {
+      // 0: South, 1: SE, 2: East, 3: NE, 4: North, 5: NW, 6: West, 7: SW
+      // Snapping rules:
+      // SE (1) -> East (2)
+      // NE (3) -> East (2)
+      // NW (5) -> North (4)
+      // SW (7) -> West (6)
+      if (renderDirection === 1) renderDirection = 2;
+      else if (renderDirection === 3) renderDirection = 2;
+      else if (renderDirection === 5) renderDirection = 4;
+      else if (renderDirection === 7) renderDirection = 6;
+    }
 
     // Calculate source rectangle (which frame to draw from sprite sheet)
     const sourceX = currentFrame * frameWidth;
-    const sourceY = lastDirection * frameHeight;
+    const sourceY = renderDirection * frameHeight;
 
     // Draw frame from sprite sheet, centered on player position
     this.ctx.drawImage(
-      this.spriteSheet,
+      currentSpriteSheet,
       sourceX,
       sourceY,
       frameWidth,
@@ -375,7 +405,7 @@ export class Renderer {
       this.ctx.stroke();
     }
 
-    // Attack flash
+    // Attack flash (legacy, can be kept for extra juice or removed)
     if (player.isAttacking) {
       this.ctx.save();
       this.ctx.globalAlpha = 0.5;
