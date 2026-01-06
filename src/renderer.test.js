@@ -67,6 +67,8 @@ describe('Renderer', () => {
       closePath: jest.fn(),
       createPattern: jest.fn(() => 'mock-pattern'),
       rect: jest.fn(),
+      fillText: jest.fn(),
+      measureText: jest.fn(() => ({ width: 100 })),
     };
     canvas.getContext = jest.fn(() => ctx);
     renderer = new Renderer(canvas);
@@ -1443,6 +1445,65 @@ describe('Renderer', () => {
       expect(renderer.floatingTexts).toHaveLength(1);
       expect(renderer.floatingTexts).toContain(activeText);
       expect(renderer.floatingTexts).not.toContain(expiredText);
+    });
+  });
+
+  describe('Loot Rendering', () => {
+    test('renderLoot should draw circles and labels for each loot item', () => {
+      const lootItems = [
+        { id: '1', item_id: 'spear', x: 100, y: 100 },
+        { id: '2', item_id: 'bo', x: 200, y: 200 }
+      ];
+
+      renderer.renderLoot(lootItems);
+
+      expect(ctx.arc).toHaveBeenCalledTimes(2);
+      expect(ctx.fillText).toHaveBeenCalledTimes(2);
+      expect(ctx.fillText).toHaveBeenCalledWith('SPEAR', 100, 80);
+      expect(ctx.fillText).toHaveBeenCalledWith('BO', 200, 180);
+    });
+
+    test('findNearestLoot should return closest item and distance', () => {
+      const player = { x: 50, y: 50 };
+      const lootItems = [
+        { id: '1', x: 100, y: 100 }, // distance ~70.7
+        { id: '2', x: 60, y: 60 }    // distance ~14.1
+      ];
+
+      const result = renderer.findNearestLoot(player, lootItems);
+
+      expect(result.item.id).toBe('2');
+      expect(result.distance).toBeLessThan(15);
+    });
+
+    test('renderInteractionPrompt should show pickup text when unarmed', () => {
+      const player = { x: 100, y: 100, equipped_weapon: 'fist' };
+      const item = { item_id: 'spear' };
+      
+      ctx.measureText.mockReturnValue({ width: 100 });
+
+      renderer.renderInteractionPrompt(player, item);
+
+      expect(ctx.fillText).toHaveBeenCalledWith(
+        expect.stringContaining('Picking up spear'),
+        100,
+        expect.any(Number)
+      );
+    });
+
+    test('renderInteractionPrompt should show swap text when armed', () => {
+      const player = { x: 100, y: 100, equipped_weapon: 'bo' };
+      const item = { item_id: 'spear' };
+      
+      ctx.measureText.mockReturnValue({ width: 100 });
+
+      renderer.renderInteractionPrompt(player, item);
+
+      expect(ctx.fillText).toHaveBeenCalledWith(
+        expect.stringContaining('swap bo for spear'),
+        100,
+        expect.any(Number)
+      );
     });
   });
 });

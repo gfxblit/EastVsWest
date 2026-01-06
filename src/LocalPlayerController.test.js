@@ -21,7 +21,7 @@ describe('LocalPlayerController', () => {
     expect(player.id).toBe('test-player');
     expect(player.x).toBe(CONFIG.WORLD.WIDTH / 2);
     expect(player.y).toBe(CONFIG.WORLD.HEIGHT / 2);
-    expect(player.weapon).toBe('fist');
+    expect(player.equipped_weapon).toBe('fist');
   });
 
   test('ShouldUpdatePositionBasedOnVelocity', () => {
@@ -78,7 +78,7 @@ describe('LocalPlayerController', () => {
     controller.update(0.1, mockSnapshot);
 
     expect(player.health).toBe(50);
-    expect(player.weapon).toBe('spear');
+    expect(player.equipped_weapon).toBe('spear');
   });
 
   describe('getCooldownStatus', () => {
@@ -97,7 +97,7 @@ describe('LocalPlayerController', () => {
       const now = Date.now();
       
       // Mock weapon with 1.0 attack speed (1000ms cooldown)
-      player.weapon = 'spear'; 
+      player.equipped_weapon = 'spear'; 
       player.lastAttackTime = now - 500; // Halfway through cooldown
 
       const status = controller.getCooldownStatus();
@@ -127,7 +127,7 @@ describe('LocalPlayerController', () => {
 
     test('WhenAttackButtonHeld_ShouldTriggerMultipleAttacksOverTime', () => {
       const player = controller.getPlayer();
-      player.weapon = 'spear'; // 1.0 attack speed = 1000ms cooldown
+      player.equipped_weapon = 'spear'; // 1.0 attack speed = 1000ms cooldown
       
       let now = 10000;
       jest.spyOn(Date, 'now').mockImplementation(() => now);
@@ -152,6 +152,7 @@ describe('LocalPlayerController', () => {
 
     test('WhenSpecialAbilityButtonHeld_ShouldTriggerMultipleAttacksOverTime', () => {
       const player = controller.getPlayer();
+      player.equipped_weapon = 'spear';
       const cooldown = CONFIG.COMBAT.SPECIAL_ABILITY_COOLDOWN_MS;
       
       let now = 10000;
@@ -177,7 +178,7 @@ describe('LocalPlayerController', () => {
 
     test('WhenMovingWhileAutoAttacking_ShouldUpdateAttackDirection', () => {
       const player = controller.getPlayer();
-      player.weapon = 'spear';
+      player.equipped_weapon = 'spear';
       
       let now = 10000;
       jest.spyOn(Date, 'now').mockImplementation(() => now);
@@ -251,6 +252,92 @@ describe('LocalPlayerController', () => {
 
       player.health = -1;
       expect(controller.isDead()).toBe(true);
+    });
+  });
+
+  describe('Loot Interaction', () => {
+    let mockLoot;
+
+    beforeEach(() => {
+      controller = new LocalPlayerController(mockNetwork, null);
+      mockLoot = [
+        { id: 'loot-1', item_id: 'spear', x: CONFIG.WORLD.WIDTH / 2 + 10, y: CONFIG.WORLD.HEIGHT / 2 + 10 }
+      ];
+    });
+
+    test('WhenUnarmedAndCollidingWithLoot_ShouldSendPickupRequest', () => {
+      const player = controller.getPlayer();
+      player.equipped_weapon = null;
+      
+      // Move player into range
+      player.x = mockLoot[0].x;
+      player.y = mockLoot[0].y;
+
+      controller.update(0.016, null, mockLoot);
+
+      expect(mockNetwork.send).toHaveBeenCalledWith('pickup_request', {
+        loot_id: 'loot-1'
+      });
+    });
+
+    test('WhenArmedAndCollidingWithLoot_ShouldNotAutoPickup', () => {
+      const player = controller.getPlayer();
+      player.equipped_weapon = 'bo';
+      
+      // Move player into range
+      player.x = mockLoot[0].x;
+      player.y = mockLoot[0].y;
+
+      controller.update(0.016, null, mockLoot);
+
+      expect(mockNetwork.send).not.toHaveBeenCalledWith('pickup_request', expect.any(Object));
+    });
+
+    test('WhenArmedAndCollidingWithLootAndPressingF_ShouldSendPickupRequest', () => {
+      const player = controller.getPlayer();
+      player.equipped_weapon = 'bo';
+      
+      // Move player into range
+      player.x = mockLoot[0].x;
+      player.y = mockLoot[0].y;
+
+      // Press 'F'
+      controller.handleInput({ interact: true });
+      controller.update(0.016, null, mockLoot);
+
+      expect(mockNetwork.send).toHaveBeenCalledWith('pickup_request', {
+        loot_id: 'loot-1'
+      });
+    });
+
+    test('WhenHoldingF_ShouldOnlySendOnePickupRequest', () => {
+      const player = controller.getPlayer();
+      player.equipped_weapon = 'bo';
+      player.x = mockLoot[0].x;
+      player.y = mockLoot[0].y;
+
+      // Frame 1: Press F
+      controller.handleInput({ interact: true });
+      controller.update(0.016, null, mockLoot);
+      expect(mockNetwork.send).toHaveBeenCalledTimes(1);
+      
+      // Clear mock
+      mockNetwork.send.mockClear();
+
+      // Frame 2: Still holding F
+      controller.handleInput({ interact: true });
+      controller.update(0.016, null, mockLoot);
+      expect(mockNetwork.send).not.toHaveBeenCalled();
+
+      // Frame 3: Release F
+      controller.handleInput({ interact: false });
+      controller.update(0.016, null, mockLoot);
+      expect(mockNetwork.send).not.toHaveBeenCalled();
+
+      // Frame 4: Press F again
+      controller.handleInput({ interact: true });
+      controller.update(0.016, null, mockLoot);
+      expect(mockNetwork.send).toHaveBeenCalledTimes(1);
     });
   });
 });

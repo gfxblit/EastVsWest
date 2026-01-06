@@ -293,6 +293,8 @@ export class Network extends EventEmitter {
       return;
     }
 
+    // console.log(`Network: broadcasting player_state_update from ${this.playerId}`);
+
     const message = {
       type: 'player_state_update',
       from: this.playerId,

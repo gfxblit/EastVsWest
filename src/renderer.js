@@ -172,6 +172,14 @@ export class Renderer {
         // Render Loot
         if (gameState && gameState.loot) {
           this.renderLoot(gameState.loot);
+          
+          // Draw interaction prompt if near any loot
+          if (localPlayer) {
+            const nearestLoot = this.findNearestLoot(localPlayer, gameState.loot);
+            if (nearestLoot && nearestLoot.distance <= CONFIG.LOOT.PICKUP_RADIUS) {
+              this.renderInteractionPrompt(localPlayer, nearestLoot.item);
+            }
+          }
         }
         
         // Update and Render Floating Texts
@@ -222,10 +230,75 @@ export class Renderer {
     this.renderPlayerWithSpriteSheet(player, isLocal);
   }
 
-  renderLoot(loot) {
-    // Simple loot representation as a square
-    this.ctx.fillStyle = '#f9ca24';
-    this.ctx.fillRect(loot.x - 5, loot.y - 5, 10, 10);
+  renderLoot(lootItems) {
+    if (!Array.isArray(lootItems)) return;
+
+    for (const loot of lootItems) {
+      // Draw loot circle
+      this.ctx.fillStyle = '#f9ca24'; // Golden yellow
+      this.ctx.beginPath();
+      this.ctx.arc(loot.x, loot.y, 15, 0, Math.PI * 2);
+      this.ctx.fill();
+      
+      // Draw item name
+      this.ctx.fillStyle = '#ffffff';
+      this.ctx.font = 'bold 14px Arial';
+      this.ctx.textAlign = 'center';
+      this.ctx.fillText(loot.item_id.toUpperCase(), loot.x, loot.y - 20);
+    }
+  }
+
+  findNearestLoot(player, lootItems) {
+    if (!lootItems || lootItems.length === 0) return null;
+
+    let nearest = null;
+    let minDistance = Infinity;
+
+    for (const item of lootItems) {
+      const dx = player.x - item.x;
+      const dy = player.y - item.y;
+      const distance = Math.sqrt(dx * dx + dy * dy);
+
+      if (distance < minDistance) {
+        minDistance = distance;
+        nearest = item;
+      }
+    }
+
+    return { item: nearest, distance: minDistance };
+  }
+
+  renderInteractionPrompt(player, item) {
+    const isUnarmed = player.equipped_weapon === 'fist' || !player.equipped_weapon;
+    let text = '';
+    
+    if (isUnarmed) {
+      text = `Picking up ${item.item_id}...`;
+    } else {
+      text = `Press F to swap ${player.equipped_weapon} for ${item.item_id}`;
+    }
+
+    this.ctx.fillStyle = 'rgba(0, 0, 0, 0.7)';
+    this.ctx.font = 'bold 16px Arial';
+    const metrics = this.ctx.measureText(text);
+    const padding = 10;
+    
+    // Draw background bubble
+    this.ctx.fillRect(
+      player.x - metrics.width / 2 - padding,
+      player.y + CONFIG.RENDER.PLAYER_RADIUS + 10,
+      metrics.width + padding * 2,
+      30
+    );
+
+    // Draw text
+    this.ctx.fillStyle = '#ffffff';
+    this.ctx.textAlign = 'center';
+    this.ctx.fillText(
+      text,
+      player.x,
+      player.y + CONFIG.RENDER.PLAYER_RADIUS + 30
+    );
   }
 
   renderEdgeIndicators(playersSnapshot, localPlayer, camera, loot = []) {
