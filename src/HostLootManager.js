@@ -4,23 +4,13 @@ export class HostLootManager {
   constructor(network, state) {
     this.network = network;
     this.state = state; // Shared game state
-  }
-
-  generateUUID() {
-    if (typeof crypto !== 'undefined' && typeof crypto.randomUUID === 'function') {
-      return crypto.randomUUID();
-    }
-    // Fallback for environments where crypto.randomUUID is not available
-    return 'xxxxxxxx-xxxx-4xxx-yxxx-xxxxxxxxxxxx'.replace(/[xy]/g, function(c) {
-      const r = Math.random() * 16 | 0;
-      const v = c === 'x' ? r : (r & 0x3 | 0x8);
-      return v.toString(16);
-    });
+    this.nextLootId = 1; // Counter for unique loot IDs
   }
 
   spawnLoot(itemId, x, y, type = 'weapon') {
+    const lootId = `loot-${this.nextLootId++}`;
     const lootItem = {
-      id: this.generateUUID(),
+      id: lootId,
       type,
       item_id: itemId,
       x,
