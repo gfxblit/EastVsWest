@@ -43,6 +43,17 @@ export class Game {
         
         network.on('attack_request', (msg) => this.hostCombatManager.handleAttackRequest(msg, this.playersSnapshot));
         network.on('pickup_request', (msg) => this.hostLootManager.handlePickupRequest(msg, this.playersSnapshot));
+        
+        // Listen for new players joining to sync game state
+        network.on('postgres_changes', (payload) => {
+          if (payload.eventType === 'INSERT' && payload.table === 'session_players') {
+            const newPlayerId = payload.new.player_id;
+            if (newPlayerId !== network.playerId) {
+              console.log(`Host: New player ${newPlayerId} joined, syncing loot...`);
+              this.hostLootManager.syncLootToPlayer(newPlayerId);
+            }
+          }
+        });
 
         // Initial loot spawn
         if (this.state.loot.length === 0) {

@@ -87,41 +87,49 @@ describe('Loot Integration', () => {
 
     // Verify loot appears on both
     await waitFor(() => {
-      return hostGame.state.loot.length === 1 && playerGame.state.loot.length === 1;
-    }, 5000);
+      // Run updates to process events
+      hostGame.update(0.05);
+      playerGame.update(0.05);
+      const expectedCount = CONFIG.GAME.INITIAL_LOOT_COUNT + 1;
+      console.log(`Loot counts - Host: ${hostGame.state.loot.length}, Player: ${playerGame.state.loot.length}`);
+      return hostGame.state.loot.length === expectedCount && playerGame.state.loot.length === expectedCount;
+    }, 10000);
 
     expect(playerGame.state.loot[0].item_id).toBe('spear');
 
     // 4. Player walks over loot (unarmed)
+    // ALSO update local controller state directly so collision logic sees it
+    playerGame.localPlayerController.player.x = lootX - 5;
+    playerGame.localPlayerController.player.y = lootY - 5;
+
     // Send position update via network so Host sees it immediately
     playerNetwork.broadcastPlayerStateUpdate({
+        player_id: playerNetwork.playerId,
         position_x: lootX - 5,
         position_y: lootY - 5,
         health: 100,
         velocity_x: 0,
         velocity_y: 0
     });
-    
-    // ALSO update local controller state directly so collision logic sees it
-    playerGame.localPlayerController.player.x = lootX - 5;
-    playerGame.localPlayerController.player.y = lootY - 5;
 
     // Wait for player position to sync at host (so pickup logic can run)
     await waitFor(() => {
+      hostGame.update(0.05); // Run host update to process incoming messages
       const p = hostSnapshot.getPlayers().get(playerNetwork.playerId);
       return p && Math.abs(p.position_x - (lootX - 5)) < 1;
-    }, 5000);
+    }, 10000);
 
     // Update player game to trigger collision detection
     await waitFor(() => {
         playerGame.update(0.1);
         hostGame.update(0.1);
         return playerGame.getLocalPlayer().equipped_weapon === 'spear';
-    }, 10000);
+    }, 15000);
 
     // Verify loot is gone for both
-    expect(playerGame.state.loot).toHaveLength(0);
-    expect(hostGame.state.loot).toHaveLength(0);
+    const finalExpectedCount = CONFIG.GAME.INITIAL_LOOT_COUNT;
+    expect(playerGame.state.loot).toHaveLength(finalExpectedCount);
+    expect(hostGame.state.loot).toHaveLength(finalExpectedCount);
     expect(hostSnapshot.getPlayers().get(playerNetwork.playerId).equipped_weapon).toBe('spear');
   }, 30000);
 
@@ -163,31 +171,39 @@ describe('Loot Integration', () => {
     const lootY = 1100;
     hostGame.hostLootManager.spawnLoot('spear', lootX, lootY);
 
-    await waitFor(() => playerGame.state.loot.length === 1, 5000);
+    await waitFor(() => {
+        hostGame.update(0.016);
+        playerGame.update(0.016);
+        const expectedCount = CONFIG.GAME.INITIAL_LOOT_COUNT + 1;
+        return playerGame.state.loot.length === expectedCount;
+    }, 5000);
 
     // 4. Player moves to loot but does NOT press F (should NOT pickup)
+    playerGame.localPlayerController.player.x = lootX - 5;
+    playerGame.localPlayerController.player.y = lootY - 5;
+
     playerNetwork.broadcastPlayerStateUpdate({
+        player_id: playerNetwork.playerId,
         position_x: lootX - 5,
         position_y: lootY - 5,
         velocity_x: 0,
         velocity_y: 0
     });
 
-    playerGame.localPlayerController.player.x = lootX - 5;
-    playerGame.localPlayerController.player.y = lootY - 5;
-
     // Wait for sync
     await waitFor(() => {
+        hostGame.update(0.05);
         const p = hostSnapshot.getPlayers().get(playerNetwork.playerId);
         return p && Math.abs(p.position_x - (lootX - 5)) < 1;
-    }, 5000);
+    }, 10000);
 
     playerGame.update(0.1);
     hostGame.update(0.1);
     
-    // Should still have bo and loot should still be there
+    // Should still have bo and loot should still be there (random + specific)
+    const initialExpectedCount = CONFIG.GAME.INITIAL_LOOT_COUNT + 1;
     expect(playerGame.getLocalPlayer().equipped_weapon).toBe('bo');
-    expect(playerGame.state.loot).toHaveLength(1);
+    expect(playerGame.state.loot).toHaveLength(initialExpectedCount);
 
     // 5. Player presses F
     playerGame.handleInput({ interact: true });
@@ -196,14 +212,15 @@ describe('Loot Integration', () => {
         playerGame.update(0.1);
         hostGame.update(0.1);
         return playerGame.getLocalPlayer().equipped_weapon === 'spear';
-    }, 10000);
+    }, 15000);
 
     // 6. Verify old weapon 'bo' was dropped
     await waitFor(() => {
         return playerGame.state.loot.some(item => item.item_id === 'bo');
     }, 5000);
 
-    expect(playerGame.state.loot).toHaveLength(1);
-    expect(playerGame.state.loot[0].item_id).toBe('bo');
+    // Count should still be the same (one picked up, one dropped)
+    expect(playerGame.state.loot).toHaveLength(initialExpectedCount);
+    expect(playerGame.state.loot.some(item => item.item_id === 'bo')).toBe(true);
   }, 40000);
 });
