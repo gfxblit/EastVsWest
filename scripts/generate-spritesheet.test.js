@@ -1,6 +1,7 @@
-import { describe, test, expect, beforeEach, afterEach } from '@jest/globals';
+import { describe, test, expect, beforeEach, afterEach, beforeAll, afterAll } from '@jest/globals';
 import fs from 'fs/promises';
 import path from 'path';
+import os from 'os';
 import { fileURLToPath } from 'url';
 import sharp from 'sharp';
 
@@ -17,15 +18,81 @@ import {
 } from './generate-spritesheet.js';
 
 describe('Sprite Sheet Generator', () => {
-  // Use /tmp/pixellab_character as the test directory
-  const pixelLabDir = '/tmp/pixellab_character';
-  const metadataPath = path.join(pixelLabDir, 'metadata.json');
+  // Use a temporary directory for the source assets
+  let pixelLabDir;
+  let metadataPath;
   
   // Use a temporary output directory for tests
   const testOutputDirName = 'test-output';
   const testOutputDir = path.join(projectRoot, testOutputDirName);
   const outputSpritePath = path.join(testOutputDir, 'player-walk-spritesheet.png');
   const outputMetadataPath = path.join(testOutputDir, 'player-walk-spritesheet.json');
+
+  // Helper to generate assets
+  async function setupTestAssets(baseDir, metaPath) {
+    const directions = [
+      'south', 'south-east', 'east', 'north-east', 
+      'north', 'north-west', 'west', 'south-west'
+    ];
+    
+    const animations = {};
+    const framesPerDir = 6;
+
+    // Create directory structure
+    for (const dir of directions) {
+      const dirPath = path.join(baseDir, 'animations', 'walking', dir);
+      await fs.mkdir(dirPath, { recursive: true });
+      
+      const framePaths = [];
+      for (let i = 0; i < framesPerDir; i++) {
+        const fileName = `frame_${i}.png`;
+        const filePath = path.join(dirPath, fileName);
+        
+        // Create a simple colored square
+        await sharp({
+          create: {
+            width: 96,
+            height: 96,
+            channels: 4,
+            background: { r: 255, g: 0, b: 0, alpha: 255 }
+          }
+        }).png().toFile(filePath);
+        
+        // Store relative path as expected in metadata
+        framePaths.push(path.join('animations', 'walking', dir, fileName));
+      }
+      animations[dir] = framePaths;
+    }
+
+    const metadata = {
+      character: { size: { width: 96, height: 96 } },
+      frames: {
+        animations: {
+          walking: animations
+        }
+      }
+    };
+
+    await fs.writeFile(metaPath, JSON.stringify(metadata, null, 2));
+  }
+
+  beforeAll(async () => {
+    // Create a temporary directory for the source assets
+    pixelLabDir = await fs.mkdtemp(path.join(os.tmpdir(), 'pixellab-test-'));
+    metadataPath = path.join(pixelLabDir, 'metadata.json');
+
+    // Generate dummy assets
+    await setupTestAssets(pixelLabDir, metadataPath);
+  });
+
+  afterAll(async () => {
+    // Cleanup source assets
+    try {
+      await fs.rm(pixelLabDir, { recursive: true, force: true });
+    } catch (e) { 
+      console.error('Failed to cleanup temp dir', e); 
+    }
+  });
 
   beforeEach(async () => {
     // Ensure test output directory exists
@@ -70,8 +137,8 @@ describe('Sprite Sheet Generator', () => {
     });
 
     test('WhenFrameHasWrongDimensions_ShouldReturnError', async () => {
-      // Create a test frame with wrong dimensions in /tmp
-      const testDir = path.join('/tmp', 'test-frames');
+      // Create a test frame with wrong dimensions in a temp subdir
+      const testDir = path.join(pixelLabDir, 'test-frames-wrong-size');
       await fs.mkdir(testDir, { recursive: true });
       const wrongSizeFrame = path.join(testDir, 'wrong-size.png');
 
@@ -90,21 +157,20 @@ describe('Sprite Sheet Generator', () => {
         frames: {
           animations: {
             walking: {
-              south: ['test-frames/wrong-size.png']
+              south: [path.relative(pixelLabDir, wrongSizeFrame)]
             }
           }
         }
       };
 
-      const result = await validateFrames(fakeMetadata, '/tmp');
+      const result = await validateFrames(fakeMetadata, pixelLabDir);
 
       expect(result.valid).toBe(false);
       expect(result.errors.length).toBeGreaterThan(0);
       expect(result.errors[0]).toContain('wrong-size.png');
       expect(result.errors[0]).toContain('96x96');
-
-      // Cleanup
-      await fs.rm(testDir, { recursive: true });
+      
+      // Cleanup is handled by afterAll (parent dir removal), but we can be nice
     });
 
     test('WhenAllFramesValid_ShouldReturnFramePaths', async () => {
