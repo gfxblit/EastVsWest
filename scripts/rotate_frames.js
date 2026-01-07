@@ -42,9 +42,25 @@ async function rotateFrames(inputPath, outputPath, degrees) {
           .rotate(angle, { background: { r: 0, g: 0, b: 0, alpha: 0 } });
 
       const rotatedBuffer = await framePipeline.toBuffer();
+      
+      // Load rotated image to check dimensions and crop back to 64x64
+      const rotatedImage = sharp(rotatedBuffer);
+      const rotatedMeta = await rotatedImage.metadata();
+      
+      const left = Math.floor((rotatedMeta.width - FRAME_WIDTH) / 2);
+      const top = Math.floor((rotatedMeta.height - FRAME_HEIGHT) / 2);
+      
+      const croppedBuffer = await rotatedImage
+        .extract({
+          left: Math.max(0, left),
+          top: Math.max(0, top),
+          width: FRAME_WIDTH,
+          height: FRAME_HEIGHT
+        })
+        .toBuffer();
 
       compositeOperations.push({
-        input: rotatedBuffer,
+        input: croppedBuffer,
         left: i * FRAME_WIDTH,
         top: 0
       });
