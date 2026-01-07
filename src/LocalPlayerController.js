@@ -131,11 +131,21 @@ export class LocalPlayerController {
 
     // Update rotation based on velocity (if moving)
     if (this.player.velocity.x !== 0 || this.player.velocity.y !== 0) {
-        this.player.rotation = Math.atan2(this.player.velocity.y, this.player.velocity.x) + Math.PI / 2;
+        // Map 4-way direction index to rotation radians
+        // North (4) -> 0
+        // East (2) -> PI/2
+        // South (0) -> PI
+        // West (6) -> 3PI/2
+        switch (direction) {
+            case 4: this.player.rotation = 0; break;
+            case 2: this.player.rotation = Math.PI / 2; break;
+            case 0: this.player.rotation = Math.PI; break;
+            case 6: this.player.rotation = 3 * Math.PI / 2; break;
+        }
         this.#normalizeRotation();
     } else {
-        // Snap to nearest 45 degrees (PI/4) when stopped
-        const snapInterval = Math.PI / 4;
+        // Snap to nearest 90 degrees (PI/2) when stopped
+        const snapInterval = Math.PI / 2;
         this.player.rotation = Math.round(this.player.rotation / snapInterval) * snapInterval;
         this.#normalizeRotation();
         
