@@ -66,9 +66,10 @@ describe('AnimationHelper', () => {
       expect(direction).toBe(0); // South
     });
 
-    test('WhenVelocityIsSouthEast_ShouldReturn1', () => {
+    test('WhenVelocityIsSouthEast_ShouldReturnCardinal', () => {
+      // |vy| >= |vx| -> South (0)
       const direction = getDirectionFromVelocity(1, 1);
-      expect(direction).toBe(1); // South-East
+      expect(direction).toBe(0); // South
     });
 
     test('WhenVelocityIsEast_ShouldReturn2', () => {
@@ -76,9 +77,10 @@ describe('AnimationHelper', () => {
       expect(direction).toBe(2); // East
     });
 
-    test('WhenVelocityIsNorthEast_ShouldReturn3', () => {
+    test('WhenVelocityIsNorthEast_ShouldReturnCardinal', () => {
+      // |vy| >= |vx| -> North (4)
       const direction = getDirectionFromVelocity(1, -1);
-      expect(direction).toBe(3); // North-East
+      expect(direction).toBe(4); // North
     });
 
     test('WhenVelocityIsNorth_ShouldReturn4', () => {
@@ -86,9 +88,10 @@ describe('AnimationHelper', () => {
       expect(direction).toBe(4); // North
     });
 
-    test('WhenVelocityIsNorthWest_ShouldReturn5', () => {
+    test('WhenVelocityIsNorthWest_ShouldReturnCardinal', () => {
+      // |vy| >= |vx| -> North (4)
       const direction = getDirectionFromVelocity(-1, -1);
-      expect(direction).toBe(5); // North-West
+      expect(direction).toBe(4); // North
     });
 
     test('WhenVelocityIsWest_ShouldReturn6', () => {
@@ -96,9 +99,10 @@ describe('AnimationHelper', () => {
       expect(direction).toBe(6); // West
     });
 
-    test('WhenVelocityIsSouthWest_ShouldReturn7', () => {
+    test('WhenVelocityIsSouthWest_ShouldReturnCardinal', () => {
+      // |vy| >= |vx| -> South (0)
       const direction = getDirectionFromVelocity(-1, 1);
-      expect(direction).toBe(7); // South-West
+      expect(direction).toBe(0); // South
     });
 
     test('WhenVelocityIsZero_ShouldReturnNull', () => {
@@ -112,10 +116,16 @@ describe('AnimationHelper', () => {
       expect(direction).toBe(2); // East
     });
 
-    test('WhenVelocityIsNearSouthEast_ShouldReturn1', () => {
-      // Test edge case: between East and SE, closer to SE (40 degrees)
+    test('WhenVelocityIsNearSouthEast_ButHorizontalDominant_ShouldReturnEast', () => {
+      // vx (1) > vy (0.7) -> East
       const direction = getDirectionFromVelocity(1, 0.7);
-      expect(direction).toBe(1); // South-East
+      expect(direction).toBe(2); // East
+    });
+    
+    test('WhenVelocityIsNearSouthEast_ButVerticalDominant_ShouldReturnSouth', () => {
+      // vy (1) > vx (0.7) -> South
+      const direction = getDirectionFromVelocity(0.7, 1);
+      expect(direction).toBe(0); // South
     });
   });
 
