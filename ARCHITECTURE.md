@@ -31,6 +31,12 @@ The source files will be organized into the following files:
 - `input.js`: Handles player input.
 - `ui.js`: Manages the UI.
 - `network.js`: Manages all multiplayer communication via Supabase.
+- `camera.js`: Manages the game camera and viewport.
+- `animationHelper.js`: Helper class for managing sprite animations.
+- `SessionPlayersSnapshot.js`: Manages a local synchronized copy of the session players.
+- `LocalPlayerController.js`: Handles the local player's logic, input, and state.
+- `HostCombatManager.js`: Handles combat logic on the host side.
+- `HostLootManager.js`: Handles loot spawning and pickup on the host side.
 
 ## Multiplayer Architecture
 
