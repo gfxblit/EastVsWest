@@ -91,8 +91,8 @@ describe('Network', () => {
    - Tests should fail initially or be skipped if Supabase is not running
 3. **Setup Supabase (if not already running):**
    ```bash
-   supabase start
-   supabase status  # Get SUPABASE_URL and SUPABASE_ANON_KEY
+   npm run supabase:start
+   npm run supabase:status  # Get SUPABASE_URL and SUPABASE_ANON_KEY
    ```
 4. **Run integration tests:**
    ```bash
@@ -227,10 +227,10 @@ describe('Network Integration', () => {
 2. **Run integration tests (REQUIRED for network/database features):**
    ```bash
    # Start Supabase if not already running
-   supabase start
+   npm run supabase:start
 
    # Get credentials
-   supabase status
+   npm run supabase:status
 
    # Run integration tests
    SUPABASE_URL="<url>" SUPABASE_ANON_KEY="<key>" npm run test:e2e

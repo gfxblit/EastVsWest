@@ -39,23 +39,16 @@ done
 
 # Check for supabase separately as it can be used via npx
 if check_cmd "supabase"; then
-    echo -e "  ✅ supabase CLI is installed globally"
-    SUPABASE_CMD="supabase"
-elif npx supabase --version &> /dev/null; then
-    echo -e "  ✅ supabase CLI is available via npx"
-    SUPABASE_CMD="npx supabase"
-else
-    echo -e "  ❌ supabase CLI is NOT installed"
-    missing_deps+=("supabase")
+    echo -e "  ✅ supabase CLI is installed globally (will prefer local npx version if available)"
 fi
+
+# We will use npx supabase which uses the local dependency
+SUPABASE_CMD="npx supabase"
 
 if [ ${#missing_deps[@]} -ne 0 ]; then
     echo -e "\n${RED}Missing dependencies: ${missing_deps[*]}${NC}"
     echo -e "Please install them before continuing."
-    
-    if [[ " ${missing_deps[*]} " =~ " supabase " ]]; then
-        echo -e "Install Supabase CLI: https://supabase.com/docs/guides/cli"
-    fi
+
     if [[ " ${missing_deps[*]} " =~ " docker " ]]; then
         echo -e "Install Docker: https://www.docker.com/products/docker-desktop"
     fi
