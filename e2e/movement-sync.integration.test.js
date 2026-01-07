@@ -1,27 +1,16 @@
-import { createClient } from '@supabase/supabase-js';
+import { createMockSupabase, resetMockBackend } from './helpers/mock-supabase.js';
 import { Network } from '../src/network';
 import { waitFor } from './helpers/wait-utils.js';
 
-// Ensure your local Supabase URL and anon key are set as environment variables
-const supabaseUrl = process.env.SUPABASE_URL;
-const supabaseAnonKey = process.env.SUPABASE_ANON_KEY;
-
-describe('Position Synchronization Integration', () => {
+describe('Position Synchronization Integration (Mocked)', () => {
   let supabaseClient;
   let network;
   let testSessionId;
   let hostUser;
 
-  if (!supabaseUrl || !supabaseAnonKey) {
-    test.only('Supabase environment variables not set, skipping integration tests', () => {
-      console.warn('Set SUPABASE_URL and SUPABASE_ANON_KEY to run integration tests.');
-      expect(true).toBe(true);
-    });
-    return;
-  }
-
   beforeAll(async () => {
-    supabaseClient = createClient(supabaseUrl, supabaseAnonKey);
+    resetMockBackend();
+    supabaseClient = createMockSupabase();
     const { data: authData, error: authError } = await supabaseClient.auth.signInAnonymously();
     if (authError) throw new Error(`Failed to authenticate host: ${authError.message}`);
     hostUser = authData.user;
@@ -129,7 +118,7 @@ describe('Position Synchronization Integration', () => {
     testSessionId = hostSession.id;
 
     // 2. Create Player B and join
-    const playerBClient = createClient(supabaseUrl, supabaseAnonKey);
+    const playerBClient = createMockSupabase();
     const { data: playerBAuth } = await playerBClient.auth.signInAnonymously();
     const playerBNetwork = new Network();
     playerBNetwork.initialize(playerBClient, playerBAuth.user.id);

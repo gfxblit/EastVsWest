@@ -1,30 +1,18 @@
-import { createClient } from '@supabase/supabase-js';
+import { createMockSupabase, resetMockBackend } from './helpers/mock-supabase.js';
 import { Network } from '../src/network';
 import { SessionPlayersSnapshot } from '../src/SessionPlayersSnapshot';
 import { waitFor } from './helpers/wait-utils.js';
 
-// Ensure your local Supabase URL and anon key are set as environment variables
-const supabaseUrl = process.env.SUPABASE_URL;
-const supabaseAnonKey = process.env.SUPABASE_ANON_KEY;
-
-describe('Player State Sync Integration with Supabase', () => {
+describe('Player State Sync Integration with Supabase (Mocked)', () => {
   let hostClient;
   let hostNetwork;
   let hostUser;
   let testSessionId;
 
-  // Skip tests if Supabase environment variables are not set
-  if (!supabaseUrl || !supabaseAnonKey) {
-    test.only('Supabase environment variables not set, skipping integration tests', () => {
-      console.warn('Set SUPABASE_URL and SUPABASE_ANON_KEY to run integration tests.');
-      expect(true).toBe(true);
-    });
-    return;
-  }
-
   beforeAll(async () => {
+    resetMockBackend();
     // Initialize host client
-    hostClient = createClient(supabaseUrl, supabaseAnonKey);
+    hostClient = createMockSupabase();
 
     // Sign in anonymously to get an authenticated session for the host
     const { data: authData, error: authError } = await hostClient.auth.signInAnonymously();
@@ -45,9 +33,6 @@ describe('Player State Sync Integration with Supabase', () => {
     if (hostClient) {
       await hostClient.auth.signOut();
     }
-
-    // Give time for cleanup to complete
-    await new Promise(resolve => setTimeout(resolve, 500));
   });
 
   afterEach(async () => {
@@ -65,9 +50,6 @@ describe('Player State Sync Integration with Supabase', () => {
       hostNetwork = new Network();
       hostNetwork.initialize(hostClient, hostUser.id);
     }
-
-    // Give time for cleanup to complete
-    await new Promise(resolve => setTimeout(resolve, 100));
   });
 
   describe('Generic Broadcast and Persistence', () => {
@@ -78,14 +60,14 @@ describe('Player State Sync Integration with Supabase', () => {
       const joinCode = hostSession.join_code;
 
       // Create player 1
-      const player1Client = createClient(supabaseUrl, supabaseAnonKey);
+      const player1Client = createMockSupabase();
       const { data: player1Auth } = await player1Client.auth.signInAnonymously();
       const player1Network = new Network();
       player1Network.initialize(player1Client, player1Auth.user.id);
       await player1Network.joinGame(joinCode, 'Player1');
 
       // Create player 2
-      const player2Client = createClient(supabaseUrl, supabaseAnonKey);
+      const player2Client = createMockSupabase();
       const { data: player2Auth } = await player2Client.auth.signInAnonymously();
       const player2Network = new Network();
       player2Network.initialize(player2Client, player2Auth.user.id);
@@ -126,9 +108,6 @@ describe('Player State Sync Integration with Supabase', () => {
       player2Network.disconnect();
       await player1Client.auth.signOut();
       await player2Client.auth.signOut();
-
-      // Wait for connections to close
-      await new Promise(resolve => setTimeout(resolve, 100));
     });
 
     test('WhenHostBroadcastsHealth_AllClientsShouldReceive', async () => {
@@ -138,7 +117,7 @@ describe('Player State Sync Integration with Supabase', () => {
       const joinCode = hostSession.join_code;
 
       // Create player client
-      const playerClient = createClient(supabaseUrl, supabaseAnonKey);
+      const playerClient = createMockSupabase();
       const { data: playerAuth } = await playerClient.auth.signInAnonymously();
       const playerNetwork = new Network();
       playerNetwork.initialize(playerClient, playerAuth.user.id);
@@ -171,9 +150,6 @@ describe('Player State Sync Integration with Supabase', () => {
       playerNetwork.off('player_state_update', playerHandler);
       playerNetwork.disconnect();
       await playerClient.auth.signOut();
-
-      // Wait for connections to close
-      await new Promise(resolve => setTimeout(resolve, 100));
     });
 
     test('WhenClientPersistsPosition_ShouldWriteToDB', async () => {
@@ -183,7 +159,7 @@ describe('Player State Sync Integration with Supabase', () => {
       const joinCode = hostSession.join_code;
 
       // Create player client
-      const playerClient = createClient(supabaseUrl, supabaseAnonKey);
+      const playerClient = createMockSupabase();
       const { data: playerAuth } = await playerClient.auth.signInAnonymously();
       const playerNetwork = new Network();
       playerNetwork.initialize(playerClient, playerAuth.user.id);
@@ -218,10 +194,7 @@ describe('Player State Sync Integration with Supabase', () => {
       // Clean up
       playerNetwork.disconnect();
       await playerClient.auth.signOut();
-
-      // Wait for connections to close
-      await new Promise(resolve => setTimeout(resolve, 100));
-    }, 10000); // Increase timeout for this test
+    });
 
     test('WhenHostPersistsHealth_ShouldWriteToDB', async () => {
       // Host creates a session
@@ -230,7 +203,7 @@ describe('Player State Sync Integration with Supabase', () => {
       const joinCode = hostSession.join_code;
 
       // Create player client
-      const playerClient = createClient(supabaseUrl, supabaseAnonKey);
+      const playerClient = createMockSupabase();
       const { data: playerAuth } = await playerClient.auth.signInAnonymously();
       const playerNetwork = new Network();
       playerNetwork.initialize(playerClient, playerAuth.user.id);
@@ -257,10 +230,7 @@ describe('Player State Sync Integration with Supabase', () => {
       // Clean up
       playerNetwork.disconnect();
       await playerClient.auth.signOut();
-
-      // Wait for connections to close
-      await new Promise(resolve => setTimeout(resolve, 100));
-    }, 10000); // Increase timeout for this test
+    });
 
     test('WhenClientReconnects_ShouldLoadPositionAndHealthFromDB', async () => {
       // Host creates a session
@@ -269,7 +239,7 @@ describe('Player State Sync Integration with Supabase', () => {
       const joinCode = hostSession.join_code;
 
       // Create player client and join
-      const playerClient = createClient(supabaseUrl, supabaseAnonKey);
+      const playerClient = createMockSupabase();
       const { data: playerAuth } = await playerClient.auth.signInAnonymously();
       const playerNetwork = new Network();
       playerNetwork.initialize(playerClient, playerAuth.user.id);
@@ -304,10 +274,7 @@ describe('Player State Sync Integration with Supabase', () => {
       // Clean up
       snapshot.destroy();
       await playerClient.auth.signOut();
-
-      // Wait for connections to close
-      await new Promise(resolve => setTimeout(resolve, 100));
-    }, 10000); // Increase timeout for this test
+    });
 
     test('WhenHostBroadcastsMultiplePlayerHealth_AllShouldSync', async () => {
       // Host creates a session
@@ -316,19 +283,19 @@ describe('Player State Sync Integration with Supabase', () => {
       const joinCode = hostSession.join_code;
 
       // Create three players
-      const player1Client = createClient(supabaseUrl, supabaseAnonKey);
+      const player1Client = createMockSupabase();
       const { data: player1Auth } = await player1Client.auth.signInAnonymously();
       const player1Network = new Network();
       player1Network.initialize(player1Client, player1Auth.user.id);
       await player1Network.joinGame(joinCode, 'Player1');
 
-      const player2Client = createClient(supabaseUrl, supabaseAnonKey);
+      const player2Client = createMockSupabase();
       const { data: player2Auth } = await player2Client.auth.signInAnonymously();
       const player2Network = new Network();
       player2Network.initialize(player2Client, player2Auth.user.id);
       await player2Network.joinGame(joinCode, 'Player2');
 
-      const player3Client = createClient(supabaseUrl, supabaseAnonKey);
+      const player3Client = createMockSupabase();
       const { data: player3Auth } = await player3Client.auth.signInAnonymously();
       const player3Network = new Network();
       player3Network.initialize(player3Client, player3Auth.user.id);
@@ -376,9 +343,6 @@ describe('Player State Sync Integration with Supabase', () => {
       await player1Client.auth.signOut();
       await player2Client.auth.signOut();
       await player3Client.auth.signOut();
-
-      // Wait for connections to close
-      await new Promise(resolve => setTimeout(resolve, 100));
-    }, 10000); // Increase timeout for this test
+    });
   });
 });

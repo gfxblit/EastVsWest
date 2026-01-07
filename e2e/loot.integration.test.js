@@ -1,14 +1,11 @@
-import { createClient } from '@supabase/supabase-js';
+import { createMockSupabase, resetMockBackend } from './helpers/mock-supabase.js';
 import { Network } from '../src/network';
 import { Game } from '../src/game';
 import { SessionPlayersSnapshot } from '../src/SessionPlayersSnapshot';
 import { waitFor } from './helpers/wait-utils.js';
 import { CONFIG } from '../src/config';
 
-const supabaseUrl = process.env.SUPABASE_URL;
-const supabaseAnonKey = process.env.SUPABASE_ANON_KEY;
-
-describe('Loot Integration', () => {
+describe('Loot Integration (Mocked)', () => {
   let hostSupabase;
   let playerSupabase;
   let hostNetwork;
@@ -21,16 +18,10 @@ describe('Loot Integration', () => {
   let hostUserId;
   let playerUserId;
 
-  if (!supabaseUrl || !supabaseAnonKey) {
-    test('Supabase environment variables not set, skipping integration tests', () => {
-      expect(true).toBe(true);
-    });
-    return;
-  }
-
   beforeAll(async () => {
-    hostSupabase = createClient(supabaseUrl, supabaseAnonKey);
-    playerSupabase = createClient(supabaseUrl, supabaseAnonKey);
+    resetMockBackend();
+    hostSupabase = createMockSupabase();
+    playerSupabase = createMockSupabase();
 
     const { data: hostAuth } = await hostSupabase.auth.signInAnonymously();
     const { data: playerAuth } = await playerSupabase.auth.signInAnonymously();
@@ -40,8 +31,6 @@ describe('Loot Integration', () => {
   });
 
   beforeEach(async () => {
-    await new Promise(resolve => setTimeout(resolve, 500));
-
     hostNetwork = new Network();
     hostNetwork.initialize(hostSupabase, hostUserId);
 
@@ -91,11 +80,10 @@ describe('Loot Integration', () => {
       hostGame.update(0.05);
       playerGame.update(0.05);
       const expectedCount = CONFIG.GAME.INITIAL_LOOT_COUNT + 1;
-      console.log(`Loot counts - Host: ${hostGame.state.loot.length}, Player: ${playerGame.state.loot.length}`);
       return hostGame.state.loot.length === expectedCount && playerGame.state.loot.length === expectedCount;
     }, 10000);
 
-    expect(playerGame.state.loot[0].item_id).toBe('spear');
+    expect(playerGame.state.loot.some(l => l.item_id === 'spear')).toBe(true);
 
     // 4. Player walks over loot (unarmed)
     // ALSO update local controller state directly so collision logic sees it

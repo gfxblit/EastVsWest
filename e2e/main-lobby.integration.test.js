@@ -1,18 +1,9 @@
-/**
- * Main.js Lobby Integration Tests
- * Tests the lobby flow with REAL Supabase, Network, and SessionPlayersSnapshot
- * Simulates the behavior of main.js without mocking external dependencies
- */
-
-import { createClient } from '@supabase/supabase-js';
+import { createMockSupabase, resetMockBackend } from './helpers/mock-supabase.js';
 import { SessionPlayersSnapshot } from '../src/SessionPlayersSnapshot.js';
 import { Network } from '../src/network.js';
 import { waitFor, waitForSilence } from './helpers/wait-utils.js';
 
-const supabaseUrl = process.env.SUPABASE_URL;
-const supabaseAnonKey = process.env.SUPABASE_ANON_KEY;
-
-describe('Main.js Lobby Integration with Real Supabase', () => {
+describe('Main.js Lobby Integration (Mocked)', () => {
   let hostClient;
   let playerClient;
   let hostNetwork;
@@ -26,19 +17,11 @@ describe('Main.js Lobby Integration with Real Supabase', () => {
   let hostLobbyInterval;
   let playerLobbyInterval;
 
-  // Skip tests if Supabase is not configured
-  if (!supabaseUrl || !supabaseAnonKey) {
-    test.only('Supabase environment variables not set, skipping integration tests', () => {
-      console.warn('Set SUPABASE_URL and SUPABASE_ANON_KEY to run integration tests.');
-      expect(true).toBe(true);
-    });
-    return;
-  }
-
   beforeAll(async () => {
+    resetMockBackend();
     // Create two separate clients (host and player)
-    hostClient = createClient(supabaseUrl, supabaseAnonKey);
-    playerClient = createClient(supabaseUrl, supabaseAnonKey);
+    hostClient = createMockSupabase();
+    playerClient = createMockSupabase();
 
     // Authenticate both clients
     const { data: hostAuth, error: hostAuthError } = await hostClient.auth.signInAnonymously();
@@ -107,9 +90,6 @@ describe('Main.js Lobby Integration with Real Supabase', () => {
     if (playerNetwork) {
       playerNetwork.disconnect();
     }
-
-    // Wait for cleanup to complete
-    await new Promise(resolve => setTimeout(resolve, 500));
 
     // Clean up test data in database
     if (testSessionId) {
@@ -343,7 +323,7 @@ describe('Main.js Lobby Integration with Real Supabase', () => {
       await hostSnapshot.ready();
 
       // Create a third client for Player2
-      const player2Client = createClient(supabaseUrl, supabaseAnonKey);
+      const player2Client = createMockSupabase();
       const { data: player2Auth } = await player2Client.auth.signInAnonymously();
       const player2Network = new Network();
       player2Network.initialize(player2Client, player2Auth.user.id);

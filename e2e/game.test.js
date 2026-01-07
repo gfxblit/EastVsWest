@@ -3,18 +3,19 @@
  */
 
 import puppeteer from 'puppeteer';
-import { fileURLToPath } from 'url';
-import { dirname, join } from 'path';
+import { startViteServer, stopViteServer } from './helpers/vite-server.js';
 import { getPuppeteerConfig } from './helpers/puppeteer-config.js';
-
-const __filename = fileURLToPath(import.meta.url);
-const __dirname = dirname(__filename);
+import { injectMockSupabase } from './helpers/puppeteer-mock-bridge.js';
+import { resetMockBackend } from './helpers/mock-supabase.js';
 
 describe('Conflict Zone: East vs West E2E', () => {
   let browser;
   let page;
+  let serverUrl;
 
   beforeAll(async () => {
+    resetMockBackend();
+    serverUrl = await startViteServer();
     browser = await puppeteer.launch(getPuppeteerConfig());
     page = await browser.newPage();
   });
@@ -23,19 +24,23 @@ describe('Conflict Zone: East vs West E2E', () => {
     if (browser) {
       await browser.close();
     }
+    await stopViteServer();
+  });
+
+  beforeEach(async () => {
+    await injectMockSupabase(page);
   });
 
   test('should load the game page correctly', async () => {
-    const indexPath = join(__dirname, '..', 'index.html');
-    await page.goto('file://' + indexPath);
+    await page.goto(serverUrl);
 
     const title = await page.title();
     expect(title).toBe('Conflict Zone: East vs West');
   });
 
   test('should display intro screen on load', async () => {
-    const indexPath = join(__dirname, '..', 'index.html');
-    await page.goto('file://' + indexPath);
+    await page.goto(serverUrl);
+    await page.waitForSelector('#intro-screen.active');
 
     const introVisible = await page.$eval('#intro-screen', (el) =>
       el.classList.contains('active')
@@ -44,8 +49,8 @@ describe('Conflict Zone: East vs West E2E', () => {
   });
 
   test('should have host game button', async () => {
-    const indexPath = join(__dirname, '..', 'index.html');
-    await page.goto('file://' + indexPath);
+    await page.goto(serverUrl);
+    await page.waitForSelector('#host-game-btn');
 
     const hostBtn = await page.$('#host-game-btn');
     expect(hostBtn).not.toBeNull();
@@ -55,8 +60,9 @@ describe('Conflict Zone: East vs West E2E', () => {
   });
 
   test('should have join game controls', async () => {
-    const indexPath = join(__dirname, '..', 'index.html');
-    await page.goto('file://' + indexPath);
+    await page.goto(serverUrl);
+    await page.waitForSelector('#join-code-input');
+    await page.waitForSelector('#join-game-btn');
 
     const joinInput = await page.$('#join-code-input');
     const joinBtn = await page.$('#join-game-btn');
@@ -66,8 +72,8 @@ describe('Conflict Zone: East vs West E2E', () => {
   });
 
   test('should have game canvas element', async () => {
-    const indexPath = join(__dirname, '..', 'index.html');
-    await page.goto('file://' + indexPath);
+    await page.goto(serverUrl);
+    await page.waitForSelector('#game-canvas');
 
     const canvas = await page.$('#game-canvas');
     expect(canvas).not.toBeNull();

@@ -6,6 +6,8 @@
 import puppeteer from 'puppeteer';
 import { startViteServer, stopViteServer } from './helpers/vite-server.js';
 import { getPuppeteerConfig } from './helpers/puppeteer-config.js';
+import { injectMockSupabase } from './helpers/puppeteer-mock-bridge.js';
+import { resetMockBackend } from './helpers/mock-supabase.js';
 
 describe('Camera Follow System Integration', () => {
   let browser;
@@ -13,6 +15,7 @@ describe('Camera Follow System Integration', () => {
   let serverUrl;
 
   beforeAll(async () => {
+    resetMockBackend();
     // Start Vite dev server
     serverUrl = await startViteServer();
     browser = await puppeteer.launch(getPuppeteerConfig());
@@ -21,6 +24,7 @@ describe('Camera Follow System Integration', () => {
     // Set viewport to match test expectations (1200px width -> 600px half-width)
     await page.setViewport({ width: 1200, height: 800 });
 
+    await injectMockSupabase(page);
     await page.goto(serverUrl);
 
     // Wait for app to initialize

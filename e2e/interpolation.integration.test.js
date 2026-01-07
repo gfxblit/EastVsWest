@@ -1,15 +1,11 @@
-
-import { createClient } from '@supabase/supabase-js';
+import { createMockSupabase, resetMockBackend } from './helpers/mock-supabase.js';
 import { Network } from '../src/network';
 import { SessionPlayersSnapshot } from '../src/SessionPlayersSnapshot';
 import { Renderer } from '../src/renderer';
 import { CONFIG } from '../src/config';
 import { waitFor } from './helpers/wait-utils.js';
 
-const supabaseUrl = process.env.SUPABASE_URL;
-const supabaseAnonKey = process.env.SUPABASE_ANON_KEY;
-
-describe('Client Interpolation Integration (Real Network)', () => {
+describe('Client Interpolation Integration (Mocked Network)', () => {
   let hostClient;
   let playerClient;
   let hostNetwork;
@@ -20,14 +16,8 @@ describe('Client Interpolation Integration (Real Network)', () => {
   let hostUser;
   let playerUser;
 
-  if (!supabaseUrl || !supabaseAnonKey) {
-    test.only('Supabase environment variables not set, skipping integration tests', () => {
-      expect(true).toBe(true);
-    });
-    return;
-  }
-
   beforeAll(async () => {
+    resetMockBackend();
     // Mock window for Renderer
     global.window = {
       innerWidth: 1200,
@@ -42,8 +32,8 @@ describe('Client Interpolation Integration (Real Network)', () => {
     };
 
     // 1. Setup Clients
-    hostClient = createClient(supabaseUrl, supabaseAnonKey);
-    playerClient = createClient(supabaseUrl, supabaseAnonKey);
+    hostClient = createMockSupabase();
+    playerClient = createMockSupabase();
 
     const [{ data: hostAuth }, { data: playerAuth }] = await Promise.all([
       hostClient.auth.signInAnonymously(),
@@ -107,7 +97,7 @@ describe('Client Interpolation Integration (Real Network)', () => {
     playerSnapshot = new SessionPlayersSnapshot(playerNetwork, session.id);
     await playerSnapshot.ready();
     // Give more time for Realtime channel to stabilize
-    await new Promise(resolve => setTimeout(resolve, 1000));
+    await new Promise(resolve => setTimeout(resolve, 100));
 
     // 4. Simulate Host Movement (3 updates, 100ms apart for stability)
     const sendUpdate = async (x) => {
@@ -119,7 +109,7 @@ describe('Client Interpolation Integration (Real Network)', () => {
         velocity_x: 100,
         velocity_y: 0
       });
-      await new Promise(resolve => setTimeout(resolve, 100));
+      await new Promise(resolve => setTimeout(resolve, 10));
     };
 
     await sendUpdate(0);   // Snapshot 1
@@ -178,7 +168,7 @@ describe('Client Interpolation Integration (Real Network)', () => {
         velocity_x: 100,
         velocity_y: 0
       });
-      await new Promise(resolve => setTimeout(resolve, 50));
+      await new Promise(resolve => setTimeout(resolve, 10));
     }
 
     // Wait for history to be populated on player side
@@ -190,7 +180,7 @@ describe('Client Interpolation Integration (Real Network)', () => {
     // 5. Simulate Render Loop on Player side
     // We'll call renderer.render manually multiple times
     const startTime = performance.now();
-    const duration = 500; // 0.5s of animation
+    const duration = 200; // 0.2s of animation
     const fps = 60;
     const dt = 1/fps;
     const mockGameState = {
@@ -200,7 +190,7 @@ describe('Client Interpolation Integration (Real Network)', () => {
 
     for (let t = 0; t < duration; t += (1000/fps)) {
       renderer.render(mockGameState, null, playerSnapshot, null, dt);
-      await new Promise(resolve => setTimeout(resolve, 1000/fps));
+      await new Promise(resolve => setTimeout(resolve, 1));
     }
 
     // 6. Verify Animation State

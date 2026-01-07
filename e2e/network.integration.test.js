@@ -1,31 +1,19 @@
-import { createClient } from '@supabase/supabase-js';
+import { createMockSupabase, resetMockBackend } from './helpers/mock-supabase.js';
 import { Network } from '../src/network';
 import { waitFor, waitForSilence } from './helpers/wait-utils.js';
 
-// Ensure your local Supabase URL and anon key are set as environment variables
-// before running this test.
-const supabaseUrl = process.env.SUPABASE_URL;
-const supabaseAnonKey = process.env.SUPABASE_ANON_KEY;
-
-describe('Network Module Integration with Supabase', () => {
+describe('Network Module Integration with Supabase (Mocked)', () => {
   let supabaseClient;
   let network;
   let testSessionId; // To store the ID of the created session for cleanup
   let hostUser; // Store authenticated host user
   let playerUser; // Store authenticated player user
 
-  // A check to ensure the test doesn't run without the necessary config
-  if (!supabaseUrl || !supabaseAnonKey) {
-    test.only('Supabase environment variables not set, skipping integration tests', () => {
-      console.warn('Set SUPABASE_URL and SUPABASE_ANON_KEY to run integration tests.');
-      expect(true).toBe(true);
-    });
-    return;
-  }
-
   beforeAll(async () => {
-    // Initialize a REAL Supabase client
-    supabaseClient = createClient(supabaseUrl, supabaseAnonKey);
+    resetMockBackend(); // Ensure clean state
+    
+    // Initialize a MOCK Supabase client
+    supabaseClient = createMockSupabase();
 
     // Sign in anonymously to get an authenticated session for the host
     const { data: authData, error: authError } = await supabaseClient.auth.signInAnonymously();
@@ -54,6 +42,7 @@ describe('Network Module Integration with Supabase', () => {
       await supabaseClient.from('game_sessions').delete().match({ id: testSessionId });
       testSessionId = null;
     }
+    // Note: resetMockBackend() effectively cleans up, but we can keep specific cleanup if tests rely on persistent state between steps (though they shouldn't usually)
   });
 
   test('hostGame() should create a new record in the game_sessions table', async () => {
@@ -104,7 +93,7 @@ describe('Network Module Integration with Supabase', () => {
     const joinCode = hostSession.join_code;
 
     // Create a new Supabase client for the joining player and authenticate
-    const playerClient = createClient(supabaseUrl, supabaseAnonKey);
+    const playerClient = createMockSupabase();
     const { data: playerAuthData, error: playerAuthError } = await playerClient.auth.signInAnonymously();
     if (playerAuthError) {
       throw new Error(`Failed to authenticate player: ${playerAuthError.message}`);
@@ -155,7 +144,7 @@ describe('Network Module Integration with Supabase', () => {
 
   test('joinGame() should fail when session does not exist', async () => {
     // Create a new authenticated player
-    const playerClient = createClient(supabaseUrl, supabaseAnonKey);
+    const playerClient = createMockSupabase();
     const { data: playerAuthData } = await playerClient.auth.signInAnonymously();
 
     const playerNetwork = new Network();
@@ -182,7 +171,7 @@ describe('Network Module Integration with Supabase', () => {
       .eq('id', hostSession.id);
 
     // Create a new authenticated player to try joining
-    const playerClient = createClient(supabaseUrl, supabaseAnonKey);
+    const playerClient = createMockSupabase();
     const { data: playerAuthData } = await playerClient.auth.signInAnonymously();
 
     const playerNetwork = new Network();
@@ -211,7 +200,7 @@ describe('Network Module Integration with Supabase', () => {
     network.on('postgres_changes', handler);
 
     // Create a new player and join
-    const playerClient = createClient(supabaseUrl, supabaseAnonKey);
+    const playerClient = createMockSupabase();
     const { data: playerAuthData } = await playerClient.auth.signInAnonymously();
     const playerNetwork = new Network();
     playerNetwork.initialize(playerClient, playerAuthData.user.id);
@@ -253,12 +242,12 @@ describe('Network Module Integration with Supabase', () => {
       const joinCode = hostSession.join_code;
 
       // Create two players
-      const player1Client = createClient(supabaseUrl, supabaseAnonKey);
+      const player1Client = createMockSupabase();
       const { data: player1Auth } = await player1Client.auth.signInAnonymously();
       const player1Network = new Network();
       player1Network.initialize(player1Client, player1Auth.user.id);
 
-      const player2Client = createClient(supabaseUrl, supabaseAnonKey);
+      const player2Client = createMockSupabase();
       const { data: player2Auth } = await player2Client.auth.signInAnonymously();
       const player2Network = new Network();
       player2Network.initialize(player2Client, player2Auth.user.id);
@@ -323,12 +312,12 @@ describe('Network Module Integration with Supabase', () => {
       const joinCode = hostSession.join_code;
 
       // Create two players
-      const player1Client = createClient(supabaseUrl, supabaseAnonKey);
+      const player1Client = createMockSupabase();
       const { data: player1Auth } = await player1Client.auth.signInAnonymously();
       const player1Network = new Network();
       player1Network.initialize(player1Client, player1Auth.user.id);
 
-      const player2Client = createClient(supabaseUrl, supabaseAnonKey);
+      const player2Client = createMockSupabase();
       const { data: player2Auth } = await player2Client.auth.signInAnonymously();
       const player2Network = new Network();
       player2Network.initialize(player2Client, player2Auth.user.id);

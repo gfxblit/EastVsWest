@@ -6,6 +6,8 @@
 import puppeteer from 'puppeteer';
 import { startViteServer, stopViteServer } from './helpers/vite-server.js';
 import { getPuppeteerConfig } from './helpers/puppeteer-config.js';
+import { injectMockSupabase } from './helpers/puppeteer-mock-bridge.js';
+import { resetMockBackend } from './helpers/mock-supabase.js';
 
 describe('Animation Integration', () => {
   let browser;
@@ -13,6 +15,7 @@ describe('Animation Integration', () => {
   let serverUrl;
 
   beforeAll(async () => {
+    resetMockBackend();
     // Start Vite dev server and launch Puppeteer
     serverUrl = await startViteServer();
     browser = await puppeteer.launch(getPuppeteerConfig());
@@ -20,6 +23,7 @@ describe('Animation Integration', () => {
 
     // Set viewport and navigate
     await page.setViewport({ width: 1200, height: 800 });
+    await injectMockSupabase(page);
     await page.goto(serverUrl);
 
     // Wait for app to initialize

@@ -1,12 +1,12 @@
 
-import { createClient } from '@supabase/supabase-js';
+import { createMockSupabase, resetMockBackend } from './helpers/mock-supabase.js';
 import { Game } from '../src/game.js';
 import { Network } from '../src/network.js';
 import { CONFIG } from '../src/config.js';
 import { SessionPlayersSnapshot } from '../src/SessionPlayersSnapshot.js';
 import { waitFor } from './helpers/wait-utils.js';
 
-describe('Health Synchronization Integration', () => {
+describe('Health Synchronization Integration (Mocked)', () => {
   let hostClient, playerClient;
   let hostNetwork, playerNetwork;
   let hostGame, playerGame;
@@ -15,14 +15,15 @@ describe('Health Synchronization Integration', () => {
 
   // Setup Supabase clients and networks
   beforeAll(async () => {
+    resetMockBackend();
     // Host setup
-    hostClient = createClient(process.env.SUPABASE_URL, process.env.SUPABASE_ANON_KEY);
+    hostClient = createMockSupabase();
     const { data: hostAuth } = await hostClient.auth.signInAnonymously();
     hostNetwork = new Network();
     hostNetwork.initialize(hostClient, hostAuth.user.id);
 
     // Player setup
-    playerClient = createClient(process.env.SUPABASE_URL, process.env.SUPABASE_ANON_KEY);
+    playerClient = createMockSupabase();
     const { data: playerAuth } = await playerClient.auth.signInAnonymously();
     playerNetwork = new Network();
     playerNetwork.initialize(playerClient, playerAuth.user.id);
@@ -33,10 +34,6 @@ describe('Health Synchronization Integration', () => {
     if (hostNetwork) hostNetwork.disconnect();
     if (playerNetwork) playerNetwork.disconnect();
     
-    // Explicitly disconnect Supabase Realtime sockets to prevent open handles
-    if (hostClient && hostClient.realtime) await hostClient.realtime.disconnect();
-    if (playerClient && playerClient.realtime) await playerClient.realtime.disconnect();
-
     // Clean up session
     if (sessionData && hostClient) {
       await hostClient.from('game_sessions').delete().eq('id', sessionData.id);
@@ -104,10 +101,6 @@ describe('Health Synchronization Integration', () => {
     // Damage is per second, so we need some time to pass
     const iterations = 10;
     const deltaTime = 1.0; // 1 second per tick
-    
-    // Mock the network broadcast to avoid noise but verify it's called
-    // actually we want real network for integration test, but for this specific test
-    // we want to verify DB persistence.
     
     // Trigger the host-authoritative update
     for (let i = 0; i < iterations; i++) {

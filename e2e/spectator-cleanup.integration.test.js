@@ -5,6 +5,8 @@
 import puppeteer from 'puppeteer';
 import { startViteServer, stopViteServer } from './helpers/vite-server.js';
 import { getPuppeteerConfig } from './helpers/puppeteer-config.js';
+import { injectMockSupabase } from './helpers/puppeteer-mock-bridge.js';
+import { resetMockBackend } from './helpers/mock-supabase.js';
 
 describe('Spectator UI Cleanup Integration', () => {
   let browser;
@@ -12,6 +14,7 @@ describe('Spectator UI Cleanup Integration', () => {
   let baseUrl;
 
   beforeAll(async () => {
+    resetMockBackend();
     baseUrl = await startViteServer();
     browser = await puppeteer.launch(getPuppeteerConfig());
     page = await browser.newPage();
@@ -25,6 +28,7 @@ describe('Spectator UI Cleanup Integration', () => {
   });
 
   test('WhenPlayerLeavesMatch_SpectatorUIShouldBeHidden', async () => {
+    await injectMockSupabase(page);
     await page.goto(baseUrl);
 
     // Mock death state and spectator UI

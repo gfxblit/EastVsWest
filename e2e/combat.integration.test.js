@@ -1,4 +1,4 @@
-import { createClient } from '@supabase/supabase-js';
+import { createMockSupabase, resetMockBackend } from './helpers/mock-supabase.js';
 import { jest } from '@jest/globals';
 import { Network } from '../src/network';
 import { Game } from '../src/game';
@@ -6,10 +6,7 @@ import { SessionPlayersSnapshot } from '../src/SessionPlayersSnapshot';
 import { waitFor } from './helpers/wait-utils.js';
 import { CONFIG } from '../src/config.js';
 
-const supabaseUrl = process.env.SUPABASE_URL;
-const supabaseAnonKey = process.env.SUPABASE_ANON_KEY;
-
-describe('Combat Integration', () => {
+describe('Combat Integration (Mocked)', () => {
   let hostSupabase;
   let playerSupabase;
   let hostNetwork;
@@ -27,21 +24,15 @@ describe('Combat Integration', () => {
   const originalSpecialCooldown = CONFIG.COMBAT.SPECIAL_ABILITY_COOLDOWN_MS;
   const originalNetworkInterval = CONFIG.NETWORK.GAME_SIMULATION_INTERVAL_MS;
 
-  if (!supabaseUrl || !supabaseAnonKey) {
-    test('Supabase environment variables not set, skipping integration tests', () => {
-      expect(true).toBe(true);
-    });
-    return;
-  }
-
   beforeAll(async () => {
+    resetMockBackend();
     // Speed up cooldowns and network for tests
     CONFIG.WEAPONS.SPEAR.attackSpeed = 10; // 100ms cooldown
     CONFIG.COMBAT.SPECIAL_ABILITY_COOLDOWN_MS = 100;
     CONFIG.NETWORK.GAME_SIMULATION_INTERVAL_MS = 10;
 
-    hostSupabase = createClient(supabaseUrl, supabaseAnonKey);
-    playerSupabase = createClient(supabaseUrl, supabaseAnonKey);
+    hostSupabase = createMockSupabase();
+    playerSupabase = createMockSupabase();
 
     const { data: hostAuth } = await hostSupabase.auth.signInAnonymously();
     const { data: playerAuth } = await playerSupabase.auth.signInAnonymously();
@@ -110,7 +101,7 @@ describe('Combat Integration', () => {
     ]);
 
     // Small sleep to let Realtime catch up
-    await new Promise(resolve => setTimeout(resolve, 100));
+    await new Promise(resolve => setTimeout(resolve, 10));
 
     // Wait for state to sync in snapshots
     await waitFor(() => {
@@ -210,7 +201,7 @@ describe('Combat Integration', () => {
     while (Date.now() - startTime < 5000) {
         hostGame.update(0.1);
         playerGame.update(0.1);
-        await new Promise(resolve => setTimeout(resolve, 50));
+        await new Promise(resolve => setTimeout(resolve, 10));
         
         victimAtHost = hostSnapshot.getPlayers().get(playerUserId);
         if (victimAtHost && victimAtHost.health <= 50) break;
@@ -233,7 +224,7 @@ describe('Combat Integration', () => {
     while (Date.now() - startTime < 5000) {
         hostGame.update(0.1);
         playerGame.update(0.1);
-        await new Promise(resolve => setTimeout(resolve, 50));
+        await new Promise(resolve => setTimeout(resolve, 10));
         
         victimAtHost = hostSnapshot.getPlayers().get(playerUserId);
         if (victimAtHost && victimAtHost.health <= 25) break;

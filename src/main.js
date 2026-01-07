@@ -89,45 +89,50 @@ class App {
         return;
       }
 
-      this.supabase = createClient(supabaseUrl, supabaseKey);
+      if (window.MOCK_SUPABASE_CLIENT) {
+        console.log('Using mock Supabase client provided by test environment');
+        this.supabase = window.MOCK_SUPABASE_CLIENT;
+      } else {
+        this.supabase = createClient(supabaseUrl, supabaseKey);
 
-      // Diagnostic: Check if we can actually reach the Supabase server
-      console.log(`Testing connectivity to ${supabaseUrl}...`);
-      try {
-        // Shorter timeout for the connectivity check
-        const controller = new AbortController();
-        const id = setTimeout(() => controller.abort(), 5000);
-        
-        // Fetch the root of the REST API to check reachability
-        const response = await fetch(`${supabaseUrl}/rest/v1/`, { 
-          signal: controller.signal,
-          headers: { 'apikey': supabaseKey }
-        });
-        clearTimeout(id);
-        
-        if (!response.ok) {
-           if (response.status === 401 || response.status === 403) {
-             const msg = 'Supabase API Key (Anon Key) is invalid. Check .env.local';
-             console.error(msg);
-             this.showError(msg);
-             return;
-           }
-           console.warn('Supabase connectivity check returned non-OK status:', response.status);
-        } else {
-           console.log('Supabase is reachable.');
+        // Diagnostic: Check if we can actually reach the Supabase server
+        console.log(`Testing connectivity to ${supabaseUrl}...`);
+        try {
+          // Shorter timeout for the connectivity check
+          const controller = new AbortController();
+          const id = setTimeout(() => controller.abort(), 5000);
+          
+          // Fetch the root of the REST API to check reachability
+          const response = await fetch(`${supabaseUrl}/rest/v1/`, { 
+            signal: controller.signal,
+            headers: { 'apikey': supabaseKey }
+          });
+          clearTimeout(id);
+          
+          if (!response.ok) {
+             if (response.status === 401 || response.status === 403) {
+               const msg = 'Supabase API Key (Anon Key) is invalid. Check .env.local';
+               console.error(msg);
+               this.showError(msg);
+               return;
+             }
+             console.warn('Supabase connectivity check returned non-OK status:', response.status);
+          } else {
+             console.log('Supabase is reachable.');
+          }
+        } catch (netErr) {
+          console.error('Failed to reach Supabase server:', netErr);
+          let errorMsg = `Cannot reach server at ${supabaseUrl}.`;
+          
+          if (import.meta.env.DEV) {
+            errorMsg += ' Is Supabase running? Try: npm run supabase:start';
+          } else {
+            errorMsg += ' Check your internet connection.';
+          }
+          
+          this.showError(errorMsg);
+          return;
         }
-      } catch (netErr) {
-        console.error('Failed to reach Supabase server:', netErr);
-        let errorMsg = `Cannot reach server at ${supabaseUrl}.`;
-        
-        if (import.meta.env.DEV) {
-          errorMsg += ' Is Supabase running? Try: npm run supabase:start';
-        } else {
-          errorMsg += ' Check your internet connection.';
-        }
-        
-        this.showError(errorMsg);
-        return;
       }
 
       // Check for existing session first to support reconnection

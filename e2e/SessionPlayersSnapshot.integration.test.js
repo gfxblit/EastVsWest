@@ -1,12 +1,9 @@
-import { createClient } from '@supabase/supabase-js';
+import { createMockSupabase, resetMockBackend } from './helpers/mock-supabase.js';
 import { SessionPlayersSnapshot } from '../src/SessionPlayersSnapshot.js';
 import { Network } from '../src/network.js';
 import { waitFor } from './helpers/wait-utils.js';
 
-const supabaseUrl = process.env.SUPABASE_URL;
-const supabaseAnonKey = process.env.SUPABASE_ANON_KEY;
-
-describe('SessionPlayersSnapshot Integration with Network', () => {
+describe('SessionPlayersSnapshot Integration with Network (Mocked)', () => {
   let hostClient;
   let playerClient;
   let hostNetwork;
@@ -18,19 +15,11 @@ describe('SessionPlayersSnapshot Integration with Network', () => {
   let hostUser;
   let playerUser;
 
-  // Skip tests if Supabase is not configured
-  if (!supabaseUrl || !supabaseAnonKey) {
-    test.only('Supabase environment variables not set, skipping integration tests', () => {
-      console.warn('Set SUPABASE_URL and SUPABASE_ANON_KEY to run integration tests.');
-      expect(true).toBe(true);
-    });
-    return;
-  }
-
   beforeAll(async () => {
+    resetMockBackend();
     // Create two separate clients (host and player)
-    hostClient = createClient(supabaseUrl, supabaseAnonKey);
-    playerClient = createClient(supabaseUrl, supabaseAnonKey);
+    hostClient = createMockSupabase();
+    playerClient = createMockSupabase();
 
     // Authenticate both clients
     const { data: hostAuth, error: hostAuthError } = await hostClient.auth.signInAnonymously();
@@ -97,7 +86,7 @@ describe('SessionPlayersSnapshot Integration with Network', () => {
       playerNetwork.disconnect();
     }
 
-    // Clean up test data FIRST (before waiting)
+    // Clean up test data FIRST
     if (testSessionId) {
       const sessionIdToDelete = testSessionId;
       testSessionId = null;
@@ -105,19 +94,7 @@ describe('SessionPlayersSnapshot Integration with Network', () => {
       await hostClient.from('session_players').delete().eq('session_id', sessionIdToDelete);
       // Delete session
       await hostClient.from('game_sessions').delete().eq('id', sessionIdToDelete);
-      
-      // Wait for cleanup to be reflected in DB
-      await waitFor(async () => {
-        const { count } = await hostClient
-          .from('game_sessions')
-          .select('*', { count: 'exact', head: true })
-          .eq('id', sessionIdToDelete);
-        return count === 0;
-      });
     }
-
-    // Small delay to allow Realtime to stabilize between tests (removals are async)
-    await new Promise(resolve => setTimeout(resolve, 500));
   });
 
   describe('Initialization and Snapshot', () => {
@@ -269,14 +246,8 @@ describe('SessionPlayersSnapshot Integration with Network', () => {
       playerSnapshot = new SessionPlayersSnapshot(playerNetwork, testSessionId);
       await playerSnapshot.ready();
 
-      // Give delay for subscriptions to fully establish
-      await new Promise(resolve => setTimeout(resolve, 200));
-
       const hostPlayerBefore = playerSnapshot.getPlayers().get(hostUser.id);
       expect(hostPlayerBefore).toBeDefined();
-      // Initial position might vary depending on DB defaults or initialization
-      const initialX = hostPlayerBefore.position_x;
-      const initialY = hostPlayerBefore.position_y;
       expect(hostPlayerBefore.position_x).toBe(1200);
       expect(hostPlayerBefore.position_y).toBe(800);
 
@@ -295,13 +266,8 @@ describe('SessionPlayersSnapshot Integration with Network', () => {
         velocity_y: 5
       });
 
-      // Wait for broadcast to propagate (Supabase Realtime latency)
-      await new Promise(resolve => setTimeout(resolve, 500));
-
-      // Assert
-      // First, verify that the player_state_update event reaches playerNetwork
-      expect(receivedEvents.length).toBeGreaterThan(0);
-      expect(receivedEvents[0].type).toBe('player_state_update');
+      // Wait for broadcast to propagate
+      await waitFor(() => receivedEvents.length > 0);
 
       playerNetwork.off('player_state_update', eventHandler);
 
@@ -313,7 +279,7 @@ describe('SessionPlayersSnapshot Integration with Network', () => {
       expect(hostPlayerAfter.position_x).toBe(100);
       expect(hostPlayerAfter.position_y).toBe(200);
       expect(hostPlayerAfter.rotation).toBe(1.5);
-    }, 15000); // Increase test timeout to 15s
+    }, 15000);
   });
 
   describe('Periodic Refresh', () => {

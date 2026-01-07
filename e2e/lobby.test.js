@@ -6,6 +6,8 @@
 import puppeteer from 'puppeteer';
 import { startViteServer, stopViteServer } from './helpers/vite-server.js';
 import { getPuppeteerConfig } from './helpers/puppeteer-config.js';
+import { injectMockSupabase } from './helpers/puppeteer-mock-bridge.js';
+import { resetMockBackend } from './helpers/mock-supabase.js';
 
 describe('Lobby UI Interactions', () => {
   let browser;
@@ -13,6 +15,7 @@ describe('Lobby UI Interactions', () => {
   let serverUrl;
 
   beforeAll(async () => {
+    resetMockBackend();
     // Start Vite dev server
     serverUrl = await startViteServer();
 
@@ -31,6 +34,7 @@ describe('Lobby UI Interactions', () => {
       throw new Error('Browser not initialized. Check beforeAll failure.');
     }
     page = await browser.newPage();
+    await injectMockSupabase(page);
 
     await page.goto(serverUrl);
 
@@ -188,10 +192,9 @@ describe('Lobby UI Interactions', () => {
 
       const joinCode = await page.$eval('#join-code', (el) => el.textContent);
 
-      // Create a new incognito browser context for the joining player
-      // This ensures they have a separate auth session from the host
-      const playerContext = await browser.createBrowserContext();
-      const playerPage = await playerContext.newPage();
+      // Create a new browser page for the joining player
+      const playerPage = await browser.newPage();
+      await injectMockSupabase(playerPage);
 
       await playerPage.goto(serverUrl);
 
@@ -231,7 +234,6 @@ describe('Lobby UI Interactions', () => {
 
       // Clean up
       await playerPage.close();
-      await playerContext.close();
     }, 60000);
   });
 
