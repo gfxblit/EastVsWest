@@ -195,6 +195,9 @@ class App {
   }
 
   setupNetworkHandlers() {
+    // Note: player_joined/player_left events removed from Network
+    // Lobby updates now come from polling SessionPlayersSnapshot
+
     this.network.on('game_start', () => {
       console.log('Game starting signal received');
       this.startGame();

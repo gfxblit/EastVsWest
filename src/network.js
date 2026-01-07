@@ -94,6 +94,7 @@ export class Network extends EventEmitter {
     
     if (playerError) throw playerError;
 
+    // Local player list will be updated via postgres_changes event
     return { session: sessionData, player: playerRecord };
   }
 
@@ -114,7 +115,7 @@ export class Network extends EventEmitter {
     this.sessionId = session.id;
     this.isHost = false;
     this.joinCode = joinCode;
-    this.hostId = session.host_id;
+    this.hostId = session.host_id; // Track host ID for authorization
 
     // 2. Client-authoritative join: Self-insert into session_players FIRST
     // This ensures RLS policies allow us to read/listen to other players in this session
@@ -209,10 +210,13 @@ export class Network extends EventEmitter {
   }
 
   _handleRealtimeMessage(payload) {
+    // Emit all messages for listeners (like SessionPlayersSnapshot)
     this.emit(payload.type, payload);
   }
 
   _handlePostgresChange(payload) {
+    // Emit generic postgres_changes event for any table
+    // Higher-level components (like SessionPlayersSnapshot) will filter and handle these
     this.emit('postgres_changes', payload);
   }
 
@@ -249,6 +253,7 @@ export class Network extends EventEmitter {
     }
   }
 
+  // FUTURE: Host-authoritative health persistence (not yet implemented)
   send(type, data) {
     if (!this.channel || !this.connected) {
       console.warn('Cannot send message, channel not connected.');
@@ -306,6 +311,11 @@ export class Network extends EventEmitter {
     this.emit('player_state_update', message);
   }
 
+  /**
+   * Write player state to database
+   * @param {string|Array} playerIdOrUpdates - Player ID (for single update) or array of updates (for batch)
+   * @param {Object} stateData - State data to write (only used for single update)
+   */
   async writePlayerStateToDB(playerIdOrUpdates, stateData) {
     if (!this.supabase || !this.sessionId) {
       console.error('Cannot write player state to DB: missing supabase or sessionId');
@@ -338,6 +348,12 @@ export class Network extends EventEmitter {
     }
   }
 
+  /**
+   * Start periodic player state writes to database
+   * @param {Function|Object|Array} stateGetter - Function that returns state data, or state data itself
+   *   Can return single update object or array of updates (for batching)
+   * @param {number} intervalMs - Write interval in milliseconds (default: 60000 / 60 seconds)
+   */
   startPeriodicPlayerStateWrite(stateGetter, intervalMs = 60000) {
     if (this.playerStateWriteInterval) return; // Already running
 
@@ -365,6 +381,9 @@ export class Network extends EventEmitter {
     this.playerStateWriteInterval = setInterval(performWrite, intervalMs);
   }
 
+  /**
+   * Stop periodic player state writes
+   */
   stopPeriodicPlayerStateWrite() {
     if (this.playerStateWriteInterval) {
       clearInterval(this.playerStateWriteInterval);
@@ -372,6 +391,9 @@ export class Network extends EventEmitter {
     }
   }
 
+  /**
+   * Leave the current game session and clean up database records
+   */
   async leaveGame() {
     if (!this.supabase || !this.sessionId) {
       this.disconnect();
