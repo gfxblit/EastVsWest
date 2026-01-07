@@ -1,5 +1,5 @@
 import { CONFIG } from './config.js';
-import { getDirectionFromVelocity, AnimationState } from './animationHelper.js';
+import { getDirectionFromVelocity, getDirectionFromRotation, AnimationState } from './animationHelper.js';
 
 export class LocalPlayerController {
   constructor(network, initialData) {
@@ -138,6 +138,9 @@ export class LocalPlayerController {
         const snapInterval = Math.PI / 4;
         this.player.rotation = Math.round(this.player.rotation / snapInterval) * snapInterval;
         this.#normalizeRotation();
+        
+        // Ensure sprite animation frame matches the snapped rotation
+        this.player.animationState.lastDirection = getDirectionFromRotation(this.player.rotation);
     }
 
     // Update attack animation timer
