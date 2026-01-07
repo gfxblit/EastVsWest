@@ -200,12 +200,21 @@ export const CONFIG = {
       PATH: 'assets/player/player-walk-spritesheet.png',
       METADATA: 'assets/player/player-walk-spritesheet.json',
     },
+    VFX: {
+      SLASH: {
+        UP: 'assets/vfx/slash-up.png',
+        DOWN: 'assets/vfx/slash-down.png',
+        LEFT: 'assets/vfx/slash-left.png',
+        RIGHT: 'assets/vfx/slash-right.png',
+      },
+    },
   },
 
   // Animation Settings
   ANIMATION: {
     FPS: 15,
     FRAMES_PER_DIRECTION: 4,
+    VFX_FPS: 25, // 5 frames over 0.2s
   },
 
   
@@ -215,6 +224,8 @@ export const CONFIG = {
     SPECIAL_ABILITY_COOLDOWN_MS: 3000,
     SPECIAL_DAMAGE_MULTIPLIER: 1.5,
     ATTACK_ANIMATION_DURATION_SECONDS: 0.2, // 200ms animation
+    SLASH_VFX_OFFSET: 10,
+    SLASH_VFX_SCALE: 3.0,
     PLAYER_HITBOX_RADIUS: 60,
     DEFAULT_THRUST_ARC: Math.PI / 4, // 45 degrees
     DEFAULT_SWING_ARC: (120 * Math.PI) / 180, // 120 degrees
