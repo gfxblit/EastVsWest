@@ -133,6 +133,11 @@ export class LocalPlayerController {
     if (this.player.velocity.x !== 0 || this.player.velocity.y !== 0) {
         this.player.rotation = Math.atan2(this.player.velocity.y, this.player.velocity.x) + Math.PI / 2;
         this.#normalizeRotation();
+    } else {
+        // Snap to nearest 45 degrees (PI/4) when stopped
+        const snapInterval = Math.PI / 4;
+        this.player.rotation = Math.round(this.player.rotation / snapInterval) * snapInterval;
+        this.#normalizeRotation();
     }
 
     // Update attack animation timer
