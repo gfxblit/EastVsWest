@@ -1291,18 +1291,22 @@ describe('Renderer', () => {
 
       renderer.renderPlayerWithSpriteSheet(player, false);
 
-      // Should draw base sprite AND attack sprite (overlay)
-      // Calls: Shadow (if loaded), Base Sprite, Attack Sprite
+      // Should REPLACE base sprite with attack sprite (Sword) + Slash Effect
+      // Calls: Shadow (if loaded), Attack Sprite (Sword), Attack Sprite (Slash)
       const calls = ctx.drawImage.mock.calls;
       
-      // Filter for attack sprite sheet
+      // Filter for base sprite sheet (should be 0)
+      const baseCalls = calls.filter(call => call[0] === renderer.spriteSheet);
+      expect(baseCalls.length).toBe(0);
+
+      // Filter for attack sprite sheet (should be 2)
       const attackCalls = calls.filter(call => call[0] === renderer.attackSpriteSheet);
-      expect(attackCalls.length).toBe(1);
+      expect(attackCalls.length).toBe(2);
 
       expect(attackCalls[0]).toEqual(expect.arrayContaining([
         renderer.attackSpriteSheet,
         expect.any(Number),
-        expect.any(Number),
+        expect.any(Number), // swordRow * 32
         expect.any(Number),
         expect.any(Number),
         expect.any(Number),
@@ -1312,16 +1316,17 @@ describe('Renderer', () => {
       ]));
     });
 
-    test('WhenAttackingDiagonally_ShouldSnapToCardinalDirection', () => {
-      // Test cases for snapping: [inputDirection, expectedSnappedDirection]
+    test('WhenAttackingDiagonally_ShouldSnapToCorrectRow', () => {
+      // Test cases: [inputDirection, expectedSwordRow, expectedSlashRow]
+      // Sword Rows: SW=4, SE=5, NW=6, NE=7
       const snapTestCases = [
-        [1, 2], // SE -> E (or S, but let's assume E for this test)
-        [3, 2], // NE -> E (or N)
-        [5, 4], // NW -> N (or W)
-        [7, 6], // SW -> W (or S)
+        [1, 5], // SE -> SE (Sword Row 5)
+        [3, 7], // NE -> NE (Sword Row 7)
+        [5, 6], // NW -> NW (Sword Row 6)
+        [7, 4], // SW -> SW (Sword Row 4)
       ];
 
-      snapTestCases.forEach(([inputDir, expectedDir]) => {
+      snapTestCases.forEach(([inputDir, expectedSwordRow]) => {
         ctx.drawImage.mockClear();
         const player = {
           id: 'player-1',
@@ -1337,23 +1342,28 @@ describe('Renderer', () => {
 
         renderer.renderPlayerWithSpriteSheet(player, false);
 
-        // sourceY = snappedDirection * frameHeight
-        const expectedSourceY = expectedDir * 32;
+        // Check Sword Row (first attack call)
+        const expectedSwordSourceY = expectedSwordRow * 32;
         
-        // Check attack sprite call
         const calls = ctx.drawImage.mock.calls;
-        const attackCall = calls.find(call => call[0] === renderer.attackSpriteSheet);
+        const attackCalls = calls.filter(call => call[0] === renderer.attackSpriteSheet);
         
-        expect(attackCall).toBeDefined();
-        // Check sourceY (3rd argument, index 2)
-        expect(attackCall[2]).toBe(expectedSourceY);
+        expect(attackCalls.length).toBe(2);
+        // First call is Sword
+        expect(attackCalls[0][2]).toBe(expectedSwordSourceY);
       });
     });
 
-    test('WhenAttackingCardinally_ShouldNotSnap', () => {
-      const cardinalDirections = [0, 2, 4, 6];
+    test('WhenAttackingCardinally_ShouldSnapToDiagonalRow', () => {
+      // S(0)->SE(5), E(2)->SE(5), N(4)->NE(7), W(6)->SW(4)
+      const cardinalTestCases = [
+        [0, 5], // South -> SE
+        [2, 5], // East -> SE
+        [4, 7], // North -> NE
+        [6, 4], // West -> SW
+      ];
 
-      cardinalDirections.forEach(dir => {
+      cardinalTestCases.forEach(([dir, expectedSwordRow]) => {
         ctx.drawImage.mockClear();
         const player = {
           id: 'player-1',
@@ -1369,13 +1379,13 @@ describe('Renderer', () => {
 
         renderer.renderPlayerWithSpriteSheet(player, false);
 
-        const expectedSourceY = dir * 32;
+        const expectedSwordSourceY = expectedSwordRow * 32;
         
         const calls = ctx.drawImage.mock.calls;
-        const attackCall = calls.find(call => call[0] === renderer.attackSpriteSheet);
+        const attackCalls = calls.filter(call => call[0] === renderer.attackSpriteSheet);
         
-        expect(attackCall).toBeDefined();
-        expect(attackCall[2]).toBe(expectedSourceY);
+        expect(attackCalls.length).toBe(2);
+        expect(attackCalls[0][2]).toBe(expectedSwordSourceY);
       });
     });
 

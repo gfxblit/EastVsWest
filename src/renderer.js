@@ -411,52 +411,78 @@ export class Renderer {
       );
     }
 
-    // 1. Render Character Base (Always)
-    if (this.spriteSheet && this.spriteSheet.complete && this.spriteSheetMetadata) {
-      const { currentFrame, lastDirection } = player.animationState;
-      const { frameWidth, frameHeight } = this.spriteSheetMetadata;
-      
-      const sourceX = currentFrame * frameWidth;
-      const sourceY = lastDirection * frameHeight;
+    const hasAttackSprite = player.isAttacking && 
+                            this.attackSpriteSheet && 
+                            this.attackSpriteSheet.complete && 
+                            this.attackSpriteSheetMetadata;
 
-      this.ctx.drawImage(
-        this.spriteSheet,
-        sourceX,
-        sourceY,
-        frameWidth,
-        frameHeight,
-        spriteX,
-        spriteY,
-        size,
-        size
-      );
-    } else {
-      // Fallback: render pink rectangle
-      this.ctx.fillStyle = '#ff69b4'; // Pink
-      this.ctx.fillRect(
-        spriteX,
-        spriteY,
-        size,
-        size
-      );
+    // 1. Render Character Base (If NOT attacking, or if attack sprite missing)
+    if (!hasAttackSprite) {
+      if (this.spriteSheet && this.spriteSheet.complete && this.spriteSheetMetadata) {
+        const { currentFrame, lastDirection } = player.animationState;
+        const { frameWidth, frameHeight } = this.spriteSheetMetadata;
+        
+        const sourceX = currentFrame * frameWidth;
+        const sourceY = lastDirection * frameHeight;
+
+        this.ctx.drawImage(
+          this.spriteSheet,
+          sourceX,
+          sourceY,
+          frameWidth,
+          frameHeight,
+          spriteX,
+          spriteY,
+          size,
+          size
+        );
+      } else {
+        // Fallback: render pink rectangle
+        this.ctx.fillStyle = '#ff69b4'; // Pink
+        this.ctx.fillRect(
+          spriteX,
+          spriteY,
+          size,
+          size
+        );
+      }
     }
 
-    // 2. Render Attack Overlay (If Attacking)
-    if (player.isAttacking && this.attackSpriteSheet && this.attackSpriteSheetMetadata) {
+    // 2. Render Attack Animation (If Attacking)
+    if (hasAttackSprite) {
       const { frameWidth, frameHeight } = this.attackSpriteSheetMetadata;
       const { lastDirection } = player.animationState;
       
-      // Cardinal Snapping for attacks
-      let renderDirection = lastDirection;
-      let renderFrame = 0;
-
+      // Map directions to sprite sheet rows based on attack_raw alphabetical order
+      // Sword Rows (Character): 4-7
+      // Slash Rows (Effect): 0-3
+      // Diagonals: SW (down_left), SE (down_right), NW (up_left), NE (up_right)
+      
+      let swordRow = 5; // Default SE
+      let slashRow = 1; // Default SE
+      
       // 0: South, 1: SE, 2: East, 3: NE, 4: North, 5: NW, 6: West, 7: SW
-      if (renderDirection === 1) renderDirection = 2;
-      else if (renderDirection === 3) renderDirection = 2;
-      else if (renderDirection === 5) renderDirection = 4;
-      else if (renderDirection === 7) renderDirection = 6;
+      switch (lastDirection) {
+        case 0: // South -> SE
+             swordRow = 5; slashRow = 1; break;
+        case 1: // SE -> SE
+             swordRow = 5; slashRow = 1; break;
+        case 2: // East -> SE
+             swordRow = 5; slashRow = 1; break;
+        case 3: // NE -> NE
+             swordRow = 7; slashRow = 3; break;
+        case 4: // North -> NE
+             swordRow = 7; slashRow = 3; break;
+        case 5: // NW -> NW
+             swordRow = 6; slashRow = 2; break;
+        case 6: // West -> SW
+             swordRow = 4; slashRow = 0; break;
+        case 7: // SW -> SW
+             swordRow = 4; slashRow = 0; break;
+      }
 
       // Calculate attack frame based on time
+      let renderFrame = 0;
       if (player.attackStartTime) {
         const elapsed = (performance.now() - player.attackStartTime) / 1000; // seconds
         const duration = CONFIG.COMBAT.ATTACK_ANIMATION_DURATION_SECONDS;
@@ -470,12 +496,25 @@ export class Renderer {
       }
 
       const sourceX = renderFrame * frameWidth;
-      const sourceY = renderDirection * frameHeight;
 
+      // Draw Sword (Character)
       this.ctx.drawImage(
         this.attackSpriteSheet,
         sourceX,
-        sourceY,
+        swordRow * frameHeight,
+        frameWidth,
+        frameHeight,
+        spriteX,
+        spriteY,
+        size,
+        size
+      );
+      
+      // Draw Slash (Effect)
+      this.ctx.drawImage(
+        this.attackSpriteSheet,
+        sourceX,
+        slashRow * frameHeight,
         frameWidth,
         frameHeight,
         spriteX,
@@ -492,24 +531,6 @@ export class Renderer {
       this.ctx.beginPath();
       this.ctx.arc(player.x, player.y, CONFIG.RENDER.PLAYER_RADIUS, 0, Math.PI * 2);
       this.ctx.stroke();
-    }
-
-    // Attack flash (legacy, can be kept for extra juice or removed)
-    if (player.isAttacking) {
-      this.ctx.save();
-      this.ctx.globalAlpha = 0.5;
-      this.ctx.fillStyle = '#ffffff';
-      
-      const arcWidth = 67 * (Math.PI / 180);
-      const startAngle = (player.rotation - Math.PI / 2) - (arcWidth / 2);
-      const endAngle = (player.rotation - Math.PI / 2) + (arcWidth / 2);
-
-      this.ctx.beginPath();
-      this.ctx.moveTo(player.x, player.y);
-      this.ctx.arc(player.x, player.y, CONFIG.RENDER.PLAYER_RADIUS + 10, startAngle, endAngle);
-      this.ctx.closePath();
-      this.ctx.fill();
-      this.ctx.restore();
     }
 
     // Health bar above player
