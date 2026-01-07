@@ -2,19 +2,74 @@
  * Tests for animationHelper.js
  */
 
-import { getDirectionFromVelocity, updateAnimationState } from './animationHelper.js';
+import { getDirectionFromRotation, getDirectionFromVelocity, updateAnimationState } from './animationHelper.js';
 import { CONFIG } from './config.js';
 
 describe('AnimationHelper', () => {
+  describe('getDirectionFromRotation', () => {
+    test('ShouldReturnCorrectFrameForCardinalDirections', () => {
+      // North (0 radians)
+      expect(getDirectionFromRotation(0)).toBe(4);
+
+      // East (PI/2 radians)
+      expect(getDirectionFromRotation(Math.PI / 2)).toBe(2);
+
+      // South (PI radians)
+      expect(getDirectionFromRotation(Math.PI)).toBe(0);
+
+      // West (3PI/2 radians)
+      expect(getDirectionFromRotation(3 * Math.PI / 2)).toBe(6);
+    });
+
+    test('ShouldReturnCorrectFrameForDiagonalDirections', () => {
+      // North-East (PI/4)
+      expect(getDirectionFromRotation(Math.PI / 4)).toBe(3);
+
+      // South-East (3PI/4)
+      expect(getDirectionFromRotation(3 * Math.PI / 4)).toBe(1);
+
+      // South-West (5PI/4)
+      expect(getDirectionFromRotation(5 * Math.PI / 4)).toBe(7);
+
+      // North-West (7PI/4)
+      expect(getDirectionFromRotation(7 * Math.PI / 4)).toBe(5);
+    });
+
+    test('ShouldHandleNegativeAngles', () => {
+      // -PI/2 is equivalent to 3PI/2 (West) -> frame 6
+      expect(getDirectionFromRotation(-Math.PI / 2)).toBe(6);
+
+      // -PI is equivalent to PI (South) -> frame 0
+      expect(getDirectionFromRotation(-Math.PI)).toBe(0);
+    });
+
+    test('ShouldHandleAnglesGreaterThan2PI', () => {
+      // 2PI + PI/2 is equivalent to PI/2 (East) -> frame 2
+      expect(getDirectionFromRotation(2.5 * Math.PI)).toBe(2);
+    });
+
+    test('ShouldHandleBoundaryConditions', () => {
+      // North is 0 +/- 22.5 degrees (approx +/- 0.3927 rad)
+      // Test slightly less than 22.5 deg -> Should be North (4)
+      const slightlyNorth = (22.0 * Math.PI) / 180;
+      expect(getDirectionFromRotation(slightlyNorth)).toBe(4);
+
+      // Test slightly more than 22.5 deg -> Should be North-East (3)
+      const slightlyNorthEast = (23.0 * Math.PI) / 180;
+      expect(getDirectionFromRotation(slightlyNorthEast)).toBe(3);
+    });
+  });
+
   describe('getDirectionFromVelocity', () => {
     test('WhenVelocityIsSouth_ShouldReturn0', () => {
       const direction = getDirectionFromVelocity(0, 1);
       expect(direction).toBe(0); // South
     });
 
-    test('WhenVelocityIsSouthEast_ShouldReturn1', () => {
+    test('WhenVelocityIsSouthEast_ShouldReturnCardinal', () => {
+      // |vy| >= |vx| -> South (0)
       const direction = getDirectionFromVelocity(1, 1);
-      expect(direction).toBe(1); // South-East
+      expect(direction).toBe(0); // South
     });
 
     test('WhenVelocityIsEast_ShouldReturn2', () => {
@@ -22,9 +77,10 @@ describe('AnimationHelper', () => {
       expect(direction).toBe(2); // East
     });
 
-    test('WhenVelocityIsNorthEast_ShouldReturn3', () => {
+    test('WhenVelocityIsNorthEast_ShouldReturnCardinal', () => {
+      // |vy| >= |vx| -> North (4)
       const direction = getDirectionFromVelocity(1, -1);
-      expect(direction).toBe(3); // North-East
+      expect(direction).toBe(4); // North
     });
 
     test('WhenVelocityIsNorth_ShouldReturn4', () => {
@@ -32,9 +88,10 @@ describe('AnimationHelper', () => {
       expect(direction).toBe(4); // North
     });
 
-    test('WhenVelocityIsNorthWest_ShouldReturn5', () => {
+    test('WhenVelocityIsNorthWest_ShouldReturnCardinal', () => {
+      // |vy| >= |vx| -> North (4)
       const direction = getDirectionFromVelocity(-1, -1);
-      expect(direction).toBe(5); // North-West
+      expect(direction).toBe(4); // North
     });
 
     test('WhenVelocityIsWest_ShouldReturn6', () => {
@@ -42,9 +99,10 @@ describe('AnimationHelper', () => {
       expect(direction).toBe(6); // West
     });
 
-    test('WhenVelocityIsSouthWest_ShouldReturn7', () => {
+    test('WhenVelocityIsSouthWest_ShouldReturnCardinal', () => {
+      // |vy| >= |vx| -> South (0)
       const direction = getDirectionFromVelocity(-1, 1);
-      expect(direction).toBe(7); // South-West
+      expect(direction).toBe(0); // South
     });
 
     test('WhenVelocityIsZero_ShouldReturnNull', () => {
@@ -58,10 +116,16 @@ describe('AnimationHelper', () => {
       expect(direction).toBe(2); // East
     });
 
-    test('WhenVelocityIsNearSouthEast_ShouldReturn1', () => {
-      // Test edge case: between East and SE, closer to SE (40 degrees)
+    test('WhenVelocityIsNearSouthEast_ButHorizontalDominant_ShouldReturnEast', () => {
+      // vx (1) > vy (0.7) -> East
       const direction = getDirectionFromVelocity(1, 0.7);
-      expect(direction).toBe(1); // South-East
+      expect(direction).toBe(2); // East
+    });
+
+    test('WhenVelocityIsNearSouthEast_ButVerticalDominant_ShouldReturnSouth', () => {
+      // vy (1) > vx (0.7) -> South
+      const direction = getDirectionFromVelocity(0.7, 1);
+      expect(direction).toBe(0); // South
     });
   });
 

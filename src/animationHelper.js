@@ -107,9 +107,10 @@ export function getDirectionFromRotation(rotation) {
 
 /**
  * Calculate direction index (0-7) from velocity vector
+ * Enforces cardinal directions (North, South, East, West) for walking animations.
  * @param {number} vx - Velocity X component
  * @param {number} vy - Velocity Y component
- * @returns {number|null} Direction index (0-7) or null if velocity is zero
+ * @returns {number|null} Direction index (0, 2, 4, 6) or null if velocity is zero
  */
 export function getDirectionFromVelocity(vx, vy) {
   // Handle zero velocity (idle state)
@@ -117,24 +118,14 @@ export function getDirectionFromVelocity(vx, vy) {
     return null;
   }
 
-  // Calculate angle from velocity
-  // atan2(vy, vx) gives angle from East (0 rad)
-  // East = 0, South = PI/2, West = PI, North = -PI/2
-
-  // We need to convert this to the rotation system used by getDirectionFromRotation:
-  // North = 0, East = PI/2, South = PI, West = 3PI/2
-
-  // So:
-  // atan2 = 0 (East) -> Rotation = PI/2 (East)
-  // atan2 = PI/2 (South) -> Rotation = PI (South)
-  // atan2 = PI (West) -> Rotation = 3PI/2 (West)
-  // atan2 = -PI/2 (North) -> Rotation = 0 (North)
-
-  // Transformation: Rotation = atan2 + PI/2
-
-  const rotation = Math.atan2(vy, vx) + Math.PI / 2;
-
-  return getDirectionFromRotation(rotation);
+  // Prioritize the axis with greater magnitude
+  if (Math.abs(vx) > Math.abs(vy)) {
+    // Horizontal movement
+    return vx > 0 ? 2 : 6; // East (2) or West (6)
+  } else {
+    // Vertical movement (default to vertical if equal)
+    return vy > 0 ? 0 : 4; // South (0) or North (4)
+  }
 }
 
 /**

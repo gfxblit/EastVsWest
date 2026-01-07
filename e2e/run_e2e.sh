@@ -7,8 +7,15 @@ if ! command -v jq &> /dev/null; then
   exit 1
 fi
 
+# Use local supabase if available, otherwise fallback to npx
+if [ -f "./node_modules/.bin/supabase" ]; then
+  SUPABASE_BIN="./node_modules/.bin/supabase"
+else
+  SUPABASE_BIN="npx supabase"
+fi
+
 # Fetch Supabase status in JSON format
-STATUS=$(npx supabase status -o json 2>/dev/null)
+STATUS=$($SUPABASE_BIN status -o json 2>/dev/null)
 
 if [ $? -ne 0 ] || [ -z "$STATUS" ]; then
   echo "Error: Could not retrieve Supabase status. Is Supabase running?"

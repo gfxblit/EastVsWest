@@ -91,7 +91,7 @@ describe('Renderer', () => {
       expect(canvas.width).toBe(CONFIG.CANVAS.WIDTH);
       expect(canvas.height).toBe(CONFIG.CANVAS.HEIGHT);
       // Should load background image + shadow image (sprite sheet loaded via fetch)
-      expect(global.Image).toHaveBeenCalledTimes(2);
+      expect(global.Image).toHaveBeenCalledTimes(6);
       expect(newRenderer.bgImage.src).toBe('/game-background.png');
       expect(newRenderer.shadowImage.src).toBe('/shadow.png');
     });
@@ -542,7 +542,7 @@ describe('Renderer', () => {
 
       // Assert
       // Should create shadow image + background image (sprite sheet loaded via fetch)
-      expect(global.Image).toHaveBeenCalledTimes(2);
+      expect(global.Image).toHaveBeenCalledTimes(6);
       expect(newRenderer.shadowImage).toBeDefined();
       expect(newRenderer.shadowImage.src).toBe('/shadow.png');
     });
@@ -853,7 +853,7 @@ describe('Renderer', () => {
         newRenderer.init();
 
         // Should create background image + shadow image (sprite sheet loaded via fetch)
-        expect(global.Image).toHaveBeenCalledTimes(2);
+        expect(global.Image).toHaveBeenCalledTimes(6);
       });
 
     });

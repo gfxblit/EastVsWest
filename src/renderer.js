@@ -4,7 +4,7 @@
  */
 
 import { CONFIG } from './config.js';
-import { getDirectionFromVelocity, AnimationState } from './animationHelper.js';
+import { getDirectionFromVelocity, getDirectionFromRotation, AnimationState } from './animationHelper.js';
 import { FloatingText } from './FloatingText.js';
 
 export class Renderer {
@@ -17,7 +17,14 @@ export class Renderer {
     this.spriteSheetMetadata = null;
     this.spriteSheetLoaded = false;
     this.shadowImage = null;
+    this.slashImages = {
+      up: null,
+      down: null,
+      left: null,
+      right: null
+    };
     this.remoteAnimationStates = new Map(); // Store animation state for remote players
+    this.visualStates = new Map(); // Store visual state (like attack animations) for remote players
     this.previousPlayerHealth = new Map(); // Store previous health for floating text detection
     this.floatingTexts = [];
   }
@@ -43,6 +50,12 @@ export class Renderer {
 
     // Load shadow image
     this.shadowImage = this.createImage('shadow.png');
+
+    // Load slash VFX images
+    this.slashImages.up = this.createImage(CONFIG.ASSETS.VFX.SLASH.UP);
+    this.slashImages.down = this.createImage(CONFIG.ASSETS.VFX.SLASH.DOWN);
+    this.slashImages.left = this.createImage(CONFIG.ASSETS.VFX.SLASH.LEFT);
+    this.slashImages.right = this.createImage(CONFIG.ASSETS.VFX.SLASH.RIGHT);
 
     // Load sprite sheet for animations
     this.loadSpriteSheet().catch(err => {
@@ -91,7 +104,16 @@ export class Renderer {
     // Set attacking flag
     animState.isAttacking = true;
 
-    // Reset after animation time
+    // Also update visual state for slash VFX if needed by legacy or other systems
+    let state = this.visualStates.get(playerId);
+    if (!state) {
+      state = { isAttacking: false, attackTimer: 0 };
+      this.visualStates.set(playerId, state);
+    }
+    state.isAttacking = true;
+    state.attackTimer = CONFIG.COMBAT.ATTACK_ANIMATION_DURATION_SECONDS;
+
+    // Reset after animation time (for animState)
     setTimeout(() => {
       // Check if state still exists
       const currentAnimState = this.remoteAnimationStates.get(playerId);
@@ -157,6 +179,16 @@ export class Renderer {
     // Render conflict zone (in world coordinates)
     this.renderConflictZone(gameState.conflictZone);
 
+    // Update visual states (attack animations)
+    this.visualStates.forEach((state, id) => {
+      if (state.isAttacking) {
+        state.attackTimer -= deltaTime;
+        if (state.attackTimer <= 0) {
+          state.isAttacking = false;
+        }
+      }
+    });
+
     // Render all players (in world coordinates)
     if (playersSnapshot) {
       // Multiplayer mode: render remote players from snapshot
@@ -189,6 +221,11 @@ export class Renderer {
         // Update animation state
         animState.update(deltaTime, isMoving, direction);
 
+        // Get visual state (attack animation)
+        const visualState = this.visualStates.get(playerId);
+        const isAttacking = (visualState && visualState.isAttacking) || playerData.is_attacking || animState.isAttacking || false;
+        const attackAnimTime = visualState ? visualState.attackTimer : 0;
+
         const player = {
           id: playerId,
           name: playerData.player_name,
@@ -196,16 +233,22 @@ export class Renderer {
           y: interpolated.y,
           rotation: interpolated.rotation,
           health: playerData.health,
-          isAttacking: animState.isAttacking || false, // Use internal state
+          isAttacking: isAttacking,
+          attackAnimTime: attackAnimTime, // Used for slash animation frame calculation
           animationState: animState,
         };
         this.renderPlayer(player, false);
       });
 
-      // Cleanup animation states and health tracking for players who left
+      // Cleanup animation states and visual states for players who left
       for (const playerId of this.remoteAnimationStates.keys()) {
         if (!snapshotPlayers.has(playerId)) {
           this.remoteAnimationStates.delete(playerId);
+        }
+      }
+      for (const playerId of this.visualStates.keys()) {
+        if (!snapshotPlayers.has(playerId)) {
+          this.visualStates.delete(playerId);
         }
       }
       for (const playerId of this.previousPlayerHealth.keys()) {
@@ -501,22 +544,9 @@ export class Renderer {
       this.ctx.stroke();
     }
 
-    // Attack flash
+    // Attack VFX
     if (player.isAttacking) {
-      this.ctx.save();
-      this.ctx.globalAlpha = 0.5;
-      this.ctx.fillStyle = '#ffffff';
-      
-      const arcWidth = 67 * (Math.PI / 180);
-      const startAngle = (player.rotation - Math.PI / 2) - (arcWidth / 2);
-      const endAngle = (player.rotation - Math.PI / 2) + (arcWidth / 2);
-
-      this.ctx.beginPath();
-      this.ctx.moveTo(player.x, player.y);
-      this.ctx.arc(player.x, player.y, CONFIG.RENDER.PLAYER_RADIUS + 10, startAngle, endAngle);
-      this.ctx.closePath();
-      this.ctx.fill();
-      this.ctx.restore();
+      this.renderSlashAnimation(player);
     }
 
     // Health bar above player
@@ -534,5 +564,70 @@ export class Renderer {
     this.ctx.fillRect(barX, barY, (player.health / 100) * barWidth, barHeight);
   }
 
+  renderSlashAnimation(player) {
+    // Total duration of attack animation
+    const totalDuration = CONFIG.COMBAT.ATTACK_ANIMATION_DURATION_SECONDS;
+    const remainingTime = player.attackAnimTime;
+    const elapsedTime = totalDuration - remainingTime;
 
+    // 5 frames total
+    const frameCount = 5;
+    const frameDuration = totalDuration / frameCount;
+
+    let currentFrame = Math.floor(elapsedTime / frameDuration);
+    if (currentFrame >= frameCount) currentFrame = frameCount - 1;
+    if (currentFrame < 0) currentFrame = 0;
+
+    // Determine direction based on rotation
+    // Usage of getDirectionFromRotation from animationHelper logic
+    // 0: South, 2: East, 4: North, 6: West
+    // We map these to our 4 directional sprites
+    const directionIndex = getDirectionFromRotation(player.rotation);
+
+    let slashImage = null;
+    let offsetX = 0;
+    let offsetY = 0;
+
+    // Map 8-way direction to 4-way sprites
+    // North (4), NE (3), NW (5) -> UP
+    // South (0), SE (1), SW (7) -> DOWN
+    // East (2) -> RIGHT
+    // West (6) -> LEFT
+
+    if (directionIndex === 4 || directionIndex === 3 || directionIndex === 5) {
+      slashImage = this.slashImages.up;
+      offsetY = -CONFIG.COMBAT.SLASH_VFX_OFFSET; // Shift up
+    } else if (directionIndex === 0 || directionIndex === 1 || directionIndex === 7) {
+      slashImage = this.slashImages.down;
+      offsetY = CONFIG.COMBAT.SLASH_VFX_OFFSET; // Shift down
+    } else if (directionIndex === 2) {
+      slashImage = this.slashImages.right;
+      offsetX = CONFIG.COMBAT.SLASH_VFX_OFFSET; // Shift right
+    } else if (directionIndex === 6) {
+      slashImage = this.slashImages.left;
+      offsetX = -CONFIG.COMBAT.SLASH_VFX_OFFSET; // Shift left
+    }
+
+    if (!slashImage || !slashImage.complete || slashImage.naturalWidth === 0) return;
+
+    const frameWidth = 64;
+    const frameHeight = 64;
+
+    // Scale up the VFX slightly to look impactful
+    const scale = CONFIG.COMBAT.SLASH_VFX_SCALE;
+    const drawWidth = frameWidth * scale;
+    const drawHeight = frameHeight * scale;
+
+    const sourceX = currentFrame * frameWidth;
+
+    // Draw centered on player + offset
+    this.ctx.drawImage(
+      slashImage,
+      sourceX, 0, frameWidth, frameHeight,
+      player.x + offsetX - drawWidth / 2,
+      player.y + offsetY - drawHeight / 2,
+      drawWidth,
+      drawHeight
+    );
+  }
 }

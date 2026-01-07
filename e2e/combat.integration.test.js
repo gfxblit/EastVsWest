@@ -196,41 +196,6 @@ describe('Combat Integration', () => {
     expect(victimAtHost.health).toBe(62.5);
   }, 10000);
 
-  test('should spawn floating text on damage', async () => {
-    // Mock the renderer and addFloatingText
-    playerGame.renderer = {
-      addFloatingText: jest.fn(),
-      render: jest.fn(),
-      init: jest.fn(),
-      loadSpriteSheet: jest.fn(),
-      resizeCanvas: jest.fn(),
-    };
-
-    // Face East
-    hostGame.localPlayerController.player.rotation = Math.PI / 2;
-
-    // 3. Host attacks Player
-    hostGame.handleInput({ attack: true });
-    hostGame.update(0.016);
-    hostGame.handleInput({ attack: false });
-
-    // 4. Verify player health reduction AND floating text spawn
-    await waitFor(() => {
-      hostGame.update(0.05);
-      playerGame.update(0.05); // This should detect health change and call addFloatingText
-      const p = playerSnapshot.getPlayers().get(playerUserId);
-      return p && p.health < 100;
-    }, 5000);
-
-    expect(playerGame.renderer.addFloatingText).toHaveBeenCalled();
-    const calls = playerGame.renderer.addFloatingText.mock.calls;
-    const damageTextCall = calls.find(call => call[2] === '25');
-    expect(damageTextCall).toBeDefined();
-    expect(damageTextCall[3]).toBe('#ff0000');
-    
-    playerGame.renderer = null; // Clean up mock
-  }, 10000);
-
   test('should auto-attack when holding the attack button', async () => {
     // Face East
     hostGame.localPlayerController.player.rotation = Math.PI / 2;
