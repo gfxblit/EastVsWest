@@ -587,7 +587,7 @@ export class Renderer {
     const frameHeight = 64;
     
     // Scale up the VFX slightly to look impactful
-    const scale = 2.0;
+    const scale = CONFIG.COMBAT.SLASH_VFX_SCALE;
     const drawWidth = frameWidth * scale;
     const drawHeight = frameHeight * scale;
 
