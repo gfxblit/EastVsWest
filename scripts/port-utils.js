@@ -55,13 +55,17 @@ export async function isPortAvailable(port) {
 }
 
 /**
- * Finds an available port starting from a base port plus branch hash.
+ * Finds an available port starting from a base port plus branch hash and a random offset.
+ * The random offset helps prevent race conditions when multiple processes start at the same time.
  * @param {number} basePort 
  * @returns {Promise<number>}
  */
 export async function getAvailablePort(basePort) {
   const hash = getBranchHash();
-  const startPort = basePort + hash;
+  // Add a random offset between 0 and 99 to reduce collision probability when multiple processes
+  // start at the same time on the same branch.
+  const randomOffset = Math.floor(Math.random() * 100);
+  const startPort = basePort + hash + randomOffset;
   let port = startPort;
   
   // Try up to 100 ports to find a free one
