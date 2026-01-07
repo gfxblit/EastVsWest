@@ -37,6 +37,9 @@ describe('Spear VFX E2E', () => {
     // Host a game
     await page.click('#host-game-btn');
     await page.waitForSelector('#lobby-screen:not(.hidden)');
+    
+    // Wait for the start game button to be visible and not disabled (host role)
+    await page.waitForSelector('#start-game-btn', { visible: true });
     await page.click('#start-game-btn');
     await page.waitForSelector('#game-screen:not(.hidden)');
 

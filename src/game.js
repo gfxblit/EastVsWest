@@ -47,6 +47,7 @@ export class Game {
         network.on('postgres_changes', (payload) => {
           if (payload.eventType === 'INSERT' && payload.table === 'session_players') {
             const newPlayerId = payload.new.player_id;
+            // Only host should respond to this
             if (newPlayerId !== network.playerId) {
               console.log(`Host: New player ${newPlayerId} joined, syncing loot...`);
               this.hostLootManager.syncLootToPlayer(newPlayerId);
@@ -54,8 +55,11 @@ export class Game {
           }
         });
 
-        // Initial loot spawn
+        // Initial loot spawn - Only if we don't have loot already
+        // This avoids double spawning if Game.init is called multiple times 
+        // (e.g. during reconnections or test setups)
         if (this.state.loot.length === 0) {
+          console.log(`Host: Initializing ${CONFIG.GAME.INITIAL_LOOT_COUNT} loot items`);
           this.hostLootManager.spawnRandomLoot(CONFIG.GAME.INITIAL_LOOT_COUNT);
         }
     }
