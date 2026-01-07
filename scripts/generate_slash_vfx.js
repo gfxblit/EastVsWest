@@ -7,12 +7,58 @@ import sharp from 'sharp';
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
 const PROJECT_ROOT = path.resolve(__dirname, '..');
-const OUTPUT_DIR = path.join(PROJECT_ROOT, 'public/assets/vfx');
-const SOURCE_FILE = path.join(OUTPUT_DIR, 'slash-original.png');
 
-const FRAME_WIDTH = 64;
-const FRAME_HEIGHT = 64;
-const NUM_FRAMES = 5;
+// Default configuration
+const DEFAULT_CONFIG = {
+  source: path.join(PROJECT_ROOT, 'public/assets/vfx/slash-original.png'),
+  output: path.join(PROJECT_ROOT, 'public/assets/vfx'),
+  width: 64,
+  height: 64,
+  frames: 5
+};
+
+// Parse command line arguments
+function parseArgs() {
+  const args = process.argv.slice(2);
+  const config = { ...DEFAULT_CONFIG };
+
+  for (let i = 0; i < args.length; i++) {
+    const arg = args[i];
+    if (arg === '--source' && args[i + 1]) {
+      config.source = path.resolve(process.cwd(), args[++i]);
+    } else if (arg === '--output' && args[i + 1]) {
+      config.output = path.resolve(process.cwd(), args[++i]);
+    } else if (arg === '--width' && args[i + 1]) {
+      config.width = parseInt(args[++i], 10);
+    } else if (arg === '--height' && args[i + 1]) {
+      config.height = parseInt(args[++i], 10);
+    } else if (arg === '--frames' && args[i + 1]) {
+      config.frames = parseInt(args[++i], 10);
+    } else if (arg === '--help' || arg === '-h') {
+      console.log(`
+Usage: node generate_slash_vfx.js [options]
+
+Options:
+  --source <path>   Path to source image (default: public/assets/vfx/slash-original.png)
+  --output <path>   Output directory (default: public/assets/vfx)
+  --width <px>      Frame width (default: 64)
+  --height <px>     Frame height (default: 64)
+  --frames <count>  Number of frames (default: 5)
+  --help, -h        Show this help message
+`);
+      process.exit(0);
+    }
+  }
+  return config;
+}
+
+const config = parseArgs();
+
+const OUTPUT_DIR = config.output;
+const SOURCE_FILE = config.source;
+const FRAME_WIDTH = config.width;
+const FRAME_HEIGHT = config.height;
+const NUM_FRAMES = config.frames;
 const SHEET_WIDTH = FRAME_WIDTH * NUM_FRAMES;
 const SHEET_HEIGHT = FRAME_HEIGHT;
 
