@@ -2,10 +2,64 @@
  * Tests for animationHelper.js
  */
 
-import { getDirectionFromVelocity, updateAnimationState } from './animationHelper.js';
+import { getDirectionFromRotation, getDirectionFromVelocity, updateAnimationState } from './animationHelper.js';
 import { CONFIG } from './config.js';
 
 describe('AnimationHelper', () => {
+  describe('getDirectionFromRotation', () => {
+    test('ShouldReturnCorrectFrameForCardinalDirections', () => {
+      // North (0 radians)
+      expect(getDirectionFromRotation(0)).toBe(4);
+
+      // East (PI/2 radians)
+      expect(getDirectionFromRotation(Math.PI / 2)).toBe(2);
+
+      // South (PI radians)
+      expect(getDirectionFromRotation(Math.PI)).toBe(0);
+
+      // West (3PI/2 radians)
+      expect(getDirectionFromRotation(3 * Math.PI / 2)).toBe(6);
+    });
+
+    test('ShouldReturnCorrectFrameForDiagonalDirections', () => {
+      // North-East (PI/4)
+      expect(getDirectionFromRotation(Math.PI / 4)).toBe(3);
+
+      // South-East (3PI/4)
+      expect(getDirectionFromRotation(3 * Math.PI / 4)).toBe(1);
+
+      // South-West (5PI/4)
+      expect(getDirectionFromRotation(5 * Math.PI / 4)).toBe(7);
+
+      // North-West (7PI/4)
+      expect(getDirectionFromRotation(7 * Math.PI / 4)).toBe(5);
+    });
+
+    test('ShouldHandleNegativeAngles', () => {
+      // -PI/2 is equivalent to 3PI/2 (West) -> frame 6
+      expect(getDirectionFromRotation(-Math.PI / 2)).toBe(6);
+
+      // -PI is equivalent to PI (South) -> frame 0
+      expect(getDirectionFromRotation(-Math.PI)).toBe(0);
+    });
+
+    test('ShouldHandleAnglesGreaterThan2PI', () => {
+      // 2PI + PI/2 is equivalent to PI/2 (East) -> frame 2
+      expect(getDirectionFromRotation(2.5 * Math.PI)).toBe(2);
+    });
+
+    test('ShouldHandleBoundaryConditions', () => {
+      // North is 0 +/- 22.5 degrees (approx +/- 0.3927 rad)
+      // Test slightly less than 22.5 deg -> Should be North (4)
+      const slightlyNorth = (22.0 * Math.PI) / 180;
+      expect(getDirectionFromRotation(slightlyNorth)).toBe(4);
+
+      // Test slightly more than 22.5 deg -> Should be North-East (3)
+      const slightlyNorthEast = (23.0 * Math.PI) / 180;
+      expect(getDirectionFromRotation(slightlyNorthEast)).toBe(3);
+    });
+  });
+
   describe('getDirectionFromVelocity', () => {
     test('WhenVelocityIsSouth_ShouldReturn0', () => {
       const direction = getDirectionFromVelocity(0, 1);
