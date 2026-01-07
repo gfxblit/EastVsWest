@@ -91,7 +91,7 @@ describe('Renderer', () => {
       expect(canvas.width).toBe(CONFIG.CANVAS.WIDTH);
       expect(canvas.height).toBe(CONFIG.CANVAS.HEIGHT);
       // Should load background image + shadow image (sprite sheet loaded via fetch)
-      expect(global.Image).toHaveBeenCalledTimes(6);
+      expect(global.Image).toHaveBeenCalledTimes(10);
       expect(newRenderer.bgImage.src).toBe('/game-background.png');
       expect(newRenderer.shadowImage.src).toBe('/shadow.png');
     });
@@ -542,7 +542,7 @@ describe('Renderer', () => {
 
       // Assert
       // Should create shadow image + background image (sprite sheet loaded via fetch)
-      expect(global.Image).toHaveBeenCalledTimes(6);
+      expect(global.Image).toHaveBeenCalledTimes(10);
       expect(newRenderer.shadowImage).toBeDefined();
       expect(newRenderer.shadowImage.src).toBe('/shadow.png');
     });
@@ -853,7 +853,7 @@ describe('Renderer', () => {
         newRenderer.init();
 
         // Should create background image + shadow image (sprite sheet loaded via fetch)
-        expect(global.Image).toHaveBeenCalledTimes(6);
+        expect(global.Image).toHaveBeenCalledTimes(10);
       });
 
     });
@@ -1237,6 +1237,70 @@ describe('Renderer', () => {
           expect.any(Number)
         );
       });
+    });
+  });
+
+  describe('Attack VFX Rendering', () => {
+    beforeEach(() => {
+      ctx.drawImage = jest.fn();
+      
+      // Mock images as loaded
+      const directions = ['up', 'down', 'left', 'right'];
+      directions.forEach(dir => {
+        renderer.slashImages[dir] = { complete: true, naturalWidth: 64, naturalHeight: 64 };
+        renderer.spearImages[dir] = { complete: true, naturalWidth: 64, naturalHeight: 64 };
+      });
+    });
+
+    test('WhenPlayerAttacksWithSlashWeapon_ShouldUseSlashImages', () => {
+      const player = {
+        x: 100,
+        y: 100,
+        rotation: Math.PI / 2, // East
+        isAttacking: true,
+        attackAnimTime: CONFIG.COMBAT.ATTACK_ANIMATION_DURATION_SECONDS,
+        equipped_weapon: 'battleaxe', // Slashing weapon
+      };
+
+      renderer.renderSlashAnimation(player);
+
+      expect(ctx.drawImage).toHaveBeenCalled();
+      const firstCall = ctx.drawImage.mock.calls[0];
+      expect(firstCall[0]).toBe(renderer.slashImages.right);
+    });
+
+    test('WhenPlayerAttacksWithSpear_ShouldUseSpearImages', () => {
+      const player = {
+        x: 100,
+        y: 100,
+        rotation: Math.PI / 2, // East
+        isAttacking: true,
+        attackAnimTime: CONFIG.COMBAT.ATTACK_ANIMATION_DURATION_SECONDS,
+        equipped_weapon: 'spear', // Piercing weapon
+      };
+
+      renderer.renderSlashAnimation(player);
+
+      expect(ctx.drawImage).toHaveBeenCalled();
+      const firstCall = ctx.drawImage.mock.calls[0];
+      expect(firstCall[0]).toBe(renderer.spearImages.right);
+    });
+
+    test('WhenPlayerAttacksFacingNorth_ShouldUseUpImages', () => {
+      const player = {
+        x: 100,
+        y: 100,
+        rotation: 0, // North
+        isAttacking: true,
+        attackAnimTime: CONFIG.COMBAT.ATTACK_ANIMATION_DURATION_SECONDS,
+        equipped_weapon: 'spear',
+      };
+
+      renderer.renderSlashAnimation(player);
+
+      expect(ctx.drawImage).toHaveBeenCalled();
+      const firstCall = ctx.drawImage.mock.calls[0];
+      expect(firstCall[0]).toBe(renderer.spearImages.up);
     });
   });
 

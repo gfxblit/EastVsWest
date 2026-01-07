@@ -23,6 +23,12 @@ export class Renderer {
       left: null,
       right: null
     };
+    this.spearImages = {
+      up: null,
+      down: null,
+      left: null,
+      right: null
+    };
     this.remoteAnimationStates = new Map(); // Store animation state for remote players
     this.visualStates = new Map(); // Store visual state (like attack animations) for remote players
     this.previousPlayerHealth = new Map(); // Store previous health for floating text diffs
@@ -56,6 +62,12 @@ export class Renderer {
     this.slashImages.down = this.createImage(CONFIG.ASSETS.VFX.SLASH.DOWN);
     this.slashImages.left = this.createImage(CONFIG.ASSETS.VFX.SLASH.LEFT);
     this.slashImages.right = this.createImage(CONFIG.ASSETS.VFX.SLASH.RIGHT);
+
+    // Load spear VFX images
+    this.spearImages.up = this.createImage(CONFIG.ASSETS.VFX.SPEAR.UP);
+    this.spearImages.down = this.createImage(CONFIG.ASSETS.VFX.SPEAR.DOWN);
+    this.spearImages.left = this.createImage(CONFIG.ASSETS.VFX.SPEAR.LEFT);
+    this.spearImages.right = this.createImage(CONFIG.ASSETS.VFX.SPEAR.RIGHT);
 
     // Load sprite sheet for animations
     this.loadSpriteSheet().catch(err => {
@@ -557,9 +569,13 @@ export class Renderer {
     // We map these to our 4 directional sprites
     const directionIndex = getDirectionFromRotation(player.rotation);
     
-    let slashImage = null;
+    let vfxImage = null;
     let offsetX = 0;
     let offsetY = 0;
+
+    // Use spear images for spear, slash images for everything else
+    const isSpear = player.equipped_weapon === 'spear';
+    const images = isSpear ? this.spearImages : this.slashImages;
 
     // Map 8-way direction to 4-way sprites
     // North (4), NE (3), NW (5) -> UP
@@ -568,20 +584,20 @@ export class Renderer {
     // West (6) -> LEFT
 
     if (directionIndex === 4 || directionIndex === 3 || directionIndex === 5) {
-      slashImage = this.slashImages.up;
+      vfxImage = images.up;
       offsetY = -CONFIG.COMBAT.SLASH_VFX_OFFSET; // Shift up
     } else if (directionIndex === 0 || directionIndex === 1 || directionIndex === 7) {
-      slashImage = this.slashImages.down;
+      vfxImage = images.down;
       offsetY = CONFIG.COMBAT.SLASH_VFX_OFFSET; // Shift down
     } else if (directionIndex === 2) {
-      slashImage = this.slashImages.right;
+      vfxImage = images.right;
       offsetX = CONFIG.COMBAT.SLASH_VFX_OFFSET; // Shift right
     } else if (directionIndex === 6) {
-      slashImage = this.slashImages.left;
+      vfxImage = images.left;
       offsetX = -CONFIG.COMBAT.SLASH_VFX_OFFSET; // Shift left
     }
 
-    if (!slashImage || !slashImage.complete || slashImage.naturalWidth === 0) return;
+    if (!vfxImage || !vfxImage.complete || vfxImage.naturalWidth === 0) return;
 
     const frameWidth = 64;
     const frameHeight = 64;
@@ -595,7 +611,7 @@ export class Renderer {
     
     // Draw centered on player + offset
     this.ctx.drawImage(
-      slashImage,
+      vfxImage,
       sourceX, 0, frameWidth, frameHeight,
       player.x + offsetX - drawWidth / 2,
       player.y + offsetY - drawHeight / 2,

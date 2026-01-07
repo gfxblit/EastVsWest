@@ -207,6 +207,12 @@ export const CONFIG = {
         LEFT: 'assets/vfx/slash-left.png',
         RIGHT: 'assets/vfx/slash-right.png',
       },
+      SPEAR: {
+        UP: 'assets/vfx/spear-up.png',
+        DOWN: 'assets/vfx/spear-down.png',
+        LEFT: 'assets/vfx/spear-left.png',
+        RIGHT: 'assets/vfx/spear-right.png',
+      },
     },
   },
 
