@@ -200,12 +200,21 @@ export const CONFIG = {
       PATH: 'assets/player/player-walk-spritesheet.png',
       METADATA: 'assets/player/player-walk-spritesheet.json',
     },
+    VFX: {
+      SLASH: {
+        UP: 'assets/vfx/slash-up.png',
+        DOWN: 'assets/vfx/slash-down.png',
+        LEFT: 'assets/vfx/slash-left.png',
+        RIGHT: 'assets/vfx/slash-right.png',
+      },
+    },
   },
 
   // Animation Settings
   ANIMATION: {
     FPS: 15,
     FRAMES_PER_DIRECTION: 4,
+    VFX_FPS: 25, // 5 frames over 0.2s
   },
 
   
