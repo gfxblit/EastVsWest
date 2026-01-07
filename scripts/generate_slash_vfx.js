@@ -119,20 +119,6 @@ async function main() {
   
   console.log('Generating slash (Left)...');
   // Mirror horizontally (flop)
-  // For Left, we can just flop the whole strip IF the animation is symmetric in time, 
-  // OR we should flop each frame.
-  // The requirement says "Horizontally mirror the original". 
-  // Usually for a slash, mirroring the whole strip mirrors the motion (left-to-right becomes right-to-left) AND the arc.
-  // Let's assume mirroring the whole image is fine for "Left" if the animation flows that way.
-  // HOWEVER, to be safe and consistent with "Up" and "Down" logic, let's do frame-by-frame.
-  // Actually, for "Left" vs "Right", usually you want the slash to still go outward.
-  // If we just flop the image, frame 1 (left-most) becomes frame 1 (right-most) in the new image? NO.
-  // Sharp's flop() on the whole image will swap pixels horizontally. 
-  // So the frame order would be reversed visually in the strip?
-  // 1 2 3 4 5 -> [5 mirrored] [4 mirrored] ...
-  // We want Frame 1 to still be Frame 1, but mirrored.
-  // So we MUST do frame-by-frame processing for Left as well to preserve animation timing order.
-  
   const leftSheet = await generateVariant(baseBuffer, (s) => s.flop());
   await leftSheet.toFile(path.join(OUTPUT_DIR, 'slash-left.png'));
   
