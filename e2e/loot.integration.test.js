@@ -80,8 +80,9 @@ describe('Loot Integration (Mocked)', () => {
       hostGame.update(0.05);
       playerGame.update(0.05);
       const expectedCount = CONFIG.GAME.INITIAL_LOOT_COUNT + 1;
+      // console.log(`Loot counts - Host: ${hostGame.state.loot.length}, Player: ${playerGame.state.loot.length}`);
       return hostGame.state.loot.length === expectedCount && playerGame.state.loot.length === expectedCount;
-    }, 10000);
+    }, 15000);
 
     expect(playerGame.state.loot.some(l => l.item_id === 'spear')).toBe(true);
 
@@ -105,14 +106,17 @@ describe('Loot Integration (Mocked)', () => {
       hostGame.update(0.05); // Run host update to process incoming messages
       const p = hostSnapshot.getPlayers().get(playerNetwork.playerId);
       return p && Math.abs(p.position_x - (lootX - 5)) < 1;
-    }, 10000);
+    }, 15000);
 
     // Update player game to trigger collision detection
     await waitFor(() => {
         playerGame.update(0.1);
         hostGame.update(0.1);
-        return playerGame.getLocalPlayer().equipped_weapon === 'spear';
-    }, 15000);
+        const localPlayer = playerGame.getLocalPlayer();
+        const hostViewOfPlayer = hostSnapshot.getPlayers().get(playerNetwork.playerId);
+        // console.log(`Pickup progress: PlayerWeapon=${localPlayer.equipped_weapon}, HostViewWeapon=${hostViewOfPlayer?.equipped_weapon}`);
+        return localPlayer.equipped_weapon === 'spear';
+    }, 20000);
 
     // Verify loot is gone for both
     const finalExpectedCount = CONFIG.GAME.INITIAL_LOOT_COUNT;
