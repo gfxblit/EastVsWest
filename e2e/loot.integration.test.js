@@ -166,6 +166,12 @@ describe('Loot Integration', () => {
         return localP.equipped_weapon === 'bo';
     }, 15000);
 
+    // Wait for initial loot sync (20 items)
+    await waitFor(() => {
+        playerGame.update(0.1);
+        return playerGame.state.loot.length === CONFIG.GAME.INITIAL_LOOT_COUNT;
+    }, 10000);
+
     // 3. Host spawns a spear
     const lootX = 1100;
     const lootY = 1100;
