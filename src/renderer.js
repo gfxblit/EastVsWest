@@ -569,16 +569,16 @@ export class Renderer {
 
     if (directionIndex === 4 || directionIndex === 3 || directionIndex === 5) {
       slashImage = this.slashImages.up;
-      offsetY = -CONFIG.RENDER.PLAYER_RADIUS; // Shift up slightly
+      offsetY = -CONFIG.COMBAT.SLASH_VFX_OFFSET; // Shift up
     } else if (directionIndex === 0 || directionIndex === 1 || directionIndex === 7) {
       slashImage = this.slashImages.down;
-      offsetY = CONFIG.RENDER.PLAYER_RADIUS; // Shift down slightly
+      offsetY = CONFIG.COMBAT.SLASH_VFX_OFFSET; // Shift down
     } else if (directionIndex === 2) {
       slashImage = this.slashImages.right;
-      offsetX = CONFIG.RENDER.PLAYER_RADIUS; // Shift right
+      offsetX = CONFIG.COMBAT.SLASH_VFX_OFFSET; // Shift right
     } else if (directionIndex === 6) {
       slashImage = this.slashImages.left;
-      offsetX = -CONFIG.RENDER.PLAYER_RADIUS; // Shift left
+      offsetX = -CONFIG.COMBAT.SLASH_VFX_OFFSET; // Shift left
     }
 
     if (!slashImage || !slashImage.complete || slashImage.naturalWidth === 0) return;
