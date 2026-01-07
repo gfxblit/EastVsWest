@@ -17,11 +17,30 @@ let currentViteUrl = null;
 
 /**
  * Start the Vite dev server
+ * @param {number} retries - Number of retries if port is already in use
  * @returns {Promise<string>} The URL of the server
  */
-export async function startViteServer() {
+export async function startViteServer(retries = 3) {
   if (currentViteUrl) return currentViteUrl;
 
+  try {
+    return await _startViteServer();
+  } catch (error) {
+    if (retries > 0 && error.message.includes('port conflict')) {
+      console.warn(`Vite server port conflict, retrying... (${retries} left)`);
+      // Wait a bit before retrying
+      await new Promise(resolve => setTimeout(resolve, 500));
+      return startViteServer(retries - 1);
+    }
+    throw error;
+  }
+}
+
+/**
+ * Internal helper to start the Vite dev server
+ * @returns {Promise<string>}
+ */
+async function _startViteServer() {
   const port = await getAvailablePort(5000);
   const url = `http://localhost:${port}`;
 
@@ -64,13 +83,21 @@ export async function startViteServer() {
 
     viteProcess.stderr.on('data', (data) => {
       const message = data.toString();
-      console.error('Vite server error:', message);
+      // Don't log expected warnings/info to stderr if it's just vite output
       if (message.includes('Port') && message.includes('is already in use')) {
         if (startTimeout) {
           clearTimeout(startTimeout);
           startTimeout = null;
         }
+        // Kill the process if it failed to start
+        if (viteProcess) {
+          viteProcess.kill('SIGKILL');
+          viteProcess = null;
+        }
         reject(new Error(`Vite server port conflict: ${message.trim()}`));
+      } else {
+        // Log other errors
+        console.error('Vite server stderr:', message);
       }
     });
 
@@ -87,14 +114,16 @@ export async function startViteServer() {
         clearTimeout(startTimeout);
         startTimeout = null;
       }
-      if (code !== 0 && code !== null) {
+      if (code !== 0 && code !== null && !currentViteUrl) {
         reject(new Error(`Vite server exited with code ${code}`));
       }
     });
 
     // Timeout after 30 seconds
     startTimeout = setTimeout(() => {
-      if (viteProcess) {
+      if (viteProcess && !currentViteUrl) {
+        viteProcess.kill('SIGKILL');
+        viteProcess = null;
         reject(new Error('Vite server failed to start within 30 seconds'));
       }
     }, 30000);
