@@ -1374,7 +1374,7 @@ describe('Renderer', () => {
         expect(call[6]).toBeCloseTo(expectedY);
       });
 
-      test('WhenFacingDown_ShouldReflectLateralOffset', () => {
+      test('WhenFacingDown_ShouldRotateOffsets270CCW', () => {
         const player = {
           x: 1000,
           y: 1000,
@@ -1387,8 +1387,8 @@ describe('Renderer', () => {
         renderer.renderSlashAnimation(player);
         
         const vfxOffset = CONFIG.COMBAT.THRUST_VFX_OFFSET;
-        // Right (x, y) -> Down (y, x) [Reflected lateral]
-        const expectedX = player.x + vfxOffset.y - halfDrawWidth;
+        // Right (x, y) -> Down (-y, x)
+        const expectedX = player.x - vfxOffset.y - halfDrawWidth;
         const expectedY = player.y + vfxOffset.x - halfDrawWidth;
         
         const call = ctx.drawImage.mock.calls[0];
