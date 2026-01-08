@@ -90,8 +90,15 @@ describe('Loot Integration', () => {
       // Run updates to process events
       hostGame.update(0.05);
       playerGame.update(0.05);
-      return playerGame.state.loot.some(l => l.id === spawnedSpear.id);
-    }, 15000);
+
+      const expectedCount = CONFIG.GAME.INITIAL_LOOT_COUNT + 1;
+      if (hostGame.state.loot.length !== expectedCount || playerGame.state.loot.length !== expectedCount) {
+        console.log(`Loot counts - Host: ${hostGame.state.loot.length}, Player: ${playerGame.state.loot.length} (Expected: ${expectedCount})`);
+      }
+      return hostGame.state.loot.length === expectedCount && playerGame.state.loot.length === expectedCount;
+    }, 20000);
+
+    expect(playerGame.state.loot[0].item_id).toBe('spear');
 
     // 4. Player walks over loot (unarmed)
     // ALSO update local controller state directly so collision logic sees it

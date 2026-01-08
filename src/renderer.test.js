@@ -90,8 +90,9 @@ describe('Renderer', () => {
       expect(canvas.getContext).toHaveBeenCalledWith('2d');
       expect(canvas.width).toBe(CONFIG.CANVAS.WIDTH);
       expect(canvas.height).toBe(CONFIG.CANVAS.HEIGHT);
-      // Should load background image + shadow image (sprite sheet loaded via fetch)
-      expect(global.Image).toHaveBeenCalledTimes(10);
+
+      // Should load background image + shadow image + 4 slash images + 5 weapon icons
+      expect(global.Image).toHaveBeenCalledTimes(11);
       expect(newRenderer.bgImage.src).toBe('/game-background.png');
       expect(newRenderer.shadowImage.src).toBe('/shadow.png');
     });
@@ -541,8 +542,9 @@ describe('Renderer', () => {
       newRenderer.init();
 
       // Assert
-      // Should create shadow image + background image (sprite sheet loaded via fetch)
-      expect(global.Image).toHaveBeenCalledTimes(10);
+
+      // Should create shadow image + background image + slash images + weapon icons
+      expect(global.Image).toHaveBeenCalledTimes(11);
       expect(newRenderer.shadowImage).toBeDefined();
       expect(newRenderer.shadowImage.src).toBe('/shadow.png');
     });
@@ -852,8 +854,8 @@ describe('Renderer', () => {
 
         newRenderer.init();
 
-        // Should create background image + shadow image (sprite sheet loaded via fetch)
-        expect(global.Image).toHaveBeenCalledTimes(10);
+        // Should create background image + shadow image + slash images + weapon icons
+        expect(global.Image).toHaveBeenCalledTimes(11);
       });
 
     });
@@ -1475,8 +1477,8 @@ describe('Renderer', () => {
 
       expect(ctx.arc).toHaveBeenCalledTimes(2);
       expect(ctx.fillText).toHaveBeenCalledTimes(2);
-      expect(ctx.fillText).toHaveBeenCalledWith('SPEAR', 100, 80);
-      expect(ctx.fillText).toHaveBeenCalledWith('BO', 200, 180);
+      expect(ctx.fillText).toHaveBeenCalledWith('SPEAR', 100, 75);
+      expect(ctx.fillText).toHaveBeenCalledWith('BO', 200, 175);
     });
 
     test('findNearestLoot should return closest item and distance', () => {

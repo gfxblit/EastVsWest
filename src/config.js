@@ -75,6 +75,7 @@ export const CONFIG = {
       baseDamage: 25,
       attackSpeed: 3.0, // attacks per second
       specialAbility: 'lunge',
+      icon: 'spear.png',
     },
     BATTLE_AXE: {
       id: 'battleaxe',
@@ -88,6 +89,7 @@ export const CONFIG = {
       baseDamage: 30,
       attackSpeed: 1.0,
       specialAbility: 'spin',
+      icon: 'axe.png',
     },
     GREAT_AXE: {
       id: 'greataxe',
@@ -101,6 +103,7 @@ export const CONFIG = {
       baseDamage: 45,
       attackSpeed: 0.7,
       specialAbility: 'whirlwind',
+      icon: 'waraxe.png',
     },
     GREAT_HAMMER: {
       id: 'greathammer',
@@ -114,6 +117,7 @@ export const CONFIG = {
       baseDamage: 50,
       attackSpeed: 0.6,
       specialAbility: 'smash',
+      icon: 'hammer.png',
     },
 
     // Eastern Melee Weapons
@@ -129,6 +133,7 @@ export const CONFIG = {
       baseDamage: 20,
       attackSpeed: 1.5,
       specialAbility: 'charged_smack',
+      icon: 'mace.png',
     },
     FIST: {
       id: 'fist',
@@ -220,6 +225,7 @@ export const CONFIG = {
         RIGHT: 'assets/vfx/thrust-right.png',
       },
     },
+    WEAPONS_BASE_URL: 'assets/weapons/',
   },
 
   // Animation Settings
