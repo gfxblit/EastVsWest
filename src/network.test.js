@@ -30,7 +30,7 @@ describe('Network', () => {
       const mockJoinCode = 'ABCDEF';
 
       // Mock generateJoinCode to return a fixed value
-      jest.spyOn(network, 'generateJoinCode').mockReturnValue(mockJoinCode);
+      jest.spyOn(network.sessionManager, 'generateJoinCode').mockReturnValue(mockJoinCode);
 
       const mockSession = {
         id: 'mock-session-id',
@@ -111,6 +111,16 @@ describe('Network', () => {
 
       expect(network.isHost).toBe(false);
       expect(network.joinCode).toBe(null);
+    });
+
+    test('should throw an error if Supabase client is not initialized', async () => {
+      network.sessionManager.supabase = null; // Unset supabase
+      await expect(network.hostGame('Player 1')).rejects.toThrow('Supabase client not initialized');
+    });
+
+    test('should throw an error if player ID is not set', async () => {
+      network.playerId = null; // Unset playerId
+      await expect(network.hostGame('Player 1')).rejects.toThrow('Player ID not set');
     });
   });
 
@@ -346,6 +356,16 @@ describe('Network', () => {
 
       await expect(network.joinGame(MOCK_JOIN_CODE, MOCK_PLAYER_NAME))
         .rejects.toThrow('Session is not joinable');
+    });
+
+    test('should throw an error if Supabase client is not initialized', async () => {
+      network.sessionManager.supabase = null; // Unset supabase
+      await expect(network.joinGame(MOCK_JOIN_CODE, 'Player 2')).rejects.toThrow('Supabase client not initialized');
+    });
+
+    test('should throw an error if player ID is not set', async () => {
+      network.playerId = null; // Unset playerId
+      await expect(network.joinGame(MOCK_JOIN_CODE, 'Player 2')).rejects.toThrow('Player ID not set');
     });
   });
 

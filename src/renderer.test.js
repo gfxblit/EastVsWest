@@ -68,7 +68,9 @@ describe('Renderer', () => {
       createPattern: jest.fn(() => 'mock-pattern'),
       rect: jest.fn(),
       fillText: jest.fn(),
+      drawImage: jest.fn(),
       measureText: jest.fn(() => ({ width: 100 })),
+      canvas: canvas, // Link context back to canvas for ctx.canvas access
     };
     canvas.getContext = jest.fn(() => ctx);
     renderer = new Renderer(canvas);
@@ -93,8 +95,8 @@ describe('Renderer', () => {
 
       // Should load background image + shadow image + 4 slash images + 4 thrust images + 5 weapon icons
       expect(global.Image).toHaveBeenCalledTimes(15);
-      expect(newRenderer.bgImage.src).toBe('/game-background.png');
-      expect(newRenderer.shadowImage.src).toBe('/shadow.png');
+      expect(newRenderer.worldRenderer.bgImage.src).toBe('/game-background.png');
+      expect(newRenderer.playerRenderer.shadowImage.src).toBe('/shadow.png');
     });
 
     test('WhenImageLoads_ShouldCreatePattern', () => {
@@ -102,10 +104,10 @@ describe('Renderer', () => {
       newRenderer.init();
 
       // Simulate background image load
-      newRenderer.bgImage.onload();
+      newRenderer.worldRenderer.bgImage.onload();
 
-      expect(ctx.createPattern).toHaveBeenCalledWith(newRenderer.bgImage, 'repeat');
-      expect(newRenderer.bgPattern).toBe('mock-pattern');
+      expect(ctx.createPattern).toHaveBeenCalledWith(newRenderer.worldRenderer.bgImage, 'repeat');
+      expect(newRenderer.worldRenderer.bgPattern).toBe('mock-pattern');
     });
     test('WhenBaseUrlIsPresent_ShouldPrefixImagePaths', () => {
       // Temporarily change base URL in config
@@ -116,7 +118,7 @@ describe('Renderer', () => {
       newRenderer.init();
       
       // Expect paths to be prefixed with custom base
-      expect(newRenderer.bgImage.src).toContain('/custom-base/game-background.png');
+      expect(newRenderer.worldRenderer.bgImage.src).toContain('/custom-base/game-background.png');
       
       // Restore config
       CONFIG.ASSETS.BASE_URL = originalBase;
@@ -263,8 +265,8 @@ describe('Renderer', () => {
     test('WhenRenderingWithCamera_ShouldDrawBackgroundInWorldCoordinates', () => {
       // Arrange
       // Trigger background image load
-      if (renderer.bgImage && renderer.bgImage.onload) {
-        renderer.bgImage.onload();
+      if (renderer.worldRenderer.bgImage && renderer.worldRenderer.bgImage.onload) {
+        renderer.worldRenderer.bgImage.onload();
       }
 
       const gameState = {
@@ -350,7 +352,7 @@ describe('Renderer', () => {
       };
 
       // Act
-      renderer.renderEdgeIndicators(playersSnapshot, null, camera);
+      renderer.uiRenderer.renderEdgeIndicators(ctx, playersSnapshot, null, camera);
 
       // Assert
       // Should render indicator (checking that drawing methods were called)
@@ -382,7 +384,7 @@ describe('Renderer', () => {
       ctx.beginPath.mockClear();
 
       // Act
-      renderer.renderEdgeIndicators(playersSnapshot, null, camera);
+      renderer.uiRenderer.renderEdgeIndicators(ctx, playersSnapshot, null, camera);
 
       // Assert
       // Should not call drawing methods (no indicators to render)
@@ -410,7 +412,7 @@ describe('Renderer', () => {
       };
 
       // Act
-      renderer.renderEdgeIndicators(null, null, camera, gameState.loot);
+      renderer.uiRenderer.renderEdgeIndicators(ctx, null, null, camera, gameState.loot);
 
       // Assert
       // Should render indicator
@@ -428,11 +430,11 @@ describe('Renderer', () => {
       };
 
       // Act
-      renderer.renderConflictZone(conflictZone);
+      renderer.worldRenderer.renderConflictZone(ctx, conflictZone);
 
       // Assert
       // Should render zone at world coordinates (1200, 800)
-      expect(ctx.arc).toHaveBeenCalledWith(1200, 800, 600, 0, Math.PI * 2);
+      expect(ctx.arc).toHaveBeenCalledWith(1200, 800, 600, 0, Math.PI * 2, true);
     });
 
     test('WhenRenderingConflictZoneDangerOverlay_ShouldCoverEntireWorld', () => {
@@ -444,7 +446,7 @@ describe('Renderer', () => {
       };
 
       // Act
-      renderer.renderConflictZone(conflictZone);
+      renderer.worldRenderer.renderConflictZone(ctx, conflictZone);
 
       // Assert
       // Danger overlay should cover entire world, not just viewport
@@ -462,12 +464,12 @@ describe('Renderer', () => {
     test('WhenRenderingPlayer_ShouldUseWorldCoordinates', () => {
       // Arrange
       // Mock sprite sheet as loaded
-      renderer.spriteSheet = {
+      renderer.assetManager.spriteSheet = {
         complete: true,
         naturalWidth: 576,
         naturalHeight: 768,
       };
-      renderer.spriteSheetMetadata = {
+      renderer.assetManager.spriteSheetMetadata = {
         frameWidth: 96,
         frameHeight: 96,
         columns: 6,
@@ -492,7 +494,7 @@ describe('Renderer', () => {
       };
 
       // Act
-      renderer.renderPlayer(player, false);
+      renderer.playerRenderer.render(ctx, player, false);
 
       // Assert
       // Should render player using sprite sheet at world coordinates (1500, 900)
@@ -510,25 +512,13 @@ describe('Renderer', () => {
       ctx.drawImage = jest.fn();
 
       // Mock shadow image as loaded
-      renderer.shadowImage = {
+      renderer.playerRenderer.shadowImage = {
         complete: true,
         naturalWidth: 100,
         width: 96,
         height: 96,
         src: '/shadow.png',
       };
-
-      // Mock directional images as loaded
-      renderer.directionalImages = [];
-      for (let i = 0; i < 8; i++) {
-        renderer.directionalImages[i] = {
-          complete: true,
-          naturalWidth: 100,
-          width: 96,
-          height: 96,
-          src: `/white-male-${i}.png`,
-        };
-      }
     });
 
     test('WhenInitialized_ShouldLoadShadowImage', () => {
@@ -545,19 +535,19 @@ describe('Renderer', () => {
 
       // Should create shadow image + background image + slash images + thrust images + weapon icons
       expect(global.Image).toHaveBeenCalledTimes(15);
-      expect(newRenderer.shadowImage).toBeDefined();
-      expect(newRenderer.shadowImage.src).toBe('/shadow.png');
+      expect(newRenderer.playerRenderer.shadowImage).toBeDefined();
+      expect(newRenderer.playerRenderer.shadowImage.src).toBe('/shadow.png');
     });
 
     test('WhenRenderingPlayer_ShouldRenderShadowBeforePlayerSprite', () => {
       // Arrange
       // Mock sprite sheet as loaded
-      renderer.spriteSheet = {
+      renderer.assetManager.spriteSheet = {
         complete: true,
         naturalWidth: 576,
         naturalHeight: 768,
       };
-      renderer.spriteSheetMetadata = {
+      renderer.assetManager.spriteSheetMetadata = {
         frameWidth: 96,
         frameHeight: 96,
         columns: 6,
@@ -584,28 +574,28 @@ describe('Renderer', () => {
       });
 
       // Act
-      renderer.renderPlayer(player, false);
+      renderer.playerRenderer.render(ctx, player, false);
 
       // Assert
       // Should call drawImage twice: once for shadow, once for player sprite sheet
       expect(ctx.drawImage).toHaveBeenCalledTimes(2);
 
       // First call should be shadow (rendered before player)
-      expect(drawImageCalls[0][0]).toBe(renderer.shadowImage);
+      expect(drawImageCalls[0][0]).toBe(renderer.playerRenderer.shadowImage);
 
       // Second call should be player sprite sheet
-      expect(drawImageCalls[1][0]).toBe(renderer.spriteSheet);
+      expect(drawImageCalls[1][0]).toBe(renderer.assetManager.spriteSheet);
     });
 
     test('WhenRenderingPlayer_ShouldPositionShadowAtPlayerLocation', () => {
       // Arrange
       // Mock sprite sheet as loaded
-      renderer.spriteSheet = {
+      renderer.assetManager.spriteSheet = {
         complete: true,
         naturalWidth: 576,
         naturalHeight: 768,
       };
-      renderer.spriteSheetMetadata = {
+      renderer.assetManager.spriteSheetMetadata = {
         frameWidth: 96,
         frameHeight: 96,
         columns: 6,
@@ -632,7 +622,7 @@ describe('Renderer', () => {
       });
 
       // Act
-      renderer.renderPlayer(player, false);
+      renderer.playerRenderer.render(ctx, player, false);
 
       // Assert
       // Shadow should be centered at player position
@@ -651,12 +641,12 @@ describe('Renderer', () => {
       const rotations = [0, Math.PI / 4, Math.PI / 2, Math.PI, 3 * Math.PI / 2];
 
       // Mock sprite sheet as loaded
-      renderer.spriteSheet = {
+      renderer.assetManager.spriteSheet = {
         complete: true,
         naturalWidth: 576,
         naturalHeight: 768,
       };
-      renderer.spriteSheetMetadata = {
+      renderer.assetManager.spriteSheetMetadata = {
         frameWidth: 96,
         frameHeight: 96,
         columns: 6,
@@ -685,24 +675,24 @@ describe('Renderer', () => {
         };
 
         // Act
-        renderer.renderPlayer(player, false);
+        renderer.playerRenderer.render(ctx, player, false);
 
         // Assert
         // Shadow should always use the same image regardless of rotation
         const shadowCall = drawImageCalls[0];
-        expect(shadowCall[0]).toBe(renderer.shadowImage);
+        expect(shadowCall[0]).toBe(renderer.playerRenderer.shadowImage);
       }
     });
 
     test('WhenRenderingLocalPlayer_ShouldRenderShadow', () => {
       // Arrange
       // Mock sprite sheet as loaded
-      renderer.spriteSheet = {
+      renderer.assetManager.spriteSheet = {
         complete: true,
         naturalWidth: 576,
         naturalHeight: 768,
       };
-      renderer.spriteSheetMetadata = {
+      renderer.assetManager.spriteSheetMetadata = {
         frameWidth: 96,
         frameHeight: 96,
         columns: 6,
@@ -729,24 +719,24 @@ describe('Renderer', () => {
       });
 
       // Act
-      renderer.renderPlayer(player, true); // isLocal = true
+      renderer.playerRenderer.render(ctx, player, true); // isLocal = true
 
       // Assert
       // Should render shadow even for local player
-      expect(drawImageCalls[0][0]).toBe(renderer.shadowImage);
+      expect(drawImageCalls[0][0]).toBe(renderer.playerRenderer.shadowImage);
     });
 
     test('WhenShadowImageNotLoaded_ShouldSkipShadowRendering', () => {
       // Arrange
-      renderer.shadowImage = null;
+      renderer.playerRenderer.shadowImage = null;
 
       // Mock sprite sheet as loaded
-      renderer.spriteSheet = {
+      renderer.assetManager.spriteSheet = {
         complete: true,
         naturalWidth: 576,
         naturalHeight: 768,
       };
-      renderer.spriteSheetMetadata = {
+      renderer.assetManager.spriteSheetMetadata = {
         frameWidth: 96,
         frameHeight: 96,
         columns: 6,
@@ -773,12 +763,12 @@ describe('Renderer', () => {
       });
 
       // Act
-      renderer.renderPlayer(player, false);
+      renderer.playerRenderer.render(ctx, player, false);
 
       // Assert
       // Should only render player sprite sheet, not shadow
       expect(ctx.drawImage).toHaveBeenCalledTimes(1);
-      expect(drawImageCalls[0][0]).toBe(renderer.spriteSheet);
+      expect(drawImageCalls[0][0]).toBe(renderer.assetManager.spriteSheet);
     });
   });
 
@@ -864,12 +854,12 @@ describe('Renderer', () => {
 
       test('WhenRenderingPlayerFacingSouth_ShouldDrawFrame0', () => {
         // Mock sprite sheet as loaded
-        renderer.spriteSheet = {
+        renderer.assetManager.spriteSheet = {
           complete: true,
           naturalWidth: 576,
           naturalHeight: 768,
         };
-        renderer.spriteSheetMetadata = {
+        renderer.assetManager.spriteSheetMetadata = {
           frameWidth: 96,
           frameHeight: 96,
           columns: 6,
@@ -890,7 +880,7 @@ describe('Renderer', () => {
           },
         };
 
-        renderer.renderPlayer(player, false);
+        renderer.playerRenderer.render(ctx, player, false);
 
         // Should draw from sprite sheet (using renderPlayerWithSpriteSheet)
         expect(ctx.drawImage).toHaveBeenCalled();
@@ -898,12 +888,12 @@ describe('Renderer', () => {
 
       test('WhenRenderingPlayerFacingEast_ShouldDrawFrame2', () => {
         // Mock sprite sheet as loaded
-        renderer.spriteSheet = {
+        renderer.assetManager.spriteSheet = {
           complete: true,
           naturalWidth: 576,
           naturalHeight: 768,
         };
-        renderer.spriteSheetMetadata = {
+        renderer.assetManager.spriteSheetMetadata = {
           frameWidth: 96,
           frameHeight: 96,
           columns: 6,
@@ -924,7 +914,7 @@ describe('Renderer', () => {
           },
         };
 
-        renderer.renderPlayer(player, false);
+        renderer.playerRenderer.render(ctx, player, false);
 
         // Should draw from sprite sheet (using renderPlayerWithSpriteSheet)
         expect(ctx.drawImage).toHaveBeenCalled();
@@ -932,12 +922,12 @@ describe('Renderer', () => {
 
       test('WhenRenderingPlayer_ShouldCenterImageOnPlayerPosition', () => {
         // Mock sprite sheet as loaded
-        renderer.spriteSheet = {
+        renderer.assetManager.spriteSheet = {
           complete: true,
           naturalWidth: 576,
           naturalHeight: 768,
         };
-        renderer.spriteSheetMetadata = {
+        renderer.assetManager.spriteSheetMetadata = {
           frameWidth: 96,
           frameHeight: 96,
           columns: 6,
@@ -958,7 +948,7 @@ describe('Renderer', () => {
           },
         };
 
-        renderer.renderPlayer(player, false);
+        renderer.playerRenderer.render(ctx, player, false);
 
         // Image should be centered on player position (using sprite sheet)
         expect(ctx.drawImage).toHaveBeenCalled();
@@ -980,12 +970,12 @@ describe('Renderer', () => {
 
       test('WhenRenderingLocalPlayer_ShouldDrawImageAndWhiteOutline', () => {
         // Mock sprite sheet as loaded
-        renderer.spriteSheet = {
+        renderer.assetManager.spriteSheet = {
           complete: true,
           naturalWidth: 576,
           naturalHeight: 768,
         };
-        renderer.spriteSheetMetadata = {
+        renderer.assetManager.spriteSheetMetadata = {
           frameWidth: 96,
           frameHeight: 96,
           columns: 6,
@@ -1006,7 +996,7 @@ describe('Renderer', () => {
           },
         };
 
-        renderer.renderPlayer(player, true); // isLocal = true
+        renderer.playerRenderer.render(ctx, player, true); // isLocal = true
 
         // Should draw the sprite from sprite sheet
         expect(ctx.drawImage).toHaveBeenCalled();
@@ -1038,23 +1028,23 @@ describe('Renderer', () => {
         const newRenderer = new Renderer(canvas);
 
         // Start loading sprite sheet
-        const loadPromise = newRenderer.loadSpriteSheet();
+        const loadPromise = newRenderer.assetManager.loadSpriteSheet();
 
         // Simulate image load completion after event loop tick
         setTimeout(() => {
-          if (newRenderer.spriteSheet && newRenderer.spriteSheet.onload) {
-            newRenderer.spriteSheet.onload();
+          if (newRenderer.assetManager.spriteSheet && newRenderer.assetManager.spriteSheet.onload) {
+            newRenderer.assetManager.spriteSheet.onload();
           }
         }, 0);
 
         await loadPromise;
 
-        expect(newRenderer.spriteSheet).toBeDefined();
-        expect(newRenderer.spriteSheetMetadata).toBeDefined();
-        expect(newRenderer.spriteSheetMetadata.frameWidth).toBe(96);
-        expect(newRenderer.spriteSheetMetadata.frameHeight).toBe(96);
-        expect(newRenderer.spriteSheetMetadata.columns).toBe(6);
-        expect(newRenderer.spriteSheetMetadata.rows).toBe(8);
+        expect(newRenderer.assetManager.spriteSheet).toBeDefined();
+        expect(newRenderer.assetManager.spriteSheetMetadata).toBeDefined();
+        expect(newRenderer.assetManager.spriteSheetMetadata.frameWidth).toBe(96);
+        expect(newRenderer.assetManager.spriteSheetMetadata.frameHeight).toBe(96);
+        expect(newRenderer.assetManager.spriteSheetMetadata.columns).toBe(6);
+        expect(newRenderer.assetManager.spriteSheetMetadata.rows).toBe(8);
       });
 
       test('WhenMetadataLoadFails_ShouldHandleGracefully', async () => {
@@ -1066,7 +1056,7 @@ describe('Renderer', () => {
         );
 
         const newRenderer = new Renderer(canvas);
-        await expect(newRenderer.loadSpriteSheet()).rejects.toThrow();
+        await expect(newRenderer.assetManager.loadSpriteSheet()).resolves.toBe(false);
       });
     });
 
@@ -1143,12 +1133,12 @@ describe('Renderer', () => {
     describe('renderPlayerWithSpriteSheet', () => {
       beforeEach(() => {
         // Mock sprite sheet as loaded
-        renderer.spriteSheet = {
+        renderer.assetManager.spriteSheet = {
           complete: true,
           naturalWidth: 576, // 6 columns * 96px
           naturalHeight: 768, // 8 rows * 96px
         };
-        renderer.spriteSheetMetadata = {
+        renderer.assetManager.spriteSheetMetadata = {
           frameWidth: 96,
           frameHeight: 96,
           columns: 6,
@@ -1170,13 +1160,13 @@ describe('Renderer', () => {
           },
         };
 
-        renderer.renderPlayerWithSpriteSheet(player, false);
+        renderer.playerRenderer.render(ctx, player, false);
 
         // Should draw frame from sprite sheet
         // sourceX = currentFrame * frameWidth = 2 * 96 = 192
         // sourceY = lastDirection * frameHeight = 4 * 96 = 384
         expect(ctx.drawImage).toHaveBeenCalledWith(
-          renderer.spriteSheet,
+          renderer.assetManager.spriteSheet,
           192, // sourceX
           384, // sourceY
           96,  // sourceWidth
@@ -1189,7 +1179,7 @@ describe('Renderer', () => {
       });
 
       test('WhenSpriteSheetNotLoaded_ShouldFallbackToPinkRectangle', () => {
-        renderer.spriteSheet = null;
+        renderer.assetManager.spriteSheet = null;
 
         const player = {
           id: 'player-1',
@@ -1202,7 +1192,7 @@ describe('Renderer', () => {
           },
         };
 
-        renderer.renderPlayerWithSpriteSheet(player, false);
+        renderer.playerRenderer.render(ctx, player, false);
 
         // Should draw fallback rectangle
         expect(ctx.fillRect).toHaveBeenCalled();
@@ -1222,13 +1212,13 @@ describe('Renderer', () => {
           },
         };
 
-        renderer.renderPlayerWithSpriteSheet(player, false);
+        renderer.playerRenderer.render(ctx, player, false);
 
         // Should draw first frame (idle) from East direction row
         // sourceX = 0 * 96 = 0
         // sourceY = 2 * 96 = 192
         expect(ctx.drawImage).toHaveBeenCalledWith(
-          renderer.spriteSheet,
+          renderer.assetManager.spriteSheet,
           0,   // sourceX (idle frame)
           192, // sourceY (East row)
           96,
@@ -1249,8 +1239,8 @@ describe('Renderer', () => {
       // Mock images as loaded
       const directions = ['up', 'down', 'left', 'right'];
       directions.forEach(dir => {
-        renderer.slashImages[dir] = { complete: true, naturalWidth: 64, naturalHeight: 64 };
-        renderer.thrustImages[dir] = { complete: true, naturalWidth: 64, naturalHeight: 64 };
+        renderer.playerRenderer.slashImages[dir] = { complete: true, naturalWidth: 64, naturalHeight: 64 };
+        renderer.playerRenderer.thrustImages[dir] = { complete: true, naturalWidth: 64, naturalHeight: 64 };
       });
     });
 
@@ -1264,11 +1254,11 @@ describe('Renderer', () => {
         equipped_weapon: 'battleaxe', // Slashing weapon
       };
 
-      renderer.renderSlashAnimation(player);
+      renderer.playerRenderer.renderSlashAnimation(ctx, player);
 
       expect(ctx.drawImage).toHaveBeenCalled();
       const firstCall = ctx.drawImage.mock.calls[0];
-      expect(firstCall[0]).toBe(renderer.slashImages.right);
+      expect(firstCall[0]).toBe(renderer.playerRenderer.slashImages.right);
     });
 
     test('WhenPlayerAttacksWithSpear_ShouldUseThrustImages', () => {
@@ -1281,11 +1271,11 @@ describe('Renderer', () => {
         equipped_weapon: 'spear', // Piercing weapon
       };
 
-      renderer.renderSlashAnimation(player);
+      renderer.playerRenderer.renderSlashAnimation(ctx, player);
 
       expect(ctx.drawImage).toHaveBeenCalled();
       const firstCall = ctx.drawImage.mock.calls[0];
-      expect(firstCall[0]).toBe(renderer.thrustImages.right);
+      expect(firstCall[0]).toBe(renderer.playerRenderer.thrustImages.right);
     });
 
     test('WhenPlayerAttacksFacingNorth_ShouldUseUpImages', () => {
@@ -1298,11 +1288,11 @@ describe('Renderer', () => {
         equipped_weapon: 'spear',
       };
 
-      renderer.renderSlashAnimation(player);
+      renderer.playerRenderer.renderSlashAnimation(ctx, player);
 
       expect(ctx.drawImage).toHaveBeenCalled();
       const firstCall = ctx.drawImage.mock.calls[0];
-      expect(firstCall[0]).toBe(renderer.thrustImages.up);
+      expect(firstCall[0]).toBe(renderer.playerRenderer.thrustImages.up);
     });
 
     describe('VFX Offset Rotation', () => {
@@ -1321,7 +1311,7 @@ describe('Renderer', () => {
           equipped_weapon: 'spear',
         };
 
-        renderer.renderSlashAnimation(player);
+        renderer.playerRenderer.renderSlashAnimation(ctx, player);
         
         const vfxOffset = CONFIG.COMBAT.THRUST_VFX_OFFSET;
         const expectedX = player.x + vfxOffset.x - halfDrawWidth;
@@ -1342,7 +1332,7 @@ describe('Renderer', () => {
           equipped_weapon: 'spear',
         };
 
-        renderer.renderSlashAnimation(player);
+        renderer.playerRenderer.renderSlashAnimation(ctx, player);
         
         const vfxOffset = CONFIG.COMBAT.THRUST_VFX_OFFSET;
         // Right (x, y) -> Up (y, -x)
@@ -1364,7 +1354,7 @@ describe('Renderer', () => {
           equipped_weapon: 'spear',
         };
 
-        renderer.renderSlashAnimation(player);
+        renderer.playerRenderer.renderSlashAnimation(ctx, player);
         
         const vfxOffset = CONFIG.COMBAT.THRUST_VFX_OFFSET;
         // Right (x, y) -> Left (-x, y) [Reflected lateral]
@@ -1386,7 +1376,7 @@ describe('Renderer', () => {
           equipped_weapon: 'spear',
         };
 
-        renderer.renderSlashAnimation(player);
+        renderer.playerRenderer.renderSlashAnimation(ctx, player);
         
         const vfxOffset = CONFIG.COMBAT.THRUST_VFX_OFFSET;
         // Right (x, y) -> Down (-y, x)
@@ -1402,10 +1392,10 @@ describe('Renderer', () => {
 
   describe('Floating Text', () => {
     test('addFloatingText should add text to floatingTexts array', () => {
-      renderer.addFloatingText(100, 200, '50', '#ff0000');
+      renderer.uiRenderer.addFloatingText(100, 200, '50', '#ff0000');
       
-      expect(renderer.floatingTexts).toHaveLength(1);
-      const text = renderer.floatingTexts[0];
+      expect(renderer.uiRenderer.floatingTexts).toHaveLength(1);
+      const text = renderer.uiRenderer.floatingTexts[0];
       
       // Check properties (with allowance for random offset)
       expect(text.x).toBeCloseTo(100, -2); // within ~50 units? +/- 20 offset
@@ -1425,7 +1415,7 @@ describe('Renderer', () => {
       };
       
       // Inject directly into renderer's list
-      renderer.floatingTexts = [mockText];
+      renderer.uiRenderer.floatingTexts = [mockText];
       
       const gameState = {
         conflictZone: { centerX: 600, centerY: 400, radius: 300 },
@@ -1451,7 +1441,7 @@ describe('Renderer', () => {
         isExpired: jest.fn(() => true),
       };
       
-      renderer.floatingTexts = [activeText, expiredText];
+      renderer.uiRenderer.floatingTexts = [activeText, expiredText];
       
       const gameState = {
         conflictZone: { centerX: 600, centerY: 400, radius: 300 },
@@ -1460,9 +1450,9 @@ describe('Renderer', () => {
 
       renderer.render(gameState, null, null, null, 0.016);
       
-      expect(renderer.floatingTexts).toHaveLength(1);
-      expect(renderer.floatingTexts).toContain(activeText);
-      expect(renderer.floatingTexts).not.toContain(expiredText);
+      expect(renderer.uiRenderer.floatingTexts).toHaveLength(1);
+      expect(renderer.uiRenderer.floatingTexts).toContain(activeText);
+      expect(renderer.uiRenderer.floatingTexts).not.toContain(expiredText);
     });
   });
 
@@ -1473,7 +1463,7 @@ describe('Renderer', () => {
         { id: '2', item_id: 'bo', x: 200, y: 200 }
       ];
 
-      renderer.renderLoot(lootItems);
+      renderer.lootRenderer.render(ctx, lootItems);
 
       expect(ctx.arc).toHaveBeenCalledTimes(2);
       expect(ctx.fillText).toHaveBeenCalledTimes(2);
@@ -1488,7 +1478,7 @@ describe('Renderer', () => {
         { id: '2', x: 60, y: 60 }    // distance ~14.1
       ];
 
-      const result = renderer.findNearestLoot(player, lootItems);
+      const result = renderer.uiRenderer.findNearestLoot(player, lootItems);
 
       expect(result.item.id).toBe('2');
       expect(result.distance).toBeLessThan(15);
@@ -1500,7 +1490,7 @@ describe('Renderer', () => {
       
       ctx.measureText.mockReturnValue({ width: 100 });
 
-      renderer.renderInteractionPrompt(player, item);
+      renderer.uiRenderer.renderInteractionPrompt(ctx, player, item);
 
       expect(ctx.fillText).toHaveBeenCalledWith(
         expect.stringContaining('Picking up spear'),
@@ -1515,7 +1505,7 @@ describe('Renderer', () => {
       
       ctx.measureText.mockReturnValue({ width: 100 });
 
-      renderer.renderInteractionPrompt(player, item);
+      renderer.uiRenderer.renderInteractionPrompt(ctx, player, item);
 
       expect(ctx.fillText).toHaveBeenCalledWith(
         expect.stringContaining('swap bo for spear'),
@@ -1525,4 +1515,3 @@ describe('Renderer', () => {
     });
   });
 });
-

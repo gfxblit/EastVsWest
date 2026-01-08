@@ -4,6 +4,7 @@
  */
 
 import { CONFIG } from './config.js';
+import { SessionManager } from './SessionManager.js';
 
 class EventEmitter {
   constructor() {
@@ -44,126 +45,21 @@ export class Network extends EventEmitter {
     this.hostId = null; // Track host ID for authorization checks
     this.channel = null;
     this.playerStateWriteInterval = null; // Interval for generic periodic DB writes
+    this.sessionManager = null;
   }
 
   initialize(supabaseClient, playerId) {
     this.supabase = supabaseClient;
     this.playerId = playerId;
+    this.sessionManager = new SessionManager(this.supabase, this);
   }
 
   async hostGame(playerName) {
-    if (!this.supabase) throw new Error('Supabase client not initialized.');
-    if (!this.playerId) throw new Error('Player ID not set.');
-
-    const newJoinCode = this.generateJoinCode();
-    const channelName = `game_session:${newJoinCode}`;
-
-    const { data: sessionData, error: sessionError } = await this.supabase
-      .from('game_sessions')
-      .insert({
-        join_code: newJoinCode,
-        host_id: this.playerId,
-        realtime_channel_name: channelName,
-      })
-      .select()
-      .single();
-
-    if (sessionError) throw sessionError;
-
-    this.sessionId = sessionData.id;
-    this.isHost = true;
-    this.joinCode = newJoinCode;
-    this.hostId = this.playerId; // Track host ID
-
-    // Subscribe to channel and postgres changes
-    await this._subscribeToChannel(channelName);
-
-    const { data: playerRecord, error: playerError } = await this.supabase
-      .from('session_players')
-      .insert({
-        session_id: this.sessionId,
-        player_id: this.playerId,
-        player_name: playerName,
-        is_host: true,
-        position_x: CONFIG.WORLD.WIDTH / 2,
-        position_y: CONFIG.WORLD.HEIGHT / 2,
-        equipped_weapon: 'fist',
-      })
-      .select()
-      .single();
-    
-    if (playerError) throw playerError;
-
-    // Local player list will be updated via postgres_changes event
-    return { session: sessionData, player: playerRecord };
+      return this.sessionManager.hostGame(playerName);
   }
 
   async joinGame(joinCode, playerName) {
-    if (!this.supabase) throw new Error('Supabase client not initialized.');
-    if (!this.playerId) throw new Error('Player ID not set.');
-
-    // 1. Get session info via RPC
-    const { data: sessionData, error: sessionError } = await this.supabase
-      .rpc('get_session_by_join_code', { p_join_code: joinCode });
-
-    if (sessionError) throw sessionError;
-    if (!sessionData || sessionData.length === 0) throw new Error('Session not found');
-
-    const session = sessionData[0];
-    if (session.status !== 'lobby') throw new Error('Session is not joinable.');
-
-    this.sessionId = session.id;
-    this.isHost = false;
-    this.joinCode = joinCode;
-    this.hostId = session.host_id; // Track host ID for authorization
-
-    // 2. Client-authoritative join: Self-insert into session_players FIRST
-    // This ensures RLS policies allow us to read/listen to other players in this session
-    let playerRecord;
-    
-    const { data: newPlayerRecord, error: insertError } = await this.supabase
-      .from('session_players')
-      .insert({
-        session_id: this.sessionId,
-        player_id: this.playerId,
-        player_name: playerName,
-        is_host: false,
-        position_x: CONFIG.WORLD.WIDTH / 2,
-        position_y: CONFIG.WORLD.HEIGHT / 2,
-        equipped_weapon: 'fist',
-      })
-      .select()
-      .single();
-
-    if (insertError) {
-      if (insertError.code === '23505') { // Unique constraint violation
-        console.log('Player already in session. Reconnecting...');
-        // Fetch the existing record
-        const { data: existingPlayer, error: fetchError } = await this.supabase
-          .from('session_players')
-          .select('*')
-          .eq('session_id', this.sessionId)
-          .eq('player_id', this.playerId)
-          .single();
-          
-        if (fetchError) throw fetchError;
-        playerRecord = existingPlayer;
-      } else {
-        throw insertError;
-      }
-    } else {
-      playerRecord = newPlayerRecord;
-    }
-
-    // 3. Subscribe to channel and postgres changes
-    await this._subscribeToChannel(session.realtime_channel_name);
-
-    this.connected = true;
-
-    return {
-      session,
-      player: playerRecord
-    };
+      return this.sessionManager.joinGame(joinCode, playerName);
   }
 
   _subscribeToChannel(channelName) {
@@ -221,36 +117,7 @@ export class Network extends EventEmitter {
   }
 
   async _enforceMaxPlayers() {
-    if (!this.isHost || !this.sessionId) return;
-
-    // Get current players sorted by join time from database
-    const { data: players, error: playersError } = await this.supabase
-      .from('session_players')
-      .select('*')
-      .eq('session_id', this.sessionId)
-      .order('joined_at', { ascending: true });
-
-    if (playersError) {
-      console.error(`Failed to fetch players for max enforcement: ${playersError.message}`);
-      return;
-    }
-
-    const { data: session } = await this.supabase
-      .from('game_sessions')
-      .select('max_players')
-      .eq('id', this.sessionId)
-      .single();
-
-    if (players.length > session.max_players) {
-      console.log(`Host: Session full (${players.length}/${session.max_players}). Evicting latest joiners.`);
-      const excessPlayers = players.slice(session.max_players);
-      for (const p of excessPlayers) {
-        await this.supabase
-          .from('session_players')
-          .delete()
-          .eq('id', p.id);
-      }
-    }
+      return this.sessionManager.enforceMaxPlayers();
   }
 
   // FUTURE: Host-authoritative health persistence (not yet implemented)
@@ -395,39 +262,7 @@ export class Network extends EventEmitter {
    * Leave the current game session and clean up database records
    */
   async leaveGame() {
-    if (!this.supabase || !this.sessionId) {
-      this.disconnect();
-      return;
-    }
-
-    try {
-      if (this.isHost) {
-        // Broadcast session termination to all clients before deleting
-        this.send('session_terminated', {
-          reason: 'host_left',
-          message: 'The host has left the game. The session has ended.'
-        });
-
-        // Host leaving deletes the entire session (cascades to players)
-        const { error } = await this.supabase
-          .from('game_sessions')
-          .delete()
-          .eq('id', this.sessionId);
-        if (error) throw error;
-      } else {
-        // Non-host player leaving deletes only their own record
-        const { error } = await this.supabase
-          .from('session_players')
-          .delete()
-          .eq('session_id', this.sessionId)
-          .eq('player_id', this.playerId);
-        if (error) throw error;
-      }
-    } catch (error) {
-      console.error('Error leaving game:', error.message);
-    } finally {
-      this.disconnect();
-    }
+      return this.sessionManager.leaveGame();
   }
 
   disconnect() {
@@ -437,14 +272,5 @@ export class Network extends EventEmitter {
       this.channel = null;
     }
     this.connected = false;
-  }
-
-  generateJoinCode() {
-    const chars = 'ABCDEFGHJKLMNPQRSTUVWXYZ23456789';
-    let code = '';
-    for (let i = 0; i < 6; i++) {
-      code += chars.charAt(Math.floor(Math.random() * chars.length));
-    }
-    return code;
   }
 }
