@@ -573,10 +573,12 @@ export class Renderer {
     let offsetX = 0;
     let offsetY = 0;
 
-    // Determine which VFX images to use based on weapon's vfxType
+    // Determine which VFX images and settings to use based on weapon's vfxType
     const weaponConfig = Object.values(CONFIG.WEAPONS).find(w => w.id === player.equipped_weapon);
     const vfxType = weaponConfig ? weaponConfig.vfxType : 'slash';
     const images = vfxType === 'thrust' ? this.thrustImages : this.slashImages;
+    const vfxOffset = vfxType === 'thrust' ? CONFIG.COMBAT.THRUST_VFX_OFFSET : CONFIG.COMBAT.SLASH_VFX_OFFSET;
+    const vfxScale = vfxType === 'thrust' ? CONFIG.COMBAT.THRUST_VFX_SCALE : CONFIG.COMBAT.SLASH_VFX_SCALE;
 
     // Map 8-way direction to 4-way sprites
     // North (4), NE (3), NW (5) -> UP
@@ -586,16 +588,16 @@ export class Renderer {
 
     if (directionIndex === 4 || directionIndex === 3 || directionIndex === 5) {
       vfxImage = images.up;
-      offsetY = -CONFIG.COMBAT.SLASH_VFX_OFFSET; // Shift up
+      offsetY = -vfxOffset; // Shift up
     } else if (directionIndex === 0 || directionIndex === 1 || directionIndex === 7) {
       vfxImage = images.down;
-      offsetY = CONFIG.COMBAT.SLASH_VFX_OFFSET; // Shift down
+      offsetY = vfxOffset; // Shift down
     } else if (directionIndex === 2) {
       vfxImage = images.right;
-      offsetX = CONFIG.COMBAT.SLASH_VFX_OFFSET; // Shift right
+      offsetX = vfxOffset; // Shift right
     } else if (directionIndex === 6) {
       vfxImage = images.left;
-      offsetX = -CONFIG.COMBAT.SLASH_VFX_OFFSET; // Shift left
+      offsetX = -vfxOffset; // Shift left
     }
 
     if (!vfxImage || !vfxImage.complete || vfxImage.naturalWidth === 0) return;
@@ -604,7 +606,7 @@ export class Renderer {
     const frameHeight = 64;
     
     // Scale up the VFX slightly to look impactful
-    const scale = CONFIG.COMBAT.SLASH_VFX_SCALE;
+    const scale = vfxScale;
     const drawWidth = frameWidth * scale;
     const drawHeight = frameHeight * scale;
 
