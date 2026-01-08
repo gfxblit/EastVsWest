@@ -1302,6 +1302,100 @@ describe('Renderer', () => {
       const firstCall = ctx.drawImage.mock.calls[0];
       expect(firstCall[0]).toBe(renderer.thrustImages.up);
     });
+
+    describe('VFX Offset Rotation', () => {
+      const frameWidth = 64;
+      const scale = CONFIG.COMBAT.THRUST_VFX_SCALE;
+      const drawWidth = frameWidth * scale;
+      const halfDrawWidth = drawWidth / 2;
+
+      test('WhenFacingRight_ShouldUseOriginalOffsets', () => {
+        const player = {
+          x: 1000,
+          y: 1000,
+          rotation: Math.PI / 2, // East/Right
+          isAttacking: true,
+          attackAnimTime: CONFIG.COMBAT.ATTACK_ANIMATION_DURATION_SECONDS,
+          equipped_weapon: 'spear',
+        };
+
+        renderer.renderSlashAnimation(player);
+        
+        const vfxOffset = CONFIG.COMBAT.THRUST_VFX_OFFSET;
+        const expectedX = player.x + vfxOffset.x - halfDrawWidth;
+        const expectedY = player.y + vfxOffset.y - halfDrawWidth;
+        
+        const call = ctx.drawImage.mock.calls[0];
+        expect(call[5]).toBeCloseTo(expectedX);
+        expect(call[6]).toBeCloseTo(expectedY);
+      });
+
+      test('WhenFacingUp_ShouldRotateOffsets90CCW', () => {
+        const player = {
+          x: 1000,
+          y: 1000,
+          rotation: 0, // North/Up
+          isAttacking: true,
+          attackAnimTime: CONFIG.COMBAT.ATTACK_ANIMATION_DURATION_SECONDS,
+          equipped_weapon: 'spear',
+        };
+
+        renderer.renderSlashAnimation(player);
+        
+        const vfxOffset = CONFIG.COMBAT.THRUST_VFX_OFFSET;
+        // Right (x, y) -> Up (y, -x)
+        const expectedX = player.x + vfxOffset.y - halfDrawWidth;
+        const expectedY = player.y - vfxOffset.x - halfDrawWidth;
+        
+        const call = ctx.drawImage.mock.calls[0];
+        expect(call[5]).toBeCloseTo(expectedX);
+        expect(call[6]).toBeCloseTo(expectedY);
+      });
+
+      test('WhenFacingLeft_ShouldRotateOffsets180CCW', () => {
+        const player = {
+          x: 1000,
+          y: 1000,
+          rotation: 3 * Math.PI / 2, // West/Left
+          isAttacking: true,
+          attackAnimTime: CONFIG.COMBAT.ATTACK_ANIMATION_DURATION_SECONDS,
+          equipped_weapon: 'spear',
+        };
+
+        renderer.renderSlashAnimation(player);
+        
+        const vfxOffset = CONFIG.COMBAT.THRUST_VFX_OFFSET;
+        // Right (x, y) -> Left (-x, -y)
+        const expectedX = player.x - vfxOffset.x - halfDrawWidth;
+        const expectedY = player.y - vfxOffset.y - halfDrawWidth;
+        
+        const call = ctx.drawImage.mock.calls[0];
+        expect(call[5]).toBeCloseTo(expectedX);
+        expect(call[6]).toBeCloseTo(expectedY);
+      });
+
+      test('WhenFacingDown_ShouldRotateOffsets270CCW', () => {
+        const player = {
+          x: 1000,
+          y: 1000,
+          rotation: Math.PI, // South/Down
+          isAttacking: true,
+          attackAnimTime: CONFIG.COMBAT.ATTACK_ANIMATION_DURATION_SECONDS,
+          equipped_weapon: 'spear',
+        };
+
+        renderer.renderSlashAnimation(player);
+        
+        const vfxOffset = CONFIG.COMBAT.THRUST_VFX_OFFSET;
+        // Right (x, y) -> Down (-y, x)
+        const expectedX = player.x - vfxOffset.y - halfDrawWidth;
+        const expectedY = player.y + vfxOffset.x - halfDrawWidth;
+        
+        const call = ctx.drawImage.mock.calls[0];
+        expect(call[5]).toBeCloseTo(expectedX);
+        expect(call[6]).toBeCloseTo(expectedY);
+      });
+    });
   });
 
   describe('Floating Text', () => {
