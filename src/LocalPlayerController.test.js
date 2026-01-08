@@ -97,7 +97,7 @@ describe('LocalPlayerController', () => {
       const now = Date.now();
       
       // Mock weapon with 1.0 attack speed (1000ms cooldown)
-      player.equipped_weapon = 'spear'; 
+      player.equipped_weapon = 'battleaxe'; 
       player.lastAttackTime = now - 500; // Halfway through cooldown
 
       const status = controller.getCooldownStatus();
@@ -127,7 +127,7 @@ describe('LocalPlayerController', () => {
 
     test('WhenAttackButtonHeld_ShouldTriggerMultipleAttacksOverTime', () => {
       const player = controller.getPlayer();
-      player.equipped_weapon = 'spear'; // 1.0 attack speed = 1000ms cooldown
+      player.equipped_weapon = 'battleaxe'; // 1.0 attack speed = 1000ms cooldown
       
       let now = 10000;
       jest.spyOn(Date, 'now').mockImplementation(() => now);
@@ -152,7 +152,7 @@ describe('LocalPlayerController', () => {
 
     test('WhenSpecialAbilityButtonHeld_ShouldTriggerMultipleAttacksOverTime', () => {
       const player = controller.getPlayer();
-      player.equipped_weapon = 'spear';
+      player.equipped_weapon = 'battleaxe';
       const cooldown = CONFIG.COMBAT.SPECIAL_ABILITY_COOLDOWN_MS;
       
       let now = 10000;
@@ -178,7 +178,7 @@ describe('LocalPlayerController', () => {
 
     test('WhenMovingWhileAutoAttacking_ShouldUpdateAttackDirection', () => {
       const player = controller.getPlayer();
-      player.equipped_weapon = 'spear';
+      player.equipped_weapon = 'battleaxe';
       
       let now = 10000;
       jest.spyOn(Date, 'now').mockImplementation(() => now);
