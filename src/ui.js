@@ -116,8 +116,23 @@ export class UI {
     // Add weapon slot if weapon exists
     if (weapon) {
       const weaponSlot = document.createElement('div');
-      weaponSlot.className = 'equipment-slot';
-      weaponSlot.textContent = `Weapon: ${weapon.name}`;
+      weaponSlot.className = 'equipment-slot weapon-slot';
+      
+      if (weapon.icon) {
+        const icon = document.createElement('img');
+        const baseUrl = (typeof CONFIG !== 'undefined' && CONFIG.ASSETS.BASE_URL) || '/';
+        const weaponsBaseUrl = (typeof CONFIG !== 'undefined' && CONFIG.ASSETS.WEAPONS_BASE_URL) || 'assets/weapons/';
+        const normalizedBase = baseUrl.endsWith('/') ? baseUrl : `${baseUrl}/`;
+        icon.src = `${normalizedBase}${weaponsBaseUrl}${weapon.icon}`;
+        icon.className = 'weapon-icon';
+        icon.alt = weapon.name;
+        weaponSlot.appendChild(icon);
+      }
+
+      const nameSpan = document.createElement('span');
+      nameSpan.textContent = `Weapon: ${weapon.name}`;
+      weaponSlot.appendChild(nameSpan);
+      
       equipmentDisplay.appendChild(weaponSlot);
     }
 
