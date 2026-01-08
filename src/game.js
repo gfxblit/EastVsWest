@@ -27,6 +27,7 @@ export class Game {
     this.playersSnapshot = null;
     this.network = null;
     this.renderer = null;
+    this.lootInitialized = false;
   }
 
   init(playersSnapshot = null, network = null, renderer = null) {
@@ -56,11 +57,9 @@ export class Game {
         });
 
         // Initial loot spawn - Only if we don't have loot already
-        // This avoids double spawning if Game.init is called multiple times 
-        // (e.g. during reconnections or test setups)
-        if (this.state.loot.length === 0) {
-          console.log(`Host: Initializing ${CONFIG.GAME.INITIAL_LOOT_COUNT} loot items`);
+        if (!this.lootInitialized && this.state.loot.length === 0) {
           this.hostLootManager.spawnRandomLoot(CONFIG.GAME.INITIAL_LOOT_COUNT);
+          this.lootInitialized = true;
         }
     }
 
@@ -68,6 +67,7 @@ export class Game {
       // Listen for network events
       network.on('attack_request', (msg) => this.handleAttackAnimation(msg));
       network.on('loot_spawned', (msg) => this.handleLootSpawned(msg));
+      network.on('loot_sync', (msg) => this.handleLootSync(msg));
       network.on('loot_picked_up', (msg) => this.handleLootPickedUp(msg));
     }
 
@@ -129,6 +129,25 @@ export class Game {
     if (localPlayer && attackerId === localPlayer.id) return;
 
     this.renderer.triggerAttackAnimation(attackerId);
+  }
+
+  handleLootSync(message) {
+    const { loot, target_player_id } = message.data;
+    
+    // Only process if it's for us and we are not the host
+    if (this.network && target_player_id === this.network.playerId && !this.network.isHost) {
+      // If we are joining fresh, just replace or merge
+      if (this.state.loot.length === 0) {
+        this.state.loot = [...loot];
+      } else {
+        // Merge only new items
+        loot.forEach(item => {
+          if (!this.state.loot.find(l => l.id === item.id)) {
+            this.state.loot.push(item);
+          }
+        });
+      }
+    }
   }
 
   handleLootSpawned(message) {

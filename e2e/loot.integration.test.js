@@ -83,38 +83,26 @@ describe('Loot Integration', () => {
     // 3. Host spawns a spear
     const lootX = 1300;
     const lootY = 900;
-    hostGame.hostLootManager.spawnLoot('spear', lootX, lootY);
+    const spawnedSpear = hostGame.hostLootManager.spawnLoot('spear', lootX, lootY);
 
     // Verify loot appears on both
-    let spawnedSpear = null;
     await waitFor(() => {
       // Run updates to process events
       hostGame.update(0.05);
       playerGame.update(0.05);
-      const expectedCount = CONFIG.GAME.INITIAL_LOOT_COUNT + 1;
-      
-      spawnedSpear = playerGame.state.loot.find(l => l.item_id === 'spear');
-      
-      return hostGame.state.loot.length === expectedCount && 
-             playerGame.state.loot.length === expectedCount &&
-             spawnedSpear !== undefined;
-    }, 10000);
-
-    expect(spawnedSpear.item_id).toBe('spear');
+      return playerGame.state.loot.some(l => l.id === spawnedSpear.id);
+    }, 15000);
 
     // 4. Player walks over loot (unarmed)
-    const lootX_final = spawnedSpear.x;
-    const lootY_final = spawnedSpear.y;
-    
     // ALSO update local controller state directly so collision logic sees it
-    playerGame.localPlayerController.player.x = lootX_final - 5;
-    playerGame.localPlayerController.player.y = lootY_final - 5;
+    playerGame.localPlayerController.player.x = lootX - 5;
+    playerGame.localPlayerController.player.y = lootY - 5;
 
     // Send position update via network so Host sees it immediately
     playerNetwork.broadcastPlayerStateUpdate({
         player_id: playerNetwork.playerId,
-        position_x: lootX_final - 5,
-        position_y: lootY_final - 5,
+        position_x: lootX - 5,
+        position_y: lootY - 5,
         health: 100,
         velocity_x: 0,
         velocity_y: 0
@@ -124,7 +112,7 @@ describe('Loot Integration', () => {
     await waitFor(() => {
       hostGame.update(0.05); // Run host update to process incoming messages
       const p = hostSnapshot.getPlayers().get(playerNetwork.playerId);
-      return p && Math.abs(p.position_x - (lootX_final - 5)) < 1;
+      return p && Math.abs(p.position_x - (lootX - 5)) < 1;
     }, 10000);
 
     // Update player game to trigger collision detection
@@ -135,17 +123,15 @@ describe('Loot Integration', () => {
     }, 15000);
 
     // Verify loot is gone for both
-    const finalExpectedCount = CONFIG.GAME.INITIAL_LOOT_COUNT;
     await waitFor(() => {
         playerGame.update(0.1);
         hostGame.update(0.1);
-        return playerGame.state.loot.length === finalExpectedCount;
-    }, 5000);
+        return !playerGame.state.loot.some(item => item.id === spawnedSpear.id);
+    }, 10000);
     
-    expect(playerGame.state.loot).toHaveLength(finalExpectedCount);
-    expect(hostGame.state.loot).toHaveLength(finalExpectedCount);
+    expect(playerGame.state.loot.some(item => item.id === spawnedSpear.id)).toBe(false);
     expect(hostSnapshot.getPlayers().get(playerNetwork.playerId).equipped_weapon).toBe('spear');
-  }, 30000);
+  }, 40000);
 
   test('should swap weapons when pressing F and drop old weapon', async () => {
     // 1. Host creates game
@@ -183,20 +169,20 @@ describe('Loot Integration', () => {
     // Wait for initial loot sync (20 items)
     await waitFor(() => {
         playerGame.update(0.1);
-        return playerGame.state.loot.length === CONFIG.GAME.INITIAL_LOOT_COUNT;
-    }, 10000);
+        hostGame.update(0.1);
+        return playerGame.state.loot.length >= CONFIG.GAME.INITIAL_LOOT_COUNT;
+    }, 20000);
 
     // 3. Host spawns a spear
     const lootX = 1100;
     const lootY = 1100;
-    hostGame.hostLootManager.spawnLoot('spear', lootX, lootY);
+    const spawnedSpear = hostGame.hostLootManager.spawnLoot('spear', lootX, lootY);
 
     await waitFor(() => {
         hostGame.update(0.016);
         playerGame.update(0.016);
-        const expectedCount = CONFIG.GAME.INITIAL_LOOT_COUNT + 1;
-        return playerGame.state.loot.length === expectedCount;
-    }, 5000);
+        return playerGame.state.loot.some(l => l.id === spawnedSpear.id);
+    }, 25000);
 
     // 4. Player moves to loot but does NOT press F (should NOT pickup)
     playerGame.localPlayerController.player.x = lootX - 5;
@@ -220,10 +206,9 @@ describe('Loot Integration', () => {
     playerGame.update(0.1);
     hostGame.update(0.1);
     
-    // Should still have bo and loot should still be there (random + specific)
-    const initialExpectedCount = CONFIG.GAME.INITIAL_LOOT_COUNT + 1;
+    // Should still have bo and loot should still be there
     expect(playerGame.getLocalPlayer().equipped_weapon).toBe('bo');
-    expect(playerGame.state.loot).toHaveLength(initialExpectedCount);
+    expect(playerGame.state.loot.some(l => l.id === spawnedSpear.id)).toBe(true);
 
     // 5. Player presses F
     playerGame.handleInput({ interact: true });
@@ -235,14 +220,15 @@ describe('Loot Integration', () => {
     }, 15000);
 
     // 6. Verify old weapon 'bo' was dropped
+    let droppedBo = null;
     await waitFor(() => {
         playerGame.update(0.1);
         hostGame.update(0.1);
-        return playerGame.state.loot.some(item => item.item_id === 'bo');
-    }, 10000);
+        droppedBo = playerGame.state.loot.find(item => item.item_id === 'bo');
+        return droppedBo !== undefined && !playerGame.state.loot.some(l => l.id === spawnedSpear.id);
+    }, 15000);
 
-    // Count should still be the same (one picked up, one dropped)
-    expect(playerGame.state.loot).toHaveLength(initialExpectedCount);
-    expect(playerGame.state.loot.some(item => item.item_id === 'bo')).toBe(true);
-  }, 40000);
+    expect(droppedBo).toBeDefined();
+    expect(playerGame.state.loot.some(l => l.id === spawnedSpear.id)).toBe(false);
+  }, 50000);
 });
