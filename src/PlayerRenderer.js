@@ -111,6 +111,7 @@ export class PlayerRenderer {
         const barY = player.y - (CONFIG.RENDER.PLAYER_RADIUS + CONFIG.RENDER.HEALTH_BAR_OFFSET_FROM_PLAYER);
 
         // Background
+        // TODO: Move health bar styles to config
         ctx.fillStyle = '#333';
         ctx.fillRect(barX, barY, barWidth, barHeight);
 
