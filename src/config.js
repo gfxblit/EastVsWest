@@ -236,6 +236,8 @@ export const CONFIG = {
     SPECIAL_ABILITY_COOLDOWN_MS: 3000,
     SPECIAL_DAMAGE_MULTIPLIER: 1.5,
     ATTACK_ANIMATION_DURATION_SECONDS: 0.2, // 200ms animation
+    // Offsets are defined for the RIGHT facing direction (x = forward, y = lateral/down)
+    // Other directions will rotate these offsets accordingly.
     SLASH_VFX_OFFSET: { x: 10, y: 10 },
     SLASH_VFX_SCALE: 3.0,
     THRUST_VFX_OFFSET: { x: 40, y: 40 },
