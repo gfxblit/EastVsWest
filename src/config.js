@@ -70,9 +70,10 @@ export const CONFIG = {
       stance: 'single',
       targetType: 'single',
       damageType: 'piercing',
+      vfxType: 'thrust',
       range: 150,
       baseDamage: 25,
-      attackSpeed: 1.0, // attacks per second
+      attackSpeed: 3.0, // attacks per second
       specialAbility: 'lunge',
       icon: 'spear.png',
     },
@@ -83,6 +84,7 @@ export const CONFIG = {
       stance: 'single',
       targetType: 'multi',
       damageType: 'slashing',
+      vfxType: 'slash',
       range: 100,
       baseDamage: 30,
       attackSpeed: 1.0,
@@ -96,6 +98,7 @@ export const CONFIG = {
       stance: 'double',
       targetType: 'multi',
       damageType: 'slashing',
+      vfxType: 'slash',
       range: 100,
       baseDamage: 45,
       attackSpeed: 0.7,
@@ -109,6 +112,7 @@ export const CONFIG = {
       stance: 'double',
       targetType: 'single',
       damageType: 'blunt',
+      vfxType: 'slash',
       range: 80,
       baseDamage: 50,
       attackSpeed: 0.6,
@@ -124,6 +128,7 @@ export const CONFIG = {
       stance: 'double',
       targetType: 'single',
       damageType: 'blunt',
+      vfxType: 'slash',
       range: 120,
       baseDamage: 20,
       attackSpeed: 1.5,
@@ -137,6 +142,7 @@ export const CONFIG = {
       stance: 'single',
       targetType: 'single',
       damageType: 'blunt',
+      vfxType: 'slash',
       range: 50,
       baseDamage: 15,
       attackSpeed: 4.0,
@@ -212,6 +218,12 @@ export const CONFIG = {
         LEFT: 'assets/vfx/slash-left.png',
         RIGHT: 'assets/vfx/slash-right.png',
       },
+      THRUST: {
+        UP: 'assets/vfx/thrust-up.png',
+        DOWN: 'assets/vfx/thrust-down.png',
+        LEFT: 'assets/vfx/thrust-left.png',
+        RIGHT: 'assets/vfx/thrust-right.png',
+      },
     },
     WEAPONS_BASE_URL: 'assets/weapons/',
   },
@@ -230,8 +242,12 @@ export const CONFIG = {
     SPECIAL_ABILITY_COOLDOWN_MS: 3000,
     SPECIAL_DAMAGE_MULTIPLIER: 1.5,
     ATTACK_ANIMATION_DURATION_SECONDS: 0.2, // 200ms animation
-    SLASH_VFX_OFFSET: 10,
+    // Offsets are defined for the RIGHT facing direction (x = forward, y = lateral/down)
+    // Other directions will rotate these offsets accordingly.
+    SLASH_VFX_OFFSET: { x: 10, y: 10 },
     SLASH_VFX_SCALE: 3.0,
+    THRUST_VFX_OFFSET: { x: 120, y: 20 },
+    THRUST_VFX_SCALE: 2.0,
     PLAYER_HITBOX_RADIUS: 60,
     DEFAULT_THRUST_ARC: Math.PI / 4, // 45 degrees
     DEFAULT_SWING_ARC: (120 * Math.PI) / 180, // 120 degrees

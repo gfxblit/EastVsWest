@@ -90,6 +90,7 @@ describe('Renderer', () => {
       expect(canvas.getContext).toHaveBeenCalledWith('2d');
       expect(canvas.width).toBe(CONFIG.CANVAS.WIDTH);
       expect(canvas.height).toBe(CONFIG.CANVAS.HEIGHT);
+
       // Should load background image + shadow image + 4 slash images + 5 weapon icons
       expect(global.Image).toHaveBeenCalledTimes(11);
       expect(newRenderer.bgImage.src).toBe('/game-background.png');
@@ -541,6 +542,7 @@ describe('Renderer', () => {
       newRenderer.init();
 
       // Assert
+
       // Should create shadow image + background image + slash images + weapon icons
       expect(global.Image).toHaveBeenCalledTimes(11);
       expect(newRenderer.shadowImage).toBeDefined();
@@ -1236,6 +1238,164 @@ describe('Renderer', () => {
           expect.any(Number),
           expect.any(Number)
         );
+      });
+    });
+  });
+
+  describe('Attack VFX Rendering', () => {
+    beforeEach(() => {
+      ctx.drawImage = jest.fn();
+      
+      // Mock images as loaded
+      const directions = ['up', 'down', 'left', 'right'];
+      directions.forEach(dir => {
+        renderer.slashImages[dir] = { complete: true, naturalWidth: 64, naturalHeight: 64 };
+        renderer.thrustImages[dir] = { complete: true, naturalWidth: 64, naturalHeight: 64 };
+      });
+    });
+
+    test('WhenPlayerAttacksWithSlashWeapon_ShouldUseSlashImages', () => {
+      const player = {
+        x: 100,
+        y: 100,
+        rotation: Math.PI / 2, // East
+        isAttacking: true,
+        attackAnimTime: CONFIG.COMBAT.ATTACK_ANIMATION_DURATION_SECONDS,
+        equipped_weapon: 'battleaxe', // Slashing weapon
+      };
+
+      renderer.renderSlashAnimation(player);
+
+      expect(ctx.drawImage).toHaveBeenCalled();
+      const firstCall = ctx.drawImage.mock.calls[0];
+      expect(firstCall[0]).toBe(renderer.slashImages.right);
+    });
+
+    test('WhenPlayerAttacksWithSpear_ShouldUseThrustImages', () => {
+      const player = {
+        x: 100,
+        y: 100,
+        rotation: Math.PI / 2, // East
+        isAttacking: true,
+        attackAnimTime: CONFIG.COMBAT.ATTACK_ANIMATION_DURATION_SECONDS,
+        equipped_weapon: 'spear', // Piercing weapon
+      };
+
+      renderer.renderSlashAnimation(player);
+
+      expect(ctx.drawImage).toHaveBeenCalled();
+      const firstCall = ctx.drawImage.mock.calls[0];
+      expect(firstCall[0]).toBe(renderer.thrustImages.right);
+    });
+
+    test('WhenPlayerAttacksFacingNorth_ShouldUseUpImages', () => {
+      const player = {
+        x: 100,
+        y: 100,
+        rotation: 0, // North
+        isAttacking: true,
+        attackAnimTime: CONFIG.COMBAT.ATTACK_ANIMATION_DURATION_SECONDS,
+        equipped_weapon: 'spear',
+      };
+
+      renderer.renderSlashAnimation(player);
+
+      expect(ctx.drawImage).toHaveBeenCalled();
+      const firstCall = ctx.drawImage.mock.calls[0];
+      expect(firstCall[0]).toBe(renderer.thrustImages.up);
+    });
+
+    describe('VFX Offset Rotation', () => {
+      const frameWidth = 64;
+      const scale = CONFIG.COMBAT.THRUST_VFX_SCALE;
+      const drawWidth = frameWidth * scale;
+      const halfDrawWidth = drawWidth / 2;
+
+      test('WhenFacingRight_ShouldUseOriginalOffsets', () => {
+        const player = {
+          x: 1000,
+          y: 1000,
+          rotation: Math.PI / 2, // East/Right
+          isAttacking: true,
+          attackAnimTime: CONFIG.COMBAT.ATTACK_ANIMATION_DURATION_SECONDS,
+          equipped_weapon: 'spear',
+        };
+
+        renderer.renderSlashAnimation(player);
+        
+        const vfxOffset = CONFIG.COMBAT.THRUST_VFX_OFFSET;
+        const expectedX = player.x + vfxOffset.x - halfDrawWidth;
+        const expectedY = player.y + vfxOffset.y - halfDrawWidth;
+        
+        const call = ctx.drawImage.mock.calls[0];
+        expect(call[5]).toBeCloseTo(expectedX);
+        expect(call[6]).toBeCloseTo(expectedY);
+      });
+
+      test('WhenFacingUp_ShouldRotateOffsets90CCW', () => {
+        const player = {
+          x: 1000,
+          y: 1000,
+          rotation: 0, // North/Up
+          isAttacking: true,
+          attackAnimTime: CONFIG.COMBAT.ATTACK_ANIMATION_DURATION_SECONDS,
+          equipped_weapon: 'spear',
+        };
+
+        renderer.renderSlashAnimation(player);
+        
+        const vfxOffset = CONFIG.COMBAT.THRUST_VFX_OFFSET;
+        // Right (x, y) -> Up (y, -x)
+        const expectedX = player.x + vfxOffset.y - halfDrawWidth;
+        const expectedY = player.y - vfxOffset.x - halfDrawWidth;
+        
+        const call = ctx.drawImage.mock.calls[0];
+        expect(call[5]).toBeCloseTo(expectedX);
+        expect(call[6]).toBeCloseTo(expectedY);
+      });
+
+      test('WhenFacingLeft_ShouldReflectLateralOffset', () => {
+        const player = {
+          x: 1000,
+          y: 1000,
+          rotation: 3 * Math.PI / 2, // West/Left
+          isAttacking: true,
+          attackAnimTime: CONFIG.COMBAT.ATTACK_ANIMATION_DURATION_SECONDS,
+          equipped_weapon: 'spear',
+        };
+
+        renderer.renderSlashAnimation(player);
+        
+        const vfxOffset = CONFIG.COMBAT.THRUST_VFX_OFFSET;
+        // Right (x, y) -> Left (-x, y) [Reflected lateral]
+        const expectedX = player.x - vfxOffset.x - halfDrawWidth;
+        const expectedY = player.y + vfxOffset.y - halfDrawWidth;
+        
+        const call = ctx.drawImage.mock.calls[0];
+        expect(call[5]).toBeCloseTo(expectedX);
+        expect(call[6]).toBeCloseTo(expectedY);
+      });
+
+      test('WhenFacingDown_ShouldRotateOffsets270CCW', () => {
+        const player = {
+          x: 1000,
+          y: 1000,
+          rotation: Math.PI, // South/Down
+          isAttacking: true,
+          attackAnimTime: CONFIG.COMBAT.ATTACK_ANIMATION_DURATION_SECONDS,
+          equipped_weapon: 'spear',
+        };
+
+        renderer.renderSlashAnimation(player);
+        
+        const vfxOffset = CONFIG.COMBAT.THRUST_VFX_OFFSET;
+        // Right (x, y) -> Down (-y, x)
+        const expectedX = player.x - vfxOffset.y - halfDrawWidth;
+        const expectedY = player.y + vfxOffset.x - halfDrawWidth;
+        
+        const call = ctx.drawImage.mock.calls[0];
+        expect(call[5]).toBeCloseTo(expectedX);
+        expect(call[6]).toBeCloseTo(expectedY);
       });
     });
   });
