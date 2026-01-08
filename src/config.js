@@ -73,7 +73,7 @@ export const CONFIG = {
       vfxType: 'thrust',
       range: 150,
       baseDamage: 25,
-      attackSpeed: 1.0, // attacks per second
+      attackSpeed: 3.0, // attacks per second
       specialAbility: 'lunge',
     },
     BATTLE_AXE: {
