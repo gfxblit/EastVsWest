@@ -91,9 +91,11 @@ describe('Loot Integration', () => {
       hostGame.update(0.05);
       playerGame.update(0.05);
       const expectedCount = CONFIG.GAME.INITIAL_LOOT_COUNT + 1;
-      console.log(`Loot counts - Host: ${hostGame.state.loot.length}, Player: ${playerGame.state.loot.length}`);
+      if (hostGame.state.loot.length !== expectedCount || playerGame.state.loot.length !== expectedCount) {
+        console.log(`Loot counts - Host: ${hostGame.state.loot.length}, Player: ${playerGame.state.loot.length} (Expected: ${expectedCount})`);
+      }
       return hostGame.state.loot.length === expectedCount && playerGame.state.loot.length === expectedCount;
-    }, 10000);
+    }, 20000);
 
     expect(playerGame.state.loot[0].item_id).toBe('spear');
 

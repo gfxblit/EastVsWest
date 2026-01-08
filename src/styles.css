@@ -353,6 +353,17 @@ button:active {
   border-radius: 4px;
   color: #f4e8c1;
   font-weight: bold;
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+
+.weapon-icon {
+  width: 32px;
+  height: 32px;
+  image-rendering: pixelated;
+  image-rendering: crisp-edges;
+  object-fit: contain;
 }
 
 #spectator-controls {
@@ -421,11 +432,6 @@ button:active {
     opacity: 1;
     transform: translateY(0);
   }
-}
-
-/* Utility Classes */
-.hidden {
-  display: none !important;
 }
 
 /* Utility Classes */

@@ -27,6 +27,7 @@ export class Renderer {
     this.visualStates = new Map(); // Store visual state (like attack animations) for remote players
     this.previousPlayerHealth = new Map(); // Store previous health for floating text diffs
     this.floatingTexts = [];
+    this.weaponIcons = new Map(); // Store pre-loaded weapon icons
   }
 
   init() {
@@ -56,6 +57,16 @@ export class Renderer {
     this.slashImages.down = this.createImage(CONFIG.ASSETS.VFX.SLASH.DOWN);
     this.slashImages.left = this.createImage(CONFIG.ASSETS.VFX.SLASH.LEFT);
     this.slashImages.right = this.createImage(CONFIG.ASSETS.VFX.SLASH.RIGHT);
+
+    // Load weapon icons
+    if (CONFIG.WEAPONS) {
+      Object.values(CONFIG.WEAPONS).forEach(weapon => {
+        if (weapon.icon) {
+          const iconPath = `${CONFIG.ASSETS.WEAPONS_BASE_URL}${weapon.icon}`;
+          this.weaponIcons.set(weapon.id, this.createImage(iconPath));
+        }
+      });
+    }
 
     // Load sprite sheet for animations
     this.loadSpriteSheet().catch(err => {
@@ -301,17 +312,30 @@ export class Renderer {
     if (!Array.isArray(lootItems)) return;
 
     for (const loot of lootItems) {
-      // Draw loot circle
-      this.ctx.fillStyle = '#f9ca24'; // Golden yellow
-      this.ctx.beginPath();
-      this.ctx.arc(loot.x, loot.y, 15, 0, Math.PI * 2);
-      this.ctx.fill();
+      const icon = this.weaponIcons.get(loot.item_id);
+      
+      if (icon && icon.complete && icon.naturalWidth > 0) {
+        // Draw weapon icon
+        const size = 40;
+        this.ctx.drawImage(
+          icon,
+          0, 0, icon.naturalWidth, icon.naturalHeight,
+          loot.x - size / 2, loot.y - size / 2,
+          size, size
+        );
+      } else {
+        // Fallback to yellow circle
+        this.ctx.fillStyle = '#f9ca24'; // Golden yellow
+        this.ctx.beginPath();
+        this.ctx.arc(loot.x, loot.y, 15, 0, Math.PI * 2);
+        this.ctx.fill();
+      }
       
       // Draw item name
       this.ctx.fillStyle = '#ffffff';
       this.ctx.font = 'bold 14px Arial';
       this.ctx.textAlign = 'center';
-      this.ctx.fillText(loot.item_id.toUpperCase(), loot.x, loot.y - 20);
+      this.ctx.fillText(loot.item_id.toUpperCase(), loot.x, loot.y - 25);
     }
   }
 
