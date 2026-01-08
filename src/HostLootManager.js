@@ -46,11 +46,11 @@ export class HostLootManager {
   syncLootToPlayer(playerId) {
     if (!this.network?.isHost) return;
 
-    // Send individual loot_spawned messages for each item
-    // Alternatively, we could create a 'loot_sync' event
-    for (const item of this.state.loot) {
-      this.network.send('loot_spawned', item);
-    }
+    // Send all loot in a single batch message to avoid rate limiting/message loss
+    this.network.send('loot_sync', {
+      loot: this.state.loot,
+      target_player_id: playerId // Optional: could be used by clients to ignore if not meant for them (though 'send' is broadcast)
+    });
   }
 
   removeLoot(lootId) {
@@ -60,6 +60,11 @@ export class HostLootManager {
       return true;
     }
     return false;
+  }
+
+  handleLootSyncRequest(message) {
+      if (!this.network?.isHost) return;
+      this.syncLootToPlayer(message.from);
   }
 
   handlePickupRequest(message, playersSnapshot) {
