@@ -592,7 +592,7 @@ export class Renderer {
       offsetY = -vfxOffset.x; // Shift up
     } else if (directionIndex === 0 || directionIndex === 1 || directionIndex === 7) {
       vfxImage = images.down;
-      offsetX = -vfxOffset.y;
+      offsetX = vfxOffset.y;
       offsetY = vfxOffset.x; // Shift down
     } else if (directionIndex === 2) {
       vfxImage = images.right;
@@ -601,7 +601,7 @@ export class Renderer {
     } else if (directionIndex === 6) {
       vfxImage = images.left;
       offsetX = -vfxOffset.x; // Shift left
-      offsetY = -vfxOffset.y;
+      offsetY = vfxOffset.y;
     }
 
     if (!vfxImage || !vfxImage.complete || vfxImage.naturalWidth === 0) return;
