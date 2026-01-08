@@ -77,6 +77,7 @@ describe('Client Interpolation Integration (Real Network)', () => {
       lineWidth: 0
     };
     const mockCanvas = { getContext: () => mockCtx, width: 800, height: 600 };
+    mockCtx.canvas = mockCanvas;
     renderer = new Renderer(mockCanvas);
     renderer.init();
   });
