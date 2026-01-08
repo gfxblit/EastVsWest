@@ -268,6 +268,16 @@ describe('UI', () => {
       const equipmentDisplay = document.getElementById('equipment-display');
       expect(equipmentDisplay.innerHTML).toContain('Weapon: Super Sword');
     });
+
+    test('WhenWeaponHasIcon_ShouldUseConfigToBuildUrl', () => {
+      const weapon = { name: 'Spear', icon: 'spear.png' };
+      ui.updateEquipment(weapon, null);
+
+      const equipmentDisplay = document.getElementById('equipment-display');
+      const img = equipmentDisplay.querySelector('.weapon-icon');
+      expect(img).not.toBeNull();
+      expect(img.src).toContain('assets/weapons/spear.png');
+    });
   });
 
   describe('showZoneWarning', () => {
