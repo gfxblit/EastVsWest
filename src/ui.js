@@ -3,6 +3,8 @@
  * Handles UI updates and screen transitions
  */
 
+import { CONFIG } from './config.js';
+
 export class UI {
   constructor() {
     this.screens = {
