@@ -120,8 +120,8 @@ export class UI {
       
       if (weapon.icon) {
         const icon = document.createElement('img');
-        const baseUrl = (typeof CONFIG !== 'undefined' && CONFIG.ASSETS.BASE_URL) || '/';
-        const weaponsBaseUrl = (typeof CONFIG !== 'undefined' && CONFIG.ASSETS.WEAPONS_BASE_URL) || 'assets/weapons/';
+        const baseUrl = CONFIG.ASSETS.BASE_URL;
+        const weaponsBaseUrl = CONFIG.ASSETS.WEAPONS_BASE_URL;
         const normalizedBase = baseUrl.endsWith('/') ? baseUrl : `${baseUrl}/`;
         icon.src = `${normalizedBase}${weaponsBaseUrl}${weapon.icon}`;
         icon.className = 'weapon-icon';
