@@ -240,8 +240,8 @@ export const CONFIG = {
     // Other directions will rotate these offsets accordingly.
     SLASH_VFX_OFFSET: { x: 10, y: 10 },
     SLASH_VFX_SCALE: 3.0,
-    THRUST_VFX_OFFSET: { x: 40, y: 40 },
-    THRUST_VFX_SCALE: 3.0,
+    THRUST_VFX_OFFSET: { x: 120, y: 20 },
+    THRUST_VFX_SCALE: 2.0,
     PLAYER_HITBOX_RADIUS: 60,
     DEFAULT_THRUST_ARC: Math.PI / 4, // 45 degrees
     DEFAULT_SWING_ARC: (120 * Math.PI) / 180, // 120 degrees
