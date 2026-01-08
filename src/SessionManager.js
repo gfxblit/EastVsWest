@@ -177,6 +177,11 @@ export class SessionManager {
           .eq('id', this.network.sessionId)
           .single();
 
+        if (!session) {
+            console.error('Failed to fetch session for max enforcement');
+            return;
+        }
+
         if (players.length > session.max_players) {
           console.log(`Host: Session full (${players.length}/${session.max_players}). Evicting latest joiners.`);
           const excessPlayers = players.slice(session.max_players);
