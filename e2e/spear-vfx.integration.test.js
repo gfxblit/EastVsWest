@@ -86,13 +86,13 @@ describe('Spear VFX E2E', () => {
     // Wait for a few frames to ensure rendering happens
     await new Promise(resolve => setTimeout(resolve, 100));
 
-    // Verify spear image is loaded in renderer
-    const spearImagesLoaded = await page.evaluate(() => {
+    // Verify thrust image is loaded in renderer
+    const thrustImagesLoaded = await page.evaluate(() => {
       const renderer = window.renderer;
-      return renderer.spearImages.right && 
-             renderer.spearImages.right.complete && 
-             renderer.spearImages.right.naturalWidth > 0;
+      return renderer.thrustImages.right && 
+             renderer.thrustImages.right.complete && 
+             renderer.thrustImages.right.naturalWidth > 0;
     });
-    expect(spearImagesLoaded).toBe(true);
+    expect(thrustImagesLoaded).toBe(true);
   });
 });

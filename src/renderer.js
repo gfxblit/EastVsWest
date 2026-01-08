@@ -23,7 +23,7 @@ export class Renderer {
       left: null,
       right: null
     };
-    this.spearImages = {
+    this.thrustImages = {
       up: null,
       down: null,
       left: null,
@@ -63,11 +63,11 @@ export class Renderer {
     this.slashImages.left = this.createImage(CONFIG.ASSETS.VFX.SLASH.LEFT);
     this.slashImages.right = this.createImage(CONFIG.ASSETS.VFX.SLASH.RIGHT);
 
-    // Load spear VFX images
-    this.spearImages.up = this.createImage(CONFIG.ASSETS.VFX.SPEAR.UP);
-    this.spearImages.down = this.createImage(CONFIG.ASSETS.VFX.SPEAR.DOWN);
-    this.spearImages.left = this.createImage(CONFIG.ASSETS.VFX.SPEAR.LEFT);
-    this.spearImages.right = this.createImage(CONFIG.ASSETS.VFX.SPEAR.RIGHT);
+    // Load thrust VFX images
+    this.thrustImages.up = this.createImage(CONFIG.ASSETS.VFX.THRUST.UP);
+    this.thrustImages.down = this.createImage(CONFIG.ASSETS.VFX.THRUST.DOWN);
+    this.thrustImages.left = this.createImage(CONFIG.ASSETS.VFX.THRUST.LEFT);
+    this.thrustImages.right = this.createImage(CONFIG.ASSETS.VFX.THRUST.RIGHT);
 
     // Load sprite sheet for animations
     this.loadSpriteSheet().catch(err => {
@@ -573,9 +573,10 @@ export class Renderer {
     let offsetX = 0;
     let offsetY = 0;
 
-    // Use spear images for spear, slash images for everything else
-    const isSpear = player.equipped_weapon === 'spear';
-    const images = isSpear ? this.spearImages : this.slashImages;
+    // Determine which VFX images to use based on weapon's vfxType
+    const weaponConfig = Object.values(CONFIG.WEAPONS).find(w => w.id === player.equipped_weapon);
+    const vfxType = weaponConfig ? weaponConfig.vfxType : 'slash';
+    const images = vfxType === 'thrust' ? this.thrustImages : this.slashImages;
 
     // Map 8-way direction to 4-way sprites
     // North (4), NE (3), NW (5) -> UP

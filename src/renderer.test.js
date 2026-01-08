@@ -1248,7 +1248,7 @@ describe('Renderer', () => {
       const directions = ['up', 'down', 'left', 'right'];
       directions.forEach(dir => {
         renderer.slashImages[dir] = { complete: true, naturalWidth: 64, naturalHeight: 64 };
-        renderer.spearImages[dir] = { complete: true, naturalWidth: 64, naturalHeight: 64 };
+        renderer.thrustImages[dir] = { complete: true, naturalWidth: 64, naturalHeight: 64 };
       });
     });
 
@@ -1269,7 +1269,7 @@ describe('Renderer', () => {
       expect(firstCall[0]).toBe(renderer.slashImages.right);
     });
 
-    test('WhenPlayerAttacksWithSpear_ShouldUseSpearImages', () => {
+    test('WhenPlayerAttacksWithSpear_ShouldUseThrustImages', () => {
       const player = {
         x: 100,
         y: 100,
@@ -1283,7 +1283,7 @@ describe('Renderer', () => {
 
       expect(ctx.drawImage).toHaveBeenCalled();
       const firstCall = ctx.drawImage.mock.calls[0];
-      expect(firstCall[0]).toBe(renderer.spearImages.right);
+      expect(firstCall[0]).toBe(renderer.thrustImages.right);
     });
 
     test('WhenPlayerAttacksFacingNorth_ShouldUseUpImages', () => {
@@ -1300,7 +1300,7 @@ describe('Renderer', () => {
 
       expect(ctx.drawImage).toHaveBeenCalled();
       const firstCall = ctx.drawImage.mock.calls[0];
-      expect(firstCall[0]).toBe(renderer.spearImages.up);
+      expect(firstCall[0]).toBe(renderer.thrustImages.up);
     });
   });
 
