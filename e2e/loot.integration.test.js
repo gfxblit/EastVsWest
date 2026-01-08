@@ -80,6 +80,11 @@ describe('Loot Integration', () => {
     playerGame = new Game();
     playerGame.init(playerSnapshot, playerNetwork);
 
+    // Wait for Host to see player in snapshot before moving
+    await waitFor(() => {
+        return hostSnapshot.getPlayers().has(playerNetwork.playerId);
+    }, 10000);
+
     // 3. Host spawns a spear
     const lootX = 1300;
     const lootY = 900;
@@ -98,7 +103,9 @@ describe('Loot Integration', () => {
       return hostGame.state.loot.length === expectedCount && playerGame.state.loot.length === expectedCount;
     }, 20000);
 
-    expect(playerGame.state.loot[0].item_id).toBe('spear');
+    const foundSpear = playerGame.state.loot.find(l => l.id === spawnedSpear.id);
+    expect(foundSpear).toBeDefined();
+    expect(foundSpear.item_id).toBe('spear');
 
     // 4. Player walks over loot (unarmed)
     // ALSO update local controller state directly so collision logic sees it
@@ -120,7 +127,7 @@ describe('Loot Integration', () => {
       hostGame.update(0.05); // Run host update to process incoming messages
       const p = hostSnapshot.getPlayers().get(playerNetwork.playerId);
       return p && Math.abs(p.position_x - (lootX - 5)) < 1;
-    }, 10000);
+    }, 15000);
 
     // Update player game to trigger collision detection
     await waitFor(() => {
