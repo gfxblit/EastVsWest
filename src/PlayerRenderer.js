@@ -141,6 +141,7 @@ export class PlayerRenderer {
         let offsetY = 0;
 
         // Determine which VFX images and settings to use based on weapon's vfxType
+        // TODO: Optimize weapon lookup using a Map
         const weaponConfig = Object.values(CONFIG.WEAPONS).find(w => w.id === player.equipped_weapon);
         const vfxType = weaponConfig ? weaponConfig.vfxType : 'slash';
         const images = vfxType === 'thrust' ? this.thrustImages : this.slashImages;
