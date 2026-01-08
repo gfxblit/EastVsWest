@@ -588,16 +588,16 @@ export class Renderer {
 
     if (directionIndex === 4 || directionIndex === 3 || directionIndex === 5) {
       vfxImage = images.up;
-      offsetY = -vfxOffset; // Shift up
+      offsetY = -vfxOffset.y; // Shift up
     } else if (directionIndex === 0 || directionIndex === 1 || directionIndex === 7) {
       vfxImage = images.down;
-      offsetY = vfxOffset; // Shift down
+      offsetY = vfxOffset.y; // Shift down
     } else if (directionIndex === 2) {
       vfxImage = images.right;
-      offsetX = vfxOffset; // Shift right
+      offsetX = vfxOffset.x; // Shift right
     } else if (directionIndex === 6) {
       vfxImage = images.left;
-      offsetX = -vfxOffset; // Shift left
+      offsetX = -vfxOffset.x; // Shift left
     }
 
     if (!vfxImage || !vfxImage.complete || vfxImage.naturalWidth === 0) return;
