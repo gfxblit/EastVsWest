@@ -203,10 +203,32 @@ class App {
       this.startGame();
     });
 
-    this.network.on('match_end', (payload) => {
-      console.log('Match ended');
+    this.network.on('game_over', (payload) => {
+      console.log('Match ended', payload);
       this.stopGameLoop();
-      this.ui.showLobby('Match Ended', payload.data.summary);
+      this.game = null;
+
+      const { winner_id, stats } = payload.data;
+      const winner = stats.find(p => p.player_id === winner_id);
+      const winnerName = winner ? winner.name : 'Unknown';
+
+      let summaryHtml = `<h4>Winner: ${winnerName}</h4>`;
+      summaryHtml += '<ul>';
+      // Sort by kills (desc)
+      stats.sort((a, b) => b.kills - a.kills);
+
+      stats.forEach(p => {
+        const isWinner = p.player_id === winner_id;
+        summaryHtml += `<li>${p.name}: ${p.kills} Kills ${isWinner ? '(WINNER)' : ''}</li>`;
+      });
+      summaryHtml += '</ul>';
+
+      this.ui.showLobby('Match Ended', summaryHtml);
+      
+      // Resume lobby polling
+      this.stopLobbyPolling();
+      this.startLobbyPolling();
+      this.updateLobbyUI();
     });
 
     this.network.on('session_terminated', (payload) => {
@@ -319,12 +341,60 @@ class App {
     }
   }
 
-  handleStartGame() {
+  async handleStartGame() {
     if (!this.network.isHost) return;
 
     console.log('Host starting game...');
+    
+    // Reset player states in DB
+    await this.resetPlayerStates();
+
     this.network.send('game_start', {});
     this.startGame();
+  }
+
+  async resetPlayerStates() {
+    if (!this.playersSnapshot) return;
+
+    console.log('Resetting player states...');
+    const updates = [];
+    const players = this.playersSnapshot.getPlayers();
+    
+    const centerX = CONFIG.WORLD.WIDTH / 2;
+    const centerY = CONFIG.WORLD.HEIGHT / 2;
+    const spawnRadius = 200;
+
+    let i = 0;
+    const totalPlayers = players.size;
+    const angleStep = (Math.PI * 2) / (totalPlayers || 1);
+
+    for (const [playerId, player] of players) {
+      const angle = i * angleStep;
+      const x = centerX + Math.cos(angle) * spawnRadius;
+      const y = centerY + Math.sin(angle) * spawnRadius;
+      
+      updates.push({
+        player_id: playerId,
+        health: 100,
+        kills: 0,
+        damage_dealt: 0,
+        position_x: x,
+        position_y: y,
+        velocity_x: 0,
+        velocity_y: 0,
+        rotation: 0,
+        equipped_weapon: 'fist',
+        equipped_armor: null
+      });
+      i++;
+    }
+
+    if (updates.length > 0) {
+      // Write to DB (authoritative source)
+      await this.network.writePlayerStateToDB(updates);
+      // Also broadcast to ensure immediate client update
+      this.network.broadcastPlayerStateUpdate(updates);
+    }
   }
 
   async leaveGame() {
