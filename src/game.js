@@ -42,6 +42,7 @@ export class Game {
         
         network.on('attack_request', (msg) => this.hostCombatManager.handleAttackRequest(msg, this.playersSnapshot));
         network.on('pickup_request', (msg) => this.hostLootManager.handlePickupRequest(msg, this.playersSnapshot));
+        network.on('request_loot_sync', (msg) => this.hostLootManager.handleLootSyncRequest(msg));
         
         // Listen for new players joining to sync game state
         network.on('postgres_changes', (payload) => {
@@ -65,6 +66,24 @@ export class Game {
       network.on('attack_request', (msg) => this.handleAttackAnimation(msg));
       network.on('loot_spawned', (msg) => this.handleLootSpawned(msg));
       network.on('loot_picked_up', (msg) => this.handleLootPickedUp(msg));
+      network.on('loot_sync', (msg) => this.handleLootSync(msg));
+    }
+
+    if (network && !network.isHost) {
+        // Periodically request loot sync until we receive it
+        // This handles cases where the initial request is lost or sent before the host is ready
+        const requestSync = () => {
+             if (!this.state.lootSynced) {
+                 network.send('request_loot_sync', {});
+             } else {
+                 clearInterval(syncInterval);
+             }
+        };
+        const syncInterval = setInterval(requestSync, 2000);
+        requestSync(); // Initial call
+        
+        // Stop retrying after 30 seconds
+        setTimeout(() => clearInterval(syncInterval), 30000);
     }
 
     // Initialize Local Player Controller
@@ -138,6 +157,22 @@ export class Game {
   handleLootPickedUp(message) {
     const { loot_id } = message.data;
     this.state.loot = this.state.loot.filter(item => item.id !== loot_id);
+  }
+
+  handleLootSync(message) {
+    const { loot } = message.data;
+    if (Array.isArray(loot)) {
+      // Merge or replace loot? For initial sync, replacing or merging unique items is best.
+      // We'll use a Map to merge by ID to avoid duplicates if some were already present
+      const lootMap = new Map(this.state.loot.map(item => [item.id, item]));
+      
+      loot.forEach(item => {
+        lootMap.set(item.id, item);
+      });
+      
+      this.state.loot = Array.from(lootMap.values());
+      this.state.lootSynced = true; // Mark as synced
+    }
   }
 
   handleInput(inputState) {

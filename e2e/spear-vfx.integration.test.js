@@ -89,9 +89,9 @@ describe('Spear VFX E2E', () => {
     // Verify thrust image is loaded in renderer
     const thrustImagesLoaded = await page.evaluate(() => {
       const renderer = window.renderer;
-      return renderer.thrustImages.right && 
-             renderer.thrustImages.right.complete && 
-             renderer.thrustImages.right.naturalWidth > 0;
+      return renderer.playerRenderer.thrustImages.right && 
+             renderer.playerRenderer.thrustImages.right.complete && 
+             renderer.playerRenderer.thrustImages.right.naturalWidth > 0;
     });
     expect(thrustImagesLoaded).toBe(true);
   });

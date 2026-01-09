@@ -257,12 +257,19 @@ describe('LocalPlayerController', () => {
 
   describe('Loot Interaction', () => {
     let mockLoot;
+    let now;
 
     beforeEach(() => {
       controller = new LocalPlayerController(mockNetwork, null);
       mockLoot = [
         { id: 'loot-1', item_id: 'spear', x: CONFIG.WORLD.WIDTH / 2 + 10, y: CONFIG.WORLD.HEIGHT / 2 + 10 }
       ];
+      now = 10000;
+      jest.spyOn(Date, 'now').mockImplementation(() => now);
+    });
+
+    afterEach(() => {
+        jest.restoreAllMocks();
     });
 
     test('WhenUnarmedAndCollidingWithLoot_ShouldSendPickupRequest', () => {
@@ -333,6 +340,9 @@ describe('LocalPlayerController', () => {
       controller.handleInput({ interact: false });
       controller.update(0.016, null, mockLoot);
       expect(mockNetwork.send).not.toHaveBeenCalled();
+
+      // Advance time past throttle limit
+      now += 1000;
 
       // Frame 4: Press F again
       controller.handleInput({ interact: true });

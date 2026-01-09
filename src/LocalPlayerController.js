@@ -7,6 +7,7 @@ export class LocalPlayerController {
     this.player = this.#initializePlayer(initialData);
     this.lastPositionSendTime = 0;
     this.lastSentState = null;
+    this.lastPickupRequestTime = 0;
     this.inputState = {
       moveX: 0,
       moveY: 0,
@@ -90,6 +91,10 @@ export class LocalPlayerController {
   #handleLootInteraction(loot) {
     if (!this.network || !loot || loot.length === 0) return;
 
+    // Throttle pickup requests to avoid spamming the network
+    const now = Date.now();
+    if (now - this.lastPickupRequestTime < 500) return;
+
     for (const item of loot) {
       const dx = this.player.x - item.x;
       const dy = this.player.y - item.y;
@@ -104,6 +109,7 @@ export class LocalPlayerController {
           this.network.send('pickup_request', {
             loot_id: item.id
           });
+          this.lastPickupRequestTime = now;
           // Only process one pickup per frame to avoid spamming multiple items if stacked
           break;
         }
