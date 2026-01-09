@@ -112,12 +112,9 @@ export class HostCombatManager {
 
           // Check for death
           if (newHealth <= 0) {
-            this.network.broadcast({
-              type: 'player_death',
-              payload: {
-                victim_id: victimId,
-                killer_id: attackerId
-              }
+            this.network.send('player_death', {
+              victim_id: victimId,
+              killer_id: attackerId
             });
           }
         }

@@ -12,7 +12,7 @@ describe('HostCombatManager', () => {
     mockNetwork = {
       isHost: true,
       broadcastPlayerStateUpdate: jest.fn(),
-      broadcast: jest.fn(),
+      send: jest.fn(),
     };
     mockSnapshot = {
       getPlayers: jest.fn(),
@@ -63,12 +63,9 @@ describe('HostCombatManager', () => {
     expect(victimUpdate.health).toBe(0);
 
     // Should broadcast death event
-    expect(mockNetwork.broadcast).toHaveBeenCalledWith(expect.objectContaining({
-      type: 'player_death',
-      payload: expect.objectContaining({
-        victim_id: 'victim',
-        killer_id: 'attacker'
-      })
+    expect(mockNetwork.send).toHaveBeenCalledWith('player_death', expect.objectContaining({
+      victim_id: 'victim',
+      killer_id: 'attacker'
     }));
   });
 
