@@ -12,6 +12,7 @@ describe('HostCombatManager', () => {
     mockNetwork = {
       isHost: true,
       broadcastPlayerStateUpdate: jest.fn(),
+      broadcast: jest.fn(),
     };
     mockSnapshot = {
       getPlayers: jest.fn(),
@@ -25,6 +26,50 @@ describe('HostCombatManager', () => {
       phase: 0,
     };
     manager = new HostCombatManager(mockNetwork, mockState);
+  });
+
+  test('WhenAttackKillsVictim_ShouldBroadcastDeathEvent', () => {
+    const attacker = {
+      id: 'attacker',
+      position_x: 0,
+      position_y: 0,
+      health: 100,
+      equipped_weapon: 'fist'
+    };
+    const victim = {
+      id: 'victim',
+      position_x: 10,
+      position_y: 0,
+      health: 10, // Low health, will die from 15 dmg fist
+      equipped_armor: null
+    };
+
+    mockSnapshot.getPlayers.mockReturnValue(new Map([
+      ['attacker', attacker],
+      ['victim', victim]
+    ]));
+
+    const msg = {
+      from: 'attacker',
+      data: { weapon_id: 'fist', aim_x: 10, aim_y: 0, is_special: false }
+    };
+
+    manager.handleAttackRequest(msg, mockSnapshot);
+
+    // Should update health
+    expect(mockNetwork.broadcastPlayerStateUpdate).toHaveBeenCalled();
+    const updates = mockNetwork.broadcastPlayerStateUpdate.mock.calls[0][0];
+    const victimUpdate = updates.find(u => u.player_id === 'victim');
+    expect(victimUpdate.health).toBe(0);
+
+    // Should broadcast death event
+    expect(mockNetwork.broadcast).toHaveBeenCalledWith(expect.objectContaining({
+      type: 'player_death',
+      payload: expect.objectContaining({
+        victim_id: 'victim',
+        killer_id: 'attacker'
+      })
+    }));
   });
 
   test('ShouldApplyZoneDamageToPlayersOutsideZone', () => {

@@ -109,6 +109,17 @@ export class HostCombatManager {
             player_id: victimId,
             health: newHealth
           });
+
+          // Check for death
+          if (newHealth <= 0) {
+            this.network.broadcast({
+              type: 'player_death',
+              payload: {
+                victim_id: victimId,
+                killer_id: attackerId
+              }
+            });
+          }
         }
       }
     }

@@ -27,6 +27,7 @@ export class Game {
     this.playersSnapshot = null;
     this.network = null;
     this.renderer = null;
+    this.spectatingTargetId = null;
   }
 
   init(playersSnapshot = null, network = null, renderer = null) {
@@ -67,6 +68,7 @@ export class Game {
       network.on('loot_spawned', (msg) => this.handleLootSpawned(msg));
       network.on('loot_picked_up', (msg) => this.handleLootPickedUp(msg));
       network.on('loot_sync', (msg) => this.handleLootSync(msg));
+      network.on('player_death', (msg) => this.handlePlayerDeath(msg));
     }
 
     if (network && !network.isHost) {
@@ -173,6 +175,44 @@ export class Game {
       this.state.loot = Array.from(lootMap.values());
       this.state.lootSynced = true; // Mark as synced
     }
+  }
+
+  handlePlayerDeath(message) {
+    const { victim_id, killer_id } = message.data;
+    if (this.network && victim_id === this.network.playerId) {
+      console.log(`You were killed by ${killer_id}. Switching to spectator mode.`);
+      this.spectatingTargetId = killer_id;
+    }
+  }
+
+  getCameraTarget() {
+    // If spectating, return the target player
+    if (this.spectatingTargetId && this.playersSnapshot) {
+      const players = this.playersSnapshot.getPlayers();
+      const target = players.get(this.spectatingTargetId);
+      
+      const interpolated = this.playersSnapshot.getInterpolatedPlayerState(this.spectatingTargetId);
+      if (interpolated) {
+        return { 
+          id: this.spectatingTargetId,
+          x: interpolated.x, 
+          y: interpolated.y,
+          name: target ? target.player_name : 'Unknown'
+        };
+      }
+      
+      if (target) {
+        return {
+           id: this.spectatingTargetId,
+           x: target.position_x,
+           y: target.position_y,
+           name: target.player_name
+        };
+      }
+    }
+    
+    // Default to local player
+    return this.getLocalPlayer();
   }
 
   handleInput(inputState) {

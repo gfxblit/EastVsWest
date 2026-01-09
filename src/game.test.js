@@ -33,6 +33,10 @@ describe('Game', () => {
     test('WhenConstructed_ShouldNotHaveLocalPlayerYet', () => {
       expect(game.getLocalPlayer()).toBeUndefined();
     });
+
+    test('WhenConstructed_ShouldInitializeSpectatingTargetIdToNull', () => {
+      expect(game.spectatingTargetId).toBeNull();
+    });
   });
 
   describe('init', () => {
@@ -253,6 +257,90 @@ describe('Game', () => {
       lootPickedUpHandler({ data: { loot_id: 'loot-1', player_id: 'player-2' } });
 
       expect(game.state.loot).toHaveLength(0);
+    });
+  });
+
+  describe('Spectator Mode', () => {
+    let mockNetwork;
+    let mockSnapshot;
+
+    beforeEach(() => {
+      mockNetwork = { 
+        playerId: 'player-1', 
+        on: jest.fn(), 
+        send: jest.fn(),
+        isHost: false 
+      };
+      // Mock players
+      const players = new Map();
+      players.set('player-1', { id: 'player-1', x: 0, y: 0, position_x: 0, position_y: 0 }); // Local
+      players.set('killer-1', { id: 'killer-1', player_name: 'Killer', position_x: 100, position_y: 100 });
+
+      mockSnapshot = { 
+        getPlayers: jest.fn().mockReturnValue(players),
+        getInterpolatedPlayerState: jest.fn((id) => {
+            if (id === 'killer-1') return { x: 100, y: 100 };
+            return null;
+        })
+      };
+      
+      game.init(mockSnapshot, mockNetwork);
+    });
+
+    test('WhenPlayerDeathEventReceivedForLocalPlayer_ShouldUpdateSpectatingTargetId', () => {
+      // Find the handler
+      const calls = mockNetwork.on.mock.calls;
+      const deathHandlerEntry = calls.find(call => call[0] === 'player_death');
+      
+      expect(deathHandlerEntry).toBeDefined();
+      const deathHandler = deathHandlerEntry[1];
+
+      // Execute handler
+      deathHandler({ 
+        from: 'host', 
+        data: { victim_id: 'player-1', killer_id: 'killer-1' } 
+      });
+
+      expect(game.spectatingTargetId).toBe('killer-1');
+    });
+
+    test('WhenPlayerDeathEventReceivedForOtherPlayer_ShouldIgnore', () => {
+      const calls = mockNetwork.on.mock.calls;
+      const deathHandlerEntry = calls.find(call => call[0] === 'player_death');
+      
+      if (deathHandlerEntry) {
+          const deathHandler = deathHandlerEntry[1];
+          deathHandler({ 
+            from: 'host', 
+            data: { victim_id: 'other-player', killer_id: 'killer-1' } 
+          });
+      }
+
+      expect(game.spectatingTargetId).toBeNull();
+    });
+
+    test('getCameraTarget_ShouldReturnLocalPlayer_WhenNotSpectating', () => {
+      const target = game.getCameraTarget();
+      expect(target).toBeDefined();
+      expect(target.id).toBe('player-1');
+    });
+
+    test('getCameraTarget_ShouldReturnKiller_WhenSpectating', () => {
+      game.spectatingTargetId = 'killer-1';
+      const target = game.getCameraTarget();
+      
+      expect(target).toBeDefined();
+      // Should return normalized coordinates
+      expect(target.x).toBe(100);
+      expect(target.y).toBe(100);
+      expect(target.name).toBe('Killer');
+    });
+
+    test('getCameraTarget_ShouldReturnLocalPlayer_WhenSpectatingInvalidTarget', () => {
+      game.spectatingTargetId = 'non-existent';
+      const target = game.getCameraTarget();
+      
+      expect(target.id).toBe('player-1');
     });
   });
 });

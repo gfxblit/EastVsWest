@@ -541,19 +541,22 @@ class App {
     // Update game state
     this.game.update(deltaTime);
 
-    // Update camera to follow local player
-    const localPlayer = this.game.getLocalPlayer();
-    if (localPlayer && this.camera) {
-      this.camera.update(localPlayer.x, localPlayer.y, CONFIG.CAMERA.LERP_FACTOR);
+    // Update camera to follow target (local player or spectated player)
+    const cameraTarget = this.game.getCameraTarget();
+    if (cameraTarget && this.camera) {
+      this.camera.update(cameraTarget.x, cameraTarget.y, CONFIG.CAMERA.LERP_FACTOR);
     }
 
     // Update UI
+    const localPlayer = this.game.getLocalPlayer();
     if (localPlayer) {
       this.ui.updateHealth(localPlayer.health);
       
       // Check for death/spectator mode
       if (this.game.localPlayerController && this.game.localPlayerController.isDead()) {
-        this.ui.showSpectatorControls(true, localPlayer.name);
+        // If spectating someone else, show their name. Otherwise show own name (or generic message)
+        const spectatingName = (cameraTarget && cameraTarget.id !== localPlayer.id) ? cameraTarget.name : localPlayer.name;
+        this.ui.showSpectatorControls(true, spectatingName);
       } else {
         this.ui.showSpectatorControls(false);
       }
