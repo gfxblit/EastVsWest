@@ -148,11 +148,27 @@ export class Network extends EventEmitter {
    */
 
   /**
-   * Broadcast player state update(s) to all clients
-   * @param {Object|Array} updates - Single update object or array of updates
-   *   Each update can contain any combination of:
-   *   - Client-auth: player_id, position_x, position_y, rotation, velocity_x, velocity_y
-   *   - Host-auth: health, equipped_weapon, equipped_armor
+   * Broadcast player state update(s) to all clients via 'player_state_update' message type.
+   * This is the primary mechanism for state synchronization in the game.
+   *
+   * @param {Object|Array} updates - Single update object or array of updates.
+   *   Each update object can contain any combination of:
+   *   - Client-Authoritative Fields (sent by the player who owns the character):
+   *     - player_id {string} (optional if sending single update as self, inferred from sender)
+   *     - position_x {number}
+   *     - position_y {number}
+   *     - rotation {number} (radians)
+   *     - velocity_x {number}
+   *     - velocity_y {number}
+   *
+   *   - Host-Authoritative Fields (sent only by the host):
+   *     - health {number}
+   *     - equipped_weapon {string|null}
+   *     - equipped_armor {string|null}
+   *     - kills {number}
+   *     - damage_dealt {number}
+   *     - is_alive {boolean}
+   *     - is_connected {boolean}
    */
   broadcastPlayerStateUpdate(updates) {
     if (!this.channel || !this.connected) {

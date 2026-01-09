@@ -26,18 +26,18 @@ The EastVsWest multiplayer system uses a **hybrid host-authority model** where:
 A core pattern for **Host-Authoritative** actions (combat, item pickups, game state transitions) follows a **Request-Approve-Broadcast** model:
 
 1.  **Request (Client → Host):** A **Client** sends a message to the **Host** requesting to perform an action.
-2.  **Approve (Host):** The **Host** validates the request. If valid, the Host applies the change to the master state (Database).
+2.  **Approve (Host):** The **Host** validates the request. If valid, the Host applies the change to the master state (Database) and broadcasts updates.
 3.  **Broadcast (Host → All Clients):** The **Host** broadcasts the result to **all Clients**.
 
 **Client-Authoritative** actions follow a **Tell-Broadcast** or **Self-Insert** model:
 
--   **Movement:** The **Client** moves locally and sends a `movement_update` directly to peers.
+-   **Movement:** The **Client** moves locally and sends a `player_state_update` directly to peers.
 -   **Joining:** The **Client** fetches the session via join code and self-inserts into `session_players`. The **Host** monitors the table to enforce `max_players` and reconcile state.
 
 ### Authority Distribution
 
 - **Client-Authoritative**: Player movement, session joining (lobby phase), player position DB writes
-- **Host-Authoritative**: Item pickups, combat interactions, game state changes, zone progression, player eviction (max count enforcement)
+- **Host-Authoritative**: Item pickups, combat interactions, health/equipment state, game state changes, zone progression, player eviction (max count enforcement)
 
 ### Technology Stack
 
@@ -88,14 +88,6 @@ CREATE UNIQUE INDEX idx_join_code ON game_sessions(join_code);
 
 -- Index for cleanup queries (expired sessions)
 CREATE INDEX idx_expires_at ON game_sessions(expires_at);
-
--- Auto-delete expired sessions (cleanup job)
-CREATE OR REPLACE FUNCTION cleanup_expired_sessions()
-RETURNS void AS $$
-BEGIN
-  DELETE FROM game_sessions WHERE expires_at < NOW() AND status = 'ended';
-END;
-$$ LANGUAGE plpgsql;
 ```
 
 #### 2. `session_players`
@@ -166,8 +158,6 @@ CREATE TABLE session_items (
 CREATE INDEX idx_session_items ON session_items(session_id, is_picked_up);
 ```
 
-
-
 ---
 
 ## Channel Communication Protocol
@@ -184,8 +174,6 @@ game_session:{join_code}
 
 The exact channel name is stored in the `game_sessions.realtime_channel_name` field for robustness.
 
-Example: `game_session:ABC123`
-
 ### Message Types
 
 All messages follow this base structure:
@@ -198,108 +186,8 @@ All messages follow this base structure:
   data: object           // Message-specific payload
 }
 ```
-## State Management Strategy: Registry + Stream
 
-To sync a local copy of the `session_players` Supabase table, we use a **Snapshot + Broadcast** architecture managed by a `SessionPlayersSnapshot`.
-
-### SessionPlayersSnapshot
-
-`SessionPlayersSnapshot` maintains a local synchronized copy of **only the players in a specific game session**. It uses a Map data structure (keyed by `player_id`) and stays in sync via database events, ephemeral WebSocket broadcasts, and periodic snapshot refreshes.
-
-#### Initialization
-- Constructor accepts `supabaseClient`, `sessionId`, and `channel`
-- Initialization is **asynchronous** - both initial snapshot fetch and channel subscription must complete
-- Call `ready()` to wait for initialization to complete before using the snapshot
-- **Important**: Channels must be created with broadcast configuration:
-  ```javascript
-  channel = client.channel('game_session:ABC123', {
-    config: {
-      broadcast: { ack: true }
-    }
-  });
-  ```
-
-#### Public API
-- `ready()` - Returns Promise that resolves when snapshot is initialized and channel is subscribed
-- `getPlayers()` - Returns Map of players **in this session only** (keyed by `player_id`)
-- `addPlayer(playerData)` - Inserts player into DB **with this `sessionId`** and adds to local snapshot
-- `destroy()` - Cleans up resources (clears interval timer, unsubscribes from channel)
-
-#### Synchronization - DB Events (High latency, ~100 ms)
-- **Source:** `session_players` database table (only broadcasted after writing to DB)
-- **Events:** `INSERT`, `DELETE`, `UPDATE`
-- **IMPORTANT**: Does NOT use Supabase filter parameter - manually filters events in handler
-  - Supabase Realtime filter may not apply correctly to DELETE events
-  - Manual filtering ensures session isolation: `if (sessionId !== this.sessionId) return;`
-- Only processes events for players in this session:
-  - `INSERT` → adds player to Map
-  - `DELETE` → removes player from Map (see DELETE limitation below)
-  - `UPDATE` → updates player in Map
-
-#### DELETE Event Limitation
-**CRITICAL**: Supabase Realtime only sends the primary key (`id`) in DELETE events, not the full record.
-- This is a Supabase Realtime limitation, not a PostgreSQL limitation
-- DELETE handler must find player by `id` field before deleting from Map by `player_id`
-- Workaround: Maintain full player records in local Map to lookup by `id`
-
-#### Synchronization - Movement Updates (Fast / Ephemeral, ~10 ms)
-- **Source:** WebSocket broadcasts (in memory, not written to disk)
-- **Events:** High-frequency X/Y position and velocity updates
-- Listens to `movement_update` broadcasts on channel
-- Updates player position and velocity in Map **only if player exists in this session**
-- Does not write to DB (ephemeral)
-- **Timing**: Allow ~100ms delay after channel subscription before sending movement broadcasts
-
-#### Periodic Snapshotting
-- Refreshes snapshot every 60 seconds **querying only this session's players**
-- Query: `SELECT * FROM session_players WHERE session_id = ?`
-- Replaces local Map with fresh results (handles lost broadcasts)
-- Logs error if refresh fails but continues operation
-
-#### Resource Cleanup
-- **CRITICAL**: Call `destroy()` when done to prevent memory leaks and channel conflicts
-- Destroy clears the periodic refresh interval
-- Destroy unsubscribes from the channel (prevents timeout errors in subsequent channel subscriptions)
-- Test cleanup should wait ~100-300ms after destroy before removing channels
-
-#### Error Handling
-- Logs errors for failed operations
-- Warns on snapshot sync failures
-- Continues operation even if periodic refresh fails
-- No handling for race conditions (broadcast during refresh)
-
-#### Player Data Structure
-Each player in the Map has the same structure as a record in the `session_players` table:
-```javascript
-{
-  id: 'uuid',
-  session_id: 'uuid',
-  player_id: 'uuid',
-  player_name: 'string',
-  is_host: boolean,
-  is_connected: boolean,
-  is_alive: boolean,
-  position_x: number,
-  position_y: number,
-  velocity_x: number,
-  velocity_y: number,
-  rotation: number,
-  equipped_weapon: string | null,
-  equipped_armor: string | null,
-  kills: number,
-  damage_dealt: number,
-  joined_at: timestamp,
-  last_heartbeat: timestamp
-}
-```
-
-### Use-cases
-When the lobby or game renders:
-1.  Call `sessionPlayersSnapshot.getPlayers()` to iterate through the player Map.
-
-#### Message Type Catalog
-
-##### 1. Connection & Lobby Flow
+#### 1. Connection & Lobby Flow
 
 Joining is **Client-Authoritative** via Database Inserts.
 
@@ -307,341 +195,143 @@ Joining is **Client-Authoritative** via Database Inserts.
 2.  **Insert:** Client performs `INSERT` into `session_players` with their metadata.
 
 **DB INSERT (Client): `session_players`**
+Supabase Realtime sends `INSERT` / `DELETE` events to all subscribed clients. This is the primary way the lobby list is kept in sync.
+
+#### 2. Player State Updates (Client & Host)
+
+**BROADCAST: `player_state_update`**
+
+Used for both high-frequency movement updates (Client-Authoritative) and state changes like health/equipment (Host-Authoritative).
+
 ```javascript
 {
-  session_id: 'uuid',
-  player_id: 'auth.uid()',
-  player_name: 'Player1',
-  is_host: false
-}
-```
-
-**TABLE CHANGE (DB → ALL): `INSERT` / `DELETE` events**
-Supabase Realtime sends these events to all subscribed clients in the session. This is the primary way the lobby list is kept in sync.
-
-#### Lobby Synchronization
-
-We keep the lobby in sync by treating the database as the single source of truth.
-
-1.  **Initial Sync:**
-    - When a player joins, they run `SELECT * FROM session_players` to get the current list.
-
-2.  **Live Updates (Postgres Changes):**
-    - All clients subscribe to `INSERT`, `UPDATE`, and `DELETE` events on `session_players`.
-    - **On INSERT:** Add the new player to the lobby list.
-    - **On DELETE:** Remove the player from the lobby list.
-    - **On UPDATE:** Update player details (e.g. ready status).
-
-3.  **Leaving the Lobby:**
-    - **Graceful Leave:** The client deletes their own row from `session_players`. This triggers a `DELETE` event for everyone else.
-    - **Forced Leave (Kick/Timeout):** The Host deletes the row of a disconnected or kicked player. This also triggers a `DELETE` event.
-    - **No separate "player_left" message is needed.** The DB event handles it.
-
-##### 2. Movement Messages (Client-Authoritative)
-
-**CLIENT → ALL (Broadcast): `movement_update`**
-```javascript
-{
-  type: 'movement_update',
+  type: 'player_state_update',
   from: 'player_uuid',
   timestamp: 1703001234567,
   data: {
+    // Client-Authoritative fields (sent by owner)
     position_x: 123.45,
     position_y: 678.90,
-    rotation: 1.57,  // radians
+    rotation: 1.57,
     velocity_x: 1.0,
     velocity_y: 0.0,
-    health: 95.5
+
+    // Host-Authoritative fields (sent by host)
+    health: 95.5,
+    equipped_weapon: 'sword',
+    equipped_armor: 'chainmail',
+    kills: 3
   }
 }
 ```
 
-**NOTE:** In the current simplified architecture, there is no `movement_broadcast` message. All clients broadcast `movement_update` directly to peers without host rebroadcasting.
+#### 3. Interaction Messages (Host-Authoritative)
 
-##### 3. Interaction Messages (Host-Authoritative)
-
-**CLIENT → HOST: `item_pickup_request`**
+**CLIENT → HOST: `pickup_request`**
 ```javascript
 {
-  type: 'item_pickup_request',
+  type: 'pickup_request',
   from: 'player_uuid',
-  timestamp: 1703001234567,
   data: {
-    item_id: 'item_uuid',
-    player_position: { x: 100, y: 200 }
+    loot_id: 'loot-1'
   }
 }
 ```
 
-**HOST → ALL: `item_pickup_result`**
+**HOST → ALL: `loot_picked_up`**
+(Signifies the item is removed from the world. The equipment change comes via `player_state_update`)
 ```javascript
 {
-  type: 'item_pickup_result',
+  type: 'loot_picked_up',
   from: 'host_uuid',
-  timestamp: 1703001234567,
   data: {
-    success: true,
-    player_id: 'player_uuid',
-    item_id: 'item_uuid',
-    item: {
-      type: 'weapon',
-      name: 'Spear',
-      power_level: 5
-    },
-    dropped_item: {  // If player swapped equipment
-      id: 'dropped_uuid',
-      type: 'weapon',
-      name: 'Fist',
-      position: { x: 100, y: 200 }
-    }
+    loot_id: 'loot-1',
+    player_id: 'player_uuid'
   }
 }
 ```
 
-**CLIENT → HOST: `attack_action`**
+**CLIENT → HOST: `attack_request`**
 ```javascript
 {
-  type: 'attack_action',
+  type: 'attack_request',
   from: 'player_uuid',
-  timestamp: 1703001234567,
   data: {
-    attack_type: 'basic',  // or 'special'
-    direction: { x: 0.707, y: 0.707 },  // normalized vector
-    position: { x: 100, y: 200 }
+    weapon_id: 'sword',
+    aim_x: 100,
+    aim_y: 200,
+    is_special: false
   }
 }
 ```
 
-**HOST → ALL: `combat_event`**
+**HOST → ALL: `player_death`**
 ```javascript
 {
-  type: 'combat_event',
+  type: 'player_death',
   from: 'host_uuid',
-  timestamp: 1703001234567,
   data: {
-    attacker_id: 'player_uuid',
-    target_id: 'target_uuid',  // or null for AoE
-    attack_type: 'basic',
-    weapon: 'Spear',
-    damage: 25,
-    hit: true,
-    target_health: 75,
-    target_eliminated: false
+    victim_id: 'player_uuid',
+    killer_id: 'killer_uuid'
   }
 }
 ```
 
-**HOST → ALL: `player_eliminated`**
+#### 4. Loot Management
+
+**HOST → ALL: `loot_spawned`**
 ```javascript
 {
-  type: 'player_eliminated',
+  type: 'loot_spawned',
   from: 'host_uuid',
-  timestamp: 1703001234567,
   data: {
-    eliminated_player_id: 'player_uuid',
-    eliminated_by_id: 'killer_uuid',  // or null for zone damage
-    cause: 'combat',  // or 'conflict_zone'
-    dropped_items: [
-      { id: 'item1', type: 'weapon', name: 'Spear', position: { x: 100, y: 200 } },
-      { id: 'item2', type: 'armor', name: 'Chainmail', position: { x: 100, y: 200 } }
-    ]
+    id: 'loot-1',
+    item_id: 'sword',
+    type: 'weapon',
+    x: 100,
+    y: 100
   }
 }
 ```
 
-##### 4. Game State Messages
+**HOST → SPECIFIC: `loot_sync`**
+(Full list of active loot, sent to new joiners)
+```javascript
+{
+  type: 'loot_sync',
+  from: 'host_uuid',
+  data: {
+    loot: [ { id: 'loot-1', ... } ],
+    target_player_id: 'new_player_uuid'
+  }
+}
+```
+
+**CLIENT → HOST: `request_loot_sync`**
+Used by clients to request current loot state upon joining.
+
+#### 5. Game State Lifecycle
 
 **HOST → ALL: `game_start`**
-```javascript
-{
-  type: 'game_start',
-  from: 'host_uuid',
-  timestamp: 1703001234567,
-  data: {
-    players: [
-      { id: 'uuid1', name: 'Player1', position: { x: 100, y: 100 } },
-      // ...
-    ],
-    items: [
-      { id: 'item1', type: 'weapon', name: 'Spear', position: { x: 200, y: 300 }, power_level: 5 },
-      // ...
-    ],
-    conflict_zone: {
-      center: { x: 500, y: 500 },
-      radius: 1000
-    }
-  }
-}
-```
 
-**HOST → ALL: `zone_update`**
+**HOST → ALL: `game_over`**
 ```javascript
 {
-  type: 'zone_update',
+  type: 'game_over',
   from: 'host_uuid',
-  timestamp: 1703001234567,
-  data: {
-    center: { x: 500, y: 500 },
-    radius: 750,
-    damage_per_second: 5,
-    next_shrink_at: 1703001240000  // timestamp
-  }
-}
-```
-
-**HOST → ALL: `game_end`**
-```javascript
-{
-  type: 'game_end',
-  from: 'host_uuid',
-  timestamp: 1703001234567,
   data: {
     winner_id: 'player_uuid',
-    winner_name: 'Player1',
-    final_standings: [
-      { player_id: 'uuid1', name: 'Player1', kills: 5, damage_dealt: 450, placement: 1 },
-      { player_id: 'uuid2', name: 'Player2', kills: 3, damage_dealt: 320, placement: 2 },
-      // ...
-    ]
+    stats: [ ... ]
   }
 }
 ```
 
-##### 5. Heartbeat & Sync
-
-**CLIENT → HOST: `heartbeat`**
-```javascript
-{
-  type: 'heartbeat',
-  from: 'player_uuid',
-  timestamp: 1703001234567,
-  data: {}
-}
-```
-
-**HOST → SPECIFIC: `state_sync_request`**
-```javascript
-{
-  type: 'state_sync_request',
-  from: 'host_uuid',
-  timestamp: 1703001234567,
-  data: {
-    reason: 'reconnect'  // or 'desync_detected'
-  }
-}
-```
-
-**HOST → SPECIFIC: `full_state_sync`**
-```javascript
-{
-  type: 'full_state_sync',
-  from: 'host_uuid',
-  timestamp: 1703001234567,
-  data: {
-    game_phase: 'combat',
-    players: [ /* all player states */ ],
-    items: [ /* all active items */ ],
-    conflict_zone: { /* current zone */ },
-    time_elapsed: 120000  // ms since game start
-  }
-}
-```
-
-### Message Flow Patterns
-
-#### Pattern 1: Client-Authoritative Movement
-
-```
-Client A          Host              Other Clients
-   |                |                     |
-   |--position_---->|                     |
-   |   update       |                     |
-   |                |---position_-------->|
-   |                |   broadcast         |
-   |                |                     |
-```
-
-Host accepts position update and broadcasts to all clients (including sender for confirmation).
-
-#### Pattern 2: Host-Authoritative Interaction
-
-```
-Client A          Host              Other Clients
-   |                |                     |
-   |--item_pickup-->|                     |
-   |   request      |                     |
-   |                |                     |
-   |                | [Validates]          |
-   |                | [Updates DB]         |
-   |                |                     |
-   |<--item_pickup--|                     |
-   |   result       |                     |
-   |                |---item_pickup------>|
-   |                |   result            |
-```
-
-Host validates request, updates authoritative state, then broadcasts result.
+**HOST → ALL: `session_terminated`**
+(Sent when host leaves)
 
 ---
 
 ## Data Flow for Host-Authority Model
-
-### Session Lifecycle
-
-```
-┌─────────────┐
-│   LOBBY     │  Players join via join code
-│   PHASE     │  Host can start game when ready
-└──────┬──────┘
-       │ Host clicks "Start Game"
-       ↓
-┌─────────────┐
-│ DEPLOYMENT  │  Players spawn at random positions
-│   PHASE     │  Items spawn on map
-└──────┬──────┘  Conflict zone initialized
-       │ Automatic transition (2-3 seconds)
-       ↓
-┌─────────────┐
-│   COMBAT    │  Main gameplay loop
-│   PHASE     │  Position updates (60Hz)
-└──────┬──────┘  Interaction requests (on-demand)
-       │          Zone updates (periodic)
-       │ Only 1 player alive OR timeout
-       ↓
-┌─────────────┐
-│    ENDED    │  Winner declared
-│   PHASE     │  Final statistics shown
-└─────────────┘  Host can start next game
-```
-
-### Detailed Data Flow: Game Start
-
-```
-HOST                          SUPABASE                      CLIENTS
- │                               │                              │
- │ 1. User clicks "Start Game"   │                              │
- │                               │                              │
- │ 2. Update session status      │                              │
- ├──UPDATE game_sessions────────>│                              │
- │   SET status='active'         │                              │
- │   SET started_at=NOW()        │                              │
- │                               │                              │
- │ 3. Generate spawn positions   │                              │
- │ 4. Generate item spawns       │                              │
- │                               │                              │
- │ 5. Insert items to DB         │                              │
- ├──INSERT session_items────────>│                              │
- │   (bulk insert)               │                              │
- │                               │                              │
- │ 6. Broadcast game_start       │                              │
- ├──PUBLISH to channel──────────>│──────game_start──────────────>│
- │   {players, items, zone}      │                              │
- │                               │                              │
- │                               │                              │ 7. Clients receive
- │                               │                              │    Initialize game state
- │                               │                              │    Render initial state
- │                               │                              │
-```
 
 ### Detailed Data Flow: Movement Update (Client-Authoritative)
 
@@ -652,22 +342,22 @@ CLIENT A          SUPABASE CHANNEL          HOST              OTHER CLIENTS
    │    (WASD input)    │                     │                    │
    │                    │                     │                    │
    │ 2. Publish update  │                     │                    │
-   ├──movement_update──>│                     │                    │
-   │   (20 Hz)          │                     │                    │
+   ├──player_state_────>│                     │                    │
+   │   update           │                     │                    │
    │                    │                     │                    │
    │                    │ 3. Broadcast to all │                    │
-   │                    │<──movement_─────────┼───────────────────>│
+   │                    │<──player_state_─────┼───────────────────>│
    │                    │   update            │                    │
    │                    │                     │                    │
    │ 4. Receive update  │                     │ 5. Receive update  │
    │    (confirmation)  │                     │    (other players) │
-   │<──movement_────────┤                     ├──movement_────────>│
+   │<──player_state_────┤                     ├──player_state_────>│
    │   update           │                     │   update           │
    │                    │                     │                    │
 ```
 
 **Frequency**: 20 Hz (every ~50ms)
-**Architecture**: Direct client broadcasting - each client broadcasts their own movement updates directly to all peers without host intermediary or batching.
+**Architecture**: Direct client broadcasting - each client broadcasts their own state updates directly to all peers.
 
 ### Detailed Data Flow: Item Pickup (Host-Authoritative)
 
@@ -681,12 +371,10 @@ CLIENT A          SUPABASE CHANNEL          HOST              DATABASE
    │    (local check)   │                     │                    │
    │                    │                     │                    │
    │ 3. Request pickup  │                     │                    │
-   ├──item_pickup_─────>│                     │                    │
-   │   request          │                     │                    │
+   ├──pickup_request───>│                     │                    │
    │                    │                     │                    │
    │                    │ 4. Forward request  │                    │
-   │                    ├──item_pickup_──────>│                    │
-   │                    │   request           │                    │
+   │                    ├──pickup_request────>│                    │
    │                    │                     │                    │
    │                    │                     │ 5. Validate:       │
    │                    │                     │    - Item exists?  │
@@ -695,36 +383,22 @@ CLIENT A          SUPABASE CHANNEL          HOST              DATABASE
    │                    │                     │                    │
    │                    │                     │ 6. Update DB       │
    │                    │                     ├─UPDATE session_────>│
-   │                    │                     │  items SET         │
-   │                    │                     │  is_picked_up=true │
-   │                    │                     │                    │
-   │                    │                     │ 7. Update player   │
-   │                    │                     ├─UPDATE session_────>│
    │                    │                     │  players SET       │
    │                    │                     │  equipped_weapon   │
    │                    │                     │                    │
-   │                    │                     │ 8. If swapping     │
-   │                    │                     │    equipment:      │
-   │                    │                     │    Insert new item │
-   │                    │                     ├─INSERT session_────>│
-   │                    │                     │  items (dropped)   │
+   │                    │                     │ 7. Broadcast result│
+   │                    │<──player_state_─────┤                    │
+   │                    │   update            │                    │
+   │                    │   (equipment)       │                    │
    │                    │                     │                    │
-   │                    │ 9. Broadcast result │                    │
-   │                    │<──item_pickup_──────┤                    │
-   │                    │   result            │                    │
+   │                    │<──loot_picked_up────┤                    │
+   │                    │   (remove item)     │                    │
    │                    │                     │                    │
    │ 10. Update UI      │                     │                    │
    │     (equip item)   │                     │                    │
-   │<──item_pickup_─────┤                     │                    │
-   │   result           │                     │                    │
+   │<──(both messages)──┤                     │                    │
+   │                    │                     │                    │
 ```
-
-**Validation Rules** (enforced by host):
-- Item must exist in `session_items` with `is_picked_up = false`
-- Distance between player position and item position < pickup_radius (e.g., 20 pixels)
-- Player is alive (`is_alive = true`)
-
-**Conflict Resolution**: If multiple clients request the same item simultaneously, host processes requests in the order received. First valid request wins, subsequent requests receive `success: false`.
 
 ### Detailed Data Flow: Combat Interaction
 
@@ -734,12 +408,12 @@ CLIENT (Attacker)      CHANNEL          HOST           DATABASE       CLIENTS (O
       │ 1. Player attacks │               │                │                 │
       │    (mouse click)  │               │                │                 │
       │                   │               │                │                 │
-      │ 2. Send action    │               │                │                 │
-      ├──attack_action───>│               │                │                 │
+      │ 2. Send request   │               │                │                 │
+      ├──attack_request──>│               │                │                 │
       │                   │               │                │                 │
       │                   │ 3. Forward    │                │                 │
       │                   ├──attack_──────>│                │                 │
-      │                   │   action      │                │                 │
+      │                   │   request     │                │                 │
       │                   │               │                │                 │
       │                   │               │ 4. Validate:   │                 │
       │                   │               │   - In range?  │                 │
@@ -749,320 +423,17 @@ CLIENT (Attacker)      CHANNEL          HOST           DATABASE       CLIENTS (O
       │                   │               │                │                 │
       │                   │               │ 5. Calculate:  │                 │
       │                   │               │   - Damage     │                 │
-      │                   │               │   - Hit/miss   │                 │
-      │                   │               │   - Armor      │                 │
-      │                   │               │     reduction  │                 │
       │                   │               │                │                 │
       │                   │               │ 6. Update HP   │                 │
       │                   │               ├─UPDATE session_┼────────────────>│
       │                   │               │  players       │                 │
+      │                   │               │  (periodic)    │                 │
       │                   │               │                │                 │
-      │                   │               │ 7. If killed:  │                 │
-      │                   │               │    Mark dead,  │                 │
-      │                   │               │    drop items  │                 │
-      │                   │               ├─UPDATE/INSERT──┼────────────────>│
-      │                   │               │                │                 │
-      │                   │ 8. Broadcast  │                │                 │
-      │                   │<──combat_─────┤                │                 │
-      │                   │   event       │                │                 │
-      │                   │               │                │                 │
-      │ 9. Play effects   │               │                │ 10. Play effects│
-      │    (animation)    │               │                │     (for all)   │
-      │<──combat_event────┤               │                │<────combat_─────┤
-      │                   │               │                │     event       │
-```
-
-**Damage Calculation** (performed by host):
-```javascript
-baseDamage = weapon.damage * weapon.powerLevel
-damageMultiplier = armor.getReduction(weapon.damageType)  // 0.0 to 1.0
-finalDamage = baseDamage * (1 - damageMultiplier)
-```
-
-### Host Responsibilities Summary
-
-The host must maintain authoritative state and process:
-
-1. **Session & Lobby Management**
-   - Create session with join code.
-   - **Monitor `session_players` table:** Enforce `max_players` by deleting excess/late-joining rows (Eviction).
-   - Ensure game hasn't already started before allowing new joins (Cleanup).
-   - Track connected players via heartbeats and DB state.
-   - Handle disconnections and timeouts.
-
-2. **Game State Management**
-   - Initialize game state (spawn positions, items)
-   - Manage conflict zone progression
-   - Track all player stats (health, kills, equipment)
-   - Track all item states (spawned, picked up, dropped)
-
-3. **Movement Updates** (Client-Authoritative)
-   - Clients broadcast their own movement updates (position, rotation, velocity) directly to all peers
-   - No host validation or aggregation (trust-based model)
-   - Host treats movement updates like any other client
-
-4. **Interaction Validation** (Host-Authoritative)
-   - Validate item pickup requests (range, availability)
-   - Validate combat actions (range, weapon equipped, target alive)
-   - Calculate damage and health changes
-   - Detect eliminations
-   - Spawn dropped items from eliminated players
-
-5. **Persistence**
-   - Update database with authoritative state changes
-   - Log events for debugging/replay
-
-6. **Broadcasting**
-   - Send state updates to all connected clients
-   - Handle late-join state synchronization
-
-### Client Responsibilities Summary
-
-Each client (including the host's client instance) must:
-
-1. **Local Input Handling**
-   - Capture user input (movement, attacks, pickup attempts)
-   - Immediately update local player position and velocity
-   - Broadcast movement updates directly to all peers (20 Hz)
-   - Send interaction requests to host (on-demand)
-
-2. **Remote State Rendering**
-   - Receive movement updates from all other clients directly
-   - Interpolate other players' positions for smooth rendering
-   - Receive and apply interaction results from host (item pickups, combat)
-   - Render game state (players, items, conflict zone)
-
-3. **UI Updates**
-   - Display player inventory/equipment
-   - Show game stats (kills, remaining players)
-   - Show conflict zone warnings
-   - Display spectator UI when eliminated
-
-4. **Error Handling**
-   - Handle network disconnections
-   - Request state sync if desynced
-   - Show connection status to user
-
-### Conflict Zone Data Flow
-
-```
-HOST (Every 5 seconds)
-  │
-  │ 1. Calculate new zone
-  │    - Shrink radius
-  │    - Increase damage
-  │
-  │ 2. Identify players outside zone
-  │
-  │ 3. Apply zone damage to those players
-  │
-  ├──UPDATE session_players (health)────> DATABASE
-  │
-  │ 4. Broadcast zone update
-  │
-  ├──zone_update──> CHANNEL ──> ALL CLIENTS
-  │
-  │ 5. If any players eliminated by zone:
-  │
-  ├──player_eliminated──> CHANNEL ──> ALL CLIENTS
-```
-
----
-
-### Latency & Client Prediction
-
-**Movement**: Clients immediately update their own position and velocity locally and broadcast updates directly to all peers. Each client is authoritative over their own movement with no host validation or correction. This provides lowest latency but no anti-cheat protection.
-
-**Interactions**: Clients can show optimistic UI feedback (e.g., item pickup animation) but must wait for host confirmation before actually applying the state change. If the host rejects the action, the client must rollback the optimistic update.
-
-### Message Rate Limiting
-
-- **Position updates**: Maximum 30 Hz per client (every ~33ms)
-- **Heartbeats**: Every 5 seconds
-
-### Database vs. Realtime Channel
-
-| Data | Storage | Rationale |
-|------|---------|-----------|
-| Session metadata | Database | Persistent, required for join code lookups |
-| Player list | Database + Channel | Database for persistence, Channel for real-time |
-| Player positions | Database + Channel | Database written periodically (60s) by each client, Channel for real-time broadcasts (20Hz) |
-| Player velocity | Database + Channel | Database written periodically (60s) by each client, Channel for real-time broadcasts (20Hz) |
-| Item states | Database + Channel | Database for authority, Channel for sync |
-| Combat events | Channel + Events log | Real-time sync, optional event log for debugging |
-| Game state changes | Database + Channel | Database for authority, Channel for sync |
-
-### Client Movement DB Writes
-
-Each client writes their own position, velocity, and rotation to the database periodically:
-
-- **Frequency**: Every 60 seconds
-- **Authority**: Client-authoritative (each client writes their own movement)
-- **Data Written**: `position_x`, `position_y`, `velocity_x`, `velocity_y`, `rotation`
-- **Purpose**: Persist state for reconnection, late-join, analytics
-- **Implementation**: `Network.startPeriodicMovementWrite()`
-- **Note**: Real-time updates use broadcast (20Hz). DB writes are for persistence only.
-
-**Health Persistence**: Health is NOT written by clients. Health is host-authoritative and will be persisted by the host via Network.js when combat is implemented.
-
-### Host Health Persistence (IMPLEMENTED)
-
-Health is **HOST-AUTHORITATIVE**:
-
-- **Authority**: Only host writes health to database
-- **Triggers**: Zone damage (host calculates), Combat damage (host calculates)
-- **Implementation**: `Network.startPeriodicPlayerStateWrite()` called by Host
-- **Process**:
-  - Host calculates health changes (e.g. zone damage)
-  - Host broadcasts updates via `player_state_update` (generic system)
-  - Host persists all players' health to DB every 60 seconds
-  - Clients receive updates and update `SessionPlayersSnapshot` (in-memory)
-
-### Scalability Considerations
-
-**Current Design (Phase 1)**:
-- 12 players per session
-- Estimated message rate: ~720 position updates/second (12 players * 60 Hz)
-- Supabase Realtime can handle this easily
-
-**Future Scaling** (if needed):
-- Use Supabase's built-in connection pooling
-- Implement message compression for position updates
-- Consider delta compression (send only changed values)
-- Add regional database replicas for global players
-
-
----
-
-## Security & Error Handling
-
-### Security Measures
-
-1. **Join Code Security**
-   - 6-character alphanumeric codes (36^6 = 2.1 billion combinations)
-   - Single-use codes (deleted when session ends)
-   - Short expiry (2 hours max session length)
-
-2. **Row Level Security (RLS)**
-   - Players can only read/write data for their own session
-   - Host has elevated permissions for their session
-   - Anonymous auth prevents account-based attacks
-
-3. **Input Validation** (Host-side)
-   - Validate all host-authoritative interaction requests (range checks, state checks)
-   - Rate limit message processing (prevent spam)
-
-4. **Cheating Prevention** (Basic)
-   - Host validates all host-authoritative actions (combat, items, game state)
-   - Position updates are NOT validated (trust-based, client-authoritative)
-   - Combat calculations done server-side (host)
-   - Event logging for post-game analysis
-
----
-
-## Appendix: Message Flow Diagrams
-
-### Full Game Lifecycle
-
-```
-┌──────────┐
-│  LOBBY   │
-│          │  Host creates session
-│          │  Players join via DB Insert
-│          │
-│  Events: │  • DB: session_players (INSERT)
-│          │  • DB: session_players (DELETE)
-└────┬─────┘
-     │
-     │ host sends: game_start
-     ↓
-┌──────────┐
-│DEPLOYMENT│
-│          │  Players spawn
-│  Events: │  • game_start (full state)
-└────┬─────┘
-     │
-     │ automatic transition
-     ↓
-┌──────────┐
-│  COMBAT  │
-│          │  Main gameplay loop
-│          │
-│  Events: │  • movement_update (20 Hz, direct client broadcast)
-│          │  • item_pickup_request
-│          │  • item_pickup_result
-│          │  • attack_action
-│          │  • combat_event
-│          │  • player_eliminated
-│          │  • zone_update (periodic)
-│          │  • heartbeat (5s)
-└────┬─────┘
-     │
-     │ only 1 player alive
-     ↓
-┌──────────┐
-│  ENDED   │
-│          │  Winner declared
-│          │  Stats displayed
-│  Events: │  • game_end
-└──────────┘
-```
-
----
-
-### Row Level Security (RLS) Policies
-
-Enable RLS to ensure data isolation between sessions:
-
-```sql
--- Enable RLS
-ALTER TABLE game_sessions ENABLE ROW LEVEL SECURITY;
-ALTER TABLE session_players ENABLE ROW LEVEL SECURITY;
-ALTER TABLE session_items ENABLE ROW LEVEL SECURITY;
-ALTER TABLE session_events ENABLE ROW LEVEL SECURITY;
-
--- Policy: Anyone can read sessions (to join via join code)
-CREATE POLICY "Allow read access to game sessions"
-  ON game_sessions FOR SELECT
-  USING (TRUE);
-
--- Policy: Only host can update session
-CREATE POLICY "Host can update session"
-  ON game_sessions FOR UPDATE
-  USING (auth.uid() = host_id);
-
--- Policy: Players can read player data ONLY for sessions they have joined.
--- This prevents players from scanning the entire table for other active sessions.
-CREATE POLICY "Players can read session players"
-  ON session_players FOR SELECT
-  USING (
-    session_id IN (
-      SELECT s.session_id 
-      FROM session_players s 
-      WHERE s.player_id = auth.uid()
-    )
-  );
-
--- Policy: Players can update their own data.
-CREATE POLICY "Players can update own data"
-  ON session_players FOR UPDATE
-  USING (player_id = auth.uid());
-
--- Policy: Players can self-insert into a session.
--- The Host is responsible for evicting players if the session is full or already started.
-CREATE POLICY "Players can insert themselves"
-  ON session_players FOR INSERT
-  WITH CHECK (player_id = auth.uid());
-
--- Policy: Only the host can delete players (eviction).
-CREATE POLICY "Host can evict players"
-  ON session_players FOR DELETE
-  USING (
-    EXISTS (
-      SELECT 1 FROM game_sessions
-      WHERE id = session_players.session_id AND host_id = auth.uid()
-    )
-  );
-
--- Similar policies for session_items and session_events
+      │                   │               │ 7. Broadcast   │                 │
+      │                   │<──player_state_─────┤                 │                 │
+      │                   │   update (health)   │                 │                 │
+      │                   │                     │                 │                 │
+      │                   │               │ 8. If killed:  │                 │
+      │                   │<──player_death──────┤                 │                 │
+      │                   │                     │                 │                 │
 ```
