@@ -255,6 +255,47 @@ button:active {
   text-shadow: 1px 1px 0px #3d2817;
 }
 
+#match-summary h4 {
+  font-size: 1.5rem;
+  color: #ffd700; /* Gold for winner header */
+  margin-bottom: 1rem;
+  text-shadow: 2px 2px 0px #3d2817;
+  text-transform: uppercase;
+  letter-spacing: 1px;
+}
+
+#match-summary ul {
+  list-style: none;
+  padding: 0;
+  margin: 0;
+  text-align: left;
+}
+
+#match-summary li {
+  padding: 0.75rem;
+  margin: 0.5rem 0;
+  background-color: rgba(61, 40, 23, 0.3);
+  border: 2px solid #3d2817;
+  border-radius: 6px;
+  color: #f4e8c1;
+  font-weight: bold;
+  text-shadow: 1px 1px 0px #2d1b00;
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+}
+
+#match-summary li:last-child {
+  border-bottom: 2px solid #3d2817;
+}
+
+/* Highlight the winner in the list */
+#match-summary li.winner-row {
+  background-color: rgba(255, 215, 0, 0.2); /* Faint gold background */
+  border-color: #ffd700;
+  color: #ffd700;
+}
+
 #controls-info {
   margin-top: 2rem;
   padding: 1.5rem;

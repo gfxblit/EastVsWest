@@ -56,6 +56,7 @@ export class HostCombatManager {
 
     if (updates.length > 0) {
       this.network.broadcastPlayerStateUpdate(updates);
+      this.checkForWinCondition(playersSnapshot);
     }
 
     // Reset accumulator after processing
@@ -110,11 +111,17 @@ export class HostCombatManager {
             health: newHealth
           });
 
-          // Check for death
+          // Handle Death and Kills
           if (newHealth <= 0) {
             this.network.send('player_death', {
               victim_id: victimId,
               killer_id: attackerId
+            });
+
+            attacker.kills = (attacker.kills || 0) + 1;
+            updates.push({
+              player_id: attackerId,
+              kills: attacker.kills
             });
           }
         }
@@ -123,6 +130,33 @@ export class HostCombatManager {
 
     if (updates.length > 0) {
       this.network.broadcastPlayerStateUpdate(updates);
+      this.checkForWinCondition(playersSnapshot);
+    }
+  }
+
+  checkForWinCondition(playersSnapshot) {
+    if (!this.state.isRunning) return;
+
+    const players = playersSnapshot.getPlayers();
+    const activePlayers = Array.from(players.values()).filter(p => p.health > 0);
+
+    // If 1 or fewer players remain alive, end the match
+    // (If 0, it's a draw or everyone died)
+    if (activePlayers.length <= 1) {
+      const winner = activePlayers[0];
+      
+      const stats = Array.from(players.values()).map(p => ({
+        player_id: p.player_id || p.id,
+        name: p.player_name || p.name || 'Unknown',
+        kills: p.kills || 0
+      }));
+
+      this.network.send('game_over', {
+        winner_id: winner ? (winner.player_id || winner.id) : null,
+        stats: stats
+      });
+      
+      this.state.isRunning = false;
     }
   }
 
