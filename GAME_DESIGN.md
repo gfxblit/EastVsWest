@@ -28,6 +28,13 @@ Conflict Zone: East vs West is a 12-player Battle Royale built on a classic 2D t
 *   **Loop:** Drop (fists only) -> Scavenge (weapons/armor) -> Fight -> Survive the Zone.
 *   **Elimination (Spectator Mode):**
     *   Eliminated players view the match through the perspective of their killer.
+    *   **Trigger:** When a player's health reaches 0.
+    *   **Action:**
+        *   Host broadcasts a `player_death` event containing `victim_id` and `killer_id`.
+        *   Victim's client sets `spectatingTargetId` to `killer_id`.
+        *   Camera interpolates to the killer's position.
+        *   UI updates to show "Spectating: [Killer Name]".
+    *   **Fallback:** If the killer dies or disconnects, the camera remains at the last known position or switches to the killer's killer (future enhancement).
     *   Can cycle through all remaining living players.
     *   Option to "Leave Match" returns the player to the Intro Screen.
 

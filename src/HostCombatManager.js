@@ -109,6 +109,14 @@ export class HostCombatManager {
             player_id: victimId,
             health: newHealth
           });
+
+          // Check for death
+          if (newHealth <= 0) {
+            this.network.send('player_death', {
+              victim_id: victimId,
+              killer_id: attackerId
+            });
+          }
         }
       }
     }
