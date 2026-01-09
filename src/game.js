@@ -191,7 +191,7 @@ export class Game {
       const players = this.playersSnapshot.getPlayers();
       const target = players.get(this.spectatingTargetId);
       
-      const interpolated = this.playersSnapshot.getInterpolatedPlayerState(this.spectatingTargetId);
+      const interpolated = this.playersSnapshot.getInterpolatedPlayerState(this.spectatingTargetId, performance.now());
       if (interpolated) {
         return { 
           id: this.spectatingTargetId,
