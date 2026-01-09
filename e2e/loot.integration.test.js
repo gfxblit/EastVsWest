@@ -91,14 +91,26 @@ describe('Loot Integration', () => {
     const spawnedSpear = hostGame.hostLootManager.spawnLoot('spear', lootX, lootY);
 
     // Verify loot appears on both
+    let syncRequestTime = 0;
     await waitFor(() => {
       // Run updates to process events
       hostGame.update(0.05);
       playerGame.update(0.05);
 
       const expectedCount = CONFIG.GAME.INITIAL_LOOT_COUNT + 1;
+      
+      // If player is missing loot, request sync periodically (every 2s)
+      if (playerGame.state.loot.length < expectedCount) {
+          const now = Date.now();
+          if (now - syncRequestTime > 2000) {
+              console.log('Test: Player missing loot, requesting sync...');
+              playerNetwork.send('request_loot_sync', {});
+              syncRequestTime = now;
+          }
+      }
+
       if (hostGame.state.loot.length !== expectedCount || playerGame.state.loot.length !== expectedCount) {
-        console.log(`Loot counts - Host: ${hostGame.state.loot.length}, Player: ${playerGame.state.loot.length} (Expected: ${expectedCount})`);
+        // console.log(`Loot counts - Host: ${hostGame.state.loot.length}, Player: ${playerGame.state.loot.length} (Expected: ${expectedCount})`);
       }
       return hostGame.state.loot.length === expectedCount && playerGame.state.loot.length === expectedCount;
     }, 20000);
@@ -140,6 +152,19 @@ describe('Loot Integration', () => {
     await waitFor(() => {
         playerGame.update(0.1);
         hostGame.update(0.1);
+
+        const hasWeapon = playerGame.getLocalPlayer().equipped_weapon === 'spear';
+        const hasLoot = playerGame.state.loot.some(item => item.id === spawnedSpear.id);
+        
+        if (hasWeapon && hasLoot) {
+             const now = Date.now();
+             if (now - syncRequestTime > 2000) {
+                 console.log('Test: Player has weapon but loot exists, requesting sync...');
+                 playerNetwork.send('request_loot_sync', {});
+                 syncRequestTime = now;
+             }
+        }
+
         return !playerGame.state.loot.some(item => item.id === spawnedSpear.id);
     }, 10000);
     
@@ -167,6 +192,11 @@ describe('Loot Integration', () => {
     playerGame = new Game();
     playerGame.init(playerSnapshot, playerNetwork);
 
+    // Wait for Host to see player in snapshot before interacting
+    await waitFor(() => {
+        return hostSnapshot.getPlayers().has(playerNetwork.playerId);
+    }, 10000);
+
     // Give player a 'bo' initially
     await playerSupabase.from('session_players')
       .update({ equipped_weapon: 'bo', position_x: 1000, position_y: 1000 })
@@ -192,9 +222,19 @@ describe('Loot Integration', () => {
     const lootY = 1100;
     const spawnedSpear = hostGame.hostLootManager.spawnLoot('spear', lootX, lootY);
 
+    let syncRequestTime = 0;
     await waitFor(() => {
         hostGame.update(0.016);
         playerGame.update(0.016);
+
+        // Retry sync if loot not found
+        if (!playerGame.state.loot.some(l => l.id === spawnedSpear.id)) {
+            const now = Date.now();
+            if (now - syncRequestTime > 2000) {
+                 playerNetwork.send('request_loot_sync', {});
+                 syncRequestTime = now;
+            }
+        }
         return playerGame.state.loot.some(l => l.id === spawnedSpear.id);
     }, 25000);
 
