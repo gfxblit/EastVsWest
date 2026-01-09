@@ -219,7 +219,8 @@ class App {
 
       stats.forEach(p => {
         const isWinner = p.player_id === winner_id;
-        summaryHtml += `<li>${p.name}: ${p.kills} Kills ${isWinner ? '(WINNER)' : ''}</li>`;
+        const winnerClass = isWinner ? 'class="winner-row"' : '';
+        summaryHtml += `<li ${winnerClass}>${p.name}: ${p.kills} Kills ${isWinner ? '(WINNER)' : ''}</li>`;
       });
       summaryHtml += '</ul>';
 
