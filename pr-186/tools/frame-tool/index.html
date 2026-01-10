@@ -1,0 +1,140 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Frame Sheet Tool</title>
+    <style>
+        body {
+            font-family: sans-serif;
+            background-color: #333;
+            color: #eee;
+            margin: 0;
+            padding: 20px;
+            display: flex;
+            flex-direction: column;
+            height: 100vh;
+            box-sizing: border-box;
+        }
+        .container {
+            display: flex;
+            flex: 1;
+            gap: 20px;
+            overflow: hidden;
+        }
+        .controls {
+            width: 300px;
+            background: #444;
+            padding: 20px;
+            border-radius: 8px;
+            overflow-y: auto;
+            display: flex;
+            flex-direction: column;
+            gap: 15px;
+        }
+        .workspace {
+            flex: 1;
+            background: #222;
+            border-radius: 8px;
+            position: relative;
+            overflow: auto;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+        }
+        .input-group {
+            display: flex;
+            flex-direction: column;
+            gap: 5px;
+        }
+        label {
+            font-size: 0.9em;
+            color: #ccc;
+        }
+        input, textarea {
+            background: #555;
+            border: 1px solid #666;
+            color: white;
+            padding: 5px;
+            border-radius: 4px;
+        }
+        textarea {
+            resize: vertical;
+            font-family: monospace;
+            height: 150px;
+        }
+        canvas {
+            border: 1px solid #555;
+            background-image: linear-gradient(45deg, #333 25%, transparent 25%), linear-gradient(-45deg, #333 25%, transparent 25%), linear-gradient(45deg, transparent 75%, #333 75%), linear-gradient(-45deg, transparent 75%, #333 75%);
+            background-size: 20px 20px;
+            background-position: 0 0, 0 10px, 10px -10px, -10px 0px;
+            background-color: #2a2a2a;
+        }
+        #previewCanvas {
+            align-self: center;
+            margin-top: 10px;
+            border: 1px solid #666;
+        }
+        .preview-container {
+            border-top: 1px solid #555;
+            padding-top: 15px;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+        }
+    </style>
+  <script type="module" crossorigin src="../../assets/frameTool-CPasMOwE.js"></script>
+  <link rel="modulepreload" crossorigin href="../../assets/modulepreload-polyfill-B5Qt9EMX.js">
+</head>
+<body>
+    <h1>Frame Sheet Tool</h1>
+    <div class="container">
+        <div class="controls">
+            <div class="input-group">
+                <label for="imageInput">Sprite Sheet Image</label>
+                <input type="file" id="imageInput" accept="image/*">
+            </div>
+
+            <div class="input-group">
+                <label for="startX">Start X</label>
+                <input type="number" id="startX" value="0">
+            </div>
+            <div class="input-group">
+                <label for="startY">Start Y</label>
+                <input type="number" id="startY" value="0">
+            </div>
+            <div class="input-group">
+                <label for="frameWidth">Frame Width</label>
+                <input type="number" id="frameWidth" value="32">
+            </div>
+            <div class="input-group">
+                <label for="frameHeight">Frame Height</label>
+                <input type="number" id="frameHeight" value="32">
+            </div>
+            <div class="input-group">
+                <label for="frameCount">Frame Count</label>
+                <input type="number" id="frameCount" value="4">
+            </div>
+            <div class="input-group">
+                <label for="fps">FPS</label>
+                <input type="number" id="fps" value="10">
+            </div>
+
+            <div class="preview-container">
+                <label>Preview</label>
+                <canvas id="previewCanvas" width="64" height="64"></canvas>
+            </div>
+
+            <div class="input-group">
+                <label for="jsonOutput">JSON Configuration</label>
+                <textarea id="jsonOutput" readonly></textarea>
+            </div>
+        </div>
+
+        <div class="workspace" id="dropZone">
+            <canvas id="mainCanvas"></canvas>
+        </div>
+    </div>
+
+</body>
+</html>
