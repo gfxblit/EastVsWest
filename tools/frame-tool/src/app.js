@@ -1,4 +1,5 @@
 import { FrameCalculator } from './FrameCalculator.js';
+import { BackgroundRemover } from './BackgroundRemover.js';
 
 class App {
     constructor() {
@@ -21,6 +22,15 @@ class App {
             globalWidth: document.getElementById('globalWidth'),
             globalHeight: document.getElementById('globalHeight'),
         };
+        
+        // Background Removal UI
+        this.bgRemoveEnabled = document.getElementById('bgRemoveEnabled');
+        this.bgRemoveControls = document.getElementById('bgRemoveControls');
+        this.bgKeyColor = document.getElementById('bgKeyColor');
+        this.bgKeyColorText = document.getElementById('bgKeyColorText');
+        this.bgThreshold = document.getElementById('bgThreshold');
+        this.bgThresholdVal = document.getElementById('bgThresholdVal');
+
         this.exportBtn = document.getElementById('exportBtn');
         this.mainCanvas = document.getElementById('mainCanvas');
         this.previewCanvas = document.getElementById('previewCanvas');
@@ -48,6 +58,27 @@ class App {
         
         Object.values(this.inputs).forEach(input => {
             input.addEventListener('input', () => this.update());
+        });
+
+        // Background Removal Events
+        this.bgRemoveEnabled.addEventListener('change', () => {
+            this.bgRemoveControls.style.display = this.bgRemoveEnabled.checked ? 'flex' : 'none';
+            this.renderPreview();
+        });
+
+        this.bgKeyColor.addEventListener('input', (e) => {
+            this.bgKeyColorText.value = e.target.value;
+            this.renderPreview();
+        });
+
+        this.bgKeyColorText.addEventListener('input', (e) => {
+            this.bgKeyColor.value = e.target.value;
+            this.renderPreview();
+        });
+
+        this.bgThreshold.addEventListener('input', (e) => {
+            this.bgThresholdVal.textContent = e.target.value;
+            this.renderPreview();
         });
 
         this.exportBtn.addEventListener('click', () => this.exportSpriteSheet());
@@ -319,6 +350,17 @@ class App {
             );
         });
 
+        if (this.bgRemoveEnabled.checked) {
+            // Process the entire export canvas at once
+            const imageData = ctx.getImageData(0, 0, exportCanvas.width, exportCanvas.height);
+            BackgroundRemover.process(
+                imageData, 
+                this.bgKeyColor.value, 
+                parseInt(this.bgThreshold.value)
+            );
+            ctx.putImageData(imageData, 0, 0);
+        }
+
         // Download Image
         const link = document.createElement('a');
         link.download = 'aligned_spritesheet.png';
@@ -389,6 +431,24 @@ class App {
             frame.x, frame.y, frame.w, frame.h,
             destX, destY, frame.w, frame.h
         );
+
+        if (this.bgRemoveEnabled.checked) {
+            // Get image data for the drawn frame
+            // Note: We capture the whole canvas or just the region?
+            // Capturing just the region is safer to avoid processing helper lines if they were under it,
+            // but helper lines are drawn BEFORE image (actually they are drawn before, but since stroke() is called... wait)
+            // The helper lines are drawn BEFORE drawImage. So drawImage is on top.
+            // If we process background removal, transparency will reveal the helper lines underneath!
+            // That is actually desirable for preview.
+            
+            const imageData = this.previewCtx.getImageData(destX, destY, frame.w, frame.h);
+            BackgroundRemover.process(
+                imageData, 
+                this.bgKeyColor.value, 
+                parseInt(this.bgThreshold.value)
+            );
+            this.previewCtx.putImageData(imageData, destX, destY);
+        }
 
         // Draw frame counter
         this.previewCtx.fillStyle = 'rgba(0, 0, 0, 0.5)';
