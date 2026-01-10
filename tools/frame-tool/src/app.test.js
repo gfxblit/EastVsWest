@@ -25,6 +25,14 @@ describe('App State Management', () => {
             <div id="overlayLayer"></div>
             <button id="saveProjectBtn"></button>
             <input type="file" id="loadProjectInput">
+            
+            <input type="checkbox" id="bgRemoveEnabled">
+            <div id="bgRemoveControls" style="display: none;">
+                <input type="color" id="bgKeyColor" value="#00ff00">
+                <input type="text" id="bgKeyColorText" value="#00ff00">
+                <input type="range" id="bgThreshold" value="0">
+                <span id="bgThresholdVal">0</span>
+            </div>
         `;
 
         // Mock canvas context
@@ -64,6 +72,7 @@ describe('App State Management', () => {
                 globalWidth: 64,
                 globalHeight: 64
             },
+            sourceFilename: null,
             anchorOverrides: { 0: { x: 5, y: 5 } },
             frameOverrides: { 1: { x: 20, y: 20 } }
         });
@@ -96,5 +105,39 @@ describe('App State Management', () => {
         // Should trigger update (we can check if calculator was called or just assume)
         // Since we mocked FrameCalculator, we can check if calculateFrames was called if we wanted,
         // but checking the state is enough.
+    });
+
+    test('captures filename when image is selected and includes it in project state', () => {
+        const file = new File([''], 'test-spritesheet.png', { type: 'image/png' });
+        
+        // Mock FileReader
+        const mockFileReaderInstance = {
+            readAsDataURL: jest.fn(function() {
+                this.onload({ target: { result: 'data:image/png;base64,' } });
+            }),
+            onload: null
+        };
+        global.FileReader = jest.fn(() => mockFileReaderInstance);
+        
+        // Mock Image
+        const mockImage = {};
+        global.Image = jest.fn(() => mockImage);
+
+        app.handleFileSelect(file);
+
+        expect(app.sourceFilename).toBe('test-spritesheet.png');
+        
+        const state = app.getProjectState();
+        expect(state.sourceFilename).toBe('test-spritesheet.png');
+
+        // Simulate loading project with filename
+        const newState = {
+            config: {},
+            sourceFilename: 'other-image.png',
+            anchorOverrides: {},
+            frameOverrides: {}
+        };
+        app.loadProjectState(newState);
+        expect(app.sourceFilename).toBe('other-image.png');
     });
 });
