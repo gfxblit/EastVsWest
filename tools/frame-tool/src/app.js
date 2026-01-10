@@ -388,14 +388,6 @@ export class App {
                     "frames": config.frameCount
                 }
             };
-
-            if (this.bgRemoveEnabled.checked) {
-                output.bgRemoval = {
-                    keyColor: this.bgKeyColor.value,
-                    threshold: parseInt(this.bgThreshold.value),
-                    erode: parseInt(this.bgErode.value)
-                };
-            }
         } else {
              // Fallback if no image loaded
             output.frames = this.frames;
@@ -462,14 +454,6 @@ export class App {
                 }
             }
         };
-
-        if (this.bgRemoveEnabled.checked) {
-            exportJSON.bgRemoval = {
-                keyColor: this.bgKeyColor.value,
-                threshold: parseInt(this.bgThreshold.value),
-                erode: parseInt(this.bgErode.value)
-            };
-        }
 
         const jsonLink = document.createElement('a');
         jsonLink.download = 'aligned_spritesheet.json';
