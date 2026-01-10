@@ -14,13 +14,9 @@ const __dirname = path.dirname(__filename);
 // Direction order for sprite sheet rows (top to bottom)
 const DIRECTION_ORDER = [
   'south',
-  'south-east',
   'east',
-  'north-east',
   'north',
-  'north-west',
-  'west',
-  'south-west'
+  'west'
 ];
 
 const ROWS = DIRECTION_ORDER.length;

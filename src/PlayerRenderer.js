@@ -149,20 +149,20 @@ export class PlayerRenderer {
         const vfxOffset = vfxType === 'thrust' ? CONFIG.COMBAT.THRUST_VFX_OFFSET : CONFIG.COMBAT.SLASH_VFX_OFFSET;
         const vfxScale = vfxType === 'thrust' ? CONFIG.COMBAT.THRUST_VFX_SCALE : CONFIG.COMBAT.SLASH_VFX_SCALE;
 
-        // Map 8-way direction to 4-way sprites
-        if (directionIndex === 4 || directionIndex === 3 || directionIndex === 5) {
+        // Map direction to cardinal VFX sprites
+        if (directionIndex === 2) { // North
             vfxImage = images.up;
             offsetX = vfxOffset.y;
             offsetY = -vfxOffset.x; // Shift up
-        } else if (directionIndex === 0 || directionIndex === 1 || directionIndex === 7) {
+        } else if (directionIndex === 0) { // South
             vfxImage = images.down;
             offsetX = -vfxOffset.y;
             offsetY = vfxOffset.x; // Shift down
-        } else if (directionIndex === 2) {
+        } else if (directionIndex === 1) { // East
             vfxImage = images.right;
             offsetX = vfxOffset.x; // Shift right
             offsetY = vfxOffset.y;
-        } else if (directionIndex === 6) {
+        } else if (directionIndex === 3) { // West
             vfxImage = images.left;
             offsetX = -vfxOffset.x; // Shift left
             offsetY = vfxOffset.y;

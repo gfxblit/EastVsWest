@@ -9,54 +9,56 @@ describe('AnimationHelper', () => {
   describe('getDirectionFromRotation', () => {
     test('ShouldReturnCorrectFrameForCardinalDirections', () => {
       // North (0 radians)
-      expect(getDirectionFromRotation(0)).toBe(4);
+      expect(getDirectionFromRotation(0)).toBe(2);
 
       // East (PI/2 radians)
-      expect(getDirectionFromRotation(Math.PI / 2)).toBe(2);
+      expect(getDirectionFromRotation(Math.PI / 2)).toBe(1);
 
       // South (PI radians)
       expect(getDirectionFromRotation(Math.PI)).toBe(0);
 
       // West (3PI/2 radians)
-      expect(getDirectionFromRotation(3 * Math.PI / 2)).toBe(6);
+      expect(getDirectionFromRotation(3 * Math.PI / 2)).toBe(3);
     });
 
-    test('ShouldReturnCorrectFrameForDiagonalDirections', () => {
-      // North-East (PI/4)
-      expect(getDirectionFromRotation(Math.PI / 4)).toBe(3);
+    test('ShouldMapDiagonalRotationToCardinalDirection', () => {
+      // North-East (PI/4) -> should be North (2) or East (1) depending on threshold
+      // Our logic: [315, 45) -> 2, [45, 135) -> 1
+      // PI/4 is 45 degrees, which is threshold for East (1)
+      expect(getDirectionFromRotation(Math.PI / 4)).toBe(1);
 
-      // South-East (3PI/4)
-      expect(getDirectionFromRotation(3 * Math.PI / 4)).toBe(1);
+      // South-East (3PI/4) is 135 degrees, threshold for South (0)
+      expect(getDirectionFromRotation(3 * Math.PI / 4)).toBe(0);
 
-      // South-West (5PI/4)
-      expect(getDirectionFromRotation(5 * Math.PI / 4)).toBe(7);
+      // South-West (5PI/4) is 225 degrees, threshold for West (3)
+      expect(getDirectionFromRotation(5 * Math.PI / 4)).toBe(3);
 
-      // North-West (7PI/4)
-      expect(getDirectionFromRotation(7 * Math.PI / 4)).toBe(5);
+      // North-West (7PI/4) is 315 degrees, threshold for North (2)
+      expect(getDirectionFromRotation(7 * Math.PI / 4)).toBe(2);
     });
 
     test('ShouldHandleNegativeAngles', () => {
-      // -PI/2 is equivalent to 3PI/2 (West) -> frame 6
-      expect(getDirectionFromRotation(-Math.PI / 2)).toBe(6);
+      // -PI/2 is equivalent to 3PI/2 (West) -> frame 3
+      expect(getDirectionFromRotation(-Math.PI / 2)).toBe(3);
 
       // -PI is equivalent to PI (South) -> frame 0
       expect(getDirectionFromRotation(-Math.PI)).toBe(0);
     });
 
     test('ShouldHandleAnglesGreaterThan2PI', () => {
-      // 2PI + PI/2 is equivalent to PI/2 (East) -> frame 2
-      expect(getDirectionFromRotation(2.5 * Math.PI)).toBe(2);
+      // 2PI + PI/2 is equivalent to PI/2 (East) -> frame 1
+      expect(getDirectionFromRotation(2.5 * Math.PI)).toBe(1);
     });
 
     test('ShouldHandleBoundaryConditions', () => {
-      // North is 0 +/- 22.5 degrees (approx +/- 0.3927 rad)
-      // Test slightly less than 22.5 deg -> Should be North (4)
-      const slightlyNorth = (22.0 * Math.PI) / 180;
-      expect(getDirectionFromRotation(slightlyNorth)).toBe(4);
+      // North is 0 +/- 45 degrees
+      // Test slightly less than 45 deg -> Should be North (2)
+      const slightlyNorth = (44.0 * Math.PI) / 180;
+      expect(getDirectionFromRotation(slightlyNorth)).toBe(2);
 
-      // Test slightly more than 22.5 deg -> Should be North-East (3)
-      const slightlyNorthEast = (23.0 * Math.PI) / 180;
-      expect(getDirectionFromRotation(slightlyNorthEast)).toBe(3);
+      // Test exactly 45 deg -> Should be East (1) based on >= 45 logic
+      const exactly45 = (45.0 * Math.PI) / 180;
+      expect(getDirectionFromRotation(exactly45)).toBe(1);
     });
   });
 
@@ -72,31 +74,31 @@ describe('AnimationHelper', () => {
       expect(direction).toBe(0); // South
     });
 
-    test('WhenVelocityIsEast_ShouldReturn2', () => {
+    test('WhenVelocityIsEast_ShouldReturn1', () => {
       const direction = getDirectionFromVelocity(1, 0);
-      expect(direction).toBe(2); // East
+      expect(direction).toBe(1); // East
     });
 
     test('WhenVelocityIsNorthEast_ShouldReturnCardinal', () => {
-      // |vy| >= |vx| -> North (4)
+      // |vy| >= |vx| -> North (2)
       const direction = getDirectionFromVelocity(1, -1);
-      expect(direction).toBe(4); // North
+      expect(direction).toBe(2); // North
     });
 
-    test('WhenVelocityIsNorth_ShouldReturn4', () => {
+    test('WhenVelocityIsNorth_ShouldReturn2', () => {
       const direction = getDirectionFromVelocity(0, -1);
-      expect(direction).toBe(4); // North
+      expect(direction).toBe(2); // North
     });
 
     test('WhenVelocityIsNorthWest_ShouldReturnCardinal', () => {
-      // |vy| >= |vx| -> North (4)
+      // |vy| >= |vx| -> North (2)
       const direction = getDirectionFromVelocity(-1, -1);
-      expect(direction).toBe(4); // North
+      expect(direction).toBe(2); // North
     });
 
-    test('WhenVelocityIsWest_ShouldReturn6', () => {
+    test('WhenVelocityIsWest_ShouldReturn3', () => {
       const direction = getDirectionFromVelocity(-1, 0);
-      expect(direction).toBe(6); // West
+      expect(direction).toBe(3); // West
     });
 
     test('WhenVelocityIsSouthWest_ShouldReturnCardinal', () => {
@@ -110,16 +112,16 @@ describe('AnimationHelper', () => {
       expect(direction).toBeNull(); // Idle, no direction change
     });
 
-    test('WhenVelocityIsNearEast_ShouldReturn2', () => {
-      // Test edge case: 22.5 degrees from East (should still be East)
+    test('WhenVelocityIsNearEast_ShouldReturn1', () => {
+      // Test edge case: near East
       const direction = getDirectionFromVelocity(1, 0.2);
-      expect(direction).toBe(2); // East
+      expect(direction).toBe(1); // East
     });
 
     test('WhenVelocityIsNearSouthEast_ButHorizontalDominant_ShouldReturnEast', () => {
       // vx (1) > vy (0.7) -> East
       const direction = getDirectionFromVelocity(1, 0.7);
-      expect(direction).toBe(2); // East
+      expect(direction).toBe(1); // East
     });
     
     test('WhenVelocityIsNearSouthEast_ButVerticalDominant_ShouldReturnSouth', () => {
@@ -146,7 +148,7 @@ describe('AnimationHelper', () => {
     });
 
     test('WhenPlayerIsIdleWithNullDirection_ShouldResetToFrame0', () => {
-      const animState = { currentFrame: 5, timeAccumulator: 1.0, lastDirection: 4 };
+      const animState = { currentFrame: 3, timeAccumulator: 1.0, lastDirection: 2 };
       updateAnimationState(animState, 0.2, false, null);
 
       expect(animState.currentFrame).toBe(0);
@@ -156,10 +158,10 @@ describe('AnimationHelper', () => {
       const animState = { currentFrame: 0, timeAccumulator: 0, lastDirection: 0 };
       const frameDuration = 1 / CONFIG.ANIMATION.FPS; // ~0.067s at 15 FPS
 
-      updateAnimationState(animState, frameDuration, true, 2);
+      updateAnimationState(animState, frameDuration, true, 1);
 
       expect(animState.currentFrame).toBe(1);
-      expect(animState.lastDirection).toBe(2);
+      expect(animState.lastDirection).toBe(1);
       expect(animState.timeAccumulator).toBeCloseTo(0, 5);
     });
 
@@ -167,7 +169,7 @@ describe('AnimationHelper', () => {
       const animState = { currentFrame: 0, timeAccumulator: 0, lastDirection: 0 };
 
       // Very small delta time (less than 1 frame duration)
-      updateAnimationState(animState, 0.001, true, 2);
+      updateAnimationState(animState, 0.001, true, 1);
 
       expect(animState.currentFrame).toBe(0); // Should not advance yet
       expect(animState.timeAccumulator).toBeCloseTo(0.001, 5);
@@ -185,11 +187,11 @@ describe('AnimationHelper', () => {
     });
 
     test('WhenFrameExceedsMax_ShouldLoopBackToZero', () => {
-      const framesPerDirection = CONFIG.ANIMATION.FRAMES_PER_DIRECTION; // 6
+      const framesPerDirection = CONFIG.ANIMATION.FRAMES_PER_DIRECTION; // 4
       const animState = { currentFrame: framesPerDirection - 1, timeAccumulator: 0, lastDirection: 0 };
       const frameDuration = 1 / CONFIG.ANIMATION.FPS;
 
-      updateAnimationState(animState, frameDuration, true, 2);
+      updateAnimationState(animState, frameDuration, true, 1);
 
       expect(animState.currentFrame).toBe(0); // Should wrap around
     });
@@ -200,20 +202,19 @@ describe('AnimationHelper', () => {
       const frameDuration = 1 / CONFIG.ANIMATION.FPS;
 
       // Advance 5 frames: 0 -> 1 -> 2 -> 3 -> 0 -> 1
-      updateAnimationState(animState, frameDuration * 5, true, 3);
+      updateAnimationState(animState, frameDuration * 5, true, 1);
 
       // With 4 frames: 5 % 4 = 1
-      // With 6 frames: 5 % 6 = 5
       expect(animState.currentFrame).toBe(1);
     });
 
     test('WhenDirectionChanges_ShouldUpdateLastDirection', () => {
-      const animState = { currentFrame: 2, timeAccumulator: 0, lastDirection: 4 };
+      const animState = { currentFrame: 2, timeAccumulator: 0, lastDirection: 2 };
       const frameDuration = 1 / CONFIG.ANIMATION.FPS;
 
-      updateAnimationState(animState, frameDuration, true, 6);
+      updateAnimationState(animState, frameDuration, true, 3);
 
-      expect(animState.lastDirection).toBe(6);
+      expect(animState.lastDirection).toBe(3);
     });
 
     test('WhenTimeAccumulatorCarriesOver_ShouldMaintainRemainder', () => {

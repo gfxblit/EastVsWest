@@ -11,23 +11,19 @@ const OUTPUT_DIR = path.join(__dirname, '../public/assets/player');
 const OUTPUT_IMAGE = path.join(OUTPUT_DIR, 'player-walk-spritesheet.png');
 const OUTPUT_METADATA = path.join(OUTPUT_DIR, 'player-walk-spritesheet.json');
 
-// Order matching AnimationHelper directions (0-7)
-// 0: South, 1: SE, 2: East, 3: NE, 4: North, 5: NW, 6: West, 7: SW
+// Order matching AnimationHelper directions (0-3)
+// 0: South, 1: East, 2: North, 3: West
 const FILES = [
   'Character_Down.png',      // 0: South
-  'Character_DownRight.png', // 1: South-East
-  'Character_Right.png',     // 2: East
-  'Character_UpRight.png',   // 3: North-East
-  'Character_Up.png',        // 4: North
-  'Character_UpLeft.png',    // 5: North-West
-  'Character_Left.png',      // 6: West
-  'Character_DownLeft.png'   // 7: South-West
+  'Character_Right.png',     // 1: East
+  'Character_Up.png',        // 2: North
+  'Character_Left.png'       // 3: West
 ];
 
 const FRAME_WIDTH = 32;
 const FRAME_HEIGHT = 32;
 const FRAMES_PER_ROW = 4; // 128px width
-const ROWS = 8; // 8 directions
+const ROWS = 4; // 4 cardinal directions
 
 async function generate() {
   console.log('Generating top-down spritesheet...');
@@ -78,13 +74,9 @@ async function generate() {
       // Optional: Add mapping info for reference
       animations: {
         south: { row: 0, frames: 4 },
-        southEast: { row: 1, frames: 4 },
-        east: { row: 2, frames: 4 },
-        northEast: { row: 3, frames: 4 },
-        north: { row: 4, frames: 4 },
-        northWest: { row: 5, frames: 4 },
-        west: { row: 6, frames: 4 },
-        southWest: { row: 7, frames: 4 }
+        east: { row: 1, frames: 4 },
+        north: { row: 2, frames: 4 },
+        west: { row: 3, frames: 4 }
       }
     };
 

@@ -138,15 +138,15 @@ export class LocalPlayerController {
     // Update rotation based on velocity (if moving)
     if (this.player.velocity.x !== 0 || this.player.velocity.y !== 0) {
         // Map 4-way direction index to rotation radians
-        // North (4) -> 0
-        // East (2) -> PI/2
+        // North (2) -> 0
+        // East (1) -> PI/2
         // South (0) -> PI
-        // West (6) -> 3PI/2
+        // West (3) -> 3PI/2
         switch (direction) {
-            case 4: this.player.rotation = 0; break;
-            case 2: this.player.rotation = Math.PI / 2; break;
+            case 2: this.player.rotation = 0; break;
+            case 1: this.player.rotation = Math.PI / 2; break;
             case 0: this.player.rotation = Math.PI; break;
-            case 6: this.player.rotation = 3 * Math.PI / 2; break;
+            case 3: this.player.rotation = 3 * Math.PI / 2; break;
         }
         this.#normalizeRotation();
     } else {
