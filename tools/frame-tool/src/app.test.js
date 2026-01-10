@@ -32,6 +32,8 @@ describe('App State Management', () => {
                 <input type="text" id="bgKeyColorText" value="#00ff00">
                 <input type="range" id="bgThreshold" value="0">
                 <span id="bgThresholdVal">0</span>
+                <input type="range" id="bgErode" value="0">
+                <span id="bgErodeVal">0</span>
             </div>
         `;
 
@@ -71,6 +73,12 @@ describe('App State Management', () => {
                 fps: 10,
                 globalWidth: 64,
                 globalHeight: 64
+            },
+            bgRemoval: {
+                enabled: false,
+                keyColor: '#00ff00',
+                threshold: '0',
+                erode: '0'
             },
             sourceFilename: null,
             anchorOverrides: { 0: { x: 5, y: 5 } },

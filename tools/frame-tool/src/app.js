@@ -32,6 +32,8 @@ export class App {
         this.bgKeyColorText = document.getElementById('bgKeyColorText');
         this.bgThreshold = document.getElementById('bgThreshold');
         this.bgThresholdVal = document.getElementById('bgThresholdVal');
+        this.bgErode = document.getElementById('bgErode');
+        this.bgErodeVal = document.getElementById('bgErodeVal');
 
         this.exportBtn = document.getElementById('exportBtn');
         this.saveProjectBtn = document.getElementById('saveProjectBtn');
@@ -82,6 +84,11 @@ export class App {
 
         this.bgThreshold.addEventListener('input', (e) => {
             this.bgThresholdVal.textContent = e.target.value;
+            this.renderPreview();
+        });
+
+        this.bgErode.addEventListener('input', (e) => {
+            this.bgErodeVal.textContent = e.target.value;
             this.renderPreview();
         });
 
@@ -154,6 +161,12 @@ export class App {
     getProjectState() {
         return {
             config: this.getConfig(),
+            bgRemoval: {
+                enabled: this.bgRemoveEnabled.checked,
+                keyColor: this.bgKeyColor.value,
+                threshold: this.bgThreshold.value,
+                erode: this.bgErode.value
+            },
             sourceFilename: this.sourceFilename,
             anchorOverrides: this.anchorOverrides,
             frameOverrides: this.frameOverrides
@@ -170,6 +183,18 @@ export class App {
             this.inputs.fps.value = state.config.fps;
             this.inputs.globalWidth.value = state.config.globalWidth;
             this.inputs.globalHeight.value = state.config.globalHeight;
+        }
+
+        if (state.bgRemoval) {
+            this.bgRemoveEnabled.checked = state.bgRemoval.enabled;
+            this.bgKeyColor.value = state.bgRemoval.keyColor;
+            this.bgKeyColorText.value = state.bgRemoval.keyColor;
+            this.bgThreshold.value = state.bgRemoval.threshold;
+            this.bgThresholdVal.textContent = state.bgRemoval.threshold;
+            this.bgErode.value = state.bgRemoval.erode || 0;
+            this.bgErodeVal.textContent = state.bgRemoval.erode || 0;
+            
+            this.bgRemoveControls.style.display = this.bgRemoveEnabled.checked ? 'flex' : 'none';
         }
 
         if (state.sourceFilename) {
@@ -402,6 +427,10 @@ export class App {
                 this.bgKeyColor.value, 
                 parseInt(this.bgThreshold.value)
             );
+            BackgroundRemover.erode(
+                imageData,
+                parseInt(this.bgErode.value)
+            );
             ctx.putImageData(imageData, 0, 0);
         }
 
@@ -517,6 +546,10 @@ export class App {
                 imageData, 
                 this.bgKeyColor.value, 
                 parseInt(this.bgThreshold.value)
+            );
+            BackgroundRemover.erode(
+                imageData,
+                parseInt(this.bgErode.value)
             );
             this.previewCtx.putImageData(imageData, destX, destY);
         }

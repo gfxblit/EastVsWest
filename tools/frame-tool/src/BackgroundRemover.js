@@ -34,4 +34,43 @@ export class BackgroundRemover {
             }
         }
     }
+
+    static erode(imageData, amount) {
+        if (amount <= 0) return;
+
+        const { width, height, data } = imageData;
+        const originalData = new Uint8ClampedArray(data);
+
+        for (let y = 0; y < height; y++) {
+            for (let x = 0; x < width; x++) {
+                const idx = (y * width + x) * 4;
+                
+                // Only process opaque pixels
+                if (originalData[idx + 3] === 0) continue;
+
+                let shouldErode = false;
+                for (let dy = -amount; dy <= amount; dy++) {
+                    for (let dx = -amount; dx <= amount; dx++) {
+                        if (dx === 0 && dy === 0) continue;
+
+                        const nx = x + dx;
+                        const ny = y + dy;
+
+                        if (nx >= 0 && nx < width && ny >= 0 && ny < height) {
+                            const nIdx = (ny * width + nx) * 4;
+                            if (originalData[nIdx + 3] === 0) {
+                                shouldErode = true;
+                                break;
+                            }
+                        }
+                    }
+                    if (shouldErode) break;
+                }
+
+                if (shouldErode) {
+                    data[idx + 3] = 0;
+                }
+            }
+        }
+    }
 }
