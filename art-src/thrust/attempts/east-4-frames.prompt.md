@@ -1,0 +1,1 @@
+Based on the picture, generate a 1-row spritesheet extending this character’s actions. The row should show the reference character throwing an invisible spear East. Maintain the exact pixel scale, color palette, and head/body proportions from the reference image. Keep the background solid white.

@@ -1,0 +1,1 @@
+Based on the picture, generate a 2D pixel art character sprite of 16-bit style pixel art character with spiky red hair and a dark outfit standing in 4 directions: facing East, North, West, South (facing the camera). Layout: Single row, 4 distinct frames. White background. Style: 32-bit pixel art, distinct outlines, flat shading.
