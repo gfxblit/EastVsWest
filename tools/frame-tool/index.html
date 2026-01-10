@@ -118,6 +118,18 @@
                 <input type="number" id="fps" value="10">
             </div>
 
+            <hr style="width: 100%; border-color: #555;">
+
+            <div class="input-group">
+                <label for="globalWidth">Global Width</label>
+                <input type="number" id="globalWidth" value="64">
+            </div>
+            <div class="input-group">
+                <label for="globalHeight">Global Height</label>
+                <input type="number" id="globalHeight" value="64">
+            </div>
+            <button id="exportBtn" style="padding: 10px; background: #4a90e2; color: white; border: none; border-radius: 4px; cursor: pointer; margin-top: 10px;">Export Adjusted Sheet</button>
+
             <div class="preview-container">
                 <label>Preview</label>
                 <canvas id="previewCanvas" width="64" height="64"></canvas>
@@ -127,10 +139,23 @@
                 <label for="jsonOutput">JSON Configuration</label>
                 <textarea id="jsonOutput" readonly></textarea>
             </div>
+
+            <div class="input-group" style="background: #333; padding: 10px; border-radius: 4px; font-size: 0.85em; line-height: 1.4; color: #bbb;">
+                <label style="color: #eee; font-weight: bold; margin-bottom: 5px; display: block;">Instructions</label>
+                <ul style="margin: 0; padding-left: 15px;">
+                    <li><strong>Move Frame:</strong> Drag the numbered green label.</li>
+                    <li><strong>Move Anchor:</strong> Shift + Drag the label.</li>
+                    <li><strong>Set Anchor:</strong> Click anywhere inside a frame.</li>
+                    <li><strong>Export:</strong> Downloads aligned strip + JSON.</li>
+                </ul>
+            </div>
         </div>
 
         <div class="workspace" id="dropZone">
-            <canvas id="mainCanvas"></canvas>
+            <div id="canvasWrapper" style="position: relative; display: inline-block;">
+                <canvas id="mainCanvas"></canvas>
+                <div id="overlayLayer" style="position: absolute; top: 0; left: 0; width: 100%; height: 100%; pointer-events: none;"></div>
+            </div>
         </div>
     </div>
 

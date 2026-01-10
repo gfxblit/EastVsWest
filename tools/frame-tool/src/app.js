@@ -18,14 +18,26 @@ class App {
             frameHeight: document.getElementById('frameHeight'),
             frameCount: document.getElementById('frameCount'),
             fps: document.getElementById('fps'),
+            globalWidth: document.getElementById('globalWidth'),
+            globalHeight: document.getElementById('globalHeight'),
         };
+        this.exportBtn = document.getElementById('exportBtn');
         this.mainCanvas = document.getElementById('mainCanvas');
         this.previewCanvas = document.getElementById('previewCanvas');
         this.jsonOutput = document.getElementById('jsonOutput');
         this.dropZone = document.getElementById('dropZone');
+        this.overlayLayer = document.getElementById('overlayLayer');
 
         this.ctx = this.mainCanvas.getContext('2d');
         this.previewCtx = this.previewCanvas.getContext('2d');
+        
+        this.anchorOverrides = {}; // Map frame index to {x, y}
+        this.frameOverrides = {}; // Map frame index to {x, y}
+        
+        this.draggingFrame = null;
+        this.dragStartMouse = { x: 0, y: 0 };
+        this.dragStartAnchor = { x: 0, y: 0 };
+        this.dragStartFramePos = { x: 0, y: 0 };
 
         this.init();
     }
@@ -37,6 +49,15 @@ class App {
         Object.values(this.inputs).forEach(input => {
             input.addEventListener('input', () => this.update());
         });
+
+        this.exportBtn.addEventListener('click', () => this.exportSpriteSheet());
+        
+        // Canvas click for setting anchor directly
+        this.mainCanvas.addEventListener('mousedown', (e) => this.handleCanvasClick(e));
+
+        // Global drag handlers
+        window.addEventListener('mousemove', (e) => this.handleGlobalMouseMove(e));
+        window.addEventListener('mouseup', () => this.handleGlobalMouseUp());
 
         // Drag and Drop
         this.dropZone.addEventListener('dragover', (e) => {
@@ -69,6 +90,9 @@ class App {
                 this.image = img;
                 this.mainCanvas.width = img.width;
                 this.mainCanvas.height = img.height;
+                // Update overlay layer size to match canvas
+                this.overlayLayer.style.width = img.width + 'px';
+                this.overlayLayer.style.height = img.height + 'px';
                 this.update();
             };
             img.src = e.target.result;
@@ -83,7 +107,9 @@ class App {
             frameWidth: parseInt(this.inputs.frameWidth.value) || 32,
             frameHeight: parseInt(this.inputs.frameHeight.value) || 32,
             frameCount: parseInt(this.inputs.frameCount.value) || 1,
-            fps: parseInt(this.inputs.fps.value) || 10
+            fps: parseInt(this.inputs.fps.value) || 10,
+            globalWidth: parseInt(this.inputs.globalWidth.value) || 64,
+            globalHeight: parseInt(this.inputs.globalHeight.value) || 64
         };
     }
 
@@ -91,12 +117,127 @@ class App {
         const config = this.getConfig();
         this.frames = this.calculator.calculateFrames(config);
         
+        // Apply overrides
+        this.frames.forEach((frame, index) => {
+            // Apply frame position overrides first
+            if (this.frameOverrides[index]) {
+                frame.x = this.frameOverrides[index].x;
+                frame.y = this.frameOverrides[index].y;
+            }
+
+            // Apply anchor overrides
+            if (this.anchorOverrides[index]) {
+                frame.anchor = { ...this.anchorOverrides[index] };
+            }
+        });
+
         this.renderMain();
+        this.renderOverlays();
         this.updateJSON(config);
         
         // Resize preview canvas
-        this.previewCanvas.width = config.frameWidth;
-        this.previewCanvas.height = config.frameHeight;
+        this.previewCanvas.width = config.globalWidth;
+        this.previewCanvas.height = config.globalHeight;
+    }
+
+    handleCanvasClick(e) {
+        if (!this.image) return;
+
+        const rect = this.mainCanvas.getBoundingClientRect();
+        const x = e.clientX - rect.left;
+        const y = e.clientY - rect.top;
+
+        // Find which frame was clicked
+        const frameIndex = this.frames.findIndex(f => 
+            x >= f.x && x < f.x + f.w &&
+            y >= f.y && y < f.y + f.h
+        );
+
+        if (frameIndex !== -1) {
+            const frame = this.frames[frameIndex];
+            // Anchor is relative to frame top-left
+            this.anchorOverrides[frameIndex] = {
+                x: x - frame.x,
+                y: y - frame.y
+            };
+            this.update();
+        }
+    }
+
+    handleHandleMouseDown(e, index) {
+        e.stopPropagation(); // Prevent canvas click if any
+        this.draggingFrame = index;
+        this.dragStartMouse = { x: e.clientX, y: e.clientY };
+        // Store original anchor and frame pos when drag started
+        this.dragStartAnchor = { ...this.frames[index].anchor };
+        this.dragStartFramePos = { x: this.frames[index].x, y: this.frames[index].y };
+    }
+
+    handleGlobalMouseMove(e) {
+        if (this.draggingFrame !== null) {
+            const dx = e.clientX - this.dragStartMouse.x;
+            const dy = e.clientY - this.dragStartMouse.y;
+            
+            if (e.shiftKey) {
+                // Shift + Drag: Move Anchor (relative to frame)
+                this.anchorOverrides[this.draggingFrame] = {
+                    x: this.dragStartAnchor.x + dx,
+                    y: this.dragStartAnchor.y + dy
+                };
+            } else {
+                // Drag: Move Frame (updates Green Rect)
+                this.frameOverrides[this.draggingFrame] = {
+                    x: this.dragStartFramePos.x + dx,
+                    y: this.dragStartFramePos.y + dy
+                };
+            }
+            
+            this.update();
+        }
+    }
+
+    handleGlobalMouseUp() {
+        this.draggingFrame = null;
+    }
+
+    renderOverlays() {
+        // Clear existing overlays if frame count changes or just sync
+        // For simplicity, we'll clear and recreate. Efficiency is fine for <100 elements.
+        this.overlayLayer.innerHTML = '';
+
+        this.frames.forEach((frame, index) => {
+            const handle = document.createElement('div');
+            handle.textContent = index;
+            handle.style.position = 'absolute';
+            // Position at absolute coordinates (frame.x + anchor.x)
+            handle.style.left = (frame.x + frame.anchor.x) + 'px';
+            handle.style.top = (frame.y + frame.anchor.y) + 'px';
+            handle.style.transform = 'translate(-50%, -50%)'; // Center on anchor
+            handle.style.width = '20px';
+            handle.style.height = '20px';
+            handle.style.backgroundColor = 'rgba(0, 255, 0, 0.7)';
+            handle.style.color = 'white';
+            handle.style.display = 'flex';
+            handle.style.alignItems = 'center';
+            handle.style.justifyContent = 'center';
+            handle.style.borderRadius = '50%';
+            handle.style.fontSize = '10px';
+            handle.style.cursor = 'move';
+            handle.style.pointerEvents = 'auto'; // Re-enable pointer events for the handle
+            handle.style.userSelect = 'none';
+
+            // Visual feedback if dragging this one
+            if (this.draggingFrame === index) {
+                handle.style.backgroundColor = 'rgba(255, 255, 0, 0.9)';
+                handle.style.color = 'black';
+                handle.style.border = '2px solid white';
+                handle.style.zIndex = '100';
+            }
+
+            handle.addEventListener('mousedown', (e) => this.handleHandleMouseDown(e, index));
+            
+            this.overlayLayer.appendChild(handle);
+        });
     }
 
     renderMain() {
@@ -107,18 +248,23 @@ class App {
         }
 
         // Draw overlays
-        this.ctx.strokeStyle = '#00ff00';
         this.ctx.lineWidth = 1;
         
         this.frames.forEach((frame, index) => {
+            this.ctx.strokeStyle = '#00ff00';
             this.ctx.strokeRect(frame.x, frame.y, frame.w, frame.h);
             
-            // Draw frame number
-            this.ctx.fillStyle = 'rgba(0, 255, 0, 0.5)';
-            this.ctx.fillRect(frame.x, frame.y, 20, 15);
-            this.ctx.fillStyle = 'black';
-            this.ctx.font = '10px sans-serif';
-            this.ctx.fillText(index, frame.x + 2, frame.y + 11);
+            // Draw anchor point crosshair (below the label)
+            const anchorX = frame.x + frame.anchor.x;
+            const anchorY = frame.y + frame.anchor.y;
+
+            this.ctx.strokeStyle = '#ff0000';
+            this.ctx.beginPath();
+            this.ctx.moveTo(anchorX - 10, anchorY);
+            this.ctx.lineTo(anchorX + 10, anchorY);
+            this.ctx.moveTo(anchorX, anchorY - 10);
+            this.ctx.lineTo(anchorX, anchorY + 10);
+            this.ctx.stroke();
         });
     }
 
@@ -150,6 +296,56 @@ class App {
         this.jsonOutput.value = JSON.stringify(output, null, 2);
     }
 
+    exportSpriteSheet() {
+        if (!this.image || this.frames.length === 0) return;
+
+        const config = this.getConfig();
+        const exportCanvas = document.createElement('canvas');
+        
+        // Create a horizontal strip for simplicity
+        exportCanvas.width = config.globalWidth * this.frames.length;
+        exportCanvas.height = config.globalHeight;
+        
+        const ctx = exportCanvas.getContext('2d');
+
+        this.frames.forEach((frame, i) => {
+            const destX = (i * config.globalWidth) + (config.globalWidth / 2) - frame.anchor.x;
+            const destY = (config.globalHeight / 2) - frame.anchor.y;
+
+            ctx.drawImage(
+                this.image,
+                frame.x, frame.y, frame.w, frame.h,
+                destX, destY, frame.w, frame.h
+            );
+        });
+
+        // Download Image
+        const link = document.createElement('a');
+        link.download = 'aligned_spritesheet.png';
+        link.href = exportCanvas.toDataURL('image/png');
+        link.click();
+
+        // Download JSON
+        const exportJSON = {
+            frameWidth: config.globalWidth,
+            frameHeight: config.globalHeight,
+            columns: this.frames.length,
+            rows: 1,
+            animations: {
+                "animation": {
+                    "row": 0,
+                    "frames": this.frames.length
+                }
+            }
+        };
+
+        const jsonLink = document.createElement('a');
+        jsonLink.download = 'aligned_spritesheet.json';
+        const blob = new Blob([JSON.stringify(exportJSON, null, 2)], {type: 'application/json'});
+        jsonLink.href = URL.createObjectURL(blob);
+        jsonLink.click();
+    }
+
     animate(timestamp) {
         if (this.image && this.frames.length > 0) {
             const config = this.getConfig();
@@ -170,13 +366,28 @@ class App {
         const frame = this.frames[this.currentFrameIndex];
         if (!frame) return;
 
+        const config = this.getConfig();
+
         this.previewCtx.clearRect(0, 0, this.previewCanvas.width, this.previewCanvas.height);
+        
+        // Calculate position to center the anchor point in the global frame
+        const destX = (config.globalWidth / 2) - frame.anchor.x;
+        const destY = (config.globalHeight / 2) - frame.anchor.y;
+
+        // Draw helper lines (center of global frame)
+        this.previewCtx.strokeStyle = 'rgba(255, 255, 255, 0.2)';
+        this.previewCtx.beginPath();
+        this.previewCtx.moveTo(config.globalWidth / 2, 0);
+        this.previewCtx.lineTo(config.globalWidth / 2, config.globalHeight);
+        this.previewCtx.moveTo(0, config.globalHeight / 2);
+        this.previewCtx.lineTo(config.globalWidth, config.globalHeight / 2);
+        this.previewCtx.stroke();
         
         // We need to draw from the original image using the frame coordinates
         this.previewCtx.drawImage(
             this.image,
             frame.x, frame.y, frame.w, frame.h,
-            0, 0, this.previewCanvas.width, this.previewCanvas.height
+            destX, destY, frame.w, frame.h
         );
 
         // Draw frame counter

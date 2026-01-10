@@ -13,7 +13,8 @@ export class FrameCalculator {
                 x: startX + (i * frameWidth),
                 y: startY,
                 w: frameWidth,
-                h: frameHeight
+                h: frameHeight,
+                anchor: { x: frameWidth / 2, y: frameHeight / 2 }
             });
         }
         
