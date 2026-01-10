@@ -26,11 +26,16 @@ class App {
         this.previewCanvas = document.getElementById('previewCanvas');
         this.jsonOutput = document.getElementById('jsonOutput');
         this.dropZone = document.getElementById('dropZone');
+        this.overlayLayer = document.getElementById('overlayLayer');
 
         this.ctx = this.mainCanvas.getContext('2d');
         this.previewCtx = this.previewCanvas.getContext('2d');
         
         this.anchorOverrides = {}; // Map frame index to {x, y}
+        
+        this.draggingFrame = null;
+        this.dragStartMouse = { x: 0, y: 0 };
+        this.dragStartAnchor = { x: 0, y: 0 };
 
         this.init();
     }
@@ -45,7 +50,9 @@ class App {
 
         this.exportBtn.addEventListener('click', () => this.exportSpriteSheet());
 
-        this.mainCanvas.addEventListener('mousedown', (e) => this.handleCanvasClick(e));
+        // Global drag handlers
+        window.addEventListener('mousemove', (e) => this.handleGlobalMouseMove(e));
+        window.addEventListener('mouseup', () => this.handleGlobalMouseUp());
 
         // Drag and Drop
         this.dropZone.addEventListener('dragover', (e) => {
@@ -78,6 +85,9 @@ class App {
                 this.image = img;
                 this.mainCanvas.width = img.width;
                 this.mainCanvas.height = img.height;
+                // Update overlay layer size to match canvas
+                this.overlayLayer.style.width = img.width + 'px';
+                this.overlayLayer.style.height = img.height + 'px';
                 this.update();
             };
             img.src = e.target.result;
@@ -110,6 +120,7 @@ class App {
         });
 
         this.renderMain();
+        this.renderOverlays();
         this.updateJSON(config);
         
         // Resize preview canvas
@@ -117,28 +128,71 @@ class App {
         this.previewCanvas.height = config.globalHeight;
     }
 
-    handleCanvasClick(e) {
-        if (!this.image) return;
+    handleHandleMouseDown(e, index) {
+        e.stopPropagation(); // Prevent canvas click if any
+        this.draggingFrame = index;
+        this.dragStartMouse = { x: e.clientX, y: e.clientY };
+        // Store original anchor when drag started
+        this.dragStartAnchor = { ...this.frames[index].anchor };
+    }
 
-        const rect = this.mainCanvas.getBoundingClientRect();
-        const x = e.clientX - rect.left;
-        const y = e.clientY - rect.top;
-
-        // Find which frame was clicked
-        const frameIndex = this.frames.findIndex(f => 
-            x >= f.x && x < f.x + f.w &&
-            y >= f.y && y < f.y + f.h
-        );
-
-        if (frameIndex !== -1) {
-            const frame = this.frames[frameIndex];
-            // Anchor is relative to frame top-left
-            this.anchorOverrides[frameIndex] = {
-                x: x - frame.x,
-                y: y - frame.y
+    handleGlobalMouseMove(e) {
+        if (this.draggingFrame !== null) {
+            const dx = e.clientX - this.dragStartMouse.x;
+            const dy = e.clientY - this.dragStartMouse.y;
+            
+            // Update the override
+            this.anchorOverrides[this.draggingFrame] = {
+                x: this.dragStartAnchor.x + dx,
+                y: this.dragStartAnchor.y + dy
             };
+            
             this.update();
         }
+    }
+
+    handleGlobalMouseUp() {
+        this.draggingFrame = null;
+    }
+
+    renderOverlays() {
+        // Clear existing overlays if frame count changes or just sync
+        // For simplicity, we'll clear and recreate. Efficiency is fine for <100 elements.
+        this.overlayLayer.innerHTML = '';
+
+        this.frames.forEach((frame, index) => {
+            const handle = document.createElement('div');
+            handle.textContent = index;
+            handle.style.position = 'absolute';
+            // Position at absolute coordinates (frame.x + anchor.x)
+            handle.style.left = (frame.x + frame.anchor.x) + 'px';
+            handle.style.top = (frame.y + frame.anchor.y) + 'px';
+            handle.style.transform = 'translate(-50%, -50%)'; // Center on anchor
+            handle.style.width = '20px';
+            handle.style.height = '20px';
+            handle.style.backgroundColor = 'rgba(0, 255, 0, 0.7)';
+            handle.style.color = 'white';
+            handle.style.display = 'flex';
+            handle.style.alignItems = 'center';
+            handle.style.justifyContent = 'center';
+            handle.style.borderRadius = '50%';
+            handle.style.fontSize = '10px';
+            handle.style.cursor = 'move';
+            handle.style.pointerEvents = 'auto'; // Re-enable pointer events for the handle
+            handle.style.userSelect = 'none';
+
+            // Visual feedback if dragging this one
+            if (this.draggingFrame === index) {
+                handle.style.backgroundColor = 'rgba(255, 255, 0, 0.9)';
+                handle.style.color = 'black';
+                handle.style.border = '2px solid white';
+                handle.style.zIndex = '100';
+            }
+
+            handle.addEventListener('mousedown', (e) => this.handleHandleMouseDown(e, index));
+            
+            this.overlayLayer.appendChild(handle);
+        });
     }
 
     renderMain() {
@@ -155,23 +209,16 @@ class App {
             this.ctx.strokeStyle = '#00ff00';
             this.ctx.strokeRect(frame.x, frame.y, frame.w, frame.h);
             
-            // Draw frame number
-            this.ctx.fillStyle = 'rgba(0, 255, 0, 0.5)';
-            this.ctx.fillRect(frame.x, frame.y, 20, 15);
-            this.ctx.fillStyle = 'black';
-            this.ctx.font = '10px sans-serif';
-            this.ctx.fillText(index, frame.x + 2, frame.y + 11);
-
-            // Draw anchor point
+            // Draw anchor point crosshair (below the label)
             const anchorX = frame.x + frame.anchor.x;
             const anchorY = frame.y + frame.anchor.y;
 
             this.ctx.strokeStyle = '#ff0000';
             this.ctx.beginPath();
-            this.ctx.moveTo(anchorX - 5, anchorY);
-            this.ctx.lineTo(anchorX + 5, anchorY);
-            this.ctx.moveTo(anchorX, anchorY - 5);
-            this.ctx.lineTo(anchorX, anchorY + 5);
+            this.ctx.moveTo(anchorX - 10, anchorY);
+            this.ctx.lineTo(anchorX + 10, anchorY);
+            this.ctx.moveTo(anchorX, anchorY - 10);
+            this.ctx.lineTo(anchorX, anchorY + 10);
             this.ctx.stroke();
         });
     }
