@@ -1,3 +1,4 @@
+import './style.css';
 import { FrameCalculator } from './FrameCalculator.js';
 import { BackgroundRemover } from './BackgroundRemover.js';
 
