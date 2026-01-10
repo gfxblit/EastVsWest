@@ -156,7 +156,11 @@ export class App {
             config: this.getConfig(),
             sourceFilename: this.sourceFilename,
             anchorOverrides: this.anchorOverrides,
-            frameOverrides: this.frameOverrides
+            frameOverrides: this.frameOverrides,
+            background: {
+                color: this.bgKeyColor.value,
+                threshold: parseInt(this.bgThreshold.value)
+            }
         };
     }
 
@@ -182,6 +186,13 @@ export class App {
         
         if (state.frameOverrides) {
             this.frameOverrides = state.frameOverrides;
+        }
+
+        if (state.background) {
+            this.bgKeyColor.value = state.background.color;
+            this.bgKeyColorText.value = state.background.color;
+            this.bgThreshold.value = state.background.threshold;
+            this.bgThresholdVal.textContent = state.background.threshold;
         }
 
         this.update();

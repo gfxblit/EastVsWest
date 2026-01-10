@@ -30,7 +30,7 @@ describe('App State Management', () => {
             <div id="bgRemoveControls" style="display: none;">
                 <input type="color" id="bgKeyColor" value="#00ff00">
                 <input type="text" id="bgKeyColorText" value="#00ff00">
-                <input type="range" id="bgThreshold" value="0">
+                <input type="range" id="bgThreshold" min="0" max="255" value="0">
                 <span id="bgThresholdVal">0</span>
             </div>
         `;
@@ -74,7 +74,11 @@ describe('App State Management', () => {
             },
             sourceFilename: null,
             anchorOverrides: { 0: { x: 5, y: 5 } },
-            frameOverrides: { 1: { x: 20, y: 20 } }
+            frameOverrides: { 1: { x: 20, y: 20 } },
+            background: {
+                color: '#00ff00',
+                threshold: 0
+            }
         });
     });
 
@@ -139,5 +143,34 @@ describe('App State Management', () => {
         };
         app.loadProjectState(newState);
         expect(app.sourceFilename).toBe('other-image.png');
+    });
+
+    test('getProjectState includes background removal settings', () => {
+        app.bgKeyColor.value = '#ff00ff';
+        app.bgThreshold.value = '150';
+
+        const state = app.getProjectState();
+
+        expect(state.background).toEqual({
+            color: '#ff00ff',
+            threshold: 150
+        });
+    });
+
+    test('loadProjectState restores background removal settings', () => {
+        const state = {
+            config: {},
+            background: {
+                color: '#0000ff',
+                threshold: 75
+            }
+        };
+
+        app.loadProjectState(state);
+
+        expect(app.bgKeyColor.value).toBe('#0000ff');
+        expect(app.bgKeyColorText.value).toBe('#0000ff');
+        expect(app.bgThreshold.value).toBe('75');
+        expect(app.bgThresholdVal.textContent).toBe('75');
     });
 });
