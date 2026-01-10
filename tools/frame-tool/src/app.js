@@ -32,10 +32,12 @@ class App {
         this.previewCtx = this.previewCanvas.getContext('2d');
         
         this.anchorOverrides = {}; // Map frame index to {x, y}
+        this.frameOverrides = {}; // Map frame index to {x, y}
         
         this.draggingFrame = null;
         this.dragStartMouse = { x: 0, y: 0 };
         this.dragStartAnchor = { x: 0, y: 0 };
+        this.dragStartFramePos = { x: 0, y: 0 };
 
         this.init();
     }
@@ -49,6 +51,9 @@ class App {
         });
 
         this.exportBtn.addEventListener('click', () => this.exportSpriteSheet());
+        
+        // Canvas click for setting anchor directly
+        this.mainCanvas.addEventListener('mousedown', (e) => this.handleCanvasClick(e));
 
         // Global drag handlers
         window.addEventListener('mousemove', (e) => this.handleGlobalMouseMove(e));
@@ -114,6 +119,13 @@ class App {
         
         // Apply overrides
         this.frames.forEach((frame, index) => {
+            // Apply frame position overrides first
+            if (this.frameOverrides[index]) {
+                frame.x = this.frameOverrides[index].x;
+                frame.y = this.frameOverrides[index].y;
+            }
+
+            // Apply anchor overrides
             if (this.anchorOverrides[index]) {
                 frame.anchor = { ...this.anchorOverrides[index] };
             }
@@ -128,12 +140,37 @@ class App {
         this.previewCanvas.height = config.globalHeight;
     }
 
+    handleCanvasClick(e) {
+        if (!this.image) return;
+
+        const rect = this.mainCanvas.getBoundingClientRect();
+        const x = e.clientX - rect.left;
+        const y = e.clientY - rect.top;
+
+        // Find which frame was clicked
+        const frameIndex = this.frames.findIndex(f => 
+            x >= f.x && x < f.x + f.w &&
+            y >= f.y && y < f.y + f.h
+        );
+
+        if (frameIndex !== -1) {
+            const frame = this.frames[frameIndex];
+            // Anchor is relative to frame top-left
+            this.anchorOverrides[frameIndex] = {
+                x: x - frame.x,
+                y: y - frame.y
+            };
+            this.update();
+        }
+    }
+
     handleHandleMouseDown(e, index) {
         e.stopPropagation(); // Prevent canvas click if any
         this.draggingFrame = index;
         this.dragStartMouse = { x: e.clientX, y: e.clientY };
-        // Store original anchor when drag started
+        // Store original anchor and frame pos when drag started
         this.dragStartAnchor = { ...this.frames[index].anchor };
+        this.dragStartFramePos = { x: this.frames[index].x, y: this.frames[index].y };
     }
 
     handleGlobalMouseMove(e) {
@@ -141,11 +178,19 @@ class App {
             const dx = e.clientX - this.dragStartMouse.x;
             const dy = e.clientY - this.dragStartMouse.y;
             
-            // Update the override
-            this.anchorOverrides[this.draggingFrame] = {
-                x: this.dragStartAnchor.x + dx,
-                y: this.dragStartAnchor.y + dy
-            };
+            if (e.shiftKey) {
+                // Shift + Drag: Move Anchor (relative to frame)
+                this.anchorOverrides[this.draggingFrame] = {
+                    x: this.dragStartAnchor.x + dx,
+                    y: this.dragStartAnchor.y + dy
+                };
+            } else {
+                // Drag: Move Frame (updates Green Rect)
+                this.frameOverrides[this.draggingFrame] = {
+                    x: this.dragStartFramePos.x + dx,
+                    y: this.dragStartFramePos.y + dy
+                };
+            }
             
             this.update();
         }
