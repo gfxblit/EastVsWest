@@ -6,6 +6,7 @@ export class App {
     constructor() {
         this.calculator = new FrameCalculator();
         this.image = null;
+        this.sourceFilename = null;
         this.frames = [];
         this.currentFrameIndex = 0;
         this.lastFrameTime = 0;
@@ -119,6 +120,7 @@ export class App {
     handleFileSelect(file) {
         if (!file || !file.type.startsWith('image/')) return;
 
+        this.sourceFilename = file.name;
         const reader = new FileReader();
         reader.onload = (e) => {
             const img = new Image();
@@ -152,6 +154,7 @@ export class App {
     getProjectState() {
         return {
             config: this.getConfig(),
+            sourceFilename: this.sourceFilename,
             anchorOverrides: this.anchorOverrides,
             frameOverrides: this.frameOverrides
         };
@@ -167,6 +170,10 @@ export class App {
             this.inputs.fps.value = state.config.fps;
             this.inputs.globalWidth.value = state.config.globalWidth;
             this.inputs.globalHeight.value = state.config.globalHeight;
+        }
+
+        if (state.sourceFilename) {
+            this.sourceFilename = state.sourceFilename;
         }
         
         if (state.anchorOverrides) {
@@ -338,6 +345,7 @@ export class App {
     updateJSON(config) {
         // Construct a JSON object compatible with the project's spritesheet format
         let output = {
+            sourceFilename: this.sourceFilename,
             frameWidth: config.frameWidth,
             frameHeight: config.frameHeight
         };
@@ -405,6 +413,7 @@ export class App {
 
         // Download JSON
         const exportJSON = {
+            sourceFilename: this.sourceFilename,
             frameWidth: config.globalWidth,
             frameHeight: config.globalHeight,
             columns: this.frames.length,
