@@ -2,7 +2,7 @@ import './style.css';
 import { FrameCalculator } from './FrameCalculator.js';
 import { BackgroundRemover } from './BackgroundRemover.js';
 
-class App {
+export class App {
     constructor() {
         this.calculator = new FrameCalculator();
         this.image = null;
@@ -33,6 +33,8 @@ class App {
         this.bgThresholdVal = document.getElementById('bgThresholdVal');
 
         this.exportBtn = document.getElementById('exportBtn');
+        this.saveProjectBtn = document.getElementById('saveProjectBtn');
+        this.loadProjectInput = document.getElementById('loadProjectInput');
         this.mainCanvas = document.getElementById('mainCanvas');
         this.previewCanvas = document.getElementById('previewCanvas');
         this.jsonOutput = document.getElementById('jsonOutput');
@@ -83,6 +85,8 @@ class App {
         });
 
         this.exportBtn.addEventListener('click', () => this.exportSpriteSheet());
+        this.saveProjectBtn.addEventListener('click', () => this.saveProject());
+        this.loadProjectInput.addEventListener('change', (e) => this.handleLoadProject(e));
         
         // Canvas click for setting anchor directly
         this.mainCanvas.addEventListener('mousedown', (e) => this.handleCanvasClick(e));
@@ -143,6 +147,37 @@ class App {
             globalWidth: parseInt(this.inputs.globalWidth.value) || 64,
             globalHeight: parseInt(this.inputs.globalHeight.value) || 64
         };
+    }
+
+    getProjectState() {
+        return {
+            config: this.getConfig(),
+            anchorOverrides: this.anchorOverrides,
+            frameOverrides: this.frameOverrides
+        };
+    }
+
+    loadProjectState(state) {
+        if (state.config) {
+            this.inputs.startX.value = state.config.startX;
+            this.inputs.startY.value = state.config.startY;
+            this.inputs.frameWidth.value = state.config.frameWidth;
+            this.inputs.frameHeight.value = state.config.frameHeight;
+            this.inputs.frameCount.value = state.config.frameCount;
+            this.inputs.fps.value = state.config.fps;
+            this.inputs.globalWidth.value = state.config.globalWidth;
+            this.inputs.globalHeight.value = state.config.globalHeight;
+        }
+        
+        if (state.anchorOverrides) {
+            this.anchorOverrides = state.anchorOverrides;
+        }
+        
+        if (state.frameOverrides) {
+            this.frameOverrides = state.frameOverrides;
+        }
+
+        this.update();
     }
 
     update() {
@@ -389,6 +424,32 @@ class App {
         jsonLink.click();
     }
 
+    saveProject() {
+        const state = this.getProjectState();
+        const blob = new Blob([JSON.stringify(state, null, 2)], {type: 'application/json'});
+        const link = document.createElement('a');
+        link.download = 'frame-tool-project.json';
+        link.href = URL.createObjectURL(blob);
+        link.click();
+    }
+
+    handleLoadProject(e) {
+        const file = e.target.files[0];
+        if (!file) return;
+
+        const reader = new FileReader();
+        reader.onload = (e) => {
+            try {
+                const state = JSON.parse(e.target.result);
+                this.loadProjectState(state);
+            } catch (err) {
+                console.error('Failed to load project:', err);
+                alert('Invalid project file');
+            }
+        };
+        reader.readAsText(file);
+    }
+
     animate(timestamp) {
         if (this.image && this.frames.length > 0) {
             const config = this.getConfig();
@@ -459,5 +520,3 @@ class App {
         this.previewCtx.fillText(this.currentFrameIndex, 2, 11);
     }
 }
-
-new App();

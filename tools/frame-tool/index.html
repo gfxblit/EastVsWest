@@ -73,6 +73,15 @@
             </div>
             <button id="exportBtn" class="p-2.5 bg-blue-500 hover:bg-blue-600 text-white border-none rounded cursor-pointer mt-2 transition-colors">Export Adjusted Sheet</button>
 
+
+          
+            <div style="display: flex; gap: 10px; margin-top: 10px;">
+                <button id="saveProjectBtn" style="flex: 1; padding: 10px; background: #555; color: white; border: 1px solid #777; border-radius: 4px; cursor: pointer;">Save Config</button>
+                <label for="loadProjectInput" style="flex: 1; padding: 10px; background: #555; color: white; border: 1px solid #777; border-radius: 4px; cursor: pointer; text-align: center;">
+                    Load Config
+                    <input type="file" id="loadProjectInput" accept=".json" style="display: none;">
+                </label>
+            </div>
             <div class="border-t border-gray-600 pt-4 flex flex-col items-center gap-2">
                 <label class="text-sm text-gray-400">Preview</label>
                 <canvas id="previewCanvas" width="64" height="64" class="self-center mt-2 border border-gray-600 bg-checkerboard"></canvas>
@@ -102,6 +111,9 @@
         </div>
     </div>
 
-    <script type="module" src="./src/app.js"></script>
+    <script type="module">
+        import { App } from './src/app.js';
+        new App();
+    </script>
 </body>
 </html>
