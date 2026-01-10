@@ -79,7 +79,7 @@ describe('Animation Integration', () => {
         expect(metadata.frameWidth).toBe(32);
         expect(metadata.frameHeight).toBe(32);
         expect(metadata.columns).toBe(4);
-        expect(metadata.rows).toBe(8);
+        expect(metadata.rows).toBe(4);
       }
       // If metadata is null, sprite sheet might be loading asynchronously
       // This test verifies that when metadata is loaded, it has the right structure
@@ -168,8 +168,8 @@ describe('Animation Integration', () => {
       // Directions should be different
       expect(eastDirection).not.toBe(southDirection);
 
-      // East should be direction 2, South should be direction 0
-      expect(eastDirection).toBe(2);
+      // East should be direction 1, South should be direction 0
+      expect(eastDirection).toBe(1);
       expect(southDirection).toBe(0);
     }, 30000);
   });

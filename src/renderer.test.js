@@ -784,53 +784,33 @@ describe('Renderer', () => {
         expect(frame).toBe(0);
       });
 
-      test('WhenRotationIsSouthEast_ShouldSelectFrame1', () => {
-        const frame = getDirectionFromRotation(3 * Math.PI / 4); // 135 degrees
+      test('WhenRotationIsEast_ShouldSelectFrame1', () => {
+        const frame = getDirectionFromRotation(Math.PI / 2); // 90 degrees
         expect(frame).toBe(1);
       });
 
-      test('WhenRotationIsEast_ShouldSelectFrame2', () => {
-        const frame = getDirectionFromRotation(Math.PI / 2); // 90 degrees
+      test('WhenRotationIsNorth_ShouldSelectFrame2', () => {
+        const frame = getDirectionFromRotation(0); // 0 degrees
         expect(frame).toBe(2);
       });
 
-      test('WhenRotationIsNorthEast_ShouldSelectFrame3', () => {
-        const frame = getDirectionFromRotation(Math.PI / 4); // 45 degrees
-        expect(frame).toBe(3);
-      });
-
-      test('WhenRotationIsNorth_ShouldSelectFrame4', () => {
-        const frame = getDirectionFromRotation(0); // 0 degrees
-        expect(frame).toBe(4);
-      });
-
-      test('WhenRotationIsNorthWest_ShouldSelectFrame5', () => {
-        const frame = getDirectionFromRotation(7 * Math.PI / 4); // 315 degrees
-        expect(frame).toBe(5);
-      });
-
-      test('WhenRotationIsWest_ShouldSelectFrame6', () => {
+      test('WhenRotationIsWest_ShouldSelectFrame3', () => {
         const frame = getDirectionFromRotation(3 * Math.PI / 2); // 270 degrees
-        expect(frame).toBe(6);
-      });
-
-      test('WhenRotationIsSouthWest_ShouldSelectFrame7', () => {
-        const frame = getDirectionFromRotation(5 * Math.PI / 4); // 225 degrees
-        expect(frame).toBe(7);
+        expect(frame).toBe(3);
       });
 
       test('WhenRotationIsBetweenDirections_ShouldSelectNearestFrame', () => {
         // Test rotation slightly past north (5 degrees)
         const frame = getDirectionFromRotation(5 * Math.PI / 180);
-        expect(frame).toBe(4); // Should round to North
+        expect(frame).toBe(2); // Should be North
 
-        // Test rotation between North and NE (20 degrees)
-        const frame2 = getDirectionFromRotation(20 * Math.PI / 180);
-        expect(frame2).toBe(4); // Should round to North (closer than NE at 45)
+        // Test rotation between North and East (44 degrees)
+        const frame2 = getDirectionFromRotation(44 * Math.PI / 180);
+        expect(frame2).toBe(2); // Should be North
 
-        // Test rotation between North and NE (30 degrees)
-        const frame3 = getDirectionFromRotation(30 * Math.PI / 180);
-        expect(frame3).toBe(3); // Should round to NE (closer than North)
+        // Test rotation between North and East (46 degrees)
+        const frame3 = getDirectionFromRotation(46 * Math.PI / 180);
+        expect(frame3).toBe(1); // Should be East
       });
     });
 
@@ -856,14 +836,14 @@ describe('Renderer', () => {
         // Mock sprite sheet as loaded
         renderer.assetManager.spriteSheet = {
           complete: true,
-          naturalWidth: 576,
-          naturalHeight: 768,
+          naturalWidth: 128,
+          naturalHeight: 128,
         };
         renderer.assetManager.spriteSheetMetadata = {
-          frameWidth: 96,
-          frameHeight: 96,
-          columns: 6,
-          rows: 8,
+          frameWidth: 32,
+          frameHeight: 32,
+          columns: 4,
+          rows: 4,
         };
 
         const player = {
@@ -886,18 +866,18 @@ describe('Renderer', () => {
         expect(ctx.drawImage).toHaveBeenCalled();
       });
 
-      test('WhenRenderingPlayerFacingEast_ShouldDrawFrame2', () => {
+      test('WhenRenderingPlayerFacingEast_ShouldDrawFrame1', () => {
         // Mock sprite sheet as loaded
         renderer.assetManager.spriteSheet = {
           complete: true,
-          naturalWidth: 576,
-          naturalHeight: 768,
+          naturalWidth: 128,
+          naturalHeight: 128,
         };
         renderer.assetManager.spriteSheetMetadata = {
-          frameWidth: 96,
-          frameHeight: 96,
-          columns: 6,
-          rows: 8,
+          frameWidth: 32,
+          frameHeight: 32,
+          columns: 4,
+          rows: 4,
         };
 
         const player = {
@@ -909,7 +889,7 @@ describe('Renderer', () => {
           rotation: Math.PI / 2, // East
           animationState: {
             currentFrame: 0,
-            lastDirection: 2, // East
+            lastDirection: 1, // East
             timeAccumulator: 0,
           },
         };
@@ -924,14 +904,14 @@ describe('Renderer', () => {
         // Mock sprite sheet as loaded
         renderer.assetManager.spriteSheet = {
           complete: true,
-          naturalWidth: 576,
-          naturalHeight: 768,
+          naturalWidth: 128,
+          naturalHeight: 128,
         };
         renderer.assetManager.spriteSheetMetadata = {
-          frameWidth: 96,
-          frameHeight: 96,
-          columns: 6,
-          rows: 8,
+          frameWidth: 32,
+          frameHeight: 32,
+          columns: 4,
+          rows: 4,
         };
 
         const player = {
@@ -943,7 +923,7 @@ describe('Renderer', () => {
           rotation: 0, // North
           animationState: {
             currentFrame: 0,
-            lastDirection: 4, // North
+            lastDirection: 2, // North
             timeAccumulator: 0,
           },
         };
@@ -972,14 +952,14 @@ describe('Renderer', () => {
         // Mock sprite sheet as loaded
         renderer.assetManager.spriteSheet = {
           complete: true,
-          naturalWidth: 576,
-          naturalHeight: 768,
+          naturalWidth: 128,
+          naturalHeight: 128,
         };
         renderer.assetManager.spriteSheetMetadata = {
-          frameWidth: 96,
-          frameHeight: 96,
-          columns: 6,
-          rows: 8,
+          frameWidth: 32,
+          frameHeight: 32,
+          columns: 4,
+          rows: 4,
         };
 
         const player = {
@@ -991,7 +971,7 @@ describe('Renderer', () => {
           rotation: 0,
           animationState: {
             currentFrame: 0,
-            lastDirection: 4, // North
+            lastDirection: 2, // North
             timeAccumulator: 0,
           },
         };
@@ -1016,11 +996,16 @@ describe('Renderer', () => {
           Promise.resolve({
             ok: true,
             json: () => Promise.resolve({
-              frameWidth: 96,
-              frameHeight: 96,
-              columns: 6,
-              rows: 8,
-              directions: ['south', 'south-east', 'east', 'north-east', 'north', 'north-west', 'west', 'south-west']
+              frameWidth: 32,
+              frameHeight: 32,
+              columns: 4,
+              rows: 4,
+              animations: {
+                south: { row: 0, frames: 4 },
+                east: { row: 1, frames: 4 },
+                north: { row: 2, frames: 4 },
+                west: { row: 3, frames: 4 }
+              }
             })
           })
         );
@@ -1041,10 +1026,10 @@ describe('Renderer', () => {
 
         expect(newRenderer.assetManager.spriteSheet).toBeDefined();
         expect(newRenderer.assetManager.spriteSheetMetadata).toBeDefined();
-        expect(newRenderer.assetManager.spriteSheetMetadata.frameWidth).toBe(96);
-        expect(newRenderer.assetManager.spriteSheetMetadata.frameHeight).toBe(96);
-        expect(newRenderer.assetManager.spriteSheetMetadata.columns).toBe(6);
-        expect(newRenderer.assetManager.spriteSheetMetadata.rows).toBe(8);
+        expect(newRenderer.assetManager.spriteSheetMetadata.frameWidth).toBe(32);
+        expect(newRenderer.assetManager.spriteSheetMetadata.frameHeight).toBe(32);
+        expect(newRenderer.assetManager.spriteSheetMetadata.columns).toBe(4);
+        expect(newRenderer.assetManager.spriteSheetMetadata.rows).toBe(4);
       });
 
       test('WhenMetadataLoadFails_ShouldHandleGracefully', async () => {
@@ -1066,25 +1051,25 @@ describe('Renderer', () => {
         const animState = {
           currentFrame: 0,
           timeAccumulator: 0,
-          lastDirection: 2 // East
+          lastDirection: 1 // East
         };
 
         const deltaTime = 1 / CONFIG.ANIMATION.FPS; // One frame duration
         const isMoving = true;
-        const direction = 2; // East
+        const direction = 1; // East
 
         updateAnimationState(animState, deltaTime, isMoving, direction);
 
         expect(animState.currentFrame).toBe(1); // Should advance to next frame
         expect(animState.timeAccumulator).toBeLessThan(deltaTime);
-        expect(animState.lastDirection).toBe(2); // Should maintain direction
+        expect(animState.lastDirection).toBe(1); // Should maintain direction
       });
 
       test('WhenPlayerIsIdle_ShouldNotAdvanceFrame', () => {
         const animState = {
           currentFrame: 3,
           timeAccumulator: 0,
-          lastDirection: 2 // East
+          lastDirection: 1 // East
         };
 
         const deltaTime = 1 / CONFIG.ANIMATION.FPS; // One frame duration
@@ -1094,19 +1079,19 @@ describe('Renderer', () => {
         updateAnimationState(animState, deltaTime, isMoving, direction);
 
         expect(animState.currentFrame).toBe(0); // Should reset to idle frame
-        expect(animState.lastDirection).toBe(2); // Should keep last direction
+        expect(animState.lastDirection).toBe(1); // Should keep last direction
       });
 
       test('WhenFrameExceedsMax_ShouldLoopBackToZero', () => {
         const animState = {
-          currentFrame: 5, // Last frame
+          currentFrame: 3, // Last frame
           timeAccumulator: 0,
-          lastDirection: 4 // North
+          lastDirection: 2 // North
         };
 
         const deltaTime = 1 / CONFIG.ANIMATION.FPS; // One frame duration
         const isMoving = true;
-        const direction = 4; // North
+        const direction = 2; // North
 
         updateAnimationState(animState, deltaTime, isMoving, direction);
 
@@ -1117,16 +1102,16 @@ describe('Renderer', () => {
         const animState = {
           currentFrame: 2,
           timeAccumulator: 0,
-          lastDirection: 2 // East
+          lastDirection: 1 // East
         };
 
         const deltaTime = 0.01; // Small delta
         const isMoving = true;
-        const direction = 4; // Changed to North
+        const direction = 2; // Changed to North
 
         updateAnimationState(animState, deltaTime, isMoving, direction);
 
-        expect(animState.lastDirection).toBe(4); // Should update to new direction
+        expect(animState.lastDirection).toBe(2); // Should update to new direction
       });
     });
 
@@ -1135,14 +1120,14 @@ describe('Renderer', () => {
         // Mock sprite sheet as loaded
         renderer.assetManager.spriteSheet = {
           complete: true,
-          naturalWidth: 576, // 6 columns * 96px
-          naturalHeight: 768, // 8 rows * 96px
+          naturalWidth: 128, // 4 columns * 32px
+          naturalHeight: 128, // 4 rows * 32px
         };
         renderer.assetManager.spriteSheetMetadata = {
-          frameWidth: 96,
-          frameHeight: 96,
-          columns: 6,
-          rows: 8,
+          frameWidth: 32,
+          frameHeight: 32,
+          columns: 4,
+          rows: 4,
         };
 
         ctx.drawImage = jest.fn();
@@ -1156,21 +1141,21 @@ describe('Renderer', () => {
           health: 100,
           animationState: {
             currentFrame: 2, // Frame 2
-            lastDirection: 4, // North (row 4)
+            lastDirection: 2, // North (row 2)
           },
         };
 
         renderer.playerRenderer.render(ctx, player, false);
 
         // Should draw frame from sprite sheet
-        // sourceX = currentFrame * frameWidth = 2 * 96 = 192
-        // sourceY = lastDirection * frameHeight = 4 * 96 = 384
+        // sourceX = currentFrame * frameWidth = 2 * 32 = 64
+        // sourceY = lastDirection * frameHeight = 2 * 32 = 64
         expect(ctx.drawImage).toHaveBeenCalledWith(
           renderer.assetManager.spriteSheet,
-          192, // sourceX
-          384, // sourceY
-          96,  // sourceWidth
-          96,  // sourceHeight
+          64, // sourceX
+          64, // sourceY
+          32,  // sourceWidth
+          32,  // sourceHeight
           1500 - CONFIG.RENDER.PLAYER_RADIUS, // destX (centered)
           900 - CONFIG.RENDER.PLAYER_RADIUS,  // destY (centered)
           CONFIG.RENDER.PLAYER_RADIUS * 2,    // destWidth
@@ -1208,21 +1193,21 @@ describe('Renderer', () => {
           health: 100,
           animationState: {
             currentFrame: 0, // Idle frame
-            lastDirection: 2, // East
+            lastDirection: 1, // East
           },
         };
 
         renderer.playerRenderer.render(ctx, player, false);
 
         // Should draw first frame (idle) from East direction row
-        // sourceX = 0 * 96 = 0
-        // sourceY = 2 * 96 = 192
+        // sourceX = 0 * 32 = 0
+        // sourceY = 1 * 32 = 32
         expect(ctx.drawImage).toHaveBeenCalledWith(
           renderer.assetManager.spriteSheet,
           0,   // sourceX (idle frame)
-          192, // sourceY (East row)
-          96,
-          96,
+          32,  // sourceY (East row)
+          32,
+          32,
           expect.any(Number),
           expect.any(Number),
           expect.any(Number),

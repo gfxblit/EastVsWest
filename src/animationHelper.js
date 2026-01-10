@@ -51,20 +51,16 @@ export class AnimationState {
 }
 
 /**
- * Calculate direction index (0-7) from rotation angle
+ * Calculate direction index (0-3) from rotation angle
  * @param {number} rotation - Rotation angle in radians
- * @returns {number} Direction index (0-7)
+ * @returns {number} Direction index (0-3: South, East, North, West)
  */
 export function getDirectionFromRotation(rotation) {
-  // Map rotation (0-2π) to frame (0-7)
+  // Map rotation (0-2π) to frame (0-3)
   // Frame 0: South (π)
-  // Frame 1: South-East (3π/4)
-  // Frame 2: East (π/2)
-  // Frame 3: North-East (π/4)
-  // Frame 4: North (0)
-  // Frame 5: North-West (7π/4 or -π/4)
-  // Frame 6: West (3π/2 or -π/2)
-  // Frame 7: South-West (5π/4 or -3π/4)
+  // Frame 1: East (π/2)
+  // Frame 2: North (0)
+  // Frame 3: West (3π/2)
 
   // Normalize rotation to 0-2π
   let normalizedRotation = rotation % (2 * Math.PI);
@@ -76,41 +72,28 @@ export function getDirectionFromRotation(rotation) {
   const degrees = (normalizedRotation * 180) / Math.PI;
 
   // Map degrees to frame
-  // North (0°) ± 22.5° = [-22.5°, 22.5°] → frame 4
-  // NE (45°) ± 22.5° = [22.5°, 67.5°] → frame 3
-  // East (90°) ± 22.5° = [67.5°, 112.5°] → frame 2
-  // SE (135°) ± 22.5° = [112.5°, 157.5°] → frame 1
-  // South (180°) ± 22.5° = [157.5°, 202.5°] → frame 0
-  // SW (225°) ± 22.5° = [202.5°, 247.5°] → frame 7
-  // West (270°) ± 22.5° = [247.5°, 292.5°] → frame 6
-  // NW (315°) ± 22.5° = [292.5°, 337.5°] → frame 5
-  // North wrap-around [337.5°, 360°] → frame 4
+  // North (0°) ± 45° = [315°, 45°] → frame 2
+  // East (90°) ± 45° = [45°, 135°] → frame 1
+  // South (180°) ± 45° = [135°, 225°] → frame 0
+  // West (270°) ± 45° = [225°, 315°] → frame 3
 
-  if (degrees >= 337.5 || degrees < 22.5) {
-    return 4; // North
-  } else if (degrees >= 22.5 && degrees < 67.5) {
-    return 3; // North-East
-  } else if (degrees >= 67.5 && degrees < 112.5) {
-    return 2; // East
-  } else if (degrees >= 112.5 && degrees < 157.5) {
-    return 1; // South-East
-  } else if (degrees >= 157.5 && degrees < 202.5) {
+  if (degrees >= 315 || degrees < 45) {
+    return 2; // North
+  } else if (degrees >= 45 && degrees < 135) {
+    return 1; // East
+  } else if (degrees >= 135 && degrees < 225) {
     return 0; // South
-  } else if (degrees >= 202.5 && degrees < 247.5) {
-    return 7; // South-West
-  } else if (degrees >= 247.5 && degrees < 292.5) {
-    return 6; // West
-  } else { // degrees >= 292.5 && degrees < 337.5
-    return 5; // North-West
+  } else { // degrees >= 225 && degrees < 315
+    return 3; // West
   }
 }
 
 /**
- * Calculate direction index (0-7) from velocity vector
+ * Calculate direction index (0-3) from velocity vector
  * Enforces cardinal directions (North, South, East, West) for walking animations.
  * @param {number} vx - Velocity X component
  * @param {number} vy - Velocity Y component
- * @returns {number|null} Direction index (0, 2, 4, 6) or null if velocity is zero
+ * @returns {number|null} Direction index (0: South, 1: East, 2: North, 3: West) or null if velocity is zero
  */
 export function getDirectionFromVelocity(vx, vy) {
   // Handle zero velocity (idle state)
@@ -121,10 +104,10 @@ export function getDirectionFromVelocity(vx, vy) {
   // Prioritize the axis with greater magnitude
   if (Math.abs(vx) > Math.abs(vy)) {
     // Horizontal movement
-    return vx > 0 ? 2 : 6; // East (2) or West (6)
+    return vx > 0 ? 1 : 3; // East (1) or West (3)
   } else {
     // Vertical movement (default to vertical if equal)
-    return vy > 0 ? 0 : 4; // South (0) or North (4)
+    return vy > 0 ? 0 : 2; // South (0) or North (2)
   }
 }
 

@@ -2,38 +2,22 @@
   "frameWidth": 32,
   "frameHeight": 32,
   "columns": 4,
-  "rows": 8,
+  "rows": 4,
   "animations": {
     "south": {
       "row": 0,
       "frames": 4
     },
-    "southEast": {
+    "east": {
       "row": 1,
       "frames": 4
     },
-    "east": {
+    "north": {
       "row": 2,
       "frames": 4
     },
-    "northEast": {
-      "row": 3,
-      "frames": 4
-    },
-    "north": {
-      "row": 4,
-      "frames": 4
-    },
-    "northWest": {
-      "row": 5,
-      "frames": 4
-    },
     "west": {
-      "row": 6,
-      "frames": 4
-    },
-    "southWest": {
-      "row": 7,
+      "row": 3,
       "frames": 4
     }
   }
