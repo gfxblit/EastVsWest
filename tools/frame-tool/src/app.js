@@ -178,6 +178,13 @@ class App {
             frame.x, frame.y, frame.w, frame.h,
             0, 0, this.previewCanvas.width, this.previewCanvas.height
         );
+
+        // Draw frame counter
+        this.previewCtx.fillStyle = 'rgba(0, 0, 0, 0.5)';
+        this.previewCtx.fillRect(0, 0, 20, 15);
+        this.previewCtx.fillStyle = 'white';
+        this.previewCtx.font = '10px sans-serif';
+        this.previewCtx.fillText(this.currentFrameIndex, 2, 11);
     }
 }
 
