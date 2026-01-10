@@ -1,5 +1,6 @@
 import { defineConfig } from 'vite';
 import { getAvailablePort } from './scripts/port-utils.js';
+import { resolve } from 'path';
 
 export default defineConfig(async () => {
   const port = await getAvailablePort(3000);
@@ -9,7 +10,13 @@ export default defineConfig(async () => {
     root: '.',
     build: {
       outDir: 'dist',
-      emptyOutDir: true
+      emptyOutDir: true,
+      rollupOptions: {
+        input: {
+          main: resolve(process.cwd(), 'index.html'),
+          frameTool: resolve(process.cwd(), 'tools/frame-tool/index.html')
+        }
+      }
     },
     server: {
       port,
