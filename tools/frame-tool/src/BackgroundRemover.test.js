@@ -84,10 +84,47 @@ describe('BackgroundRemover', () => {
 
             expect(imageData.data[7]).toBe(255);
         });
-        
-        test('should handle disable flag if we add one to API (optional)', () => {
-             // If we rely on caller to just not call process, we don't need this test.
-             // But let's stick to the current API.
+
+        test('should respect exact threshold boundary', () => {
+             // Key Color: (0, 0, 0)
+             const keyColor = '#000000';
+
+             // Pixel 1: (10, 0, 0). DistSq = 100.
+             // Pixel 2: (11, 0, 0). DistSq = 121.
+
+             // Create data: [R, G, B, A]
+             const data = new Uint8ClampedArray([
+                 10, 0, 0, 255,  // Pixel 1
+                 11, 0, 0, 255   // Pixel 2
+             ]);
+             imageData = { width: 2, height: 1, data };
+
+             // Threshold 10. ThreshSq = 100.
+             // Pixel 1 distSq (100) <= 100 -> Should remove.
+             // Pixel 2 distSq (121) > 100 -> Should keep.
+             BackgroundRemover.process(imageData, keyColor, 10);
+
+             expect(imageData.data[3]).toBe(0);   // Pixel 1 removed
+             expect(imageData.data[7]).toBe(255); // Pixel 2 kept
+        });
+
+        test('should preserve existing transparency of non-matching pixels', () => {
+            const keyColor = '#00ff00';
+
+            // Pixel 1: Red, but already half transparent
+            // Pixel 2: Red, fully transparent
+            const data = new Uint8ClampedArray([
+                255, 0, 0, 128,
+                255, 0, 0, 0
+            ]);
+            imageData = { width: 2, height: 1, data };
+
+            BackgroundRemover.process(imageData, keyColor, 0);
+
+            // Neither matches green, so logic shouldn't touch them.
+            // Alpha should remain as is.
+            expect(imageData.data[3]).toBe(128);
+            expect(imageData.data[7]).toBe(0);
         });
     });
 });
