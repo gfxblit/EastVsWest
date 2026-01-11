@@ -43,6 +43,7 @@ export class App {
         this.jsonOutput = document.getElementById('jsonOutput');
         this.dropZone = document.getElementById('dropZone');
         this.overlayLayer = document.getElementById('overlayLayer');
+        this.interactionMode = document.getElementById('interactionMode');
 
         this.ctx = this.mainCanvas.getContext('2d');
         this.previewCtx = this.previewCanvas.getContext('2d');
@@ -98,10 +99,24 @@ export class App {
         
         // Canvas click for setting anchor directly
         this.mainCanvas.addEventListener('mousedown', (e) => this.handleCanvasClick(e));
+        this.mainCanvas.addEventListener('touchstart', (e) => {
+            if (e.touches.length === 1) {
+                this.handleCanvasClick(e.touches[0]);
+                e.preventDefault();
+            }
+        }, { passive: false });
 
         // Global drag handlers
         window.addEventListener('mousemove', (e) => this.handleGlobalMouseMove(e));
         window.addEventListener('mouseup', () => this.handleGlobalMouseUp());
+
+        window.addEventListener('touchmove', (e) => {
+            if (this.draggingFrame !== null && e.touches.length === 1) {
+                this.handleGlobalMouseMove(e.touches[0]);
+                e.preventDefault();
+            }
+        }, { passive: false });
+        window.addEventListener('touchend', () => this.handleGlobalMouseUp());
 
         // Drag and Drop
         this.dropZone.addEventListener('dragover', (e) => {
@@ -264,7 +279,6 @@ export class App {
     }
 
     handleHandleMouseDown(e, index) {
-        e.stopPropagation(); // Prevent canvas click if any
         this.draggingFrame = index;
         this.dragStartMouse = { x: e.clientX, y: e.clientY };
         // Store original anchor and frame pos when drag started
@@ -277,14 +291,16 @@ export class App {
             const dx = e.clientX - this.dragStartMouse.x;
             const dy = e.clientY - this.dragStartMouse.y;
             
-            if (e.shiftKey) {
-                // Shift + Drag: Move Anchor (relative to frame)
+            const isAnchorMode = e.shiftKey || (this.interactionMode && this.interactionMode.value === 'anchor');
+
+            if (isAnchorMode) {
+                // Shift + Drag (or Anchor mode): Move Anchor (relative to frame)
                 this.anchorOverrides[this.draggingFrame] = {
                     x: this.dragStartAnchor.x + dx,
                     y: this.dragStartAnchor.y + dy
                 };
             } else {
-                // Drag: Move Frame (updates Green Rect)
+                // Drag (or Frame mode): Move Frame (updates Green Rect)
                 this.frameOverrides[this.draggingFrame] = {
                     x: this.dragStartFramePos.x + dx,
                     y: this.dragStartFramePos.y + dy
@@ -333,7 +349,19 @@ export class App {
                 handle.style.zIndex = '100';
             }
 
-            handle.addEventListener('mousedown', (e) => this.handleHandleMouseDown(e, index));
+            handle.addEventListener('mousedown', (e) => {
+                e.stopPropagation();
+                this.handleHandleMouseDown(e, index);
+            });
+            handle.addEventListener('touchstart', (e) => {
+                if (e.touches.length === 1) {
+                    e.stopPropagation();
+                    this.handleHandleMouseDown(e.touches[0], index);
+                    // We don't preventDefault here to allow scrolling if needed? 
+                    // Actually, dragging the handle should probably prevent scrolling.
+                    e.preventDefault();
+                }
+            }, { passive: false });
             
             this.overlayLayer.appendChild(handle);
         });
