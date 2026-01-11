@@ -1,0 +1,13 @@
+{
+  "sourceFilename": "east.png",
+  "frameWidth": 350,
+  "frameHeight": 450,
+  "columns": 5,
+  "rows": 1,
+  "animations": {
+    "animation": {
+      "row": 0,
+      "frames": 5
+    }
+  }
+}

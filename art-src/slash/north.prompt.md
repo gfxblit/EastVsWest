@@ -1,0 +1,2 @@
+Based on the reference picture, generate a 1-row spritesheet containing exactly 5 frames of animation extending this character’s actions. The row must show the character facing North (back to the camera) and slashing an **invisible** sword, organized as a logical sequence: raising the right arm, extending the right arm (no sword), and a low follow-through recovery. Maintain the exact pixel scale, color palette, and head/body proportions from the reference image. Keep the background solid magenta (#FF00FF).
+
