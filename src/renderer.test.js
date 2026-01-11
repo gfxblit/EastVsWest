@@ -1047,7 +1047,52 @@ describe('Renderer', () => {
 
 
     describe('updateAnimationState', () => {
-      test('WhenPlayerIsMoving_ShouldAdvanceFrame', () => {
+      test('WhenPlayerIsAttacking_ShouldUseSlashSpritesheet', () => {
+      // Mock both spritesheets
+      const walkSheet = { complete: true, naturalWidth: 128, naturalHeight: 128 };
+      const slashSheet = { complete: true, naturalWidth: 1750, naturalHeight: 1400 }; // 5 frames * 350, 4 rows * 350
+      
+      renderer.assetManager._spriteSheets.set('walk', walkSheet);
+      renderer.assetManager._spriteSheets.set('slash', slashSheet);
+      
+      renderer.assetManager._spriteSheetMetadata.set('walk', {
+        frameWidth: 32, frameHeight: 32, columns: 4, rows: 4
+      });
+      renderer.assetManager._spriteSheetMetadata.set('slash', {
+        frameWidth: 350, frameHeight: 350, columns: 5, rows: 4
+      });
+
+      const player = {
+        id: 'player-1',
+        x: 100,
+        y: 100,
+        rotation: Math.PI / 2, // East
+        isAttacking: true,
+        attackAnimTime: 0.1, // Halfway through 0.2s animation
+        animationState: {
+          currentFrame: 0,
+          lastDirection: 1, // East
+        },
+      };
+
+      renderer.playerRenderer.render(ctx, player, false);
+
+      // Should draw from slash spritesheet
+      // 5th argument of drawImage is sourceWidth, which is 350 for slash sheet
+      expect(ctx.drawImage).toHaveBeenCalledWith(
+        slashSheet,
+        expect.any(Number), // sourceX
+        expect.any(Number), // sourceY
+        350,                // sourceWidth
+        350,                // sourceHeight
+        expect.any(Number), // destX
+        expect.any(Number), // destY
+        expect.any(Number), // destWidth
+        expect.any(Number)  // destHeight
+      );
+    });
+
+    test('WhenPlayerIsMoving_ShouldAdvanceFrame', () => {
         const animState = {
           currentFrame: 0,
           timeAccumulator: 0,

@@ -47,9 +47,12 @@ export class Renderer {
     this.playerRenderer.init();
     this.lootRenderer.init();
 
-    // Load sprite sheet for animations
-    this.assetManager.loadSpriteSheet().catch(err => {
-        console.warn('Failed to load sprite sheet, using fallback rendering:', err.message);
+    // Load sprite sheets for animations
+    Promise.all([
+      this.assetManager.loadSpriteSheet('walk', CONFIG.ASSETS.SPRITE_SHEET.METADATA, CONFIG.ASSETS.SPRITE_SHEET.PATH),
+      this.assetManager.loadSpriteSheet('slash', CONFIG.ASSETS.PLAYER_SLASH.METADATA, CONFIG.ASSETS.PLAYER_SLASH.PATH)
+    ]).catch(err => {
+        console.warn('Failed to load sprite sheets, using fallback rendering:', err.message);
     });
     
     console.log('Renderer initialized');

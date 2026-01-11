@@ -211,6 +211,10 @@ export const CONFIG = {
       PATH: 'assets/player/player-walk-spritesheet.png',
       METADATA: 'assets/player/player-walk-spritesheet.json',
     },
+    PLAYER_SLASH: {
+      PATH: 'assets/player/player-slash-spritesheet.png',
+      METADATA: 'assets/player/player-slash-spritesheet.json',
+    },
     VFX: {
       SLASH: {
         UP: 'assets/vfx/slash-up.png',

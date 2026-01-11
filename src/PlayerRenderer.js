@@ -51,8 +51,10 @@ export class PlayerRenderer {
             );
         }
 
-        const spriteSheet = this.assetManager.getSpriteSheet();
-        const spriteSheetMetadata = this.assetManager.getSpriteSheetMetadata();
+        const isAttacking = player.isAttacking;
+        const spriteSheetName = isAttacking ? 'slash' : 'walk';
+        const spriteSheet = this.assetManager.getSpriteSheet(spriteSheetName);
+        const spriteSheetMetadata = this.assetManager.getSpriteSheetMetadata(spriteSheetName);
 
         // Check if sprite sheet is loaded
         if (!spriteSheet || !spriteSheet.complete || !spriteSheetMetadata) {
@@ -65,8 +67,26 @@ export class PlayerRenderer {
                 size
             );
         } else {
-            const { currentFrame, lastDirection } = player.animationState;
+            let currentFrame, lastDirection;
             const { frameWidth, frameHeight } = spriteSheetMetadata;
+
+            if (isAttacking) {
+                // Calculate attack frame from attackAnimTime (countdown)
+                const totalDuration = CONFIG.COMBAT.ATTACK_ANIMATION_DURATION_SECONDS;
+                const elapsedTime = totalDuration - player.attackAnimTime;
+                const frameCount = spriteSheetMetadata.columns;
+                const frameDuration = totalDuration / frameCount;
+                
+                currentFrame = Math.floor(elapsedTime / frameDuration);
+                if (currentFrame >= frameCount) currentFrame = frameCount - 1;
+                if (currentFrame < 0) currentFrame = 0;
+                
+                // Use rotation-based direction for attacking
+                lastDirection = getDirectionFromRotation(player.rotation);
+            } else {
+                currentFrame = player.animationState.currentFrame;
+                lastDirection = player.animationState.lastDirection;
+            }
 
             // Calculate source rectangle (which frame to draw from sprite sheet)
             const sourceX = currentFrame * frameWidth;
