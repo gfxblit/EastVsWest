@@ -4,6 +4,7 @@ import { FrameCalculator } from './FrameCalculator.js';
 
 describe('App State Management', () => {
     let app;
+    let getContextSpy;
 
     beforeEach(() => {
         // Setup DOM
@@ -49,9 +50,15 @@ describe('App State Management', () => {
             fillRect: jest.fn(),
             fillText: jest.fn(),
         };
-        HTMLCanvasElement.prototype.getContext = jest.fn(() => mockContext);
+        getContextSpy = jest.spyOn(HTMLCanvasElement.prototype, 'getContext').mockReturnValue(mockContext);
 
         app = new App();
+    });
+
+    afterEach(() => {
+        getContextSpy.mockRestore();
+        document.body.innerHTML = '';
+        jest.restoreAllMocks(); // Ensure other mocks like FileReader/Image are also cleaned up if needed
     });
 
     test('getProjectState returns current config and overrides', () => {

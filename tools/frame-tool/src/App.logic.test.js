@@ -4,6 +4,7 @@ import { App } from './app.js';
 describe('App Logic Integration', () => {
     let app;
     let mockContext;
+    let getContextSpy;
 
     beforeEach(() => {
         // Setup minimal DOM required for App initialization
@@ -48,9 +49,17 @@ describe('App Logic Integration', () => {
             fillRect: jest.fn(),
             fillText: jest.fn(),
         };
-        HTMLCanvasElement.prototype.getContext = jest.fn(() => mockContext);
+
+        // Use spyOn instead of direct assignment to avoid polluting global state
+        getContextSpy = jest.spyOn(HTMLCanvasElement.prototype, 'getContext').mockReturnValue(mockContext);
 
         app = new App();
+    });
+
+    afterEach(() => {
+        // Cleanup
+        getContextSpy.mockRestore();
+        document.body.innerHTML = '';
     });
 
     describe('Overrides', () => {
