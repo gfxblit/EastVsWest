@@ -15,7 +15,7 @@
     "threshold": "37",
     "erode": "3"
   },
-  "sourceFilename": "east.png",
+  "sourceFilename": "north.png",
   "anchorOverrides": {
     "0": {
       "x": 80.5,
