@@ -6,8 +6,9 @@
 2. [Supabase Schema Design](#supabase-schema-design)
 3. [Channel Communication Protocol](#channel-communication-protocol)
 4. [Data Flow for Host-Authority Model](#data-flow-for-host-authority-model)
-5. [Implementation Considerations](#implementation-considerations)
-6. [Security & Error Handling](#security--error-handling)
+5. [State Management Strategy: Registry + Stream](#state-management-strategy-registry--stream)
+6. [Implementation Considerations](#implementation-considerations)
+7. [Security & Error Handling](#security--error-handling)
 
 ---
 
@@ -313,6 +314,13 @@ Used by clients to request current loot state upon joining.
 #### 5. Game State Lifecycle
 
 **HOST → ALL: `game_start`**
+```javascript
+{
+  type: 'game_start',
+  from: 'host_uuid',
+  data: {} // Empty payload, signals clients to switch to game screen
+}
+```
 
 **HOST → ALL: `game_over`**
 ```javascript
@@ -328,6 +336,16 @@ Used by clients to request current loot state upon joining.
 
 **HOST → ALL: `session_terminated`**
 (Sent when host leaves)
+```javascript
+{
+  type: 'session_terminated',
+  from: 'host_uuid',
+  data: {
+    reason: 'host_left',
+    message: 'The host has left the game. The session has ended.'
+  }
+}
+```
 
 ---
 
@@ -436,4 +454,227 @@ CLIENT (Attacker)      CHANNEL          HOST           DATABASE       CLIENTS (O
       │                   │               │ 8. If killed:  │                 │
       │                   │<──player_death──────┤                 │                 │
       │                   │                     │                 │                 │
+```
+
+---
+
+## State Management Strategy: Registry + Stream
+
+To sync a local copy of the `session_players` Supabase table, we use a **Snapshot + Broadcast** architecture managed by a `SessionPlayersSnapshot`.
+
+### SessionPlayersSnapshot
+
+`SessionPlayersSnapshot` maintains a local synchronized copy of **only the players in a specific game session**. It uses a Map data structure (keyed by `player_id`) and stays in sync via database events, ephemeral WebSocket broadcasts, and periodic snapshot refreshes.
+
+#### Initialization
+- Constructor accepts `supabaseClient`, `sessionId`, and `channel`
+- Initialization is **asynchronous** - both initial snapshot fetch and channel subscription must complete
+- Call `ready()` to wait for initialization to complete before using the snapshot
+
+#### Public API
+- `ready()` - Returns Promise that resolves when snapshot is initialized and channel is subscribed
+- `getPlayers()` - Returns Map of players **in this session only** (keyed by `player_id`)
+- `destroy()` - Cleans up resources (clears interval timer, unsubscribes from channel)
+- `getInterpolatedPlayerState(playerId, renderTime)` - Returns interpolated state for rendering
+
+#### Synchronization - DB Events (High latency, ~100 ms)
+- **Source:** `session_players` database table (only broadcasted after writing to DB)
+- **Events:** `INSERT`, `DELETE`, `UPDATE`
+- **Mechanism:** Listens to generic `postgres_changes` events from `Network.js` and manually filters for the current session ID.
+- Only processes events for players in this session:
+  - `INSERT` → adds player to Map
+  - `DELETE` → removes player from Map (see DELETE limitation below)
+  - `UPDATE` → updates player in Map
+
+#### DELETE Event Limitation
+**CRITICAL**: Supabase Realtime only sends the primary key (`id`) in DELETE events, not the full record.
+- This is a Supabase Realtime limitation, not a PostgreSQL limitation
+- DELETE handler must find player by `id` field before deleting from Map by `player_id`
+- Workaround: Maintain full player records in local Map to lookup by `id`
+
+#### Synchronization - Movement Updates (Fast / Ephemeral, ~10 ms)
+- **Source:** WebSocket broadcasts (in memory, not written to disk)
+- **Events:** `player_state_update` messages
+- Listens to `player_state_update` broadcasts on channel
+- Updates player position, velocity, and host-authoritative fields (like health) in Map **only if player exists in this session**
+- Does not write to DB (ephemeral)
+
+#### Periodic Snapshotting
+- Refreshes snapshot every 60 seconds **querying only this session's players**
+- Query: `SELECT * FROM session_players WHERE session_id = ?`
+- Replaces local Map with fresh results (handles lost broadcasts)
+- Logs error if refresh fails but continues operation
+
+#### Resource Cleanup
+- **CRITICAL**: Call `destroy()` when done to prevent memory leaks and channel conflicts
+- Destroy clears the periodic refresh interval
+- Destroy unsubscribes from the channel (prevents timeout errors in subsequent channel subscriptions)
+
+---
+
+## Implementation Considerations
+
+### Latency & Client Prediction
+
+**Movement**: Clients immediately update their own position and velocity locally and broadcast updates directly to all peers. Each client is authoritative over their own movement with no host validation or correction (except for map bounds). This provides lowest latency but limited anti-cheat protection.
+
+**Interactions**: Clients can show optimistic UI feedback (e.g., item pickup animation) but must wait for host confirmation before actually applying the state change. If the host rejects the action, the client must rollback the optimistic update.
+
+**Interpolation**: The `SessionPlayersSnapshot` class maintains a history of position updates for remote players. During rendering, it interpolates between the two most relevant historical snapshots to provide smooth movement, even if network updates are jittery.
+
+### Database vs. Realtime Channel
+
+| Data | Storage | Rationale |
+|------|---------|-----------|
+| Session metadata | Database | Persistent, required for join code lookups |
+| Player list | Database + Channel | Database for persistence, Channel for real-time |
+| Player positions | Database + Channel | Database written periodically (60s) by each client, Channel for real-time broadcasts (20Hz) |
+| Player velocity | Database + Channel | Database written periodically (60s) by each client, Channel for real-time broadcasts (20Hz) |
+| Item states | Database + Channel | Database for authority, Channel for sync |
+| Combat events | Channel + Events log | Real-time sync, optional event log for debugging |
+| Game state changes | Database + Channel | Database for authority, Channel for sync |
+
+### Host Responsibilities Summary
+
+The host must maintain authoritative state and process:
+
+1. **Session & Lobby Management**
+   - Create session with join code.
+   - **Monitor `session_players` table:** Enforce `max_players` by deleting excess/late-joining rows (Eviction).
+   - Ensure game hasn't already started before allowing new joins (Cleanup).
+   - Track connected players via heartbeats and DB state.
+   - Handle disconnections and timeouts.
+
+2. **Game State Management**
+   - Initialize game state (spawn positions, items)
+   - Manage conflict zone progression
+   - Track all player stats (health, kills, equipment)
+   - Track all item states (spawned, picked up, dropped)
+
+3. **Movement Updates** (Client-Authoritative)
+   - Clients broadcast their own movement updates (position, rotation, velocity) directly to all peers
+   - Host receives these updates and forwards them to `SessionPlayersSnapshot` for rendering
+   - No host validation or aggregation (trust-based model)
+
+4. **Interaction Validation** (Host-Authoritative)
+   - Validate item pickup requests (range, availability)
+   - Validate combat actions (range, weapon equipped, target alive)
+   - Calculate damage and health changes
+   - Detect eliminations
+   - Spawn dropped items from eliminated players
+
+5. **Persistence**
+   - Update database with authoritative state changes
+   - Log events for debugging/replay
+
+6. **Broadcasting**
+   - Send state updates to all connected clients
+   - Handle late-join state synchronization
+
+### Client Responsibilities Summary
+
+Each client (including the host's client instance) must:
+
+1. **Local Input Handling**
+   - Capture user input (movement, attacks, pickup attempts)
+   - Immediately update local player position and velocity
+   - Broadcast movement updates directly to all peers (20 Hz)
+   - Send interaction requests to host (on-demand)
+
+2. **Remote State Rendering**
+   - Receive movement updates from all other clients directly
+   - Interpolate other players' positions for smooth rendering
+   - Receive and apply interaction results from host (item pickups, combat)
+   - Render game state (players, items, conflict zone)
+
+3. **UI Updates**
+   - Display player inventory/equipment
+   - Show game stats (kills, remaining players)
+   - Show conflict zone warnings
+   - Display spectator UI when eliminated
+
+4. **Error Handling**
+   - Handle network disconnections
+   - Request state sync if desynced
+   - Show connection status to user
+
+---
+
+## Security & Error Handling
+
+### Security Measures
+
+1. **Join Code Security**
+   - 6-character alphanumeric codes (36^6 = 2.1 billion combinations)
+   - Single-use codes (deleted when session ends)
+   - Short expiry (2 hours max session length)
+
+2. **Row Level Security (RLS)**
+   - Players can only read/write data for their own session
+   - Host has elevated permissions for their session
+   - Anonymous auth prevents account-based attacks
+
+3. **Input Validation** (Host-side)
+   - Validate all host-authoritative interaction requests (range checks, state checks)
+   - Rate limit message processing (prevent spam)
+
+4. **Cheating Prevention** (Basic)
+   - Host validates all host-authoritative actions (combat, items, game state)
+   - Position updates are NOT validated (trust-based, client-authoritative)
+   - Combat calculations done server-side (host)
+   - Event logging for post-game analysis
+
+### Row Level Security (RLS) Policies
+
+Enable RLS to ensure data isolation between sessions:
+
+```sql
+-- Enable RLS
+ALTER TABLE game_sessions ENABLE ROW LEVEL SECURITY;
+ALTER TABLE session_players ENABLE ROW LEVEL SECURITY;
+ALTER TABLE session_items ENABLE ROW LEVEL SECURITY;
+ALTER TABLE session_events ENABLE ROW LEVEL SECURITY;
+
+-- Policy: Anyone can read sessions (to join via join code)
+CREATE POLICY "Allow read access to game sessions"
+  ON game_sessions FOR SELECT
+  USING (TRUE);
+
+-- Policy: Only host can update session
+CREATE POLICY "Host can update session"
+  ON game_sessions FOR UPDATE
+  USING (auth.uid() = host_id);
+
+-- Policy: Players can read player data ONLY for sessions they have joined.
+-- This prevents players from scanning the entire table for other active sessions.
+CREATE POLICY "Players can read session players"
+  ON session_players FOR SELECT
+  USING (
+    session_id IN (
+      SELECT s.session_id
+      FROM session_players s
+      WHERE s.player_id = auth.uid()
+    )
+  );
+
+-- Policy: Players can update their own data.
+CREATE POLICY "Players can update own data"
+  ON session_players FOR UPDATE
+  USING (player_id = auth.uid());
+
+-- Policy: Players can self-insert into a session.
+-- The Host is responsible for evicting players if the session is full or already started.
+CREATE POLICY "Players can insert themselves"
+  ON session_players FOR INSERT
+  WITH CHECK (player_id = auth.uid());
+
+-- Policy: Only the host can delete players (eviction).
+CREATE POLICY "Host can evict players"
+  ON session_players FOR DELETE
+  USING (
+    EXISTS (
+      SELECT 1 FROM game_sessions
+      WHERE id = session_players.session_id AND host_id = auth.uid()
+    )
+  );
 ```
