@@ -1,7 +1,7 @@
 {
   "sourceFilename": "east.png",
   "frameWidth": 350,
-  "frameHeight": 500,
+  "frameHeight": 350,
   "columns": 5,
   "rows": 1,
   "animations": {

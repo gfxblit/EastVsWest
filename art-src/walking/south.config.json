@@ -2,62 +2,62 @@
   "config": {
     "startX": 0,
     "startY": 0,
-    "frameWidth": 225,
-    "frameHeight": 350,
+    "frameWidth": 180,
+    "frameHeight": 300,
     "frameCount": 5,
     "fps": 10,
-    "globalWidth": 400,
-    "globalHeight": 400
+    "globalWidth": 350,
+    "globalHeight": 350
   },
   "bgRemoval": {
     "enabled": true,
     "keyColor": "#ff00ff",
-    "threshold": "69",
-    "erode": "2"
+    "threshold": "37",
+    "erode": "3"
   },
   "sourceFilename": "east.png",
   "anchorOverrides": {
     "0": {
-      "x": 115.49609375,
-      "y": 210.25
+      "x": 95.5,
+      "y": 164.5
     },
     "1": {
-      "x": 114.49609375,
-      "y": 220.25
+      "x": 90.5,
+      "y": 163.5
     },
     "2": {
-      "x": 123.49609375,
-      "y": 209.25
+      "x": 92.5,
+      "y": 160.5
     },
     "3": {
-      "x": 111.49609375,
-      "y": 215.25
+      "x": 86.5,
+      "y": 161.5
     },
     "4": {
-      "x": 110.49609375,
-      "y": 217.25
+      "x": 86.5,
+      "y": 159.5
     }
   },
   "frameOverrides": {
     "0": {
-      "x": 81,
-      "y": 207
+      "x": 55,
+      "y": 144
     },
     "1": {
-      "x": 336,
-      "y": 196
+      "x": 245,
+      "y": 145
     },
     "2": {
-      "x": 571,
-      "y": 208
+      "x": 427,
+      "y": 150
     },
     "3": {
-      "x": 832,
-      "y": 201
+      "x": 622,
+      "y": 149
     },
     "4": {
-      "x": 1087,
-      "y": 199
+      "x": 811,
+      "y": 148
     }
   }
 }
