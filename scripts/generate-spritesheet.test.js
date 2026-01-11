@@ -178,7 +178,7 @@ describe('Sprite Sheet Generator', () => {
       const result = await validateFrames(metadata, pixelLabDir);
 
       expect(result.framePaths).toBeDefined();
-      expect(result.framePaths.length).toBe(8); // 8 directions
+      expect(result.framePaths.length).toBe(4); // 4 directions
       expect(result.framePaths[0].direction).toBe('south');
       expect(result.framePaths[0].frames).toHaveLength(6); // 6 frames per direction
     });
@@ -199,7 +199,7 @@ describe('Sprite Sheet Generator', () => {
       const image = sharp(outputSpritePath);
       const imageMetadata = await image.metadata();
       expect(imageMetadata.width).toBe(576); // 6 columns * 96px
-      expect(imageMetadata.height).toBe(768); // 8 rows * 96px
+      expect(imageMetadata.height).toBe(384); // 4 rows * 96px
     });
 
     test('WhenGeneratingSheet_ShouldPlaceFramesInCorrectGrid', async () => {
@@ -234,13 +234,9 @@ describe('Sprite Sheet Generator', () => {
     test('WhenCalled_ShouldCreateMetadataFile', async () => {
       const expectedDirections = [
         'south',
-        'south-east',
         'east',
-        'north-east',
         'north',
-        'north-west',
-        'west',
-        'south-west'
+        'west'
       ];
 
       await generateMetadata(outputMetadataPath, expectedDirections, 96, 96, 6);
@@ -254,7 +250,7 @@ describe('Sprite Sheet Generator', () => {
       expect(content.frameWidth).toBe(96);
       expect(content.frameHeight).toBe(96);
       expect(content.columns).toBe(6);
-      expect(content.rows).toBe(8);
+      expect(content.rows).toBe(4);
       expect(content.directions).toEqual(expectedDirections);
     });
   });
@@ -275,11 +271,11 @@ describe('Sprite Sheet Generator', () => {
       const image = sharp(outputSpritePath);
       const imageMetadata = await image.metadata();
       expect(imageMetadata.width).toBe(576);
-      expect(imageMetadata.height).toBe(768);
+      expect(imageMetadata.height).toBe(384);
 
       // Verify metadata content
       const metadataContent = JSON.parse(await fs.readFile(outputMetadataPath, 'utf-8'));
-      expect(metadataContent.directions).toHaveLength(8);
+      expect(metadataContent.directions).toHaveLength(4);
     });
 
     test('WhenMetadataFileMissing_ShouldThrowError', async () => {

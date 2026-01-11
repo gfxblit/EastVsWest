@@ -6,10 +6,12 @@ The workflow uses AI-generated images as raw input, which are then processed thr
 ## Workflow
 
 1.  **Generate**: Use the prompts in this file (or the `.prompt.md` sidecars) to generate raw images.
+    -   **Consistency Note**: Ensure input images have approximately the same resolution/scale before processing. Significant differences can cause weird scaling artifacts when switching between animations (e.g., walk vs. slash).
 2.  **Organize**: Save raw images in `art-src/[action]/[direction].png`.
 3.  **Process**: Load the raw image into `tools/frame-tool/index.html`.
     -   Set global width/height (e.g., 256x256).
     -   Align frames and set anchor points.
+    -   **Anchor Note**: Use the same anchor point across *all* animations for a character. This ensures the character doesn't "jump" or shift positions when transitioning from walking to attacking.
     -   Enable "Remove Background".
     -   **Export**: Save the `.strip.png` and `.strip.json` in the same directory.
     -   **Save Config**: Save the project as `[direction].config.json`.
@@ -40,7 +42,10 @@ The workflow uses AI-generated images as raw input, which are then processed thr
 ## Slash Animation (`slash/`)
 | Direction | Source | Prompt | Tool Config | Result |
 |-----------|--------|--------|-------------|--------|
-| East (1)  | (Pending)               | [md](slash/east.prompt.md)   | -                                 | -                 |
+| South (0) | [png](slash/south.png) | [md](slash/south.prompt.md) | [json](slash/south.config.json) | `south.strip.png` |
+| East (1)  | [png](slash/east.png)  | [md](slash/east.prompt.md)  | [json](slash/east.config.json)  | `east.strip.png`  |
+| North (2) | [png](slash/north.png) | [md](slash/north.prompt.md) | [json](slash/north.config.json) | `north.strip.png` |
+| West (3)  | (Flipped East)         | -                           | -                                | -                 |
 
 ---
 
