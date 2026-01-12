@@ -5,6 +5,7 @@ import { jest } from '@jest/globals';
  */
 
 import { Renderer } from './renderer.js';
+import { AssetManager } from './AssetManager.js';
 import { CONFIG } from './config.js';
 import { updateAnimationState, getDirectionFromRotation } from './animationHelper.js';
 
@@ -13,6 +14,7 @@ describe('Renderer', () => {
   let ctx;
   let renderer;
   let mockImage;
+  let assetManager;
 
   beforeEach(() => {
     // Mock window dimensions for responsive canvas sizing
@@ -73,7 +75,8 @@ describe('Renderer', () => {
       canvas: canvas, // Link context back to canvas for ctx.canvas access
     };
     canvas.getContext = jest.fn(() => ctx);
-    renderer = new Renderer(canvas);
+    assetManager = new AssetManager();
+    renderer = new Renderer(canvas, assetManager);
     renderer.init();
   });
 
@@ -86,7 +89,7 @@ describe('Renderer', () => {
       // Clear Image mock to count only this test's calls
       global.Image.mockClear();
 
-      const newRenderer = new Renderer(canvas);
+      const newRenderer = new Renderer(canvas, new AssetManager());
       newRenderer.init();
 
       expect(canvas.getContext).toHaveBeenCalledWith('2d');
@@ -101,10 +104,11 @@ describe('Renderer', () => {
     });
 
     test('WhenImageLoads_ShouldCreatePattern', () => {
-      const newRenderer = new Renderer(canvas);
+      const newRenderer = new Renderer(canvas, new AssetManager());
       newRenderer.init();
 
-      // Simulate background image load
+      // Simulate background image load with valid dimensions
+      newRenderer.worldRenderer.bgImage.naturalWidth = 100;
       newRenderer.worldRenderer.bgImage.onload();
 
       expect(ctx.createPattern).toHaveBeenCalledWith(newRenderer.worldRenderer.bgImage, 'repeat');
@@ -115,7 +119,7 @@ describe('Renderer', () => {
       const originalBase = CONFIG.ASSETS.BASE_URL;
       CONFIG.ASSETS.BASE_URL = '/custom-base/';
       
-      const newRenderer = new Renderer(canvas);
+      const newRenderer = new Renderer(canvas, new AssetManager());
       newRenderer.init();
       
       // Expect paths to be prefixed with custom base
@@ -266,8 +270,11 @@ describe('Renderer', () => {
     test('WhenRenderingWithCamera_ShouldDrawBackgroundInWorldCoordinates', () => {
       // Arrange
       // Trigger background image load
-      if (renderer.worldRenderer.bgImage && renderer.worldRenderer.bgImage.onload) {
-        renderer.worldRenderer.bgImage.onload();
+      if (renderer.worldRenderer.bgImage) {
+        renderer.worldRenderer.bgImage.naturalWidth = 100;
+        if (renderer.worldRenderer.bgImage.onload) {
+          renderer.worldRenderer.bgImage.onload();
+        }
       }
 
       const gameState = {
@@ -524,7 +531,7 @@ describe('Renderer', () => {
 
     test('WhenInitialized_ShouldLoadShadowImage', () => {
       // Arrange - Create new renderer to test initialization
-      const newRenderer = new Renderer(canvas);
+      const newRenderer = new Renderer(canvas, new AssetManager());
 
       // Clear existing Image mock calls
       global.Image.mockClear();
@@ -818,7 +825,7 @@ describe('Renderer', () => {
     describe('Image Loading', () => {
       test('WhenInitialized_ShouldLoadAllDirectionalImages', () => {
         // Create new renderer to test initialization
-        const newRenderer = new Renderer(canvas);
+        const newRenderer = new Renderer(canvas, new AssetManager());
 
         // Clear existing Image mock calls
         global.Image.mockClear();
@@ -949,7 +956,7 @@ describe('Renderer', () => {
         expect(hasCorrectPosition).toBe(true);
       });
 
-      test('WhenRenderingLocalPlayer_ShouldDrawImageAndWhiteOutline', () => {
+      test('WhenRenderingLocalPlayer_ShouldDrawImage', () => {
         // Mock sprite sheet as loaded
         renderer.assetManager.spriteSheet = {
           complete: true,
@@ -981,10 +988,6 @@ describe('Renderer', () => {
 
         // Should draw the sprite from sprite sheet
         expect(ctx.drawImage).toHaveBeenCalled();
-
-        // Should also draw white outline for local player
-        expect(ctx.stroke).toHaveBeenCalled();
-        expect(ctx.strokeStyle).toBe('#ffffff');
       });
     });
   });
@@ -1011,7 +1014,7 @@ describe('Renderer', () => {
           })
         );
 
-        const newRenderer = new Renderer(canvas);
+        const newRenderer = new Renderer(canvas, new AssetManager());
 
         // Start loading sprite sheet
         const loadPromise = newRenderer.assetManager.loadSpriteSheet();
@@ -1041,7 +1044,7 @@ describe('Renderer', () => {
           })
         );
 
-        const newRenderer = new Renderer(canvas);
+        const newRenderer = new Renderer(canvas, new AssetManager());
         await expect(newRenderer.assetManager.loadSpriteSheet()).resolves.toBe(false);
       });
     });

@@ -12,6 +12,7 @@ import { Network } from './network.js';
 import { SessionPlayersSnapshot } from './SessionPlayersSnapshot.js';
 import { Camera } from './camera.js';
 import { createClient } from '@supabase/supabase-js';
+import { AssetManager } from './AssetManager.js';
 
 // Initialize Eruda for mobile debugging (console, network, elements inspector)
 // Only load in development/preview builds, or when ?debug=true query parameter is present
@@ -45,6 +46,7 @@ class App {
     this.animationFrameId = null;
     this.lastWeaponId = null;
     this.lastArmorId = null;
+    this.assetManager = new AssetManager();
   }
 
   async init() {
@@ -54,6 +56,18 @@ class App {
     this.ui = new UI();
     this.ui.init();
     this.setupHandlers();
+
+    // Load assets
+    try {
+        await this.loadAssets();
+    } catch (e) {
+        console.error('Failed to load assets:', e);
+        this.showError('Failed to load game assets. Please refresh.');
+        return;
+    }
+    
+    // Show intro screen
+    this.ui.showScreen('intro');
 
     try {
       console.log('Creating Supabase client...');
@@ -164,6 +178,70 @@ class App {
       console.error('Error during app initialization:', err);
       this.showError(`Initialization error: ${err.message}`);
     }
+  }
+
+  async loadAssets() {
+    console.log('Starting asset loading...');
+    const manifest = [];
+    const { ASSETS, WEAPONS } = CONFIG;
+    const baseUrl = ASSETS.BASE_URL.endsWith('/') ? ASSETS.BASE_URL : `${ASSETS.BASE_URL}/`;
+    const weaponsBaseUrl = ASSETS.WEAPONS_BASE_URL;
+
+    // Spritesheets
+    manifest.push({ 
+        key: 'walk', 
+        src: ASSETS.SPRITE_SHEET.PATH, 
+        metadata: ASSETS.SPRITE_SHEET.METADATA, 
+        type: 'spritesheet' 
+    });
+    manifest.push({
+        key: 'slash',
+        src: ASSETS.PLAYER_SLASH.PATH,
+        metadata: ASSETS.PLAYER_SLASH.METADATA,
+        type: 'spritesheet'
+    });
+    
+    // Death spritesheet
+    if (ASSETS.PLAYER_DEATH && ASSETS.PLAYER_DEATH.PATH) {
+         manifest.push({
+             key: 'death',
+             src: ASSETS.PLAYER_DEATH.PATH,
+             type: 'image'
+         });
+    }
+
+    // VFX
+    if (ASSETS.VFX) {
+        Object.values(ASSETS.VFX).forEach(group => {
+            Object.values(group).forEach(path => {
+                manifest.push({ src: path, type: 'image' });
+            });
+        });
+    }
+
+    // Weapons
+    if (WEAPONS) {
+        Object.values(WEAPONS).forEach(weapon => {
+            if (weapon.icon) {
+                manifest.push({ 
+                    src: `${weaponsBaseUrl}${weapon.icon}`, 
+                    type: 'image' 
+                });
+            }
+        });
+    }
+
+    // Backgrounds
+    manifest.push({ src: 'game-background.png', type: 'image' });
+    manifest.push({ src: 'lobby-background.png', type: 'image' });
+
+    console.log(`Loading ${manifest.length} assets...`);
+    
+    await this.assetManager.preloadAssets(manifest, (progress) => {
+        this.ui.updateLoading(progress);
+    });
+    
+    console.log('Assets loaded');
   }
 
   setupHandlers() {
@@ -501,7 +579,7 @@ class App {
       return;
     }
 
-    this.renderer = new Renderer(canvas);
+    this.renderer = new Renderer(canvas, this.assetManager);
     this.game = new Game();
     this.input = new Input();
 

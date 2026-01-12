@@ -12,11 +12,11 @@ import { LootRenderer } from './LootRenderer.js';
 import { UIRenderer } from './UIRenderer.js';
 
 export class Renderer {
-  constructor(canvas) {
+  constructor(canvas, assetManager) {
     this.canvas = canvas;
     this.ctx = null;
 
-    this.assetManager = new AssetManager();
+    this.assetManager = assetManager;
     this.worldRenderer = new WorldRenderer(this.assetManager);
     this.playerRenderer = new PlayerRenderer(this.assetManager);
     this.lootRenderer = new LootRenderer(this.assetManager);
@@ -46,14 +46,6 @@ export class Renderer {
     this.worldRenderer.init(this.ctx);
     this.playerRenderer.init();
     this.lootRenderer.init();
-
-    // Load sprite sheets for animations
-    Promise.all([
-      this.assetManager.loadSpriteSheet('walk', CONFIG.ASSETS.SPRITE_SHEET.METADATA, CONFIG.ASSETS.SPRITE_SHEET.PATH),
-      this.assetManager.loadSpriteSheet('slash', CONFIG.ASSETS.PLAYER_SLASH.METADATA, CONFIG.ASSETS.PLAYER_SLASH.PATH)
-    ]).catch(err => {
-        console.warn('Failed to load sprite sheets, using fallback rendering:', err.message);
-    });
     
     console.log('Renderer initialized');
   }
