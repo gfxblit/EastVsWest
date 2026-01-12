@@ -642,12 +642,16 @@ button:active {
 /* Loading Screen */
 #loading-screen {
   background-color: #2d1b00;
-  display: flex;
+  display: none;
   flex-direction: column;
   justify-content: center;
   align-items: center;
   z-index: 10000;
   /* Pixel art bg pattern if available, or just solid color */
+}
+
+#loading-screen.active {
+  display: flex;
 }
 
 #loading-bar-container {
