@@ -17,6 +17,7 @@ export class PlayerRenderer {
             left: null,
             right: null
         };
+        this.deathImage = null;
         this.deadPlayers = new Map();
     }
 
@@ -37,11 +38,7 @@ export class PlayerRenderer {
 
         // Load death sprite sheet
         if (CONFIG.ASSETS.PLAYER_DEATH) {
-            this.assetManager.loadSpriteSheet(
-                'death',
-                CONFIG.ASSETS.PLAYER_DEATH.METADATA,
-                CONFIG.ASSETS.PLAYER_DEATH.PATH
-            );
+            this.deathImage = this.assetManager.createImage(CONFIG.ASSETS.PLAYER_DEATH.PATH);
         }
     }
 
@@ -229,10 +226,7 @@ export class PlayerRenderer {
     }
 
     renderDeath(ctx, player, x, y, size) {
-        const spriteSheet = this.assetManager.getSpriteSheet('death');
-        const metadata = this.assetManager.getSpriteSheetMetadata('death');
-
-        if (!spriteSheet || !spriteSheet.complete || !metadata) {
+        if (!this.deathImage || !this.deathImage.complete || this.deathImage.naturalWidth === 0) {
              // Fallback if not loaded
              return;
         }
@@ -244,23 +238,24 @@ export class PlayerRenderer {
         const deathTime = this.deadPlayers.get(player.id);
         const elapsed = (Date.now() - deathTime) / 1000;
         const fps = CONFIG.ANIMATION.DEATH_FPS || 10;
-        const totalFrames = metadata.columns;
+        
+        const totalFrames = CONFIG.ANIMATION.DEATH_FRAME_COUNT || 5;
+        const frameWidth = this.deathImage.naturalWidth / totalFrames;
+        const frameHeight = this.deathImage.naturalHeight;
         
         let currentFrame = Math.floor(elapsed * fps);
         if (currentFrame >= totalFrames) {
             currentFrame = totalFrames - 1;
         }
 
-        // Assuming single row for direction-agnostic death
+        // Assuming single row for direction-agnostic death for now
+        // TODO: Add direction support if needed by adding rows to the sheet
         const row = 0; 
-        const frameWidth = metadata.frameWidth;
-        const frameHeight = metadata.frameHeight;
-
         const sourceX = currentFrame * frameWidth;
         const sourceY = row * frameHeight;
 
         ctx.drawImage(
-            spriteSheet,
+            this.deathImage,
             sourceX,
             sourceY,
             frameWidth,

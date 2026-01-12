@@ -8,29 +8,37 @@ describe('PlayerRenderer Death Animation', () => {
     let mockCtx;
     let originalPlayerDeathConfig;
     let originalDeathFps;
+    let originalDeathFrameCount;
 
     beforeAll(() => {
         // Backup config
         originalPlayerDeathConfig = CONFIG.ASSETS.PLAYER_DEATH;
         originalDeathFps = CONFIG.ANIMATION.DEATH_FPS;
+        originalDeathFrameCount = CONFIG.ANIMATION.DEATH_FRAME_COUNT;
 
         // Patch config
         CONFIG.ASSETS.PLAYER_DEATH = {
-            PATH: 'death_sheet.png',
-            METADATA: 'death_sheet.json'
+            PATH: 'death_sheet.png'
         };
         CONFIG.ANIMATION.DEATH_FPS = 10;
+        CONFIG.ANIMATION.DEATH_FRAME_COUNT = 4;
     });
 
     afterAll(() => {
         // Restore config
         CONFIG.ASSETS.PLAYER_DEATH = originalPlayerDeathConfig;
         CONFIG.ANIMATION.DEATH_FPS = originalDeathFps;
+        CONFIG.ANIMATION.DEATH_FRAME_COUNT = originalDeathFrameCount;
     });
 
     beforeEach(() => {
         mockAssetManager = {
-            createImage: jest.fn().mockReturnValue({ complete: true, naturalWidth: 100 }),
+            createImage: jest.fn().mockImplementation((src) => ({ 
+                complete: true, 
+                naturalWidth: 256, 
+                naturalHeight: 64,
+                src: src
+            })),
             getSpriteSheet: jest.fn(),
             getSpriteSheetMetadata: jest.fn(),
             loadSpriteSheet: jest.fn().mockResolvedValue(true)
@@ -47,19 +55,15 @@ describe('PlayerRenderer Death Animation', () => {
         renderer = new PlayerRenderer(mockAssetManager);
     });
 
-    test('should initialize death sprite sheet', () => {
-        // We expect init() to trigger loading of the death sprite sheet via loadSpriteSheet
+    test('should initialize death sprite image directly', () => {
         renderer.init();
-        
-        expect(mockAssetManager.loadSpriteSheet).toHaveBeenCalledWith(
-            'death',
-            CONFIG.ASSETS.PLAYER_DEATH.METADATA,
-            CONFIG.ASSETS.PLAYER_DEATH.PATH
-        );
+        expect(mockAssetManager.createImage).toHaveBeenCalledWith('death_sheet.png');
     });
 
-    test('should render death animation when health is <= 0', () => {
+    test('should render death animation when health is <= 0 using inferred dimensions', () => {
+        // Setup renderer with mocked image response handled in beforeEach
         renderer.init();
+        
         const player = {
             id: 'p1',
             x: 100,
@@ -70,20 +74,25 @@ describe('PlayerRenderer Death Animation', () => {
             animationState: { currentFrame: 0, lastDirection: 0 }
         };
 
-        // Mock death sprite sheet availability
-        const mockDeathSheet = { complete: true, width: 100, src: 'death_sheet.png' };
-        const mockMetadata = { frameWidth: 64, frameHeight: 64, columns: 4 };
+        // We need to capture the image object created in init
+        // Since we mocked createImage to return a specific object based on input, 
+        // and init calls it with 'death_sheet.png' (from our CONFIG mock),
+        // we can assume the renderer stored that result.
+        // However, since we can't easily access the private property or the exact return value 
+        // without spying strictly, we'll verify the drawImage call which passes the image.
 
-        mockAssetManager.getSpriteSheet.mockReturnValue(mockDeathSheet);
-        mockAssetManager.getSpriteSheetMetadata.mockReturnValue(mockMetadata);
-        
         renderer.render(mockCtx, player, false);
 
-        // Expect drawImage to be called with our mock death sheet
+        // Expected frame width calculation:
+        // naturalWidth (256) / DEATH_FRAME_COUNT (4) = 64
+        const expectedFrameWidth = 64;
+        const expectedFrameHeight = 64; // naturalHeight
+
+        // Expect drawImage to be called with the image and calculated source rect
         expect(mockCtx.drawImage).toHaveBeenCalledWith(
-            mockDeathSheet,
-            expect.any(Number), expect.any(Number), // source x, y
-            expect.any(Number), expect.any(Number), // source w, h
+            expect.objectContaining({ src: 'death_sheet.png' }), // The image object
+            0, 0, // source x, y (first frame)
+            expectedFrameWidth, expectedFrameHeight, // source w, h
             expect.any(Number), expect.any(Number), // dest x, y
             expect.any(Number), expect.any(Number)  // dest w, h
         );

@@ -1,0 +1,1 @@
+Based on the reference picture, generate a 1-row spritesheet containing exactly 5 frames of a death animation. The sequence must show a logical death cycle: initial living frame, starting to decay, decomposition, and compost. Maintain the exact pixel scale, color palette, and head/body proportions from the reference image. Keep the background solid magenta (#FF00FF).

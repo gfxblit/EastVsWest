@@ -1,9 +1,0 @@
-{
-  "frameWidth": 256,
-  "frameHeight": 256,
-  "columns": 4,
-  "rows": 1,
-  "directions": [
-    "all"
-  ]
-}
