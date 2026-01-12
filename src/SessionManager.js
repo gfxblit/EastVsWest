@@ -210,9 +210,41 @@ export class SessionManager {
 
         if (playerCount < minPlayers) {
             const botsNeeded = minPlayers - playerCount;
+            const botRecords = [];
+            const weaponIds = Object.keys(CONFIG.WEAPONS);
             
             for (let i = 1; i <= botsNeeded; i++) {
-                await this.addBot(i);
+                const botId = crypto.randomUUID();
+                const botName = `Bot-${i}`;
+                
+                // Random weapon selection with safety fallback
+                const randomWeapon = weaponIds.length > 0
+                    ? CONFIG.WEAPONS[weaponIds[Math.floor(Math.random() * weaponIds.length)]].id
+                    : 'fist';
+
+                // Spawn bots around the center with some offset
+                const offsetX = (Math.random() - 0.5) * 400;
+                const offsetY = (Math.random() - 0.5) * 400;
+
+                botRecords.push({
+                    session_id: this.network.sessionId,
+                    player_id: botId,
+                    player_name: botName,
+                    is_host: false,
+                    is_bot: true,
+                    position_x: CONFIG.WORLD.WIDTH / 2 + offsetX,
+                    position_y: CONFIG.WORLD.HEIGHT / 2 + offsetY,
+                    equipped_weapon: randomWeapon,
+                    health: 100
+                });
+            }
+
+            const { error: insertError } = await this.supabase
+                .from('session_players')
+                .insert(botRecords);
+
+            if (insertError) {
+                console.error('Failed to add bots:', insertError.message);
             }
         }
 
@@ -228,37 +260,6 @@ export class SessionManager {
         this.network.send('game_start', {
             timestamp: Date.now()
         });
-    }
-
-    async addBot(botNumber) {
-        const botId = crypto.randomUUID();
-        const botName = `Bot-${botNumber}`;
-        
-        // Random weapon selection
-        const weaponIds = Object.keys(CONFIG.WEAPONS);
-        const randomWeapon = CONFIG.WEAPONS[weaponIds[Math.floor(Math.random() * weaponIds.length)]].id;
-
-        // Spawn bots around the center with some offset
-        const offsetX = (Math.random() - 0.5) * 400;
-        const offsetY = (Math.random() - 0.5) * 400;
-
-        const { error } = await this.supabase
-            .from('session_players')
-            .insert({
-                session_id: this.network.sessionId,
-                player_id: botId,
-                player_name: botName,
-                is_host: false,
-                is_bot: true,
-                position_x: CONFIG.WORLD.WIDTH / 2 + offsetX,
-                position_y: CONFIG.WORLD.HEIGHT / 2 + offsetY,
-                equipped_weapon: randomWeapon,
-                health: 100
-            });
-
-        if (error) {
-            console.error(`Failed to add bot ${botName}:`, error.message);
-        }
     }
 
     generateJoinCode() {

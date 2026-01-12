@@ -65,8 +65,8 @@ export class BotController {
     const moveX = Math.cos(angle) * speed * deltaTime;
     const moveY = Math.sin(angle) * speed * deltaTime;
 
-    const newX = bot.position_x + moveX;
-    const newY = bot.position_y + moveY;
+    const newX = Math.max(0, Math.min(CONFIG.WORLD.WIDTH, bot.position_x + moveX));
+    const newY = Math.max(0, Math.min(CONFIG.WORLD.HEIGHT, bot.position_y + moveY));
 
     // Broadcast movement (Host is authoritative for bots)
     // SessionPlayersSnapshot listens to these broadcasts and updates locally
@@ -91,11 +91,8 @@ export class BotController {
     const moveX = Math.cos(this.wanderAngle) * speed * deltaTime;
     const moveY = Math.sin(this.wanderAngle) * speed * deltaTime;
 
-    const newX = bot.position_x + moveX;
-    const newY = bot.position_y + moveY;
-    
-    // Keep within world bounds (simple check)
-    // TODO: Keep within conflict zone?
+    const newX = Math.max(0, Math.min(CONFIG.WORLD.WIDTH, bot.position_x + moveX));
+    const newY = Math.max(0, Math.min(CONFIG.WORLD.HEIGHT, bot.position_y + moveY));
     
     this.network.broadcastPlayerStateUpdate({
         player_id: this.botId,

@@ -13,7 +13,7 @@ describe('Bot Integration', () => {
   let hostUser;
 
   if (!supabaseUrl || !supabaseAnonKey) {
-    test.only('Supabase environment variables not set, skipping integration tests', () => {
+    test('Supabase environment variables not set, skipping integration tests', () => {
       console.warn('Set SUPABASE_URL and SUPABASE_ANON_KEY to run integration tests.');
       expect(true).toBe(true);
     });
