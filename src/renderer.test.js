@@ -93,8 +93,8 @@ describe('Renderer', () => {
       expect(canvas.width).toBe(CONFIG.CANVAS.WIDTH);
       expect(canvas.height).toBe(CONFIG.CANVAS.HEIGHT);
 
-      // Should load background image + shadow image + 4 slash images + 4 thrust images + 5 weapon icons
-      expect(global.Image).toHaveBeenCalledTimes(15);
+      // Should load background image + shadow image + 4 slash images + 4 thrust images + 4 blunt images + 5 weapon icons
+      expect(global.Image).toHaveBeenCalledTimes(19);
       expect(newRenderer.worldRenderer.bgImage.src).toBe('/game-background.png');
       expect(newRenderer.playerRenderer.shadowImage.src).toBe('/shadow.png');
     });
@@ -533,8 +533,8 @@ describe('Renderer', () => {
 
       // Assert
 
-      // Should create shadow image + background image + slash images + thrust images + weapon icons
-      expect(global.Image).toHaveBeenCalledTimes(15);
+      // Should create shadow image + background image + slash images + thrust images + blunt images + weapon icons
+      expect(global.Image).toHaveBeenCalledTimes(19);
       expect(newRenderer.playerRenderer.shadowImage).toBeDefined();
       expect(newRenderer.playerRenderer.shadowImage.src).toBe('/shadow.png');
     });
@@ -824,8 +824,8 @@ describe('Renderer', () => {
 
         newRenderer.init();
 
-        // Should create background image + shadow image + slash images + thrust images + weapon icons
-        expect(global.Image).toHaveBeenCalledTimes(15);
+      // Should create shadow image + background image + slash images + thrust images + blunt images + weapon icons
+      expect(global.Image).toHaveBeenCalledTimes(19);
       });
 
     });
@@ -1269,8 +1269,9 @@ describe('Renderer', () => {
       // Mock images as loaded
       const directions = ['up', 'down', 'left', 'right'];
       directions.forEach(dir => {
-        renderer.playerRenderer.slashImages[dir] = { complete: true, naturalWidth: 64, naturalHeight: 64 };
-        renderer.playerRenderer.thrustImages[dir] = { complete: true, naturalWidth: 64, naturalHeight: 64 };
+        renderer.playerRenderer.slashImages[dir] = { complete: true, naturalWidth: 320, naturalHeight: 64 };
+        renderer.playerRenderer.thrustImages[dir] = { complete: true, naturalWidth: 320, naturalHeight: 64 };
+        renderer.playerRenderer.bluntImages[dir] = { complete: true, naturalWidth: 320, naturalHeight: 64 };
       });
     });
 
@@ -1284,7 +1285,7 @@ describe('Renderer', () => {
         equipped_weapon: 'battleaxe', // Slashing weapon
       };
 
-      renderer.playerRenderer.renderSlashAnimation(ctx, player);
+      renderer.playerRenderer.renderAttackVFX(ctx, player);
 
       expect(ctx.drawImage).toHaveBeenCalled();
       const firstCall = ctx.drawImage.mock.calls[0];
@@ -1301,11 +1302,28 @@ describe('Renderer', () => {
         equipped_weapon: 'spear', // Piercing weapon
       };
 
-      renderer.playerRenderer.renderSlashAnimation(ctx, player);
+      renderer.playerRenderer.renderAttackVFX(ctx, player);
 
       expect(ctx.drawImage).toHaveBeenCalled();
       const firstCall = ctx.drawImage.mock.calls[0];
       expect(firstCall[0]).toBe(renderer.playerRenderer.thrustImages.right);
+    });
+
+    test('WhenPlayerAttacksWithBluntWeapon_ShouldUseBluntImages', () => {
+      const player = {
+        x: 100,
+        y: 100,
+        rotation: Math.PI / 2, // East
+        isAttacking: true,
+        attackAnimTime: CONFIG.COMBAT.ATTACK_ANIMATION_DURATION_SECONDS,
+        equipped_weapon: 'fist', // Blunt weapon
+      };
+
+      renderer.playerRenderer.renderAttackVFX(ctx, player);
+
+      expect(ctx.drawImage).toHaveBeenCalled();
+      const firstCall = ctx.drawImage.mock.calls[0];
+      expect(firstCall[0]).toBe(renderer.playerRenderer.bluntImages.right);
     });
 
     test('WhenPlayerAttacksFacingNorth_ShouldUseUpImages', () => {
@@ -1318,7 +1336,7 @@ describe('Renderer', () => {
         equipped_weapon: 'spear',
       };
 
-      renderer.playerRenderer.renderSlashAnimation(ctx, player);
+      renderer.playerRenderer.renderAttackVFX(ctx, player);
 
       expect(ctx.drawImage).toHaveBeenCalled();
       const firstCall = ctx.drawImage.mock.calls[0];
@@ -1341,7 +1359,7 @@ describe('Renderer', () => {
           equipped_weapon: 'spear',
         };
 
-        renderer.playerRenderer.renderSlashAnimation(ctx, player);
+        renderer.playerRenderer.renderAttackVFX(ctx, player);
         
         const vfxOffset = CONFIG.COMBAT.THRUST_VFX_OFFSET;
         const expectedX = player.x + vfxOffset.x - halfDrawWidth;
@@ -1362,7 +1380,7 @@ describe('Renderer', () => {
           equipped_weapon: 'spear',
         };
 
-        renderer.playerRenderer.renderSlashAnimation(ctx, player);
+        renderer.playerRenderer.renderAttackVFX(ctx, player);
         
         const vfxOffset = CONFIG.COMBAT.THRUST_VFX_OFFSET;
         // Right (x, y) -> Up (y, -x)
@@ -1384,7 +1402,7 @@ describe('Renderer', () => {
           equipped_weapon: 'spear',
         };
 
-        renderer.playerRenderer.renderSlashAnimation(ctx, player);
+        renderer.playerRenderer.renderAttackVFX(ctx, player);
         
         const vfxOffset = CONFIG.COMBAT.THRUST_VFX_OFFSET;
         // Right (x, y) -> Left (-x, y) [Reflected lateral]
@@ -1406,7 +1424,7 @@ describe('Renderer', () => {
           equipped_weapon: 'spear',
         };
 
-        renderer.playerRenderer.renderSlashAnimation(ctx, player);
+        renderer.playerRenderer.renderAttackVFX(ctx, player);
         
         const vfxOffset = CONFIG.COMBAT.THRUST_VFX_OFFSET;
         // Right (x, y) -> Down (-y, x)

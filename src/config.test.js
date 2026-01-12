@@ -39,6 +39,7 @@ describe('CONFIG', () => {
 
     expect(CONFIG.WEAPONS.FIST).toBeDefined();
     expect(CONFIG.WEAPONS.FIST.faction).toBe('east');
+    expect(CONFIG.WEAPONS.FIST.vfxType).toBe('blunt');
   });
 
   test('should have armor types defined', () => {

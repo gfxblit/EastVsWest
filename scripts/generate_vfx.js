@@ -8,10 +8,11 @@ const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
 const PROJECT_ROOT = path.resolve(__dirname, '..');
 
-// Default configuration
+// Default configuration (empty to force user input)
 const DEFAULT_CONFIG = {
-  source: path.join(PROJECT_ROOT, 'public/assets/vfx/slash-original.png'),
-  output: path.join(PROJECT_ROOT, 'public/assets/vfx'),
+  source: null,
+  output: null,
+  prefix: null,
   width: 64,
   height: 64,
   frames: 5,
@@ -23,36 +24,68 @@ function parseArgs() {
   const args = process.argv.slice(2);
   const config = { ...DEFAULT_CONFIG };
 
-  for (let i = 0; i < args.length; i++) {
-    const arg = args[i];
-    if (arg === '--source' && args[i + 1]) {
-      config.source = path.resolve(process.cwd(), args[++i]);
-    } else if (arg === '--output' && args[i + 1]) {
-      config.output = path.resolve(process.cwd(), args[++i]);
-    } else if (arg === '--width' && args[i + 1]) {
-      config.width = parseInt(args[++i], 10);
-    } else if (arg === '--height' && args[i + 1]) {
-      config.height = parseInt(args[++i], 10);
-    } else if (arg === '--frames' && args[i + 1]) {
-      config.frames = parseInt(args[++i], 10);
-    } else if (arg === '--input-layout' && args[i + 1]) {
-      config.inputLayout = args[++i].toLowerCase();
-    } else if (arg === '--help' || arg === '-h') {
-      console.log(`
+  if (args.length === 0 || args.includes('--help') || args.includes('-h')) {
+    console.log(`
 Usage: node generate_vfx.js [options]
 
-Options:
-  --source <path>        Path to source image (default: public/assets/vfx/slash-original.png)
-  --output <path>        Output directory (default: public/assets/vfx)
+Required Options:
+  --source <path>        Path to source image (e.g., public/assets/vfx/my-effect.png)
+  --output <path>        Output directory (e.g., public/assets/vfx)
+
+Optional Options:
+  --prefix <string>      Output filename prefix (defaults to source filename)
   --width <px>           Frame width (default: 64)
   --height <px>          Frame height (default: 64)
   --frames <count>       Number of frames (default: 5)
   --input-layout <h|v>   Input layout: h=horizontal, v=vertical (default: h)
   --help, -h             Show this help message
+
+Example:
+  node scripts/generate_vfx.js --source public/assets/raw/slash-right.png --output public/assets/vfx --prefix slash --width 64 --height 64 --frames 5
 `);
-      process.exit(0);
+    process.exit(0);
+  }
+
+  for (let i = 0; i < args.length; i++) {
+    const arg = args[i];
+    let key = arg;
+    let value = null;
+
+    if (arg.startsWith('--') && arg.includes('=')) {
+      const parts = arg.split('=');
+      key = parts[0];
+      value = parts.slice(1).join('=');
+    } else if (arg.startsWith('--') && args[i + 1] && !args[i + 1].startsWith('--')) {
+      value = args[++i];
+    }
+
+    if (key === '--source' && value) {
+      config.source = path.resolve(process.cwd(), value);
+    } else if (key === '--output' && value) {
+      config.output = path.resolve(process.cwd(), value);
+    } else if (key === '--prefix' && value) {
+      config.prefix = value;
+    } else if (key === '--width' && value) {
+      config.width = parseInt(value, 10);
+    } else if (key === '--height' && value) {
+      config.height = parseInt(value, 10);
+    } else if (key === '--frames' && value) {
+      config.frames = parseInt(value, 10);
+    } else if (key === '--input-layout' && value) {
+      config.inputLayout = value.toLowerCase();
     }
   }
+
+  // Validation
+  if (!config.source) {
+    console.error('Error: --source is required');
+    process.exit(1);
+  }
+  if (!config.output) {
+    console.error('Error: --output is required');
+    process.exit(1);
+  }
+
   return config;
 }
 
@@ -64,6 +97,7 @@ const FRAME_WIDTH = config.width;
 const FRAME_HEIGHT = config.height;
 const NUM_FRAMES = config.frames;
 const INPUT_LAYOUT = config.inputLayout;
+const PREFIX = config.prefix || path.basename(SOURCE_FILE, path.extname(SOURCE_FILE)).replace('-original', '');
 
 // Output is always horizontal
 const SHEET_WIDTH = FRAME_WIDTH * NUM_FRAMES;
@@ -121,34 +155,33 @@ async function main() {
     process.exit(1);
   }
   
-  const baseName = path.basename(SOURCE_FILE, path.extname(SOURCE_FILE)).replace('-original', '');
-  console.log(`Reading source file: ${SOURCE_FILE} (prefix: ${baseName})`);
+  console.log(`Reading source file: ${SOURCE_FILE} (prefix: ${PREFIX})`);
   const baseBuffer = await fs.readFile(SOURCE_FILE);
   
-  console.log(`Generating ${baseName} (Right)... `);
+  console.log(`Generating ${PREFIX} (Right)... `);
   // If input is vertical, we need to convert it to horizontal for the "Right" version
   if (INPUT_LAYOUT === 'v') {
     const rightSheet = await generateVariant(baseBuffer, (s) => s);
-    await rightSheet.toFile(path.join(OUTPUT_DIR, `${baseName}-right.png`));
+    await rightSheet.toFile(path.join(OUTPUT_DIR, `${PREFIX}-right.png`));
   } else {
     // Already horizontal, just copy or rename if needed
-    await fs.copyFile(SOURCE_FILE, path.join(OUTPUT_DIR, `${baseName}-right.png`));
+    await fs.copyFile(SOURCE_FILE, path.join(OUTPUT_DIR, `${PREFIX}-right.png`));
   }
   
-  console.log(`Generating ${baseName} (Left)... `);
+  console.log(`Generating ${PREFIX} (Left)... `);
   // Mirror horizontally (flop)
   const leftSheet = await generateVariant(baseBuffer, (s) => s.flop());
-  await leftSheet.toFile(path.join(OUTPUT_DIR, `${baseName}-left.png`));
+  await leftSheet.toFile(path.join(OUTPUT_DIR, `${PREFIX}-left.png`));
   
-  console.log(`Generating ${baseName} (Up)... `);
+  console.log(`Generating ${PREFIX} (Up)... `);
   // Rotate -90 (270)
   const upSheet = await generateVariant(baseBuffer, (s) => s.rotate(270));
-  await upSheet.toFile(path.join(OUTPUT_DIR, `${baseName}-up.png`));
+  await upSheet.toFile(path.join(OUTPUT_DIR, `${PREFIX}-up.png`));
   
-  console.log(`Generating ${baseName} (Down)... `);
+  console.log(`Generating ${PREFIX} (Down)... `);
   // Rotate +90 (90)
   const downSheet = await generateVariant(baseBuffer, (s) => s.rotate(90));
-  await downSheet.toFile(path.join(OUTPUT_DIR, `${baseName}-down.png`));
+  await downSheet.toFile(path.join(OUTPUT_DIR, `${PREFIX}-down.png`));
   
   console.log('Done! Assets saved to:', OUTPUT_DIR);
 }

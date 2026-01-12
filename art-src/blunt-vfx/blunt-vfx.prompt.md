@@ -1,0 +1,1 @@
+generate a 1-row spritesheet containing exactly 5 frames of animation. The row must show a top-down explosion from a blunt impact, organized as a logical sequence: small seed, growing explosion, maximal burst, recession. The vfx is grayscale. Keep the background solid magenta (#FF00FF).

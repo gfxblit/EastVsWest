@@ -10,7 +10,7 @@ const PROJECT_ROOT = path.resolve(__dirname, '..');
 
 // Default configuration
 const DEFAULT_CONFIG = {
-  output: path.join(PROJECT_ROOT, 'public/assets/vfx'),
+  output: null,
   width: 64,
   height: 64,
   frames: 5
@@ -21,18 +21,55 @@ function parseArgs() {
   const args = process.argv.slice(2);
   const config = { ...DEFAULT_CONFIG };
 
+  if (args.length === 0 || args.includes('--help') || args.includes('-h')) {
+    console.log(`
+Usage: node generate_spear_vfx.js [options]
+
+Required Options:
+  --output <path>        Output directory (e.g., public/assets/vfx)
+
+Optional Options:
+  --width <px>           Frame width (default: 64)
+  --height <px>          Frame height (default: 64)
+  --frames <count>       Number of frames (default: 5)
+  --help, -h             Show this help message
+
+Example:
+  node scripts/generate_spear_vfx.js --output public/assets/vfx --width 64 --height 64 --frames 5
+`);
+    process.exit(0);
+  }
+
   for (let i = 0; i < args.length; i++) {
     const arg = args[i];
-    if (arg === '--output' && args[i + 1]) {
-      config.output = path.resolve(process.cwd(), args[++i]);
-    } else if (arg === '--width' && args[i + 1]) {
-      config.width = parseInt(args[++i], 10);
-    } else if (arg === '--height' && args[i + 1]) {
-      config.height = parseInt(args[++i], 10);
-    } else if (arg === '--frames' && args[i + 1]) {
-      config.frames = parseInt(args[++i], 10);
+    let key = arg;
+    let value = null;
+
+    if (arg.startsWith('--') && arg.includes('=')) {
+      const parts = arg.split('=');
+      key = parts[0];
+      value = parts.slice(1).join('=');
+    } else if (arg.startsWith('--') && args[i + 1] && !args[i + 1].startsWith('--')) {
+      value = args[++i];
+    }
+
+    if (key === '--output' && value) {
+      config.output = path.resolve(process.cwd(), value);
+    } else if (key === '--width' && value) {
+      config.width = parseInt(value, 10);
+    } else if (key === '--height' && value) {
+      config.height = parseInt(value, 10);
+    } else if (key === '--frames' && value) {
+      config.frames = parseInt(value, 10);
     }
   }
+
+  // Validation
+  if (!config.output) {
+    console.error('Error: --output is required');
+    process.exit(1);
+  }
+
   return config;
 }
 
