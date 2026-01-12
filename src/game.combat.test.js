@@ -23,13 +23,13 @@ describe('Game Combat', () => {
         ['player-1', {
           player_id: 'player-1',
           position_x: 100,
-          position_y: 100,
+          position_y: 300,
           health: 100,
           equipped_weapon: 'spear'
         }],
         ['player-2', {
           player_id: 'player-2',
-          position_x: 150,
+          position_x: 100,
           position_y: 100,
           health: 100,
           equipped_weapon: 'fist'
@@ -58,15 +58,15 @@ describe('Game Combat', () => {
         aimY: 100  // Should be ignored
       };
 
-      // Player is at 100,100 with rotation 0 (North). 
-      // Attack vector (0, -1) * 100 = (0, -100). Target: 100, 0.
+      // Player is at 100,300 with rotation 0 (North). 
+      // Attack vector (0, -1) * 100 = (0, -100). Target: 100, 200.
       game.handleInput(inputState);
       game.update(0.016);
 
       expect(mockNetwork.send).toHaveBeenCalledWith('attack_request', expect.objectContaining({
         weapon_id: 'spear',
         aim_x: 100,
-        aim_y: 0,
+        aim_y: 200,
         is_special: false
       }));
     });
@@ -85,7 +85,7 @@ describe('Game Combat', () => {
       expect(mockNetwork.send).toHaveBeenCalledWith('attack_request', expect.objectContaining({
         weapon_id: 'spear',
         aim_x: 100,
-        aim_y: 0,
+        aim_y: 200,
         is_special: true
       }));
     });
@@ -121,7 +121,7 @@ describe('Game Combat', () => {
         from: 'player-1',
         data: {
           weapon_id: 'spear',
-          aim_x: 150,
+          aim_x: 100,
           aim_y: 100,
           is_special: false
         }
@@ -187,7 +187,7 @@ describe('Game Combat', () => {
       const attackRequest = {
         type: 'attack_request',
         from: 'player-1',
-        data: { weapon_id: 'spear', aim_x: 150, aim_y: 100, is_special: false }
+        data: { weapon_id: 'spear', aim_x: 100, aim_y: 100, is_special: false }
       };
 
       game.hostCombatManager.handleAttackRequest(attackRequest, mockPlayersSnapshot);
@@ -202,11 +202,14 @@ describe('Game Combat', () => {
       // Give player-2 Plated armor (weak to blunt - fist is blunt)
       players.get('player-2').equipped_armor = 'plated';
       players.get('player-1').equipped_weapon = 'fist';
+      
+      // Move them closer for fist range (150-100 = 50. distance 50 < 50+60 = 110)
+      players.get('player-1').position_y = 150;
 
       const attackRequest = {
         type: 'attack_request',
         from: 'player-1',
-        data: { weapon_id: 'fist', aim_x: 150, aim_y: 100, is_special: false }
+        data: { weapon_id: 'fist', aim_x: 100, aim_y: 100, is_special: false }
       };
 
       game.hostCombatManager.handleAttackRequest(attackRequest, mockPlayersSnapshot);
