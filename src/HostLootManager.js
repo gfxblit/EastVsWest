@@ -5,6 +5,22 @@ export class HostLootManager {
     this.network = network;
     this.state = state; // Shared game state
     this.nextLootId = 1; // Counter for unique loot IDs
+    
+    this.#setupListeners();
+  }
+
+  #setupListeners() {
+    if (!this.network) return;
+
+    this.network.on('postgres_changes', (payload) => {
+      if (payload.table === 'session_players' && payload.eventType === 'INSERT') {
+        const newPlayerId = payload.new.player_id;
+        if (newPlayerId !== this.network.playerId) {
+          console.log(`Host: New player ${newPlayerId} joined, syncing loot...`);
+          this.syncLootToPlayer(newPlayerId);
+        }
+      }
+    });
   }
 
   spawnLoot(itemId, x, y, type = 'weapon') {

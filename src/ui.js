@@ -44,40 +44,47 @@ export class UI {
   }
 
   updatePlayerList(players, isHost) {
+    this.renderPlayerList(players);
+    this.updateStartButton(players, isHost);
+  }
+
+  renderPlayerList(players) {
     const playerList = document.getElementById('player-list');
+    if (!playerList) return;
+
+    playerList.innerHTML = '';
+    players.forEach(player => {
+      const li = document.createElement('li');
+      li.textContent = player.player_name + (player.is_host ? ' (Host)' : '');
+      playerList.appendChild(li);
+    });
+  }
+
+  updateStartButton(players, isHost) {
     const startBtn = document.getElementById('start-game-btn');
     const waitingMsg = document.getElementById('waiting-msg');
+    const botFillMsg = document.getElementById('bot-fill-msg');
 
-    if (playerList) {
-      playerList.innerHTML = '';
-      players.forEach(player => {
-        const li = document.createElement('li');
-        li.textContent = player.player_name + (player.is_host ? ' (Host)' : '');
-        playerList.appendChild(li);
-      });
-    }
+    if (!startBtn || !waitingMsg) return;
 
-    if (startBtn && waitingMsg) {
-      const botFillMsg = document.getElementById('bot-fill-msg');
-      if (isHost) {
-        startBtn.classList.remove('hidden');
-        waitingMsg.classList.add('hidden');
-        
-        // Update button text with bot count
-        const minPlayers = CONFIG.GAME.MIN_PLAYERS || 4;
-        if (players.length < minPlayers) {
-          const botsNeeded = minPlayers - players.length;
-          startBtn.textContent = `Start Game (+${botsNeeded} Bots)`;
-          if (botFillMsg) botFillMsg.classList.remove('hidden');
-        } else {
-          startBtn.textContent = 'Start Game';
-          if (botFillMsg) botFillMsg.classList.add('hidden');
-        }
+    if (isHost) {
+      startBtn.classList.remove('hidden');
+      waitingMsg.classList.add('hidden');
+      
+      // Update button text with bot count
+      const minPlayers = CONFIG.GAME.MIN_PLAYERS || 4;
+      if (players.length < minPlayers) {
+        const botsNeeded = minPlayers - players.length;
+        startBtn.textContent = `Start Game (+${botsNeeded} Bots)`;
+        if (botFillMsg) botFillMsg.classList.remove('hidden');
       } else {
-        startBtn.classList.add('hidden');
-        waitingMsg.classList.remove('hidden');
+        startBtn.textContent = 'Start Game';
         if (botFillMsg) botFillMsg.classList.add('hidden');
       }
+    } else {
+      startBtn.classList.add('hidden');
+      waitingMsg.classList.remove('hidden');
+      if (botFillMsg) botFillMsg.classList.add('hidden');
     }
   }
 
