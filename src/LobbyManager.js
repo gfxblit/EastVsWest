@@ -14,8 +14,26 @@ export class LobbyManager {
 
   async hostGame() {
     try {
-      const playerName = `Host-${Math.random().toString(36).substr(2, 5)}`;
-      const { session, player } = await this.network.hostGame(playerName);
+        const playerName = `Host-${Math.random().toString(36).substr(2, 5)}`;
+        await this._enterLobby(() => this.network.hostGame(playerName));
+    } catch (error) {
+        console.error('Failed to host game:', error);
+        throw error;
+    }
+  }
+
+  async joinGame(joinCode) {
+    try {
+        const playerName = `Player-${Math.random().toString(36).substr(2, 5)}`;
+        await this._enterLobby(() => this.network.joinGame(joinCode, playerName));
+    } catch (error) {
+        console.error('Failed to join game:', error);
+        throw error;
+    }
+  }
+
+  async _enterLobby(networkAction) {
+      const { session, player } = await networkAction();
 
       await this.initializeSnapshot(session.id);
 
@@ -23,27 +41,6 @@ export class LobbyManager {
       this.ui.showJoinCode(session.join_code);
       this.ui.showLobby('Game Lobby');
       this.updateUI();
-    } catch (error) {
-      console.error('Failed to host game:', error);
-      throw error;
-    }
-  }
-
-  async joinGame(joinCode) {
-    try {
-      const playerName = `Player-${Math.random().toString(36).substr(2, 5)}`;
-      const { session, player } = await this.network.joinGame(joinCode, playerName);
-
-      await this.initializeSnapshot(session.id);
-
-      this.startPolling();
-      this.ui.showJoinCode(joinCode);
-      this.ui.showLobby('Game Lobby');
-      this.updateUI();
-    } catch (error) {
-      console.error('Failed to join game:', error);
-      throw error;
-    }
   }
 
   async initializeSnapshot(sessionId) {
