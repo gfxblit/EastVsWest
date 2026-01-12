@@ -215,6 +215,9 @@ export const CONFIG = {
       PATH: 'assets/player/player-slash-spritesheet.png',
       METADATA: 'assets/player/player-slash-spritesheet.json',
     },
+    PLAYER_DEATH: {
+      PATH: 'assets/player/player-death-spritesheet.png',
+    },
     VFX: {
       SLASH: {
         UP: 'assets/vfx/slash-up.png',
@@ -242,6 +245,8 @@ export const CONFIG = {
   ANIMATION: {
     FPS: 15,
     FRAMES_PER_DIRECTION: 4,
+    DEATH_FPS: 10,
+    DEATH_FRAME_COUNT: 5,
     VFX_FPS: 25, // 5 frames over 0.2s
   },
 
