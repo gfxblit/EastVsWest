@@ -275,4 +275,9 @@ export const CONFIG = {
   LOOT: {
     PICKUP_RADIUS: 80,
   },
+
+  // Collision Settings
+  COLLISION: {
+    RESOLUTION_ITERATIONS: 2, // Number of times to repeat collision resolution to handle corner cases
+  },
 };

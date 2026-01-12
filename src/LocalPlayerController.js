@@ -123,40 +123,54 @@ export class LocalPlayerController {
     this.player.x += this.player.velocity.x * deltaTime;
     this.player.y += this.player.velocity.y * deltaTime;
 
-    // Resolve player-to-player collisions
-    if (playersSnapshot) {
-      // Repeat twice for corner cases where one resolution pushes into another
-      for (let i = 0; i < 2; i++) {
-        const localHitbox = getHitbox(this.player);
-        
-        for (const otherPlayer of playersSnapshot.getPlayers().values()) {
-          const otherId = otherPlayer.player_id || otherPlayer.id;
-          // Don't collide with self or dead players
-          if (otherId === this.player.id || otherPlayer.health <= 0) continue;
-
-          const otherHitbox = getHitbox(otherPlayer);
-          const mtv = resolveAABBCollision(localHitbox, otherHitbox);
-
-          if (mtv.x !== 0 || mtv.y !== 0) {
-            this.player.x += mtv.x;
-            this.player.y += mtv.y;
-            // Update local hitbox for next check in this iteration
-            localHitbox.x += mtv.x;
-            localHitbox.y += mtv.y;
-            localHitbox.minX += mtv.x;
-            localHitbox.maxX += mtv.x;
-            localHitbox.minY += mtv.y;
-            localHitbox.maxY += mtv.y;
-            localHitbox.centerX += mtv.x;
-            localHitbox.centerY += mtv.y;
-          }
-        }
-      }
-    }
+    // Resolve collisions
+    this.#resolveCollisions(playersSnapshot);
 
     // Keep player within world bounds (AFTER collision resolution)
     this.player.x = Math.max(0, Math.min(CONFIG.WORLD.WIDTH, this.player.x));
     this.player.y = Math.max(0, Math.min(CONFIG.WORLD.HEIGHT, this.player.y));
+  }
+
+  /**
+   * Resolves collisions with other entities (players, props)
+   * @param {Object} playersSnapshot Current snapshot of all players
+   */
+  #resolveCollisions(playersSnapshot) {
+    if (!playersSnapshot) return;
+
+    // Repeat resolution to handle complex cases (e.g. being pushed between two objects)
+    const iterations = CONFIG.COLLISION.RESOLUTION_ITERATIONS || 2;
+    for (let i = 0; i < iterations; i++) {
+      this.#handlePlayerCollisions(playersSnapshot);
+    }
+  }
+
+  /**
+   * Handles collision resolution specifically against other players
+   * @param {Object} playersSnapshot Current snapshot of all players
+   */
+  #handlePlayerCollisions(playersSnapshot) {
+    let localHitbox = getHitbox(this.player);
+    
+    for (const otherPlayer of playersSnapshot.getPlayers().values()) {
+      const otherId = otherPlayer.player_id || otherPlayer.id;
+      
+      // Skip self and dead players
+      if (otherId === this.player.id || otherPlayer.health <= 0) {
+        continue;
+      }
+
+      const otherHitbox = getHitbox(otherPlayer);
+      const mtv = resolveAABBCollision(localHitbox, otherHitbox);
+
+      if (mtv.x !== 0 || mtv.y !== 0) {
+        this.player.x += mtv.x;
+        this.player.y += mtv.y;
+        
+        // Update local hitbox for next check in this iteration
+        localHitbox = getHitbox(this.player);
+      }
+    }
   }
 
   #updateAnimation(deltaTime) {
