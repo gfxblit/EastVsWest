@@ -5,6 +5,7 @@ import { jest } from '@jest/globals';
  */
 
 import { Renderer } from './renderer.js';
+import { AssetManager } from './AssetManager.js';
 import { CONFIG } from './config.js';
 import { updateAnimationState, getDirectionFromRotation } from './animationHelper.js';
 
@@ -13,6 +14,7 @@ describe('Renderer', () => {
   let ctx;
   let renderer;
   let mockImage;
+  let assetManager;
 
   beforeEach(() => {
     // Mock window dimensions for responsive canvas sizing
@@ -73,7 +75,8 @@ describe('Renderer', () => {
       canvas: canvas, // Link context back to canvas for ctx.canvas access
     };
     canvas.getContext = jest.fn(() => ctx);
-    renderer = new Renderer(canvas);
+    assetManager = new AssetManager();
+    renderer = new Renderer(canvas, assetManager);
     renderer.init();
   });
 
@@ -86,7 +89,7 @@ describe('Renderer', () => {
       // Clear Image mock to count only this test's calls
       global.Image.mockClear();
 
-      const newRenderer = new Renderer(canvas);
+      const newRenderer = new Renderer(canvas, new AssetManager());
       newRenderer.init();
 
       expect(canvas.getContext).toHaveBeenCalledWith('2d');
@@ -100,7 +103,7 @@ describe('Renderer', () => {
     });
 
     test('WhenImageLoads_ShouldCreatePattern', () => {
-      const newRenderer = new Renderer(canvas);
+      const newRenderer = new Renderer(canvas, new AssetManager());
       newRenderer.init();
 
       // Simulate background image load
@@ -114,7 +117,7 @@ describe('Renderer', () => {
       const originalBase = CONFIG.ASSETS.BASE_URL;
       CONFIG.ASSETS.BASE_URL = '/custom-base/';
       
-      const newRenderer = new Renderer(canvas);
+      const newRenderer = new Renderer(canvas, new AssetManager());
       newRenderer.init();
       
       // Expect paths to be prefixed with custom base
@@ -523,7 +526,7 @@ describe('Renderer', () => {
 
     test('WhenInitialized_ShouldLoadShadowImage', () => {
       // Arrange - Create new renderer to test initialization
-      const newRenderer = new Renderer(canvas);
+      const newRenderer = new Renderer(canvas, new AssetManager());
 
       // Clear existing Image mock calls
       global.Image.mockClear();
@@ -817,7 +820,7 @@ describe('Renderer', () => {
     describe('Image Loading', () => {
       test('WhenInitialized_ShouldLoadAllDirectionalImages', () => {
         // Create new renderer to test initialization
-        const newRenderer = new Renderer(canvas);
+        const newRenderer = new Renderer(canvas, new AssetManager());
 
         // Clear existing Image mock calls
         global.Image.mockClear();
@@ -1010,7 +1013,7 @@ describe('Renderer', () => {
           })
         );
 
-        const newRenderer = new Renderer(canvas);
+        const newRenderer = new Renderer(canvas, new AssetManager());
 
         // Start loading sprite sheet
         const loadPromise = newRenderer.assetManager.loadSpriteSheet();
@@ -1040,7 +1043,7 @@ describe('Renderer', () => {
           })
         );
 
-        const newRenderer = new Renderer(canvas);
+        const newRenderer = new Renderer(canvas, new AssetManager());
         await expect(newRenderer.assetManager.loadSpriteSheet()).resolves.toBe(false);
       });
     });
