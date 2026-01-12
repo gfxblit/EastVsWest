@@ -106,7 +106,8 @@ describe('Renderer', () => {
       const newRenderer = new Renderer(canvas, new AssetManager());
       newRenderer.init();
 
-      // Simulate background image load
+      // Simulate background image load with valid dimensions
+      newRenderer.worldRenderer.bgImage.naturalWidth = 100;
       newRenderer.worldRenderer.bgImage.onload();
 
       expect(ctx.createPattern).toHaveBeenCalledWith(newRenderer.worldRenderer.bgImage, 'repeat');
@@ -268,8 +269,11 @@ describe('Renderer', () => {
     test('WhenRenderingWithCamera_ShouldDrawBackgroundInWorldCoordinates', () => {
       // Arrange
       // Trigger background image load
-      if (renderer.worldRenderer.bgImage && renderer.worldRenderer.bgImage.onload) {
-        renderer.worldRenderer.bgImage.onload();
+      if (renderer.worldRenderer.bgImage) {
+        renderer.worldRenderer.bgImage.naturalWidth = 100;
+        if (renderer.worldRenderer.bgImage.onload) {
+          renderer.worldRenderer.bgImage.onload();
+        }
       }
 
       const gameState = {
