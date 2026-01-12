@@ -138,15 +138,6 @@ export class PlayerRenderer {
             );
         }
 
-        // Add white outline for local player
-        if (isLocal) {
-            ctx.strokeStyle = '#ffffff';
-            ctx.lineWidth = 2;
-            ctx.beginPath();
-            ctx.arc(player.x, player.y, CONFIG.RENDER.PLAYER_RADIUS, 0, Math.PI * 2);
-            ctx.stroke();
-        }
-
         // Attack VFX
         if (player.isAttacking) {
             this.renderSlashAnimation(ctx, player);

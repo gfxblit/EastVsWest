@@ -955,7 +955,7 @@ describe('Renderer', () => {
         expect(hasCorrectPosition).toBe(true);
       });
 
-      test('WhenRenderingLocalPlayer_ShouldDrawImageAndWhiteOutline', () => {
+      test('WhenRenderingLocalPlayer_ShouldDrawImage', () => {
         // Mock sprite sheet as loaded
         renderer.assetManager.spriteSheet = {
           complete: true,
@@ -987,10 +987,6 @@ describe('Renderer', () => {
 
         // Should draw the sprite from sprite sheet
         expect(ctx.drawImage).toHaveBeenCalled();
-
-        // Should also draw white outline for local player
-        expect(ctx.stroke).toHaveBeenCalled();
-        expect(ctx.strokeStyle).toBe('#ffffff');
       });
     });
   });
