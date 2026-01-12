@@ -17,6 +17,12 @@ export class PlayerRenderer {
             left: null,
             right: null
         };
+        this.bluntImages = {
+            up: null,
+            down: null,
+            left: null,
+            right: null
+        };
         this.deathImage = null;
         this.deadPlayers = new Map();
     }
@@ -36,6 +42,11 @@ export class PlayerRenderer {
         this.thrustImages.left = this.assetManager.createImage(CONFIG.ASSETS.VFX.THRUST.LEFT);
         this.thrustImages.right = this.assetManager.createImage(CONFIG.ASSETS.VFX.THRUST.RIGHT);
 
+        // Load blunt VFX images
+        this.bluntImages.up = this.assetManager.createImage(CONFIG.ASSETS.VFX.BLUNT.UP);
+        this.bluntImages.down = this.assetManager.createImage(CONFIG.ASSETS.VFX.BLUNT.DOWN);
+        this.bluntImages.left = this.assetManager.createImage(CONFIG.ASSETS.VFX.BLUNT.LEFT);
+        this.bluntImages.right = this.assetManager.createImage(CONFIG.ASSETS.VFX.BLUNT.RIGHT);
         // Load death sprite sheet
         if (CONFIG.ASSETS.PLAYER_DEATH) {
             this.deathImage = this.assetManager.createImage(CONFIG.ASSETS.PLAYER_DEATH.PATH);
@@ -149,7 +160,7 @@ export class PlayerRenderer {
 
         // Attack VFX
         if (player.isAttacking) {
-            this.renderSlashAnimation(ctx, player);
+            this.renderAttackVFX(ctx, player);
         }
 
         // Health bar above player
@@ -175,7 +186,7 @@ export class PlayerRenderer {
         ctx.fillRect(barX, barY, (player.health / 100) * barWidth, barHeight);
     }
 
-    renderSlashAnimation(ctx, player) {
+    renderAttackVFX(ctx, player) {
         // Total duration of attack animation
         const totalDuration = CONFIG.COMBAT.ATTACK_ANIMATION_DURATION_SECONDS;
         const remainingTime = player.attackAnimTime;
@@ -200,9 +211,21 @@ export class PlayerRenderer {
         // TODO: Optimize weapon lookup using a Map
         const weaponConfig = Object.values(CONFIG.WEAPONS).find(w => w.id === player.equipped_weapon);
         const vfxType = weaponConfig ? weaponConfig.vfxType : 'slash';
-        const images = vfxType === 'thrust' ? this.thrustImages : this.slashImages;
-        const vfxOffset = vfxType === 'thrust' ? CONFIG.COMBAT.THRUST_VFX_OFFSET : CONFIG.COMBAT.SLASH_VFX_OFFSET;
-        const vfxScale = vfxType === 'thrust' ? CONFIG.COMBAT.THRUST_VFX_SCALE : CONFIG.COMBAT.SLASH_VFX_SCALE;
+        
+        let images, vfxOffset, vfxScale;
+        if (vfxType === 'thrust') {
+            images = this.thrustImages;
+            vfxOffset = CONFIG.COMBAT.THRUST_VFX_OFFSET;
+            vfxScale = CONFIG.COMBAT.THRUST_VFX_SCALE;
+        } else if (vfxType === 'blunt') {
+            images = this.bluntImages;
+            vfxOffset = CONFIG.COMBAT.BLUNT_VFX_OFFSET;
+            vfxScale = CONFIG.COMBAT.BLUNT_VFX_SCALE;
+        } else {
+            images = this.slashImages;
+            vfxOffset = CONFIG.COMBAT.SLASH_VFX_OFFSET;
+            vfxScale = CONFIG.COMBAT.SLASH_VFX_SCALE;
+        }
 
         // Map direction to cardinal VFX sprites
         if (directionIndex === 2) { // North
@@ -225,8 +248,10 @@ export class PlayerRenderer {
 
         if (!vfxImage || !vfxImage.complete || vfxImage.naturalWidth === 0) return;
 
-        const frameWidth = 64;
-        const frameHeight = 64;
+        // Calculate frame dimensions dynamically
+        // Assumes horizontal sprite sheet with 'frameCount' frames
+        const frameWidth = vfxImage.naturalWidth / frameCount;
+        const frameHeight = vfxImage.naturalHeight;
 
         // Scale up the VFX slightly to look impactful
         const scale = vfxScale;
