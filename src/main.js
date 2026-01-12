@@ -559,13 +559,7 @@ class App {
     }
 
     // Render
-    // Get snapshot from lobby manager if game doesn't expose it directly (Game.init stores it but doesn't expose it)
-    // Actually, App.init passes playersSnapshot to game.init.
-    // In original code, App kept a reference to playersSnapshot.
-    // In new code, LobbyManager has it.
-    const playersSnapshot = this.lobbyManager ? this.lobbyManager.getPlayersSnapshot() : null;
-
-    this.renderer.render(this.game.getState(), this.game.getLocalPlayer(), playersSnapshot, this.camera, deltaTime);
+    this.renderer.render(this.game.getState(), this.game.getLocalPlayer(), this.game.playersSnapshot, this.camera, deltaTime);
 
     // Continue loop
     this.animationFrameId = requestAnimationFrame((timestamp) => this.gameLoop(timestamp));
