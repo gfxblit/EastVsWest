@@ -72,9 +72,15 @@ describe('Client Interpolation Integration (Real Network)', () => {
       rect: () => {},
       fill: () => {},
       stroke: () => {},
+      fillText: () => {},
+      measureText: () => ({ width: 0 }),
       createPattern: () => ({}),
       strokeStyle: '',
-      lineWidth: 0
+      lineWidth: 0,
+      textAlign: '',
+      font: '',
+      shadowColor: '',
+      shadowBlur: 0
     };
     const mockCanvas = { getContext: () => mockCtx, width: 800, height: 600 };
     mockCtx.canvas = mockCanvas;
