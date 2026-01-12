@@ -58,12 +58,25 @@ export class UI {
     }
 
     if (startBtn && waitingMsg) {
+      const botFillMsg = document.getElementById('bot-fill-msg');
       if (isHost) {
         startBtn.classList.remove('hidden');
         waitingMsg.classList.add('hidden');
+        
+        // Update button text with bot count
+        const minPlayers = CONFIG.GAME.MIN_PLAYERS || 4;
+        if (players.length < minPlayers) {
+          const botsNeeded = minPlayers - players.length;
+          startBtn.textContent = `Start Game (+${botsNeeded} Bots)`;
+          if (botFillMsg) botFillMsg.classList.remove('hidden');
+        } else {
+          startBtn.textContent = 'Start Game';
+          if (botFillMsg) botFillMsg.classList.add('hidden');
+        }
       } else {
         startBtn.classList.add('hidden');
         waitingMsg.classList.remove('hidden');
+        if (botFillMsg) botFillMsg.classList.add('hidden');
       }
     }
   }

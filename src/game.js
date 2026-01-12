@@ -7,6 +7,7 @@ import { CONFIG } from './config.js';
 import { LocalPlayerController } from './LocalPlayerController.js';
 import { HostCombatManager } from './HostCombatManager.js';
 import { HostLootManager } from './HostLootManager.js';
+import { BotController } from './BotController.js';
 
 export class Game {
   constructor() {
@@ -28,6 +29,7 @@ export class Game {
     this.network = null;
     this.renderer = null;
     this.spectatingTargetId = null;
+    this.botControllers = new Map();
   }
 
   init(playersSnapshot = null, network = null, renderer = null) {
@@ -45,20 +47,53 @@ export class Game {
         network.on('pickup_request', (msg) => this.hostLootManager.handlePickupRequest(msg, this.playersSnapshot));
         network.on('request_loot_sync', (msg) => this.hostLootManager.handleLootSyncRequest(msg));
         
-        // Listen for new players joining to sync game state
+        // Listen for new players joining to sync game state and manage bots
         network.on('postgres_changes', (payload) => {
-          if (payload.eventType === 'INSERT' && payload.table === 'session_players') {
-            const newPlayerId = payload.new.player_id;
-            if (newPlayerId !== network.playerId) {
-              console.log(`Host: New player ${newPlayerId} joined, syncing loot...`);
-              this.hostLootManager.syncLootToPlayer(newPlayerId);
-            }
+          if (payload.table === 'session_players') {
+             if (payload.eventType === 'INSERT') {
+                const newPlayer = payload.new;
+                const newPlayerId = newPlayer.player_id;
+
+                // Loot sync
+                if (newPlayerId !== network.playerId) {
+                  console.log(`Host: New player ${newPlayerId} joined, syncing loot...`);
+                  this.hostLootManager.syncLootToPlayer(newPlayerId);
+                }
+                
+                // Bot management
+                if (newPlayer.is_bot) {
+                    this.addBot(newPlayerId);
+                }
+             } else if (payload.eventType === 'DELETE') {
+                 // Handle bot removal if needed
+                 // payload.old only has id (primary key), not player_id
+                 // But we can check if we have a bot controller for a removed player
+                 // Wait, payload.old.id is the UUID primary key.
+                 // We map botControllers by player_id. 
+                 // We need to look up which player_id was removed.
+                 // But playersSnapshot might have already removed it?
+                 // Actually, SessionPlayersSnapshot handles removal.
+                 // We can reconcile botControllers in update() or here.
+                 // Let's rely on snapshot state in update() or reconcile periodically.
+                 // Or better: iterate playersSnapshot.getPlayers() in update() and manage controllers?
+                 // No, that's expensive.
+                 // Let's just ignore delete for now, or assume game end clears them.
+             }
           }
         });
 
         // Initial loot spawn
         if (this.state.loot.length === 0) {
           this.hostLootManager.spawnRandomLoot(CONFIG.GAME.INITIAL_LOOT_COUNT);
+        }
+        
+        // Initialize existing bots
+        if (this.playersSnapshot) {
+            this.playersSnapshot.getPlayers().forEach(player => {
+                if (player.is_bot) {
+                    this.addBot(player.player_id);
+                }
+            });
         }
     }
 
@@ -124,6 +159,25 @@ export class Game {
     if (this.hostCombatManager) {
       this.hostCombatManager.update(deltaTime, this.playersSnapshot);
     }
+    
+    // Update Bots (Host only)
+    if (this.network && this.network.isHost && this.botControllers.size > 0) {
+        this.botControllers.forEach((controller, botId) => {
+            // Check if bot still exists in snapshot
+            if (!this.playersSnapshot.getPlayers().has(botId)) {
+                this.botControllers.delete(botId);
+                return;
+            }
+            controller.update(deltaTime);
+        });
+    }
+  }
+
+  addBot(botId) {
+      if (!this.botControllers.has(botId)) {
+          console.log(`Initializing controller for bot ${botId}`);
+          this.botControllers.set(botId, new BotController(botId, this.network, this.playersSnapshot, this));
+      }
   }
 
   updateConflictZone(deltaTime) {

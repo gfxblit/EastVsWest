@@ -62,6 +62,11 @@ export class Network extends EventEmitter {
       return this.sessionManager.joinGame(joinCode, playerName);
   }
 
+  async startGame() {
+      if (!this.isHost) throw new Error('Only the host can start the game.');
+      return this.sessionManager.startGame();
+  }
+
   _subscribeToChannel(channelName) {
     if (this.channel) {
       this.supabase.removeChannel(this.channel);
