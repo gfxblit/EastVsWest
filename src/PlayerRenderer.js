@@ -42,6 +42,23 @@ export class PlayerRenderer {
         }
     }
 
+    renderPlayerName(ctx, player) {
+        if (!player.name) return;
+
+        ctx.save();
+        ctx.textAlign = 'center';
+        ctx.fillStyle = '#ffffff';
+        ctx.font = 'bold 14px Arial';
+        ctx.shadowColor = 'black';
+        ctx.shadowBlur = 2;
+        
+        // Position above the health bar
+        const nameY = player.y - (CONFIG.RENDER.PLAYER_RADIUS + CONFIG.RENDER.HEALTH_BAR_OFFSET_FROM_PLAYER + 15);
+        
+        ctx.fillText(player.name, player.x, nameY);
+        ctx.restore();
+    }
+
     render(ctx, player, isLocal = false) {
         const size = CONFIG.RENDER.PLAYER_RADIUS * 2;
         const spriteX = player.x - CONFIG.RENDER.PLAYER_RADIUS;
@@ -60,6 +77,7 @@ export class PlayerRenderer {
 
         if (player.health <= 0) {
             this.renderDeath(ctx, player, spriteX, spriteY, size);
+            this.renderPlayerName(ctx, player);
             return;
         } else if (this.deadPlayers.has(player.id)) {
             this.deadPlayers.delete(player.id);
@@ -136,6 +154,9 @@ export class PlayerRenderer {
 
         // Health bar above player
         this.renderHealthBar(ctx, player);
+        
+        // Player Name
+        this.renderPlayerName(ctx, player);
     }
 
     renderHealthBar(ctx, player) {

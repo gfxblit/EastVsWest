@@ -49,7 +49,10 @@ describe('PlayerRenderer Death Animation', () => {
             fillRect: jest.fn(),
             beginPath: jest.fn(),
             arc: jest.fn(),
-            stroke: jest.fn()
+            stroke: jest.fn(),
+            save: jest.fn(),
+            restore: jest.fn(),
+            fillText: jest.fn()
         };
 
         renderer = new PlayerRenderer(mockAssetManager);
@@ -95,6 +98,55 @@ describe('PlayerRenderer Death Animation', () => {
             expectedFrameWidth, expectedFrameHeight, // source w, h
             expect.any(Number), expect.any(Number), // dest x, y
             expect.any(Number), expect.any(Number)  // dest w, h
+        );
+    });
+
+    test('should render player name', () => {
+        renderer.init();
+        const player = {
+            id: 'p1',
+            name: 'TestPlayer',
+            x: 100,
+            y: 100,
+            health: 100,
+            rotation: 0,
+            isAttacking: false,
+            animationState: { currentFrame: 0, lastDirection: 0 }
+        };
+
+        // Mock sprite sheet availability
+        const mockSpriteSheet = { complete: true, width: 100, src: 'walk.png' };
+        mockAssetManager.getSpriteSheet.mockReturnValue(mockSpriteSheet);
+        mockAssetManager.getSpriteSheetMetadata.mockReturnValue({ frameWidth: 32, frameHeight: 32, columns: 4 });
+
+        renderer.render(mockCtx, player, false);
+
+        expect(mockCtx.fillText).toHaveBeenCalledWith(
+            'TestPlayer',
+            player.x,
+            expect.any(Number)
+        );
+    });
+
+    test('should render player name even when dead', () => {
+        renderer.init();
+        const player = {
+            id: 'p1',
+            name: 'DeadPlayer',
+            x: 100,
+            y: 100,
+            health: 0,
+            rotation: 0,
+            isAttacking: false,
+            animationState: { currentFrame: 0, lastDirection: 0 }
+        };
+
+        renderer.render(mockCtx, player, false);
+
+        expect(mockCtx.fillText).toHaveBeenCalledWith(
+            'DeadPlayer',
+            player.x,
+            expect.any(Number)
         );
     });
 });
