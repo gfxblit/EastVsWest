@@ -3,6 +3,7 @@ import { createClient } from '@supabase/supabase-js';
 import { Network } from '../src/network';
 import { SessionPlayersSnapshot } from '../src/SessionPlayersSnapshot';
 import { Renderer } from '../src/renderer';
+import { AssetManager } from '../src/AssetManager';
 import { CONFIG } from '../src/config';
 import { waitFor } from './helpers/wait-utils.js';
 
@@ -84,7 +85,7 @@ describe('Client Interpolation Integration (Real Network)', () => {
     };
     const mockCanvas = { getContext: () => mockCtx, width: 800, height: 600 };
     mockCtx.canvas = mockCanvas;
-    renderer = new Renderer(mockCanvas);
+    renderer = new Renderer(mockCanvas, new AssetManager());
     renderer.init();
   });
 

@@ -9,9 +9,18 @@ export class WorldRenderer {
 
     init(ctx) {
         this.bgImage = this.assetManager.createImage('game-background.png');
-        this.bgImage.onload = () => {
-            this.bgPattern = ctx.createPattern(this.bgImage, 'repeat');
+        
+        const createPattern = () => {
+            if (this.bgImage.naturalWidth > 0) {
+                this.bgPattern = ctx.createPattern(this.bgImage, 'repeat');
+            }
         };
+
+        if (this.bgImage.complete) {
+            createPattern();
+        } else {
+            this.bgImage.onload = createPattern;
+        }
     }
 
     render(ctx, camera, conflictZone) {

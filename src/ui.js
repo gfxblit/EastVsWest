@@ -8,6 +8,7 @@ import { CONFIG } from './config.js';
 export class UI {
   constructor() {
     this.screens = {
+      loading: null,
       intro: null,
       lobby: null,
       game: null,
@@ -16,10 +17,20 @@ export class UI {
   }
 
   init() {
+    this.screens.loading = document.getElementById('loading-screen');
     this.screens.intro = document.getElementById('intro-screen');
     this.screens.lobby = document.getElementById('lobby-screen');
     this.screens.game = document.getElementById('game-screen');
   }
+
+  updateLoading(progress) {
+    const bar = document.getElementById('loading-bar');
+    const text = document.getElementById('loading-text');
+    
+    if (bar) bar.style.width = `${progress * 100}%`;
+    if (text) text.textContent = `${Math.floor(progress * 100)}%`;
+  }
+
 
   showScreen(screenName) {
     // Hide all screens
