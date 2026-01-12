@@ -5,10 +5,9 @@ import path from 'path';
 
 const OUTPUT_DIR = 'public/assets/player';
 const PNG_PATH = path.join(OUTPUT_DIR, 'player-death-spritesheet.png');
-const JSON_PATH = path.join(OUTPUT_DIR, 'player-death-spritesheet.json');
 
 const FRAME_SIZE = 256; // Matching walk sheet size for consistency
-const FRAMES = 4;
+const FRAMES = 5;
 
 async function generate() {
     // Create a composite image
@@ -46,17 +45,6 @@ async function generate() {
     .toFile(PNG_PATH);
 
     console.log(`Generated ${PNG_PATH}`);
-
-    const metadata = {
-        frameWidth: FRAME_SIZE,
-        frameHeight: FRAME_SIZE,
-        columns: FRAMES,
-        rows: 1,
-        directions: ["all"]
-    };
-
-    fs.writeFileSync(JSON_PATH, JSON.stringify(metadata, null, 2));
-    console.log(`Generated ${JSON_PATH}`);
 }
 
 generate().catch(console.error);

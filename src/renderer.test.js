@@ -93,8 +93,8 @@ describe('Renderer', () => {
       expect(canvas.width).toBe(CONFIG.CANVAS.WIDTH);
       expect(canvas.height).toBe(CONFIG.CANVAS.HEIGHT);
 
-      // Should load background image + shadow image + 4 slash images + 4 thrust images + 5 weapon icons
-      expect(global.Image).toHaveBeenCalledTimes(15);
+      // Should load background image + shadow image + 4 slash images + 4 thrust images + 5 weapon icons + 1 death image
+      expect(global.Image).toHaveBeenCalledTimes(16);
       expect(newRenderer.worldRenderer.bgImage.src).toBe('/game-background.png');
       expect(newRenderer.playerRenderer.shadowImage.src).toBe('/shadow.png');
     });
@@ -533,8 +533,8 @@ describe('Renderer', () => {
 
       // Assert
 
-      // Should create shadow image + background image + slash images + thrust images + weapon icons
-      expect(global.Image).toHaveBeenCalledTimes(15);
+      // Should create shadow image + background image + slash images + thrust images + weapon icons + 1 death image
+      expect(global.Image).toHaveBeenCalledTimes(16);
       expect(newRenderer.playerRenderer.shadowImage).toBeDefined();
       expect(newRenderer.playerRenderer.shadowImage.src).toBe('/shadow.png');
     });
@@ -824,8 +824,8 @@ describe('Renderer', () => {
 
         newRenderer.init();
 
-        // Should create background image + shadow image + slash images + thrust images + weapon icons
-        expect(global.Image).toHaveBeenCalledTimes(15);
+        // Should create background image + shadow image + slash images + thrust images + weapon icons + 1 death image
+        expect(global.Image).toHaveBeenCalledTimes(16);
       });
 
     });

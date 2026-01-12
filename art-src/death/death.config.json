@@ -1,0 +1,63 @@
+{
+  "config": {
+    "startX": 0,
+    "startY": 0,
+    "frameWidth": 180,
+    "frameHeight": 300,
+    "frameCount": 5,
+    "fps": 5,
+    "globalWidth": 350,
+    "globalHeight": 350
+  },
+  "bgRemoval": {
+    "enabled": true,
+    "keyColor": "#ff00ff",
+    "threshold": "141",
+    "erode": "3"
+  },
+  "sourceFilename": "east.png",
+  "anchorOverrides": {
+    "0": {
+      "x": 103.5,
+      "y": 149
+    },
+    "1": {
+      "x": 98.5,
+      "y": 131
+    },
+    "2": {
+      "x": 101,
+      "y": 123
+    },
+    "3": {
+      "x": 105.5,
+      "y": 124
+    },
+    "4": {
+      "x": 88.5,
+      "y": 140
+    }
+  },
+  "frameOverrides": {
+    "0": {
+      "x": 12,
+      "y": 131
+    },
+    "1": {
+      "x": 224,
+      "y": 127
+    },
+    "2": {
+      "x": 429,
+      "y": 132
+    },
+    "3": {
+      "x": 640,
+      "y": 135
+    },
+    "4": {
+      "x": 834,
+      "y": 133
+    }
+  }
+}

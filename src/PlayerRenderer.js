@@ -17,6 +17,7 @@ export class PlayerRenderer {
             left: null,
             right: null
         };
+        this.deathImage = null;
         this.deadPlayers = new Map();
     }
 
@@ -37,12 +38,25 @@ export class PlayerRenderer {
 
         // Load death sprite sheet
         if (CONFIG.ASSETS.PLAYER_DEATH) {
-            this.assetManager.loadSpriteSheet(
-                'death',
-                CONFIG.ASSETS.PLAYER_DEATH.METADATA,
-                CONFIG.ASSETS.PLAYER_DEATH.PATH
-            );
+            this.deathImage = this.assetManager.createImage(CONFIG.ASSETS.PLAYER_DEATH.PATH);
         }
+    }
+
+    renderPlayerName(ctx, player) {
+        if (!player.name) return;
+
+        ctx.save();
+        ctx.textAlign = 'center';
+        ctx.fillStyle = '#ffffff';
+        ctx.font = 'bold 14px Arial';
+        ctx.shadowColor = 'black';
+        ctx.shadowBlur = 2;
+        
+        // Position above the health bar
+        const nameY = player.y - (CONFIG.RENDER.PLAYER_RADIUS + CONFIG.RENDER.HEALTH_BAR_OFFSET_FROM_PLAYER + 15);
+        
+        ctx.fillText(player.name, player.x, nameY);
+        ctx.restore();
     }
 
     render(ctx, player, isLocal = false) {
@@ -63,6 +77,7 @@ export class PlayerRenderer {
 
         if (player.health <= 0) {
             this.renderDeath(ctx, player, spriteX, spriteY, size);
+            this.renderPlayerName(ctx, player);
             return;
         } else if (this.deadPlayers.has(player.id)) {
             this.deadPlayers.delete(player.id);
@@ -139,6 +154,9 @@ export class PlayerRenderer {
 
         // Health bar above player
         this.renderHealthBar(ctx, player);
+        
+        // Player Name
+        this.renderPlayerName(ctx, player);
     }
 
     renderHealthBar(ctx, player) {
@@ -229,10 +247,7 @@ export class PlayerRenderer {
     }
 
     renderDeath(ctx, player, x, y, size) {
-        const spriteSheet = this.assetManager.getSpriteSheet('death');
-        const metadata = this.assetManager.getSpriteSheetMetadata('death');
-
-        if (!spriteSheet || !spriteSheet.complete || !metadata) {
+        if (!this.deathImage || !this.deathImage.complete || this.deathImage.naturalWidth === 0) {
              // Fallback if not loaded
              return;
         }
@@ -244,23 +259,24 @@ export class PlayerRenderer {
         const deathTime = this.deadPlayers.get(player.id);
         const elapsed = (Date.now() - deathTime) / 1000;
         const fps = CONFIG.ANIMATION.DEATH_FPS || 10;
-        const totalFrames = metadata.columns;
+        
+        const totalFrames = CONFIG.ANIMATION.DEATH_FRAME_COUNT || 5;
+        const frameWidth = this.deathImage.naturalWidth / totalFrames;
+        const frameHeight = this.deathImage.naturalHeight;
         
         let currentFrame = Math.floor(elapsed * fps);
         if (currentFrame >= totalFrames) {
             currentFrame = totalFrames - 1;
         }
 
-        // Assuming single row for direction-agnostic death
+        // Assuming single row for direction-agnostic death for now
+        // TODO: Add direction support if needed by adding rows to the sheet
         const row = 0; 
-        const frameWidth = metadata.frameWidth;
-        const frameHeight = metadata.frameHeight;
-
         const sourceX = currentFrame * frameWidth;
         const sourceY = row * frameHeight;
 
         ctx.drawImage(
-            spriteSheet,
+            this.deathImage,
             sourceX,
             sourceY,
             frameWidth,
