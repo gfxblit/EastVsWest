@@ -8,6 +8,13 @@ export class HostCombatManager {
     this.playerCooldowns = new Map(); // Track cooldowns independently of snapshot
   }
 
+  /**
+   * Main update loop for host-authoritative combat logic.
+   * Handles zone damage application and periodically broadcasts health updates.
+   *
+   * @param {number} deltaTime - Time since last frame in seconds
+   * @param {SessionPlayersSnapshot} playersSnapshot - Current state of all players
+   */
   update(deltaTime, playersSnapshot) {
     if (!this.network?.isHost || !playersSnapshot) return;
 
@@ -63,6 +70,14 @@ export class HostCombatManager {
     this.healthUpdateAccumulator = 0;
   }
 
+  /**
+   * Handles an 'attack_request' from a client.
+   * Validates the attack (cooldown, weapon ownership), calculates damage/hits,
+   * and broadcasts results via 'player_state_update' (health) and 'player_death'.
+   *
+   * @param {Object} message - The attack_request message
+   * @param {SessionPlayersSnapshot} playersSnapshot - Current state of all players
+   */
   handleAttackRequest(message, playersSnapshot) {
     if (!this.network?.isHost || !playersSnapshot) return;
 

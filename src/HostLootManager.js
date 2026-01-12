@@ -7,6 +7,9 @@ export class HostLootManager {
     this.nextLootId = 1; // Counter for unique loot IDs
   }
 
+  /**
+   * Spawns a new loot item and broadcasts 'loot_spawned' to all clients.
+   */
   spawnLoot(itemId, x, y, type = 'weapon') {
     const lootId = `loot-${this.nextLootId++}`;
     const lootItem = {
@@ -67,6 +70,11 @@ export class HostLootManager {
       this.syncLootToPlayer(message.from);
   }
 
+  /**
+   * Handles a 'pickup_request' from a client.
+   * Validates the request (distance, availability), updates the player's equipment
+   * via 'player_state_update', and broadcasts 'loot_picked_up' to remove the item.
+   */
   handlePickupRequest(message, playersSnapshot) {
     if (!this.network?.isHost || !playersSnapshot) return;
 
