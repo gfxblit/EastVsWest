@@ -51,8 +51,7 @@ describe('BotController', () => {
     });
 
     mockSnapshot = {
-      getPlayers: () => players,
-      updatePlayer: jest.fn()
+      getPlayers: () => players
     };
     
     // Minimal mock of game state for zone checks if needed
@@ -94,14 +93,12 @@ describe('BotController', () => {
     const deltaTime = 1.0; // 1 second
     botController.update(deltaTime);
 
-    // Bot should move 100 units towards (200, 0) -> (100, 0)
-    expect(mockSnapshot.updatePlayer).toHaveBeenCalledWith(botId, expect.objectContaining({
+    // Should broadcast movement
+    expect(mockNetwork.broadcastPlayerStateUpdate).toHaveBeenCalledWith(expect.objectContaining({
+      player_id: botId,
       position_x: 100,
       position_y: 0
     }));
-    
-    // Should broadcast movement
-    expect(mockNetwork.broadcastPlayerStateUpdate).toHaveBeenCalled();
   });
 
   test('should attack when in range', () => {
@@ -119,10 +116,10 @@ describe('BotController', () => {
       const initialX = mockSnapshot.getPlayers().get(botId).position_x;
       botController.update(1.0);
       
-      const newX = mockSnapshot.updatePlayer.mock.calls[0][1].position_x;
-      const newY = mockSnapshot.updatePlayer.mock.calls[0][1].position_y;
+      // Should have broadcasted some movement
+      expect(mockNetwork.broadcastPlayerStateUpdate).toHaveBeenCalled();
+      const lastUpdate = mockNetwork.broadcastPlayerStateUpdate.mock.calls[0][0];
       
-      // Should have moved somewhere
-      expect(newX !== initialX || newY !== 0).toBe(true);
+      expect(lastUpdate.position_x !== initialX || lastUpdate.position_y !== 0).toBe(true);
   });
 });

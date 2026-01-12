@@ -43,7 +43,11 @@ export class Game {
         this.hostCombatManager = new HostCombatManager(network, this.state);
         this.hostLootManager = new HostLootManager(network, this.state);
         
-        network.on('attack_request', (msg) => this.hostCombatManager.handleAttackRequest(msg, this.playersSnapshot));
+        network.on('attack_request', (msg) => {
+            this.hostCombatManager.handleAttackRequest(msg, this.playersSnapshot);
+            // Also trigger animation for bots or self if needed (LocalPlayerController handles self)
+            this.handleAttackAnimation(msg);
+        });
         network.on('pickup_request', (msg) => this.hostLootManager.handlePickupRequest(msg, this.playersSnapshot));
         network.on('request_loot_sync', (msg) => this.hostLootManager.handleLootSyncRequest(msg));
         
@@ -99,7 +103,6 @@ export class Game {
 
     if (network) {
       // Listen for network events
-      network.on('attack_request', (msg) => this.handleAttackAnimation(msg));
       network.on('loot_spawned', (msg) => this.handleLootSpawned(msg));
       network.on('loot_picked_up', (msg) => this.handleLootPickedUp(msg));
       network.on('loot_sync', (msg) => this.handleLootSync(msg));

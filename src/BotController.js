@@ -68,25 +68,8 @@ export class BotController {
     const newX = bot.position_x + moveX;
     const newY = bot.position_y + moveY;
 
-    // Boundary checks could be added here or rely on server validation (HostCombatManager updates position?)
-    // Actually, Host needs to update the position in the snapshot and broadcast it.
-    
-    // Update local snapshot immediately
-    this.playersSnapshot.updatePlayer(this.botId, {
-      position_x: newX,
-      position_y: newY,
-      rotation: angle // Face target
-    });
-
     // Broadcast movement (Host is authoritative for bots)
-    // We can throttle this if needed, but for now simple broadcast
-    // In a real scenario, Host might bundle these updates. 
-    // For now, let's piggyback on the standard update mechanism if possible, 
-    // or just assume HostCombatManager/Game loop broadcasts state?
-    // The Game loop broadcasts *health* updates from HostCombatManager.
-    // Movement updates usually come from clients. 
-    // Since Host *owns* the bot, Host needs to broadcast bot movement.
-    
+    // SessionPlayersSnapshot listens to these broadcasts and updates locally
     this.network.broadcastPlayerStateUpdate({
         player_id: this.botId,
         position_x: newX,
@@ -114,12 +97,6 @@ export class BotController {
     // Keep within world bounds (simple check)
     // TODO: Keep within conflict zone?
     
-    this.playersSnapshot.updatePlayer(this.botId, {
-        position_x: newX,
-        position_y: newY,
-        rotation: this.wanderAngle
-    });
-
     this.network.broadcastPlayerStateUpdate({
         player_id: this.botId,
         position_x: newX,
