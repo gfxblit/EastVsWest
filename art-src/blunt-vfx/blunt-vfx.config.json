@@ -12,8 +12,8 @@
   "bgRemoval": {
     "enabled": true,
     "keyColor": "#ff00ff",
-    "threshold": "205",
-    "erode": "1"
+    "threshold": 205,
+    "erode": 1
   },
   "sourceFilename": "east.png",
   "anchorOverrides": {
