@@ -17,6 +17,7 @@ export class PlayerRenderer {
             left: null,
             right: null
         };
+        this.deadPlayers = new Map();
     }
 
     init() {
@@ -33,6 +34,15 @@ export class PlayerRenderer {
         this.thrustImages.down = this.assetManager.createImage(CONFIG.ASSETS.VFX.THRUST.DOWN);
         this.thrustImages.left = this.assetManager.createImage(CONFIG.ASSETS.VFX.THRUST.LEFT);
         this.thrustImages.right = this.assetManager.createImage(CONFIG.ASSETS.VFX.THRUST.RIGHT);
+
+        // Load death sprite sheet
+        if (CONFIG.ASSETS.PLAYER_DEATH) {
+            this.assetManager.loadSpriteSheet(
+                'death',
+                CONFIG.ASSETS.PLAYER_DEATH.METADATA,
+                CONFIG.ASSETS.PLAYER_DEATH.PATH
+            );
+        }
     }
 
     render(ctx, player, isLocal = false) {
@@ -49,6 +59,13 @@ export class PlayerRenderer {
                 size,
                 size
             );
+        }
+
+        if (player.health <= 0) {
+            this.renderDeath(ctx, player, spriteX, spriteY, size);
+            return;
+        } else if (this.deadPlayers.has(player.id)) {
+            this.deadPlayers.delete(player.id);
         }
 
         const isAttacking = player.isAttacking;
@@ -208,6 +225,50 @@ export class PlayerRenderer {
             player.y + offsetY - drawHeight / 2,
             drawWidth,
             drawHeight
+        );
+    }
+
+    renderDeath(ctx, player, x, y, size) {
+        const spriteSheet = this.assetManager.getSpriteSheet('death');
+        const metadata = this.assetManager.getSpriteSheetMetadata('death');
+
+        if (!spriteSheet || !spriteSheet.complete || !metadata) {
+             // Fallback if not loaded
+             return;
+        }
+
+        if (!this.deadPlayers.has(player.id)) {
+            this.deadPlayers.set(player.id, Date.now());
+        }
+
+        const deathTime = this.deadPlayers.get(player.id);
+        const elapsed = (Date.now() - deathTime) / 1000;
+        const fps = CONFIG.ANIMATION.DEATH_FPS || 10;
+        const totalFrames = metadata.columns;
+        
+        let currentFrame = Math.floor(elapsed * fps);
+        if (currentFrame >= totalFrames) {
+            currentFrame = totalFrames - 1;
+        }
+
+        // Assuming single row for direction-agnostic death
+        const row = 0; 
+        const frameWidth = metadata.frameWidth;
+        const frameHeight = metadata.frameHeight;
+
+        const sourceX = currentFrame * frameWidth;
+        const sourceY = row * frameHeight;
+
+        ctx.drawImage(
+            spriteSheet,
+            sourceX,
+            sourceY,
+            frameWidth,
+            frameHeight,
+            x,
+            y,
+            size,
+            size
         );
     }
 }
