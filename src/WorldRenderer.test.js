@@ -70,6 +70,10 @@ describe('WorldRenderer', () => {
     });
 
     test('ShouldSetCorrectColorForPropsWithNoImage', () => {
+        // Arrange: Add a temporary prop type without an image
+        CONFIG.PROPS.TYPES.COLOR_ONLY = { renderWidth: 20, renderHeight: 20, color: '#ff00ff' };
+        CONFIG.PROPS.MAP.push({ id: 'temp_color', type: 'color_only', x: 10, y: 10 });
+
         // Track fillStyle changes
         const fillStyles = [];
         Object.defineProperty(mockCtx, 'fillStyle', {
@@ -82,8 +86,11 @@ describe('WorldRenderer', () => {
         worldRenderer.renderProps(mockCtx);
 
         // Assert
-        // TREE has no image, should use color
-        expect(fillStyles).toContain(CONFIG.PROPS.TYPES.TREE.color);
+        expect(fillStyles).toContain('#ff00ff');
+
+        // Cleanup
+        delete CONFIG.PROPS.TYPES.COLOR_ONLY;
+        CONFIG.PROPS.MAP.pop();
     });
 
     test('WhenDebugModeIsEnabled_ShouldDrawOutlines', () => {

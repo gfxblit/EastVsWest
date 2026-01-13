@@ -135,36 +135,30 @@ describe('BotController', () => {
   });
 
   test('WhenBotMovesIntoProp_ShouldBeBlocked', () => {
-    // tree_1 is at 400, 400. Size 40x40. X Range [380, 420].
+    // tree_1 is at 400, 400. Hitbox 60x140. X Range [370, 430].
     // Bot collision logic will mirror player logic.
 
     const botPlayer = mockSnapshot.getPlayers().get(botId);
     const hitboxRadius = CONFIG.PLAYER.HITBOX_RADIUS;
     
     // Start bot just to the left of the tree.
-    // Left edge of tree = 380.
+    // Left edge of tree = 370.
     // Bot Right Edge = x + hitboxRadius.
-    // Start Bot at 380 - hitboxRadius - 10.
-    // hitboxRadius is 40. Start at 330.
+    // Start Bot at 370 - hitboxRadius - 10.
     
-    botPlayer.position_x = 380 - hitboxRadius - 10;
+    botPlayer.position_x = 370 - hitboxRadius - 10;
     botPlayer.position_y = 400; // Center Y
     
     // Set Target to the right of the tree (e.g. 500, 400)
     mockSnapshot.getPlayers().get(targetId).position_x = 500;
     mockSnapshot.getPlayers().get(targetId).position_y = 400;
     
-    // Speed 100.
-    // Update for 0.5s -> move 50px. Target X = 330 + 50 = 380.
-    // 380 + 40 (hitbox) = 420. This is > 380 (tree left).
-    // Should be clamped. Max X = 380 - 40 = 340.
-    
     botController.update(0.5);
 
     // Verify position in broadcast
     const lastUpdate = mockNetwork.broadcastPlayerStateUpdate.mock.calls[mockNetwork.broadcastPlayerStateUpdate.mock.calls.length - 1][0];
     
-    const expectedMaxX = 380 - hitboxRadius;
+    const expectedMaxX = 370 - hitboxRadius;
     expect(lastUpdate.position_x).toBeLessThanOrEqual(expectedMaxX + 0.1);
     expect(lastUpdate.position_x).toBeGreaterThan(botPlayer.position_x); // Should have moved some amount
   });
