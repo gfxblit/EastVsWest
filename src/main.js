@@ -294,6 +294,7 @@ class App {
       console.log('Match ended', payload);
       this.stopGameLoop();
       this.game = null;
+      this.ui.showSpectatorControls(false);
 
       const { winner_id, stats } = payload.data;
       const winner = stats.find(p => p.player_id === winner_id);
