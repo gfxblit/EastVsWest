@@ -289,13 +289,13 @@ export const CONFIG = {
   PROPS: {
     TYPES: {
       TREE: { 
-        renderWidth: 40, renderHeight: 40, 
-        hitboxWidth: 40, hitboxHeight: 40, 
-        color: '#2d5a27', type: 'tree' 
+        renderWidth: 70, renderHeight: 150, 
+        hitboxWidth: 60, hitboxHeight: 140, 
+        color: '#2d5a27', type: 'tree', src: 'assets/props/tree.png' 
       },
       ROCK: { 
-        renderWidth: 30, renderHeight: 20, 
-        hitboxWidth: 25, hitboxHeight: 15, 
+        renderWidth: 128, renderHeight: 100, 
+        hitboxWidth: 70, hitboxHeight: 50, 
         color: '#7a7a7a', type: 'rock', src: 'assets/props/rock.png' 
       },
     },
