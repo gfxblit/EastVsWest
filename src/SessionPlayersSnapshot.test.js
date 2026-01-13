@@ -641,6 +641,34 @@ describe('SessionPlayersSnapshot (Built on Network)', () => {
       // Should not crash or add new player
       expect(snapshot.getPlayers().get('unknown-player-id')).toBeUndefined();
     });
+
+    test('WhenUpdatePlayersCalled_ShouldSyncLocalMapWithProvidedList', async () => {
+      snapshot = new SessionPlayersSnapshot(mockNetwork, TEST_SESSION_ID);
+      await snapshot.ready();
+
+      const initialPlayers = [
+        createMockPlayer({ player_id: 'p1', player_name: 'Player 1' }),
+        createMockPlayer({ player_id: 'p2', player_name: 'Player 2' })
+      ];
+
+      snapshot.updatePlayers(initialPlayers);
+
+      expect(snapshot.getPlayers().size).toBe(2);
+      expect(snapshot.getPlayers().get('p1').player_name).toBe('Player 1');
+      expect(snapshot.getPlayers().get('p2').player_name).toBe('Player 2');
+
+      const updatedPlayers = [
+        createMockPlayer({ player_id: 'p1', player_name: 'Player 1 Updated' }),
+        createMockPlayer({ player_id: 'p3', player_name: 'Player 3' })
+      ];
+
+      snapshot.updatePlayers(updatedPlayers);
+
+      expect(snapshot.getPlayers().size).toBe(2);
+      expect(snapshot.getPlayers().get('p1').player_name).toBe('Player 1 Updated');
+      expect(snapshot.getPlayers().get('p3').player_name).toBe('Player 3');
+      expect(snapshot.getPlayers().has('p2')).toBe(false);
+    });
   });
 
   describe('Authorization Checks', () => {

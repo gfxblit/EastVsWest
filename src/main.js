@@ -285,8 +285,16 @@ class App {
     // Note: player_joined/player_left events removed from Network
     // Lobby updates now come from polling SessionPlayersSnapshot
 
-    this.network.on('game_start', () => {
+    this.network.on('game_start', (payload) => {
       console.log('Game starting signal received');
+      
+      // Atomic sync: Update snapshot with initial players (including bots) from payload
+      if (payload && payload.data && payload.data.players) {
+        if (this.playersSnapshot) {
+          this.playersSnapshot.updatePlayers(payload.data.players);
+        }
+      }
+      
       this.startGame();
     });
 

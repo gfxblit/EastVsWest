@@ -256,20 +256,47 @@ export class SessionManager {
 
             if (insertError) {
                 console.error('Failed to add bots:', insertError.message);
+                throw insertError; // Throw so we don't start a broken game
             }
         }
 
-        // 2. Update session status to active
+        // 2. Reset all players' state for a clean start
+        const { error: resetError } = await this.supabase
+            .from('session_players')
+            .update({
+                health: 100,
+                is_alive: true,
+                kills: 0,
+                damage_dealt: 0,
+                position_x: CONFIG.WORLD.WIDTH / 2,
+                position_y: CONFIG.WORLD.HEIGHT / 2,
+                equipped_weapon: 'fist'
+            })
+            .eq('session_id', this.network.sessionId);
+
+        if (resetError) throw resetError;
+
+        // 3. Update session status to active
         const { error: updateError } = await this.supabase
             .from('game_sessions')
             .update({ status: 'active' })
             .eq('id', this.network.sessionId);
 
         if (updateError) throw updateError;
+
+        // 4. Fetch final list of players (including bots) for atomic broadcast
+        const { data: finalPlayers, error: finalPlayersError } = await this.supabase
+            .from('session_players')
+            .select('*')
+            .eq('session_id', this.network.sessionId);
+
+        if (finalPlayersError) throw finalPlayersError;
         
         // Broadcast start event so clients transition UI
+        // Include full player list for immediate client-side sync
         this.network.send('game_start', {
-            timestamp: Date.now()
+            timestamp: Date.now(),
+            players: finalPlayers
         });
     }
 

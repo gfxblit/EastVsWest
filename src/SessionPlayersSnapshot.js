@@ -429,6 +429,35 @@ export class SessionPlayersSnapshot {
   }
 
   /**
+   * Update the entire player list atomically.
+   * Useful for initial game start to ensure all clients have the same bot/player state.
+   * @param {Array} playerList - Array of player records from the database
+   */
+  updatePlayers(playerList) {
+    if (!playerList || !Array.isArray(playerList)) return;
+
+    const newPlayerIds = new Set(playerList.map(p => p.player_id));
+
+    // Update existing or add new
+    playerList.forEach(dbPlayer => {
+      const localPlayer = this.players.get(dbPlayer.player_id);
+      if (localPlayer) {
+        // Merge DB data into local player object
+        Object.assign(localPlayer, dbPlayer);
+      } else {
+        this.players.set(dbPlayer.player_id, dbPlayer);
+      }
+    });
+
+    // Remove players not in the new list
+    for (const [id] of this.players) {
+      if (!newPlayerIds.has(id)) {
+        this.players.delete(id);
+      }
+    }
+  }
+
+  /**
    * Get all players in this session
    * @returns {Map} Map of players keyed by player_id
    */
