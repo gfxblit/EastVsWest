@@ -282,4 +282,20 @@ export const CONFIG = {
     STOPPING_DISTANCE: 40,
     MOVEMENT_SPEED: 50,
   },
+
+  // Environmental Props
+  PROPS: {
+    TYPES: {
+      TREE: { width: 40, height: 40, color: '#2d5a27', type: 'tree' },
+      ROCK: { width: 60, height: 40, color: '#7a7a7a', type: 'rock' },
+    },
+    // Static map definition
+    MAP: [
+      { id: 'tree_1', type: 'tree', x: 400, y: 400 },
+      { id: 'tree_2', type: 'tree', x: 450, y: 550 },
+      { id: 'rock_1', type: 'rock', x: 600, y: 300 },
+      { id: 'rock_2', type: 'rock', x: 1000, y: 600 },
+      { id: 'tree_3', type: 'tree', x: 1600, y: 1200 },
+    ]
+  },
 };

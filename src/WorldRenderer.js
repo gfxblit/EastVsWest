@@ -41,8 +41,31 @@ export class WorldRenderer {
              ctx.fillRect(0, 0, ctx.canvas.width, ctx.canvas.height);
         }
 
+        // Render environmental props
+        this.renderProps(ctx);
+
         // Render conflict zone
         this.renderConflictZone(ctx, conflictZone);
+    }
+
+    renderProps(ctx) {
+        if (!CONFIG.PROPS || !CONFIG.PROPS.MAP) return;
+
+        ctx.save();
+        CONFIG.PROPS.MAP.forEach(prop => {
+            const propType = CONFIG.PROPS.TYPES[prop.type.toUpperCase()];
+            if (propType) {
+                ctx.fillStyle = propType.color;
+                // Draw centered at position
+                ctx.fillRect(
+                    prop.x - propType.width / 2,
+                    prop.y - propType.height / 2,
+                    propType.width,
+                    propType.height
+                );
+            }
+        });
+        ctx.restore();
     }
 
     renderConflictZone(ctx, zone) {

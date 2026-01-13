@@ -118,13 +118,93 @@ export class LocalPlayerController {
   }
 
   #updatePhysics(deltaTime) {
-    // Update position based on velocity
-    this.player.x += this.player.velocity.x * deltaTime;
-    this.player.y += this.player.velocity.y * deltaTime;
+    // Apply X movement
+    let nextX = this.player.x + this.player.velocity.x * deltaTime;
+    this.player.x = this.#resolveCollisionX(nextX, this.player.y);
+
+    // Apply Y movement
+    let nextY = this.player.y + this.player.velocity.y * deltaTime;
+    this.player.y = this.#resolveCollisionY(this.player.x, nextY);
 
     // Keep player within world bounds
     this.player.x = Math.max(0, Math.min(CONFIG.WORLD.WIDTH, this.player.x));
     this.player.y = Math.max(0, Math.min(CONFIG.WORLD.HEIGHT, this.player.y));
+  }
+
+  #resolveCollisionX(x, y) {
+    if (!CONFIG.PROPS || !CONFIG.PROPS.MAP) return x;
+
+    const playerHalfSize = CONFIG.RENDER.PLAYER_RADIUS; // Using radius as half-extent for AABB
+    const playerMinX = x - playerHalfSize;
+    const playerMaxX = x + playerHalfSize;
+    const playerMinY = y - playerHalfSize;
+    const playerMaxY = y + playerHalfSize;
+
+    for (const prop of CONFIG.PROPS.MAP) {
+      const propType = CONFIG.PROPS.TYPES[prop.type.toUpperCase()];
+      if (!propType) continue;
+
+      const propHalfWidth = propType.width / 2;
+      const propHalfHeight = propType.height / 2;
+
+      const propMinX = prop.x - propHalfWidth;
+      const propMaxX = prop.x + propHalfWidth;
+      const propMinY = prop.y - propHalfHeight;
+      const propMaxY = prop.y + propHalfHeight;
+
+      // Check for overlap
+      if (playerMinX < propMaxX && playerMaxX > propMinX &&
+          playerMinY < propMaxY && playerMaxY > propMinY) {
+        
+        // Resolve X collision
+        if (x < prop.x) {
+          // Coming from left, hit left side
+          return propMinX - playerHalfSize;
+        } else {
+          // Coming from right, hit right side
+          return propMaxX + playerHalfSize;
+        }
+      }
+    }
+    return x;
+  }
+
+  #resolveCollisionY(x, y) {
+    if (!CONFIG.PROPS || !CONFIG.PROPS.MAP) return y;
+
+    const playerHalfSize = CONFIG.RENDER.PLAYER_RADIUS;
+    const playerMinX = x - playerHalfSize;
+    const playerMaxX = x + playerHalfSize;
+    const playerMinY = y - playerHalfSize;
+    const playerMaxY = y + playerHalfSize;
+
+    for (const prop of CONFIG.PROPS.MAP) {
+      const propType = CONFIG.PROPS.TYPES[prop.type.toUpperCase()];
+      if (!propType) continue;
+
+      const propHalfWidth = propType.width / 2;
+      const propHalfHeight = propType.height / 2;
+
+      const propMinX = prop.x - propHalfWidth;
+      const propMaxX = prop.x + propHalfWidth;
+      const propMinY = prop.y - propHalfHeight;
+      const propMaxY = prop.y + propHalfHeight;
+
+      // Check for overlap
+      if (playerMinX < propMaxX && playerMaxX > propMinX &&
+          playerMinY < propMaxY && playerMaxY > propMinY) {
+        
+        // Resolve Y collision
+        if (y < prop.y) {
+          // Coming from top, hit top side
+          return propMinY - playerHalfSize;
+        } else {
+          // Coming from bottom, hit bottom side
+          return propMaxY + playerHalfSize;
+        }
+      }
+    }
+    return y;
   }
 
   #updateAnimation(deltaTime) {
