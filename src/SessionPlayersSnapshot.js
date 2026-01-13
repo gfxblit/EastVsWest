@@ -296,12 +296,13 @@ export class SessionPlayersSnapshot {
             if (isHost) {
               // Host: Only update client-authoritative fields from DB
               // Preserve local host-authoritative fields (health, equipment, etc.)
-              localPlayer.position_x = dbPlayer.position_x;
-              localPlayer.position_y = dbPlayer.position_y;
-              localPlayer.rotation = dbPlayer.rotation;
-              localPlayer.velocity_x = dbPlayer.velocity_x;
-              localPlayer.velocity_y = dbPlayer.velocity_y;
-              localPlayer.is_connected = dbPlayer.is_connected;
+              const clientAuthFields = [
+                'position_x', 'position_y', 'rotation',
+                'velocity_x', 'velocity_y', 'is_connected'
+              ];
+              clientAuthFields.forEach(field => {
+                localPlayer[field] = dbPlayer[field];
+              });
               
               // Also sync read-only metadata if needed, but safe to ignore for now
             } else {
