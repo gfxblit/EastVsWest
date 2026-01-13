@@ -5,6 +5,7 @@ export class WorldRenderer {
         this.assetManager = assetManager;
         this.bgPattern = null;
         this.bgImage = null;
+        this.propImages = {};
     }
 
     init(ctx) {
@@ -20,6 +21,29 @@ export class WorldRenderer {
             createPattern();
         } else {
             this.bgImage.onload = createPattern;
+        }
+
+        // Load prop images
+        if (CONFIG.PROPS && CONFIG.PROPS.TYPES) {
+            Object.entries(CONFIG.PROPS.TYPES).forEach(([key, typeConfig]) => {
+                if (typeConfig.src) {
+                    const img = this.assetManager.createImage(typeConfig.src);
+                    this.propImages[key] = img;
+                    
+                    const updateDimensions = () => {
+                        if (img.naturalWidth > 0 && img.naturalHeight > 0) {
+                            typeConfig.width = img.naturalWidth;
+                            typeConfig.height = img.naturalHeight;
+                        }
+                    };
+
+                    if (img.complete) {
+                        updateDimensions();
+                    } else {
+                        img.onload = updateDimensions;
+                    }
+                }
+            });
         }
     }
 
@@ -53,19 +77,27 @@ export class WorldRenderer {
 
         ctx.save();
         CONFIG.PROPS.MAP.forEach(prop => {
-            const propType = CONFIG.PROPS.TYPES[prop.type.toUpperCase()];
+            const typeKey = prop.type.toUpperCase();
+            const propType = CONFIG.PROPS.TYPES[typeKey];
             if (propType) {
-                ctx.fillStyle = propType.color;
-                // Draw centered at position
-                const x = prop.x - propType.width / 2;
-                const y = prop.y - propType.height / 2;
+                const width = propType.width;
+                const height = propType.height;
+                const x = prop.x - width / 2;
+                const y = prop.y - height / 2;
                 
-                ctx.fillRect(x, y, propType.width, propType.height);
+                const img = this.propImages ? this.propImages[typeKey] : null;
+
+                if (img && img.complete && img.naturalWidth > 0) {
+                    ctx.drawImage(img, x, y, width, height);
+                } else {
+                    ctx.fillStyle = propType.color;
+                    ctx.fillRect(x, y, width, height);
+                }
 
                 if (debugMode) {
                     ctx.strokeStyle = 'red';
                     ctx.lineWidth = 2;
-                    ctx.strokeRect(x, y, propType.width, propType.height);
+                    ctx.strokeRect(x, y, width, height);
                 }
             }
         });

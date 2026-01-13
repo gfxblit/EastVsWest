@@ -21,6 +21,7 @@ describe('WorldRenderer', () => {
     // Mock Canvas Context
     mockCtx = {
       createPattern: jest.fn(),
+      drawImage: jest.fn(),
       fillStyle: '',
       fillRect: jest.fn(),
       strokeRect: jest.fn(),
@@ -50,27 +51,25 @@ describe('WorldRenderer', () => {
       worldRenderer.renderProps(mockCtx);
 
       // Assert
-      // We expect fillRect to be called for each prop in CONFIG.PROPS.MAP
-      // plus the background calls (which we are not focusing on here, but renderProps should add more calls)
-      
       const props = CONFIG.PROPS.MAP;
       
       props.forEach(prop => {
-        const propType = CONFIG.PROPS.TYPES[prop.type.toUpperCase()];
+        const typeKey = prop.type.toUpperCase();
+        const propType = CONFIG.PROPS.TYPES[typeKey];
+        const img = worldRenderer.propImages[typeKey];
+
+        const x = prop.x - propType.width / 2;
+        const y = prop.y - propType.height / 2;
         
-        // Verify a fillRect call matches this prop's dimensions and position
-        // We use Math.floor or similar if needed, but here we expect exact matches
-        // Note: fillRect might be called for background too, so we look for matching calls
-        expect(mockCtx.fillRect).toHaveBeenCalledWith(
-          prop.x - propType.width / 2, // Centered X
-          prop.y - propType.height / 2, // Centered Y
-          propType.width,
-          propType.height
-        );
+        if (img && img.complete) {
+            expect(mockCtx.drawImage).toHaveBeenCalledWith(img, x, y, propType.width, propType.height);
+        } else {
+            expect(mockCtx.fillRect).toHaveBeenCalledWith(x, y, propType.width, propType.height);
+        }
       });
     });
 
-    test('ShouldSetCorrectColorForProps', () => {
+    test('ShouldSetCorrectColorForPropsWithNoImage', () => {
         // Track fillStyle changes
         const fillStyles = [];
         Object.defineProperty(mockCtx, 'fillStyle', {
@@ -83,9 +82,8 @@ describe('WorldRenderer', () => {
         worldRenderer.renderProps(mockCtx);
 
         // Assert
-        // Check if colors for TREE and ROCK are used
+        // TREE has no image, should use color
         expect(fillStyles).toContain(CONFIG.PROPS.TYPES.TREE.color);
-        expect(fillStyles).toContain(CONFIG.PROPS.TYPES.ROCK.color);
     });
 
     test('WhenDebugModeIsEnabled_ShouldDrawOutlines', () => {
@@ -96,6 +94,55 @@ describe('WorldRenderer', () => {
       // Should call strokeRect for each prop
       expect(mockCtx.strokeRect).toHaveBeenCalledTimes(CONFIG.PROPS.MAP.length);
       expect(mockCtx.strokeStyle).toBe('red');
+    });
+
+    test('ShouldLoadPropImagesAndResizeConfig', () => {
+        // Arrange
+        const rockType = CONFIG.PROPS.TYPES.ROCK;
+        // Reset dimensions to verify update
+        rockType.width = 10; 
+        rockType.height = 10;
+
+        // Mock createImage to return an image with specific dimensions for the rock source
+        mockAssetManager.createImage.mockImplementation((src) => {
+            if (src === 'assets/props/rock.png') {
+                return {
+                    src,
+                    complete: true,
+                    naturalWidth: 123,
+                    naturalHeight: 456,
+                    onload: null
+                };
+            }
+            return { src, complete: true, naturalWidth: 100, onload: null };
+        });
+
+        // Act
+        worldRenderer.init(mockCtx);
+
+        // Assert
+        expect(worldRenderer.propImages['ROCK']).toBeDefined();
+        // Config should be updated to natural dimensions
+        expect(rockType.width).toBe(123);
+        expect(rockType.height).toBe(456);
+    });
+
+    test('ShouldRenderPropImageWhenAvailable', () => {
+        // Arrange
+        mockCtx.drawImage = jest.fn();
+        
+        // Ensure ROCK has an image
+        const rockImg = { complete: true, naturalWidth: 100, naturalHeight: 100 };
+        worldRenderer.propImages = { 'ROCK': rockImg };
+        
+        // Act
+        worldRenderer.renderProps(mockCtx);
+
+        // Assert
+        // Should call drawImage at least once (for rocks in the map)
+        expect(mockCtx.drawImage).toHaveBeenCalled();
+        const calls = mockCtx.drawImage.mock.calls;
+        expect(calls[0][0]).toBe(rockImg);
     });
   });
 });

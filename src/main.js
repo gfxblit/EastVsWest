@@ -235,6 +235,15 @@ class App {
     manifest.push({ src: 'game-background.png', type: 'image' });
     manifest.push({ src: 'lobby-background.png', type: 'image' });
 
+    // Props
+    if (CONFIG.PROPS && CONFIG.PROPS.TYPES) {
+        Object.values(CONFIG.PROPS.TYPES).forEach(propType => {
+            if (propType.src) {
+                manifest.push({ src: propType.src, type: 'image' });
+            }
+        });
+    }
+
     console.log(`Loading ${manifest.length} assets...`);
     
     await this.assetManager.preloadAssets(manifest, (progress) => {

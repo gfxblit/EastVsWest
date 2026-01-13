@@ -289,7 +289,7 @@ export const CONFIG = {
   PROPS: {
     TYPES: {
       TREE: { width: 40, height: 40, color: '#2d5a27', type: 'tree' },
-      ROCK: { width: 60, height: 40, color: '#7a7a7a', type: 'rock' },
+      ROCK: { width: 60, height: 40, color: '#7a7a7a', type: 'rock', src: 'assets/props/rock.png' },
     },
     // Static map definition
     MAP: [
