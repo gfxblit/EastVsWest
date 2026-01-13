@@ -1271,4 +1271,67 @@ describe('SessionPlayersSnapshot (Built on Network)', () => {
       expect(snapshot.refreshInterval).toBeNull();
     });
   });
+
+  describe('Bug Fixes', () => {
+    test('Host should NOT overwrite local authoritative bot health with stale DB data during refresh', async () => {
+      jest.useFakeTimers();
+
+      // Setup host auth
+      mockNetwork.isHost = true;
+      mockNetwork.hostId = TEST_PLAYER_ID; // The mocked network uses TEST_PLAYER_ID as its ID implicitly in tests usually, but let's be safe
+      
+      const BOT_ID = 'bot-id';
+
+      // 1. Initial State: Bot exists in DB with health 100
+      const initialBotState = {
+        player_id: BOT_ID,
+        session_id: TEST_SESSION_ID,
+        is_bot: true,
+        health: 100,
+        position_x: 0,
+        position_y: 0
+      };
+
+      // Setup mock to return initial state first
+      mockSupabaseClient.from().select().eq.mockResolvedValueOnce({
+        data: [initialBotState],
+        error: null,
+      });
+
+      snapshot = new SessionPlayersSnapshot(mockNetwork, TEST_SESSION_ID);
+      await snapshot.ready();
+
+      // Verify initial load
+      let bot = snapshot.getPlayers().get(BOT_ID);
+      expect(bot.health).toBe(100);
+
+      // 2. Simulate Host Logic: Bot takes damage and dies locally
+      bot.health = 0;
+      expect(snapshot.getPlayers().get(BOT_ID).health).toBe(0);
+
+      // 3. Trigger Refresh: DB still has health 100 (stale)
+      // IMPORTANT: Return a NEW object to ensure we test data overwriting, 
+      // not object reference mutation.
+      mockSupabaseClient.from().select().eq.mockResolvedValueOnce({
+        data: [{ 
+          ...initialBotState, 
+          health: 100 // Explicitly 100
+        }],
+        error: null,
+      });
+
+      // Fast-forward time to trigger refresh interval
+      jest.advanceTimersByTime(60000);
+      
+      // Wait for promises to resolve (refresh is async)
+      await Promise.resolve(); 
+      await Promise.resolve();
+
+      // 4. Assertion: Bot health should STILL be 0 because we are Host
+      bot = snapshot.getPlayers().get(BOT_ID);
+      expect(bot.health).toBe(0); 
+
+      jest.useRealTimers();
+    });
+  });
 });

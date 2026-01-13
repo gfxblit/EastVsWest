@@ -54,6 +54,7 @@ A hybrid authority model is used to balance responsiveness and consistency:
 
 - **Player Movement (Client-Authoritative)**: Each client has authority over its own player's position. It sends its position to the host, who accepts it and broadcasts the update to other clients. This ensures movement feels instantaneous.
 - **Shared Interactions (Server-Authoritative)**: For actions like picking up an item, clients send a request to the host. The host has the final authority, resolves any conflicts, and broadcasts the definitive outcome to all clients.
+- **State Persistence (Smart Merge)**: The Host maintains the authoritative game state in memory and throttles writes to the database (e.g., every 60s). To prevent stale database data from overwriting fresh in-memory state during synchronization, the Host employs a **Smart Merge** strategy: it ignores DB values for fields it controls (like health and kills) while accepting updates for client-controlled fields (like position).
 
 ## Game State Management
 
