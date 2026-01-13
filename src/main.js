@@ -742,7 +742,7 @@ class App {
     }
 
     // Render
-    this.renderer.render(this.game.getState(), this.game.getLocalPlayer(), this.playersSnapshot, this.camera, deltaTime);
+    this.renderer.render(this.game.getState(), this.game.getLocalPlayer(), this.playersSnapshot, this.camera, deltaTime, this.game.debugMode);
 
     // Continue loop
     this.animationFrameId = requestAnimationFrame((timestamp) => this.gameLoop(timestamp));

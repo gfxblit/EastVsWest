@@ -23,6 +23,7 @@ describe('WorldRenderer', () => {
       createPattern: jest.fn(),
       fillStyle: '',
       fillRect: jest.fn(),
+      strokeRect: jest.fn(),
       save: jest.fn(),
       restore: jest.fn(),
       beginPath: jest.fn(),
@@ -85,6 +86,16 @@ describe('WorldRenderer', () => {
         // Check if colors for TREE and ROCK are used
         expect(fillStyles).toContain(CONFIG.PROPS.TYPES.TREE.color);
         expect(fillStyles).toContain(CONFIG.PROPS.TYPES.ROCK.color);
+    });
+
+    test('WhenDebugModeIsEnabled_ShouldDrawOutlines', () => {
+      // Act
+      worldRenderer.renderProps(mockCtx, true); // debugMode = true
+
+      // Assert
+      // Should call strokeRect for each prop
+      expect(mockCtx.strokeRect).toHaveBeenCalledTimes(CONFIG.PROPS.MAP.length);
+      expect(mockCtx.strokeStyle).toBe('red');
     });
   });
 });

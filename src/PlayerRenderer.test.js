@@ -50,12 +50,32 @@ describe('PlayerRenderer Death Animation', () => {
             beginPath: jest.fn(),
             arc: jest.fn(),
             stroke: jest.fn(),
+            fill: jest.fn(),
+            strokeRect: jest.fn(),
             save: jest.fn(),
             restore: jest.fn(),
             fillText: jest.fn()
         };
 
         renderer = new PlayerRenderer(mockAssetManager);
+    });
+
+    test('should render debug AABB when debugMode is true', () => {
+        renderer.init();
+        const player = {
+            id: 'p1',
+            x: 100,
+            y: 100,
+            health: 100,
+            rotation: 0,
+            animationState: { currentFrame: 0, lastDirection: 0 }
+        };
+
+        renderer.render(mockCtx, player, false, true); // debugMode = true
+
+        expect(mockCtx.strokeRect).toHaveBeenCalled();
+        expect(mockCtx.beginPath).toHaveBeenCalled();
+        expect(mockCtx.arc).toHaveBeenCalled();
     });
 
     test('should initialize death sprite image directly', () => {

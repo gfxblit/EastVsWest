@@ -16,6 +16,7 @@ export class Input {
       attack: false,
       specialAbility: false,
       interact: false,
+      toggleDebug: false,
     };
 
     this.keysPressed = new Set();
@@ -74,6 +75,9 @@ export class Input {
     } else if (key === CONFIG.INPUT.INTERACT_KEY) {
       this.inputState.interact = true;
       this.notifyChange();
+    } else if (key === CONFIG.INPUT.DEBUG_TOGGLE_KEY) {
+      this.inputState.toggleDebug = true;
+      this.notifyChange();
     }
   }
 
@@ -88,6 +92,9 @@ export class Input {
       this.notifyChange();
     } else if (key === CONFIG.INPUT.INTERACT_KEY) {
       this.inputState.interact = false;
+      this.notifyChange();
+    } else if (key === CONFIG.INPUT.DEBUG_TOGGLE_KEY) {
+      this.inputState.toggleDebug = false;
       this.notifyChange();
     }
   }

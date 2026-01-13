@@ -195,6 +195,7 @@ export const CONFIG = {
     SPECIAL_ABILITY_KEY: 'KeyQ',
     INTERACT_KEY: 'KeyF',
     DEBUG_CYCLE_WEAPON_KEY: 'KeyT',
+    DEBUG_TOGGLE_KEY: 'KeyO',
     MAX_JOYSTICK_DISTANCE: 45, // Maximum distance for virtual joystick movement
   },
 

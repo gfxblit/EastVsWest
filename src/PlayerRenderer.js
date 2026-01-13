@@ -70,7 +70,7 @@ export class PlayerRenderer {
         ctx.restore();
     }
 
-    render(ctx, player, isLocal = false) {
+    render(ctx, player, isLocal = false, debugMode = false) {
         const size = CONFIG.RENDER.PLAYER_RADIUS * 2;
         const spriteX = player.x - CONFIG.RENDER.PLAYER_RADIUS;
         const spriteY = player.y - CONFIG.RENDER.PLAYER_RADIUS;
@@ -84,6 +84,22 @@ export class PlayerRenderer {
                 size,
                 size
             );
+        }
+
+        // Debug AABB
+        if (debugMode) {
+            ctx.save();
+            ctx.strokeStyle = 'rgba(0, 255, 0, 0.8)'; // Green for player
+            ctx.lineWidth = 2;
+            // AABB is radius*2 box centered at player
+            ctx.strokeRect(player.x - CONFIG.RENDER.PLAYER_RADIUS, player.y - CONFIG.RENDER.PLAYER_RADIUS, size, size);
+            
+            // Also draw center point
+            ctx.fillStyle = 'yellow';
+            ctx.beginPath();
+            ctx.arc(player.x, player.y, 2, 0, Math.PI * 2);
+            ctx.fill();
+            ctx.restore();
         }
 
         if (player.health <= 0) {
