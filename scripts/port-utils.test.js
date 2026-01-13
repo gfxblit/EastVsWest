@@ -40,24 +40,12 @@ describe('Port Utilities', () => {
   });
 
   describe('getAvailablePort', () => {
-    let originalMathRandom;
-
-    beforeEach(() => {
-      originalMathRandom = Math.random;
-      // Mock Math.random to return 0, ensuring offset is 0 for deterministic testing
-      Math.random = () => 0;
-    });
-
-    afterEach(() => {
-      Math.random = originalMathRandom;
-    });
-
     test('should return a port in the expected range', async () => {
       const basePort = 3000;
       const port = await getAvailablePort(basePort);
       const hash = getBranchHash();
       
-      // With random() mocked to 0, the offset is 0
+      // deterministic behavior
       expect(port).toBeGreaterThanOrEqual(basePort + hash);
       expect(port).toBeLessThan(basePort + hash + 100);
     });
@@ -65,7 +53,7 @@ describe('Port Utilities', () => {
     test('should return a different port if the hashed one is taken', async () => {
       const basePort = 20000;
       const hash = getBranchHash();
-      // With random() mocked to 0, offset is 0
+      // deterministic behavior
       const hashedPort = basePort + hash;
       
       const server = net.createServer();
@@ -86,7 +74,7 @@ describe('Port Utilities', () => {
     test('should throw an error if no port is available', async () => {
       const basePort = 21000;
       const hash = getBranchHash();
-      // With random() mocked to 0, offset is 0
+      // deterministic behavior
       const startPort = basePort + hash;
       const servers = [];
 

@@ -74,10 +74,8 @@ export async function isPortAvailable(port) {
  */
 export async function getAvailablePort(basePort) {
   const hash = getBranchHash();
-  // Add a random offset between 0 and 99 to reduce collision probability when multiple processes
-  // start at the same time on the same branch.
-  const randomOffset = Math.floor(Math.random() * 100);
-  const startPort = basePort + hash + randomOffset;
+  // Remove random offset to ensure deterministic port selection for tests
+  const startPort = basePort + hash;
   let port = startPort;
   
   // Try up to 100 ports to find a free one
