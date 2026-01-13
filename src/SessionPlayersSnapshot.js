@@ -283,12 +283,45 @@ export class SessionPlayersSnapshot {
         return;
       }
 
-      // Replace the map with fresh data
+      // Smart Merge: Update existing players, add new ones, remove missing ones
       if (data) {
-        this.players.clear();
-        data.forEach(player => {
-          this.players.set(player.player_id, player);
+        const dbPlayerIds = new Set();
+        const isHost = this.network.isHost;
+
+        data.forEach(dbPlayer => {
+          dbPlayerIds.add(dbPlayer.player_id);
+          const localPlayer = this.players.get(dbPlayer.player_id);
+
+          if (localPlayer) {
+            if (isHost) {
+              // Host: Only update client-authoritative fields from DB
+              // Preserve local host-authoritative fields (health, equipment, etc.)
+              const clientAuthFields = [
+                'position_x', 'position_y', 'rotation',
+                'velocity_x', 'velocity_y', 'is_connected'
+              ];
+              clientAuthFields.forEach(field => {
+                localPlayer[field] = dbPlayer[field];
+              });
+              
+              // Also sync read-only metadata if needed, but safe to ignore for now
+            } else {
+              // Client: DB is authoritative (via Host), so update everything
+              // Use assign to preserve the object reference and any local-only properties (like positionHistory)
+              Object.assign(localPlayer, dbPlayer);
+            }
+          } else {
+            // New player: Add to map
+            this.players.set(dbPlayer.player_id, dbPlayer);
+          }
         });
+
+        // Remove players not in DB
+        for (const [id] of this.players) {
+          if (!dbPlayerIds.has(id)) {
+            this.players.delete(id);
+          }
+        }
       }
     } catch (err) {
       console.error(`Failed to refresh snapshot: ${err.message}`);
