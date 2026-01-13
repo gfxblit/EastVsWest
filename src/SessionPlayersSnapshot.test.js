@@ -1324,8 +1324,7 @@ describe('SessionPlayersSnapshot (Built on Network)', () => {
       jest.advanceTimersByTime(60000);
       
       // Wait for promises to resolve (refresh is async)
-      await Promise.resolve(); 
-      await Promise.resolve();
+      await new Promise(jest.requireActual('timers').setImmediate);
 
       // 4. Assertion: Bot health should STILL be 0 because we are Host
       bot = snapshot.getPlayers().get(BOT_ID);
