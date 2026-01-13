@@ -125,7 +125,7 @@ export class BotController {
   resolveCollisionX(x, y) {
     if (!CONFIG.PROPS || !CONFIG.PROPS.MAP) return x;
 
-    const playerHalfSize = CONFIG.RENDER.PLAYER_RADIUS;
+    const playerHalfSize = CONFIG.PLAYER.HITBOX_RADIUS;
     const playerMinX = x - playerHalfSize;
     const playerMaxX = x + playerHalfSize;
     const playerMinY = y - playerHalfSize;
@@ -169,7 +169,7 @@ export class BotController {
   resolveCollisionY(x, y) {
     if (!CONFIG.PROPS || !CONFIG.PROPS.MAP) return y;
 
-    const playerHalfSize = CONFIG.RENDER.PLAYER_RADIUS;
+    const playerHalfSize = CONFIG.PLAYER.HITBOX_RADIUS;
     const playerMinX = x - playerHalfSize;
     const playerMaxX = x + playerHalfSize;
     const playerMinY = y - playerHalfSize;

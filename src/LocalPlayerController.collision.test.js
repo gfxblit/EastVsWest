@@ -28,16 +28,16 @@ describe('LocalPlayerController Collision', () => {
     // Uses tree_1 at 400, 400. 40x40.
     // Prop X Range: [380, 420].
     
-    // Player Radius.
-    const radius = CONFIG.RENDER.PLAYER_RADIUS;
+    // Player Hitbox Radius.
+    const hitboxRadius = CONFIG.PLAYER.HITBOX_RADIUS;
     
     // Start player just to the left of the tree.
     // We want right edge of player to touch left edge of tree.
     // Left edge of tree = 380.
-    // Player X = 380 - radius.
+    // Player X = 380 - hitboxRadius.
     
     // Let's start a bit further back to allow some movement.
-    const startX = 380 - radius - 10;
+    const startX = 380 - hitboxRadius - 10;
     controller.player.x = startX;
     controller.player.y = 400; // Aligned with center Y
     
@@ -50,8 +50,8 @@ describe('LocalPlayerController Collision', () => {
     
     const player = controller.getPlayer();
     
-    // Expected Max X = 380 - radius
-    const expectedMaxX = 380 - radius;
+    // Expected Max X = 380 - hitboxRadius
+    const expectedMaxX = 380 - hitboxRadius;
     
     expect(player.x).toBeLessThanOrEqual(expectedMaxX + 0.1); // float tolerance
     expect(player.x).toBeGreaterThan(startX); // Should have moved some amount
@@ -59,10 +59,10 @@ describe('LocalPlayerController Collision', () => {
 
   test('WhenMovingIntoPropFromTop_ShouldBeBlocked', () => {
     // tree_1 at 400, 400. Y Range: [380, 420].
-    const radius = CONFIG.RENDER.PLAYER_RADIUS;
+    const hitboxRadius = CONFIG.PLAYER.HITBOX_RADIUS;
     
     // Start above
-    const startY = 380 - radius - 10;
+    const startY = 380 - hitboxRadius - 10;
     controller.player.x = 400;
     controller.player.y = startY;
     
@@ -73,7 +73,7 @@ describe('LocalPlayerController Collision', () => {
     
     const player = controller.getPlayer();
     
-    const expectedMaxY = 380 - radius;
+    const expectedMaxY = 380 - hitboxRadius;
     expect(player.y).toBeLessThanOrEqual(expectedMaxY + 0.1);
     expect(player.y).toBeGreaterThan(startY);
   });

@@ -91,8 +91,10 @@ export class PlayerRenderer {
             ctx.save();
             ctx.strokeStyle = 'rgba(0, 255, 0, 0.8)'; // Green for player
             ctx.lineWidth = 2;
-            // AABB is radius*2 box centered at player
-            ctx.strokeRect(player.x - CONFIG.RENDER.PLAYER_RADIUS, player.y - CONFIG.RENDER.PLAYER_RADIUS, size, size);
+            // AABB is radius*2 box centered at player (using hitbox radius)
+            const hitboxRadius = CONFIG.PLAYER.HITBOX_RADIUS;
+            const hitboxSize = hitboxRadius * 2;
+            ctx.strokeRect(player.x - hitboxRadius, player.y - hitboxRadius, hitboxSize, hitboxSize);
             
             // Also draw center point
             ctx.fillStyle = 'yellow';

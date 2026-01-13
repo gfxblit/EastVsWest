@@ -40,6 +40,7 @@ export const CONFIG = {
     DOUBLE_HANDED_SPEED_MODIFIER: 0.85, // -15% speed for double-handed weapons
     SPAWN_INVULNERABILITY_MS: 3000, // 3 seconds of invulnerability after spawn
     MAX_HEALTH: 100,
+    HITBOX_RADIUS: 40, // Collision half-width/height
   },
 
   // Conflict Zone Settings
