@@ -60,7 +60,7 @@ export class BotController {
     const speed = CONFIG.PLAYER.BASE_MOVEMENT_SPEED;
     
     // Stop if very close to avoid jitter
-    if (Math.hypot(dx, dy) < 10) return;
+    if (Math.hypot(dx, dy) < (CONFIG.BOT?.STOPPING_DISTANCE || 10)) return;
 
     const moveX = Math.cos(angle) * speed * deltaTime;
     const moveY = Math.sin(angle) * speed * deltaTime;

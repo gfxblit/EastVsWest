@@ -276,4 +276,9 @@ export const CONFIG = {
   LOOT: {
     PICKUP_RADIUS: 80,
   },
+
+  // Bot Settings
+  BOT: {
+    STOPPING_DISTANCE: 10,
+  },
 };

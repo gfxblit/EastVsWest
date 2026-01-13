@@ -15,12 +15,14 @@ describe('BotController', () => {
   const originalPlayerConfig = { ...CONFIG.PLAYER };
   const originalWeaponsConfig = { ...CONFIG.WEAPONS };
   const originalCombatConfig = { ...CONFIG.COMBAT };
+  const originalBotConfig = { ...CONFIG.BOT };
 
   beforeEach(() => {
     // Override CONFIG for testing
     CONFIG.PLAYER.BASE_MOVEMENT_SPEED = 100;
     CONFIG.WEAPONS.FIST.range = 50;
     CONFIG.COMBAT.ATTACK_AIM_DISTANCE = 100;
+    CONFIG.BOT = { STOPPING_DISTANCE: 10 };
 
     mockNetwork = {
       send: jest.fn(),
@@ -65,14 +67,19 @@ describe('BotController', () => {
         }
     };
 
+    // Mock Math.random for predictable behavior
+    jest.spyOn(Math, 'random').mockReturnValue(0.5);
+
     botController = new BotController(botId, mockNetwork, mockSnapshot, mockGame);
   });
 
   afterEach(() => {
+    jest.restoreAllMocks();
     // Restore CONFIG
     Object.assign(CONFIG.PLAYER, originalPlayerConfig);
     Object.assign(CONFIG.WEAPONS, originalWeaponsConfig);
     Object.assign(CONFIG.COMBAT, originalCombatConfig);
+    CONFIG.BOT = originalBotConfig;
   });
 
   test('should find nearest target', () => {
