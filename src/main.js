@@ -425,11 +425,19 @@ class App {
 
     console.log('Host starting game...');
     
-    // Reset player states in DB
-    await this.resetPlayerStates();
+    try {
+      // Spawn bots and update session status in DB
+      await this.network.startGame();
 
-    this.network.send('game_start', {});
-    this.startGame();
+      // Reset player states in DB (now including bots)
+      await this.resetPlayerStates();
+
+      // Note: network.startGame() already broadcasts 'game_start' which triggers this.startGame()
+      // for all clients via the network listener in setupNetworkHandlers().
+    } catch (error) {
+      console.error('Failed to start game:', error);
+      this.showError(`Error starting game: ${error.message}`);
+    }
   }
 
   async resetPlayerStates() {

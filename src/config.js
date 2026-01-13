@@ -9,6 +9,7 @@ export const CONFIG = {
   // Game Settings
   GAME: {
     MAX_PLAYERS: 12,
+    MIN_PLAYERS: 4,
     MATCH_DURATION_SECONDS: 300, // 5 minutes
     INITIAL_ZONE_SHRINK_DELAY_SECONDS: 60, // 1 minute before shrinking starts
     INITIAL_LOOT_COUNT: 20,
@@ -274,5 +275,11 @@ export const CONFIG = {
   // Loot Settings
   LOOT: {
     PICKUP_RADIUS: 80,
+  },
+
+  // Bot Settings
+  BOT: {
+    STOPPING_DISTANCE: 40,
+    MOVEMENT_SPEED: 50,
   },
 };

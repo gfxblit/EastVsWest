@@ -194,6 +194,85 @@ export class SessionManager {
         }
     }
 
+    async startGame() {
+        if (!this.supabase || !this.network.sessionId) return;
+
+        // 1. Get current players to see how many bots we need
+        const { data: players, error: playersError } = await this.supabase
+            .from('session_players')
+            .select('id')
+            .eq('session_id', this.network.sessionId);
+
+        if (playersError) throw playersError;
+
+        const playerCount = players.length;
+        const minPlayers = CONFIG.GAME.MIN_PLAYERS || 4;
+
+        if (playerCount < minPlayers) {
+            const botsNeeded = minPlayers - playerCount;
+            const botRecords = [];
+            const weaponIds = Object.keys(CONFIG.WEAPONS);
+            
+            // Fallback for crypto.randomUUID in insecure contexts (HTTP)
+            const generateUUID = () => {
+                if (typeof crypto.randomUUID === 'function') {
+                    return crypto.randomUUID();
+                }
+                // Basic fallback using getRandomValues
+                return ([1e7]+-1e3+-4e3+-8e3+-1e11).replace(/[018]/g, c =>
+                    (c ^ crypto.getRandomValues(new Uint8Array(1))[0] & 15 >> c / 4).toString(16)
+                );
+            };
+
+            for (let i = 1; i <= botsNeeded; i++) {
+                const botId = generateUUID();
+                const botName = `Bot-${i}`;
+                
+                // Random weapon selection with safety fallback
+                const randomWeapon = weaponIds.length > 0
+                    ? CONFIG.WEAPONS[weaponIds[Math.floor(Math.random() * weaponIds.length)]].id
+                    : 'fist';
+
+                // Spawn bots around the center with some offset
+                const offsetX = (Math.random() - 0.5) * 400;
+                const offsetY = (Math.random() - 0.5) * 400;
+
+                botRecords.push({
+                    session_id: this.network.sessionId,
+                    player_id: botId,
+                    player_name: botName,
+                    is_host: false,
+                    is_bot: true,
+                    position_x: CONFIG.WORLD.WIDTH / 2 + offsetX,
+                    position_y: CONFIG.WORLD.HEIGHT / 2 + offsetY,
+                    equipped_weapon: randomWeapon,
+                    health: 100
+                });
+            }
+
+            const { error: insertError } = await this.supabase
+                .from('session_players')
+                .insert(botRecords);
+
+            if (insertError) {
+                console.error('Failed to add bots:', insertError.message);
+            }
+        }
+
+        // 2. Update session status to active
+        const { error: updateError } = await this.supabase
+            .from('game_sessions')
+            .update({ status: 'active' })
+            .eq('id', this.network.sessionId);
+
+        if (updateError) throw updateError;
+        
+        // Broadcast start event so clients transition UI
+        this.network.send('game_start', {
+            timestamp: Date.now()
+        });
+    }
+
     generateJoinCode() {
         const chars = 'ABCDEFGHJKLMNPQRSTUVWXYZ23456789';
         let code = '';

@@ -62,6 +62,11 @@ export class Network extends EventEmitter {
       return this.sessionManager.joinGame(joinCode, playerName);
   }
 
+  async startGame() {
+      if (!this.isHost) throw new Error('Only the host can start the game.');
+      return this.sessionManager.startGame();
+  }
+
   _subscribeToChannel(channelName) {
     if (this.channel) {
       this.supabase.removeChannel(this.channel);
@@ -122,13 +127,20 @@ export class Network extends EventEmitter {
 
   // FUTURE: Host-authoritative health persistence (not yet implemented)
   send(type, data) {
+    return this.sendFrom(this.playerId, type, data);
+  }
+
+  /**
+   * Send a message as a specific player (host-only utility for bots)
+   */
+  sendFrom(fromId, type, data) {
     if (!this.channel || !this.connected) {
       console.warn('Cannot send message, channel not connected.');
       return;
     }
     const message = {
       type,
-      from: this.playerId,
+      from: fromId,
       timestamp: Date.now(),
       data,
     };

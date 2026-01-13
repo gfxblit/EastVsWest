@@ -7,6 +7,7 @@ import { CONFIG } from './config.js';
 import { LocalPlayerController } from './LocalPlayerController.js';
 import { HostCombatManager } from './HostCombatManager.js';
 import { HostLootManager } from './HostLootManager.js';
+import { HostBotManager } from './HostBotManager.js';
 
 export class Game {
   constructor() {
@@ -24,6 +25,7 @@ export class Game {
     this.localPlayerController = null;
     this.hostCombatManager = null;
     this.hostLootManager = null;
+    this.hostBotManager = null;
     this.playersSnapshot = null;
     this.network = null;
     this.renderer = null;
@@ -40,31 +42,27 @@ export class Game {
     if (network && network.isHost) {
         this.hostCombatManager = new HostCombatManager(network, this.state);
         this.hostLootManager = new HostLootManager(network, this.state);
+        this.hostBotManager = new HostBotManager(network, this.playersSnapshot, this);
         
-        network.on('attack_request', (msg) => this.hostCombatManager.handleAttackRequest(msg, this.playersSnapshot));
+        network.on('attack_request', (msg) => {
+            this.hostCombatManager.handleAttackRequest(msg, this.playersSnapshot);
+            // Also trigger animation for bots or self if needed (LocalPlayerController handles self)
+            this.handleAttackAnimation(msg);
+        });
         network.on('pickup_request', (msg) => this.hostLootManager.handlePickupRequest(msg, this.playersSnapshot));
         network.on('request_loot_sync', (msg) => this.hostLootManager.handleLootSyncRequest(msg));
         
-        // Listen for new players joining to sync game state
-        network.on('postgres_changes', (payload) => {
-          if (payload.eventType === 'INSERT' && payload.table === 'session_players') {
-            const newPlayerId = payload.new.player_id;
-            if (newPlayerId !== network.playerId) {
-              console.log(`Host: New player ${newPlayerId} joined, syncing loot...`);
-              this.hostLootManager.syncLootToPlayer(newPlayerId);
-            }
-          }
-        });
-
         // Initial loot spawn
         if (this.state.loot.length === 0) {
           this.hostLootManager.spawnRandomLoot(CONFIG.GAME.INITIAL_LOOT_COUNT);
         }
+        
+        // Initialize existing bots
+        this.hostBotManager.initExistingBots();
     }
 
     if (network) {
       // Listen for network events
-      network.on('attack_request', (msg) => this.handleAttackAnimation(msg));
       network.on('loot_spawned', (msg) => this.handleLootSpawned(msg));
       network.on('loot_picked_up', (msg) => this.handleLootPickedUp(msg));
       network.on('loot_sync', (msg) => this.handleLootSync(msg));
@@ -123,6 +121,11 @@ export class Game {
     // Host-authoritative updates
     if (this.hostCombatManager) {
       this.hostCombatManager.update(deltaTime, this.playersSnapshot);
+    }
+    
+    // Update Bots (Host only)
+    if (this.hostBotManager) {
+        this.hostBotManager.update(deltaTime);
     }
   }
 

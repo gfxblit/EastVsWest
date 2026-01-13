@@ -1,0 +1,1 @@
+ALTER TABLE session_players ADD COLUMN is_bot BOOLEAN DEFAULT FALSE;
