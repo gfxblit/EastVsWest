@@ -1,5 +1,6 @@
 
 import { CONFIG } from './config.js';
+import { resolveCollisionX, resolveCollisionY } from './physicsHelper.js';
 
 export class BotController {
   constructor(botId, network, playersSnapshot, game) {
@@ -65,13 +66,15 @@ export class BotController {
     const moveX = Math.cos(angle) * speed * deltaTime;
     const moveY = Math.sin(angle) * speed * deltaTime;
 
+    const hitboxRadius = CONFIG.PLAYER.HITBOX_RADIUS;
+
     // Apply X movement and collision
     let newX = bot.position_x + moveX;
-    newX = this.resolveCollisionX(newX, bot.position_y);
+    newX = resolveCollisionX(newX, bot.position_y, hitboxRadius);
 
     // Apply Y movement and collision
     let newY = bot.position_y + moveY;
-    newY = this.resolveCollisionY(newX, newY);
+    newY = resolveCollisionY(newX, newY, hitboxRadius);
 
     // Clamp to world bounds
     newX = Math.max(0, Math.min(CONFIG.WORLD.WIDTH, newX));
@@ -100,13 +103,15 @@ export class BotController {
     const moveX = Math.cos(this.wanderAngle) * speed * deltaTime;
     const moveY = Math.sin(this.wanderAngle) * speed * deltaTime;
 
+    const hitboxRadius = CONFIG.PLAYER.HITBOX_RADIUS;
+
     // Apply X movement and collision
     let newX = bot.position_x + moveX;
-    newX = this.resolveCollisionX(newX, bot.position_y);
+    newX = resolveCollisionX(newX, bot.position_y, hitboxRadius);
 
     // Apply Y movement and collision
     let newY = bot.position_y + moveY;
-    newY = this.resolveCollisionY(newX, newY);
+    newY = resolveCollisionY(newX, newY, hitboxRadius);
 
     // Clamp to world bounds
     newX = Math.max(0, Math.min(CONFIG.WORLD.WIDTH, newX));
@@ -120,85 +125,6 @@ export class BotController {
         velocity_x: Math.cos(this.wanderAngle) * 0.5,
         velocity_y: Math.sin(this.wanderAngle) * 0.5
     });
-  }
-
-  resolveCollisionX(x, y) {
-    if (!CONFIG.PROPS || !CONFIG.PROPS.MAP) return x;
-
-    const playerHalfSize = CONFIG.PLAYER.HITBOX_RADIUS;
-    const playerMinX = x - playerHalfSize;
-    const playerMaxX = x + playerHalfSize;
-    const playerMinY = y - playerHalfSize;
-    const playerMaxY = y + playerHalfSize;
-
-    for (const prop of CONFIG.PROPS.MAP) {
-      const propType = CONFIG.PROPS.TYPES[prop.type.toUpperCase()];
-      if (!propType) continue;
-
-      const propHalfWidth = propType.hitboxWidth / 2;
-      const propHalfHeight = propType.hitboxHeight / 2;
-
-      const propMinX = prop.x - propHalfWidth;
-      const propMaxX = prop.x + propHalfWidth;
-      const propMinY = prop.y - propHalfHeight;
-      const propMaxY = prop.y + propHalfHeight;
-
-      // Check for overlap
-      if (playerMinX < propMaxX && playerMaxX > propMinX &&
-          playerMinY < propMaxY && playerMaxY > propMinY) {
-        
-        // Resolve X collision
-        // We compare against the prop center to decide which side to push to
-        // But since we are calculating based on a PROPOSED x, we can just push out to the nearest edge
-        // Or assume we came from the "previous" x (which we don't have easy access to here without passing it)
-        // Wait, logic in LocalPlayerController used 'x < prop.x' (center). 
-        // This assumes we haven't crossed the center yet.
-        
-        if (x < prop.x) {
-          // Hit left side
-          return propMinX - playerHalfSize;
-        } else {
-          // Hit right side
-          return propMaxX + playerHalfSize;
-        }
-      }
-    }
-    return x;
-  }
-
-  resolveCollisionY(x, y) {
-    if (!CONFIG.PROPS || !CONFIG.PROPS.MAP) return y;
-
-    const playerHalfSize = CONFIG.PLAYER.HITBOX_RADIUS;
-    const playerMinX = x - playerHalfSize;
-    const playerMaxX = x + playerHalfSize;
-    const playerMinY = y - playerHalfSize;
-    const playerMaxY = y + playerHalfSize;
-
-    for (const prop of CONFIG.PROPS.MAP) {
-      const propType = CONFIG.PROPS.TYPES[prop.type.toUpperCase()];
-      if (!propType) continue;
-
-      const propHalfWidth = propType.hitboxWidth / 2;
-      const propHalfHeight = propType.hitboxHeight / 2;
-
-      const propMinX = prop.x - propHalfWidth;
-      const propMaxX = prop.x + propHalfWidth;
-      const propMinY = prop.y - propHalfHeight;
-      const propMaxY = prop.y + propHalfHeight;
-
-      // Check for overlap
-      if (playerMinX < propMaxX && playerMaxX > propMinX &&
-          playerMinY < propMaxY && playerMaxY > propMinY) {
-        
-        if (y < prop.y) {
-          return propMinY - playerHalfSize;
-        } else {
-          return propMaxY + playerHalfSize;
-        }
-      }
-    }
-    return y;
   }
 
   attemptAttack(bot, target) {

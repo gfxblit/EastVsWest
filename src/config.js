@@ -205,6 +205,7 @@ export const CONFIG = {
     GAME_SIMULATION_INTERVAL_MS: 50, // interval between position updates (20 Hz = 50ms)
     INTERPOLATION_DELAY_MS: 100,
     INTERPOLATION_BUFFER_SIZE: 3,
+    CLIENT_AUTHORITATIVE_FIELDS: ['position_x', 'position_y', 'rotation', 'velocity_x', 'velocity_y', 'is_connected'],
   },
 
   // Asset Settings

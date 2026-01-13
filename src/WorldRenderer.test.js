@@ -106,20 +106,15 @@ describe('WorldRenderer', () => {
     test('ShouldLoadPropImagesAndResizeConfig', () => {
         // Arrange
         const rockType = CONFIG.PROPS.TYPES.ROCK;
-        // Reset dimensions to 0 to verify auto-update
+        // Mock config with 0 dimensions (should auto-update in local map)
+        const originalWidth = rockType.renderWidth;
         rockType.renderWidth = 0; 
         rockType.renderHeight = 0;
 
-        // Mock createImage to return an image with specific dimensions for the rock source
+        // Mock createImage
         mockAssetManager.createImage.mockImplementation((src) => {
             if (src === 'assets/props/rock.png') {
-                return {
-                    src,
-                    complete: true,
-                    naturalWidth: 123,
-                    naturalHeight: 456,
-                    onload: null
-                };
+                return { src, complete: true, naturalWidth: 123, naturalHeight: 456, onload: null };
             }
             return { src, complete: true, naturalWidth: 100, onload: null };
         });
@@ -128,29 +123,30 @@ describe('WorldRenderer', () => {
         worldRenderer.init(mockCtx);
 
         // Assert
-        expect(worldRenderer.propImages['ROCK']).toBeDefined();
-        // Config should be updated to natural dimensions because they were 0
-        expect(rockType.renderWidth).toBe(123);
-        expect(rockType.renderHeight).toBe(456);
+        const dimensions = worldRenderer.propDimensions.get('ROCK');
+        expect(dimensions).toBeDefined();
+        // Local dimensions should be updated
+        expect(dimensions.renderWidth).toBe(123);
+        expect(dimensions.renderHeight).toBe(456);
+        
+        // Global CONFIG should NOT be mutated (it stays 0 as set in this test)
+        expect(rockType.renderWidth).toBe(0);
+
+        // Restore
+        rockType.renderWidth = originalWidth;
     });
 
     test('ShouldPreserveConfiguredRenderDimensions', () => {
         // Arrange
         const rockType = CONFIG.PROPS.TYPES.ROCK;
+        const originalWidth = rockType.renderWidth;
         // Set explicit dimensions
         rockType.renderWidth = 50; 
         rockType.renderHeight = 50;
 
-        // Mock createImage
         mockAssetManager.createImage.mockImplementation((src) => {
             if (src === 'assets/props/rock.png') {
-                return {
-                    src,
-                    complete: true,
-                    naturalWidth: 123,
-                    naturalHeight: 456,
-                    onload: null
-                };
+                return { src, complete: true, naturalWidth: 123, naturalHeight: 456, onload: null };
             }
             return { src, complete: true, naturalWidth: 100, onload: null };
         });
@@ -159,9 +155,13 @@ describe('WorldRenderer', () => {
         worldRenderer.init(mockCtx);
 
         // Assert
-        // Config should KEEP explicit dimensions
-        expect(rockType.renderWidth).toBe(50);
-        expect(rockType.renderHeight).toBe(50);
+        const dimensions = worldRenderer.propDimensions.get('ROCK');
+        // Should keep explicit dimensions
+        expect(dimensions.renderWidth).toBe(50);
+        expect(dimensions.renderHeight).toBe(50);
+        
+        // Restore
+        rockType.renderWidth = originalWidth;
     });
 
     test('ShouldRenderPropImageWhenAvailable', () => {

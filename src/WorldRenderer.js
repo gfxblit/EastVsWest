@@ -6,6 +6,7 @@ export class WorldRenderer {
         this.bgPattern = null;
         this.bgImage = null;
         this.propImages = {};
+        this.propDimensions = new Map();
     }
 
     init(ctx) {
@@ -26,6 +27,10 @@ export class WorldRenderer {
         // Load prop images
         if (CONFIG.PROPS && CONFIG.PROPS.TYPES) {
             Object.entries(CONFIG.PROPS.TYPES).forEach(([key, typeConfig]) => {
+                // Initialize with config defaults
+                const dimensions = { ...typeConfig };
+                this.propDimensions.set(key, dimensions);
+
                 if (typeConfig.src) {
                     const img = this.assetManager.createImage(typeConfig.src);
                     this.propImages[key] = img;
@@ -33,8 +38,8 @@ export class WorldRenderer {
                     const updateDimensions = () => {
                         if (img.naturalWidth > 0 && img.naturalHeight > 0) {
                             // Only set default dimensions if not explicitly configured
-                            if (!typeConfig.renderWidth) typeConfig.renderWidth = img.naturalWidth;
-                            if (!typeConfig.renderHeight) typeConfig.renderHeight = img.naturalHeight;
+                            if (!typeConfig.renderWidth) dimensions.renderWidth = img.naturalWidth;
+                            if (!typeConfig.renderHeight) dimensions.renderHeight = img.naturalHeight;
                         }
                     };
 
@@ -80,9 +85,11 @@ export class WorldRenderer {
         CONFIG.PROPS.MAP.forEach(prop => {
             const typeKey = prop.type.toUpperCase();
             const propType = CONFIG.PROPS.TYPES[typeKey];
-            if (propType) {
-                const renderWidth = propType.renderWidth;
-                const renderHeight = propType.renderHeight;
+            const dimensions = this.propDimensions.get(typeKey) || propType;
+
+            if (propType && dimensions) {
+                const renderWidth = dimensions.renderWidth;
+                const renderHeight = dimensions.renderHeight;
                 const renderX = prop.x - renderWidth / 2;
                 const renderY = prop.y - renderHeight / 2;
                 
@@ -96,8 +103,8 @@ export class WorldRenderer {
                 }
 
                 if (debugMode) {
-                    const hitboxWidth = propType.hitboxWidth;
-                    const hitboxHeight = propType.hitboxHeight;
+                    const hitboxWidth = dimensions.hitboxWidth;
+                    const hitboxHeight = dimensions.hitboxHeight;
                     const hitboxX = prop.x - hitboxWidth / 2;
                     const hitboxY = prop.y - hitboxHeight / 2;
 
