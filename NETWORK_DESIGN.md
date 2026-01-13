@@ -489,23 +489,22 @@ We keep the lobby in sync by treating the database as the single source of truth
 }
 ```
 
-**HOST → ALL: `game_end`**
+**HOST → ALL: `game_over`**
 ```javascript
 {
-  type: 'game_end',
+  type: 'game_over',
   from: 'host_uuid',
   timestamp: 1703001234567,
   data: {
     winner_id: 'player_uuid',
-    winner_name: 'Player1',
-    final_standings: [
-      { player_id: 'uuid1', name: 'Player1', kills: 5, damage_dealt: 450, placement: 1 },
-      { player_id: 'uuid2', name: 'Player2', kills: 3, damage_dealt: 320, placement: 2 },
+    stats: [
+      { player_id: 'uuid1', name: 'Player1', kills: 5, damage_dealt: 450 },
       // ...
     ]
   }
 }
 ```
+**Note:** Receiving this event must trigger the cleanup of all in-game UI, including hiding any active spectator controls.
 
 ##### 5. Heartbeat & Sync
 

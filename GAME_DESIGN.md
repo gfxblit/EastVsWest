@@ -41,6 +41,7 @@ Conflict Zone: East vs West is a 12-player Battle Royale built on a classic 2D t
 ### Phase 4: Resolution (Match Summary & Reset)
 *   **Purpose:** Review performance and loop back to play again.
 *   **Flow:** When a winner is declared, all players (winner and spectators) return to the **Game Lobby**.
+*   **UI Cleanup:** Any active spectator controls or "Spectating: [Name]" overlays are automatically cleared.
 *   **Match Summary:** The Lobby screen updates to show stats (Winner, Kills, Survival Time).
 *   **Reset:** The host can immediately click "Start Game" to begin a new match with the same group, bypassing the intro.
 
