@@ -65,11 +65,20 @@ describe('Loot Integration', () => {
     const { session: hostSession } = await hostNetwork.hostGame('Host');
     testSessionId = hostSession.id;
 
+    // Move host far away to avoid collision interference
+    await hostSupabase.from('session_players')
+      .update({ position_x: 0, position_y: 0 })
+      .eq('player_id', hostNetwork.playerId);
+
     hostSnapshot = new SessionPlayersSnapshot(hostNetwork, hostSession.id);
     await hostSnapshot.ready();
     
     hostGame = new Game();
     hostGame.init(hostSnapshot, hostNetwork);
+    if (hostGame.localPlayerController && hostGame.localPlayerController.player) {
+        hostGame.localPlayerController.player.x = 0;
+        hostGame.localPlayerController.player.y = 0;
+    }
 
     // 2. Player joins game
     await playerNetwork.joinGame(hostSession.join_code, 'Player');
@@ -177,11 +186,20 @@ describe('Loot Integration', () => {
     const { session: hostSession } = await hostNetwork.hostGame('Host');
     testSessionId = hostSession.id;
 
+    // Move host far away to avoid collision interference
+    await hostSupabase.from('session_players')
+      .update({ position_x: 0, position_y: 0 })
+      .eq('player_id', hostNetwork.playerId);
+
     hostSnapshot = new SessionPlayersSnapshot(hostNetwork, hostSession.id);
     await hostSnapshot.ready();
     
     hostGame = new Game();
     hostGame.init(hostSnapshot, hostNetwork);
+    if (hostGame.localPlayerController && hostGame.localPlayerController.player) {
+        hostGame.localPlayerController.player.x = 0;
+        hostGame.localPlayerController.player.y = 0;
+    }
 
     // 2. Player joins game
     await playerNetwork.joinGame(hostSession.join_code, 'Player');

@@ -93,7 +93,7 @@ describe('Combat Integration', () => {
         hostGame.localPlayerController.player.velocity = { x: 0, y: 0 };
     }
     if (playerGame.localPlayerController && playerGame.localPlayerController.player) {
-        playerGame.localPlayerController.player.x = 1250;
+        playerGame.localPlayerController.player.x = 1340;
         playerGame.localPlayerController.player.y = 800;
         playerGame.localPlayerController.player.health = 100;
         playerGame.localPlayerController.player.velocity = { x: 0, y: 0 };
@@ -105,7 +105,7 @@ describe('Combat Integration', () => {
             .update({ equipped_weapon: 'spear', position_x: 1200, position_y: 800, health: 100, velocity_x: 0, velocity_y: 0 })
             .eq('player_id', hostUserId),
         playerSupabase.from('session_players')
-            .update({ position_x: 1250, position_y: 800, health: 100, velocity_x: 0, velocity_y: 0 })
+            .update({ position_x: 1340, position_y: 800, health: 100, velocity_x: 0, velocity_y: 0 })
             .eq('player_id', playerUserId)
     ]);
 
@@ -122,7 +122,7 @@ describe('Combat Integration', () => {
         if (!h || !p) return false;
         
         const healthSynced = h.health === 100 && p.health === 100;
-        const posSynced = Math.abs(h.position_x - 1200) < 5 && Math.abs(p.position_x - 1250) < 5;
+        const posSynced = Math.abs(h.position_x - 1200) < 5 && Math.abs(p.position_x - 1340) < 5;
         
         return healthSynced && posSynced;
     }, 10000);
