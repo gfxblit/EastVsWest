@@ -123,8 +123,12 @@ describe('Bot Integration', () => {
         equipped_weapon: 'fist'
     });
 
-    // Wait for sync
-    await new Promise(resolve => setTimeout(resolve, 1000));
+    // Wait for snapshot to reflect the health and position updates
+    await waitFor(() => {
+        const h = snapshot.getPlayers().get(hostUser.id);
+        const b = snapshot.getPlayers().get(bot.player_id);
+        return h && h.health === 5 && b && b.position_x === 110;
+    }, 5000, 100);
 
     // Listen for Game Over
     let gameOverData = null;
