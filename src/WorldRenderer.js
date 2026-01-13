@@ -32,8 +32,9 @@ export class WorldRenderer {
                     
                     const updateDimensions = () => {
                         if (img.naturalWidth > 0 && img.naturalHeight > 0) {
-                            typeConfig.renderWidth = img.naturalWidth;
-                            typeConfig.renderHeight = img.naturalHeight;
+                            // Only set default dimensions if not explicitly configured
+                            if (!typeConfig.renderWidth) typeConfig.renderWidth = img.naturalWidth;
+                            if (!typeConfig.renderHeight) typeConfig.renderHeight = img.naturalHeight;
                         }
                     };
 

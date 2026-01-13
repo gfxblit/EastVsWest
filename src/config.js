@@ -294,8 +294,8 @@ export const CONFIG = {
         color: '#2d5a27', type: 'tree' 
       },
       ROCK: { 
-        renderWidth: 60, renderHeight: 40, 
-        hitboxWidth: 50, hitboxHeight: 30, 
+        renderWidth: 30, renderHeight: 20, 
+        hitboxWidth: 25, hitboxHeight: 15, 
         color: '#7a7a7a', type: 'rock', src: 'assets/props/rock.png' 
       },
     },
