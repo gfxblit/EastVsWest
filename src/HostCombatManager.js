@@ -138,7 +138,11 @@ export class HostCombatManager {
     if (!this.state.isRunning) return;
 
     const players = playersSnapshot.getPlayers();
-    const activePlayers = Array.from(players.values()).filter(p => p.health > 0);
+    // Use a safety check for health to ensure we don't skip players with undefined health
+    const activePlayers = Array.from(players.values()).filter(p => {
+      const health = p.health !== undefined ? p.health : 100;
+      return health > 0;
+    });
 
     // If 1 or fewer players remain alive, end the match
     // (If 0, it's a draw or everyone died)
@@ -148,8 +152,11 @@ export class HostCombatManager {
       const stats = Array.from(players.values()).map(p => ({
         player_id: p.player_id || p.id,
         name: p.player_name || p.name || 'Unknown',
-        kills: p.kills || 0
+        kills: p.kills || 0,
+        is_bot: !!p.is_bot
       }));
+
+      console.log(`Match resolved. Winner: ${winner ? (winner.player_name || winner.name || winner.player_id) : 'None'}`);
 
       this.network.send('game_over', {
         winner_id: winner ? (winner.player_id || winner.id) : null,

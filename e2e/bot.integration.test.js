@@ -74,4 +74,76 @@ describe('Bot Integration', () => {
     expect(botPlayers[0].player_name).toMatch(/Bot-\d+/);
     expect(botPlayers[0].is_bot).toBe(true);
   });
+
+  test('should end game when a bot kills the host', async () => {
+    // Use a unique session for this test
+    const hostName = 'HostPlayer';
+    const { session } = await network.hostGame(hostName);
+    testSessionId = session.id;
+
+    // Start game with bots
+    await network.startGame();
+
+    // Setup snapshot and game
+    const { SessionPlayersSnapshot } = await import('../src/SessionPlayersSnapshot.js');
+    const { Game } = await import('../src/game.js');
+    
+    const snapshot = new SessionPlayersSnapshot(network, session.id);
+    await snapshot.ready();
+
+    const game = new Game();
+    game.init(snapshot, network, null);
+
+    // Find the bot
+    const players = snapshot.getPlayers();
+    const bot = Array.from(players.values()).find(p => p.is_bot);
+    expect(bot).toBeDefined();
+
+    // Set all other bots to 0 health first
+    const otherBots = Array.from(players.values()).filter(p => p.is_bot && p.player_id !== bot.player_id);
+    const botUpdates = otherBots.map(b => ({
+        player_id: b.player_id,
+        health: 0
+    }));
+    if (botUpdates.length > 0) {
+        await network.writePlayerStateToDB(botUpdates);
+    }
+
+    // Position host and bot close together and set low host health
+    await network.writePlayerStateToDB(hostUser.id, {
+        position_x: 100,
+        position_y: 100,
+        health: 5 // One hit kill
+    });
+    
+    await network.writePlayerStateToDB(bot.player_id, {
+        position_x: 110, // Close to host
+        position_y: 100,
+        health: 100,
+        equipped_weapon: 'fist'
+    });
+
+    // Wait for sync
+    await new Promise(resolve => setTimeout(resolve, 1000));
+
+    // Listen for Game Over
+    let gameOverData = null;
+    network.on('game_over', (msg) => {
+        gameOverData = msg;
+    });
+
+    // Manually trigger bot attack (simulating BotController)
+    network.sendFrom(bot.player_id, 'attack_request', {
+        aim_x: 100,
+        aim_y: 100,
+        is_special: false
+    });
+
+    // Wait for processing
+    await waitFor(() => gameOverData !== null, 5000, 200);
+
+    expect(gameOverData).toBeDefined();
+    expect(gameOverData.data.winner_id).toBe(bot.player_id);
+    expect(game.state.isRunning).toBe(false);
+  });
 });
