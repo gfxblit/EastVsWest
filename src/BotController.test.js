@@ -26,6 +26,7 @@ describe('BotController', () => {
 
     mockNetwork = {
       send: jest.fn(),
+      sendFrom: jest.fn(),
       broadcastPlayerStateUpdate: jest.fn(),
       isHost: true,
       playerId: 'host-player'
@@ -114,7 +115,7 @@ describe('BotController', () => {
     
     botController.update(0.1);
 
-    expect(mockNetwork.send).toHaveBeenCalledWith('attack_request', expect.any(Object)); 
+    expect(mockNetwork.sendFrom).toHaveBeenCalledWith(botId, 'attack_request', expect.any(Object)); 
   });
   
   test('should wander if no target', () => {

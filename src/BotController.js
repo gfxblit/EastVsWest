@@ -115,10 +115,8 @@ export class BotController {
 
     if (dist <= range) {
         // Send attack request (simulating input)
-        // Since we are host, we can send to network which we are listening to
-        // Or directly call HostCombatManager if accessible.
-        // But consistent way is:
-        this.network.send('attack_request', {
+        // We use sendFrom to ensure the attacker ID is the bot's ID, not the host's ID
+        this.network.sendFrom(this.botId, 'attack_request', {
             aim_x: target.position_x,
             aim_y: target.position_y,
             is_special: false

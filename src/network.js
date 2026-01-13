@@ -127,13 +127,20 @@ export class Network extends EventEmitter {
 
   // FUTURE: Host-authoritative health persistence (not yet implemented)
   send(type, data) {
+    return this.sendFrom(this.playerId, type, data);
+  }
+
+  /**
+   * Send a message as a specific player (host-only utility for bots)
+   */
+  sendFrom(fromId, type, data) {
     if (!this.channel || !this.connected) {
       console.warn('Cannot send message, channel not connected.');
       return;
     }
     const message = {
       type,
-      from: this.playerId,
+      from: fromId,
       timestamp: Date.now(),
       data,
     };
