@@ -253,7 +253,11 @@ To sync a local copy of the `session_players` Supabase table, we use a **Snapsho
 #### Periodic Snapshotting
 - Refreshes snapshot every 60 seconds **querying only this session's players**
 - Query: `SELECT * FROM session_players WHERE session_id = ?`
-- Replaces local Map with fresh results (handles lost broadcasts)
+- **Host Strategy (Smart Merge)**: 
+  - Updates client-authoritative fields (position, velocity, connection) from DB.
+  - **Ignores** stale DB values for host-authoritative fields (health, equipment, kills) to preserve local state.
+  - **Rationale**: The Host is the source of truth for game state. The database is a replica. Reading back from the replica (which may be stale due to write throttling) to update the master would introduce race conditions and revert valid game state changes (e.g., bot death). Smart merge prevents this by prioritizing local memory for authoritative fields.
+- **Client Strategy**: Updates all fields from DB (as Host/DB is authoritative).
 - Logs error if refresh fails but continues operation
 
 #### Resource Cleanup
