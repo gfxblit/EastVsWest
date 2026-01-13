@@ -9,10 +9,10 @@ import { Renderer } from './renderer.js';
 import { Input } from './input.js';
 import { UI } from './ui.js';
 import { Network } from './network.js';
-import { SessionPlayersSnapshot } from './SessionPlayersSnapshot.js';
 import { Camera } from './camera.js';
-import { createClient } from '@supabase/supabase-js';
 import { AssetManager } from './AssetManager.js';
+import { AuthManager } from './AuthManager.js';
+import { LobbyManager } from './LobbyManager.js';
 
 // Initialize Eruda for mobile debugging (console, network, elements inspector)
 // Only load in development/preview builds, or when ?debug=true query parameter is present
@@ -30,6 +30,7 @@ export async function initializeDebugTools(env = import.meta.env, location = win
 
 // Initialize debug tools asynchronously (non-blocking)
 initializeDebugTools().catch(err => console.warn('Failed to initialize debug tools:', err));
+
 class App {
   constructor() {
     this.game = null;
@@ -37,10 +38,9 @@ class App {
     this.input = null;
     this.ui = null;
     this.network = null;
-    this.supabase = null;
-    this.playersSnapshot = null;
+    this.authManager = new AuthManager();
+    this.lobbyManager = null;
     this.camera = null;
-    this.lobbyUpdateInterval = null;
     this.running = false;
     this.lastTimestamp = 0;
     this.animationFrameId = null;
@@ -70,107 +70,14 @@ class App {
     this.ui.showScreen('intro');
 
     try {
-      console.log('Creating Supabase client...');
-      let supabaseUrl = import.meta.env.VITE_SUPABASE_URL;
-      let supabaseKey = import.meta.env.VITE_SUPABASE_ANON_KEY;
+      const supabase = await this.authManager.init();
       
-      // Dynamic URL construction for development to support Tailscale/LAN/Localhost seamlessly
-      if (import.meta.env.DEV) {
-        const currentHost = window.location.hostname;
-        console.log(`Development mode detected. Current hostname: ${currentHost}`);
-        
-        // If we are on a custom hostname (like Tailscale or LAN IP), try to use that for the backend too
-        // This assumes the backend is running on port 54321 on the same machine
-        if (currentHost !== 'localhost' && currentHost !== '127.0.0.1') {
-            const dynamicUrl = `http://${currentHost}:54321`;
-            console.log(`Overriding VITE_SUPABASE_URL to match hostname: ${dynamicUrl}`);
-            supabaseUrl = dynamicUrl;
-        }
-      }
-
-      // Fallback for local development if env vars are missing
-      if ((!supabaseUrl || !supabaseKey) && import.meta.env.DEV) {
-        console.warn('Supabase credentials missing in env, falling back to local defaults');
-        supabaseUrl = 'http://127.0.0.1:54321';
-        // Default local Supabase Anon Key
-        supabaseKey = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZS1kZW1vIiwicm9sZSI6ImFub24iLCJleHAiOjE5ODM4MTI5OTZ9.CRXP1A7WOeoJeXxjNni43kdQwgnWNReilDMblYTn_I0';
-      }
-      
-      if (!supabaseUrl || !supabaseKey) {
-        const msg = 'Missing Supabase credentials in environment variables';
-        console.error(msg);
-        this.showError(msg);
-        return;
-      }
-
-      this.supabase = createClient(supabaseUrl, supabaseKey);
-
-      // Diagnostic: Check if we can actually reach the Supabase server
-      console.log(`Testing connectivity to ${supabaseUrl}...`);
-      try {
-        // Shorter timeout for the connectivity check
-        const controller = new AbortController();
-        const id = setTimeout(() => controller.abort(), 5000);
-        
-        // Fetch the root of the REST API to check reachability
-        const response = await fetch(`${supabaseUrl}/rest/v1/`, { 
-          signal: controller.signal,
-          headers: { 'apikey': supabaseKey }
-        });
-        clearTimeout(id);
-        
-        if (!response.ok) {
-           if (response.status === 401 || response.status === 403) {
-             const msg = 'Supabase API Key (Anon Key) is invalid. Check .env.local';
-             console.error(msg);
-             this.showError(msg);
-             return;
-           }
-           console.warn('Supabase connectivity check returned non-OK status:', response.status);
-        } else {
-           console.log('Supabase is reachable.');
-        }
-      } catch (netErr) {
-        console.error('Failed to reach Supabase server:', netErr);
-        let errorMsg = `Cannot reach server at ${supabaseUrl}.`;
-        
-        if (import.meta.env.DEV) {
-          errorMsg += ' Is Supabase running? Try: npm run supabase:start';
-        } else {
-          errorMsg += ' Check your internet connection.';
-        }
-        
-        this.showError(errorMsg);
-        return;
-      }
-
-      // Check for existing session first to support reconnection
-      console.log('Checking for existing session...');
-      const { data: sessionData, error: sessionError } = await this.supabase.auth.getSession();
-      
-      let userId;
-      
-      if (sessionData?.session?.user) {
-        console.log('Found existing session, reusing user ID:', sessionData.session.user.id);
-        userId = sessionData.session.user.id;
-      } else {
-        // Sign in anonymously to get an auth.uid()
-        console.log('No session found. Signing in anonymously...');
-        const { data: authData, error: authError } = await this.supabase.auth.signInAnonymously();
-        if (authError) {
-          const msg = `Failed to sign in anonymously: ${authError.message}`;
-          console.error(msg, authError);
-          this.showError(msg);
-          return;
-        }
-        console.log('Signed in anonymously', authData.user.id);
-        userId = authData.user.id;
-      }
-
       this.network = new Network();
       // Use the authenticated user's ID as the player ID
-      this.network.initialize(this.supabase, userId);
+      this.network.initialize(supabase, this.authManager.getUserId());
       this.setupNetworkHandlers();
+
+      this.lobbyManager = new LobbyManager(this.network, this.ui);
 
       console.log('App initialization complete');
       document.body.classList.add('loaded');
@@ -273,9 +180,6 @@ class App {
   }
 
   setupNetworkHandlers() {
-    // Note: player_joined/player_left events removed from Network
-    // Lobby updates now come from polling SessionPlayersSnapshot
-
     this.network.on('game_start', () => {
       console.log('Game starting signal received');
       this.startGame();
@@ -305,9 +209,11 @@ class App {
       this.ui.showLobby('Match Ended', summaryHtml);
       
       // Resume lobby polling
-      this.stopLobbyPolling();
-      this.startLobbyPolling();
-      this.updateLobbyUI();
+      if (this.lobbyManager) {
+        this.lobbyManager.stopPolling();
+        this.lobbyManager.startPolling();
+        this.lobbyManager.updateUI();
+      }
     });
 
     this.network.on('session_terminated', (payload) => {
@@ -352,24 +258,8 @@ class App {
     }
 
     try {
-      const playerName = `Host-${Math.random().toString(36).substr(2, 5)}`;
-      const { session, player } = await this.network.hostGame(playerName);
-
-      // Create SessionPlayersSnapshot for lobby synchronization
-      this.playersSnapshot = new SessionPlayersSnapshot(this.network, session.id);
-      await this.playersSnapshot.ready();
-      console.log('SessionPlayersSnapshot ready');
-
-      // Start polling for lobby updates
-      this.startLobbyPolling();
-
-      this.ui.showJoinCode(session.join_code);
-      this.ui.showLobby('Game Lobby');
-
-      // Initial UI update
-      this.updateLobbyUI();
+      await this.lobbyManager.hostGame();
     } catch (error) {
-      console.error('Failed to host game:', error);
       this.showError(`Error hosting game: ${error.message}`);
     }
   }
@@ -398,24 +288,8 @@ class App {
 
     console.log('Joining game with code:', joinCode);
     try {
-      const playerName = `Player-${Math.random().toString(36).substr(2, 5)}`;
-      const { session, player } = await this.network.joinGame(joinCode, playerName);
-
-      // Create SessionPlayersSnapshot for lobby synchronization
-      this.playersSnapshot = new SessionPlayersSnapshot(this.network, session.id);
-      await this.playersSnapshot.ready();
-      console.log('SessionPlayersSnapshot ready');
-
-      // Start polling for lobby updates
-      this.startLobbyPolling();
-
-      this.ui.showJoinCode(joinCode);
-      this.ui.showLobby('Game Lobby');
-
-      // Initial UI update
-      this.updateLobbyUI();
+      await this.lobbyManager.joinGame(joinCode);
     } catch (error) {
-      console.error('Failed to join game:', error);
       this.showError(`Error joining game: ${error.message}`);
     }
   }
@@ -441,11 +315,12 @@ class App {
   }
 
   async resetPlayerStates() {
-    if (!this.playersSnapshot) return;
+    const playersSnapshot = this.lobbyManager.getPlayersSnapshot();
+    if (!playersSnapshot) return;
 
     console.log('Resetting player states...');
     const updates = [];
-    const players = this.playersSnapshot.getPlayers();
+    const players = playersSnapshot.getPlayers();
     
     const centerX = CONFIG.WORLD.WIDTH / 2;
     const centerY = CONFIG.WORLD.HEIGHT / 2;
@@ -490,17 +365,8 @@ class App {
       if (!confirmed) return;
     }
 
-    // Stop lobby polling
-    this.stopLobbyPolling();
-
-    // Clean up SessionPlayersSnapshot
-    if (this.playersSnapshot) {
-      this.playersSnapshot.destroy();
-      this.playersSnapshot = null;
-    }
-
-    if (this.network) {
-      await this.network.leaveGame();
+    if (this.lobbyManager) {
+        await this.lobbyManager.leaveGame();
     }
 
     this.stopGameLoop();
@@ -512,21 +378,9 @@ class App {
     this.ui.showScreen('intro');
   }
 
-  /**
-   * Specifically handle the case where the host leaves and terminates the session.
-   * Similar to leaveGame but doesn't prompt for confirmation and doesn't
-   * need to call network.leaveGame() (as the session is already being deleted).
-   */
   handleHostLeft() {
-    this.stopLobbyPolling();
-    
-    if (this.playersSnapshot) {
-      this.playersSnapshot.destroy();
-      this.playersSnapshot = null;
-    }
-
-    if (this.network) {
-      this.network.disconnect();
+    if (this.lobbyManager) {
+        this.lobbyManager.handleHostLeft();
     }
 
     this.stopGameLoop();
@@ -536,46 +390,14 @@ class App {
 
     this.ui.showSpectatorControls(false);
     this.ui.showScreen('intro');
-  }
-
-  /**
-   * Start polling SessionPlayersSnapshot for lobby updates
-   */
-  startLobbyPolling() {
-    if (this.lobbyUpdateInterval) return; // Already polling
-
-    this.lobbyUpdateInterval = setInterval(() => {
-      this.updateLobbyUI();
-    }, 1000); // Poll every 1s
-    console.log('Lobby polling started');
-  }
-
-  /**
-   * Update lobby UI from SessionPlayersSnapshot
-   */
-  updateLobbyUI() {
-    if (!this.playersSnapshot) return;
-
-    const players = Array.from(this.playersSnapshot.getPlayers().values());
-    this.ui.updatePlayerList(players, this.network.isHost);
-  }
-
-  /**
-   * Stop polling SessionPlayersSnapshot
-   */
-  stopLobbyPolling() {
-    if (this.lobbyUpdateInterval) {
-      clearInterval(this.lobbyUpdateInterval);
-      this.lobbyUpdateInterval = null;
-      console.log('Lobby polling stopped');
-    }
   }
 
   startGame() {
     console.log('Entering game screen...');
 
-    // Stop lobby polling
-    this.stopLobbyPolling();
+    if (this.lobbyManager) {
+        this.lobbyManager.stopPolling();
+    }
 
     // Switch to game screen
     this.ui.showScreen('game');
@@ -593,7 +415,10 @@ class App {
 
     // Initialize components
     this.renderer.init();
-    this.game.init(this.playersSnapshot, this.network, this.renderer);
+
+    // Get snapshot from lobby manager
+    const playersSnapshot = this.lobbyManager ? this.lobbyManager.getPlayersSnapshot() : null;
+    this.game.init(playersSnapshot, this.network, this.renderer);
 
     // Initialize camera with actual canvas dimensions (after renderer.init)
     this.camera = new Camera(
@@ -634,7 +459,7 @@ class App {
     window.addEventListener('resize', this.handleResize);
 
     // Start periodic player state DB writes if we have a session (for persistence)
-    if (this.playersSnapshot && this.network) {
+    if (playersSnapshot && this.network) {
       this.network.startPeriodicPlayerStateWrite(() => {
         const localPlayer = this.game.getLocalPlayer();
         if (!localPlayer) return { player_id: this.network.playerId };
@@ -653,10 +478,10 @@ class App {
       // Persist health for ALL players to DB every 60 seconds
       if (this.network.isHost) {
         this.network.startPeriodicPlayerStateWrite(() => {
-          if (!this.playersSnapshot) return [];
+          if (!playersSnapshot) return [];
 
           const updates = [];
-          for (const [playerId, player] of this.playersSnapshot.getPlayers()) {
+          for (const [playerId, player] of playersSnapshot.getPlayers()) {
             // Only write if health is defined
             if (player.health !== undefined) {
               updates.push({
@@ -742,7 +567,13 @@ class App {
     }
 
     // Render
-    this.renderer.render(this.game.getState(), this.game.getLocalPlayer(), this.playersSnapshot, this.camera, deltaTime);
+    // Get snapshot from lobby manager if game doesn't expose it directly (Game.init stores it but doesn't expose it)
+    // Actually, App.init passes playersSnapshot to game.init.
+    // In original code, App kept a reference to playersSnapshot.
+    // In new code, LobbyManager has it.
+    const playersSnapshot = this.lobbyManager ? this.lobbyManager.getPlayersSnapshot() : null;
+
+    this.renderer.render(this.game.getState(), this.game.getLocalPlayer(), playersSnapshot, this.camera, deltaTime);
 
     // Continue loop
     this.animationFrameId = requestAnimationFrame((timestamp) => this.gameLoop(timestamp));
@@ -775,7 +606,13 @@ class App {
       this.network.disconnect();
     }
     this.game = null;
-    this.playersSnapshot = null;
+    if (this.lobbyManager) {
+        this.lobbyManager.stopPolling();
+        if (this.lobbyManager.playersSnapshot) {
+            this.lobbyManager.playersSnapshot.destroy();
+            this.lobbyManager.playersSnapshot = null;
+        }
+    }
     this.lastWeaponId = null;
     this.lastArmorId = null;
   }
