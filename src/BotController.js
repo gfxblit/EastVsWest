@@ -57,7 +57,7 @@ export class BotController {
     const dy = target.position_y - bot.position_y;
     const angle = Math.atan2(dy, dx);
 
-    const speed = CONFIG.PLAYER.BASE_MOVEMENT_SPEED;
+    const speed = CONFIG.BOT?.MOVEMENT_SPEED || CONFIG.PLAYER.BASE_MOVEMENT_SPEED;
     
     // Stop if very close to avoid jitter
     if (Math.hypot(dx, dy) < (CONFIG.BOT?.STOPPING_DISTANCE || 10)) return;
@@ -87,7 +87,7 @@ export class BotController {
       this.wanderTimer = 2.0; // Change every 2 seconds
     }
 
-    const speed = CONFIG.PLAYER.BASE_MOVEMENT_SPEED * 0.5; // Walk slower when wandering
+    const speed = (CONFIG.BOT?.MOVEMENT_SPEED || CONFIG.PLAYER.BASE_MOVEMENT_SPEED) * 0.5; // Walk slower when wandering
     const moveX = Math.cos(this.wanderAngle) * speed * deltaTime;
     const moveY = Math.sin(this.wanderAngle) * speed * deltaTime;
 

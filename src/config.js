@@ -279,6 +279,7 @@ export const CONFIG = {
 
   // Bot Settings
   BOT: {
-    STOPPING_DISTANCE: 10,
+    STOPPING_DISTANCE: 40,
+    MOVEMENT_SPEED: 50,
   },
 };

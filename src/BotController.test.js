@@ -22,7 +22,10 @@ describe('BotController', () => {
     CONFIG.PLAYER.BASE_MOVEMENT_SPEED = 100;
     CONFIG.WEAPONS.FIST.range = 50;
     CONFIG.COMBAT.ATTACK_AIM_DISTANCE = 100;
-    CONFIG.BOT = { STOPPING_DISTANCE: 10 };
+    CONFIG.BOT = { 
+      STOPPING_DISTANCE: 10,
+      MOVEMENT_SPEED: 100
+    };
 
     mockNetwork = {
       send: jest.fn(),
