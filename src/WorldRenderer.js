@@ -32,8 +32,8 @@ export class WorldRenderer {
                     
                     const updateDimensions = () => {
                         if (img.naturalWidth > 0 && img.naturalHeight > 0) {
-                            typeConfig.width = img.naturalWidth;
-                            typeConfig.height = img.naturalHeight;
+                            typeConfig.renderWidth = img.naturalWidth;
+                            typeConfig.renderHeight = img.naturalHeight;
                         }
                     };
 
@@ -80,24 +80,29 @@ export class WorldRenderer {
             const typeKey = prop.type.toUpperCase();
             const propType = CONFIG.PROPS.TYPES[typeKey];
             if (propType) {
-                const width = propType.width;
-                const height = propType.height;
-                const x = prop.x - width / 2;
-                const y = prop.y - height / 2;
+                const renderWidth = propType.renderWidth;
+                const renderHeight = propType.renderHeight;
+                const renderX = prop.x - renderWidth / 2;
+                const renderY = prop.y - renderHeight / 2;
                 
                 const img = this.propImages ? this.propImages[typeKey] : null;
 
                 if (img && img.complete && img.naturalWidth > 0) {
-                    ctx.drawImage(img, x, y, width, height);
+                    ctx.drawImage(img, renderX, renderY, renderWidth, renderHeight);
                 } else {
                     ctx.fillStyle = propType.color;
-                    ctx.fillRect(x, y, width, height);
+                    ctx.fillRect(renderX, renderY, renderWidth, renderHeight);
                 }
 
                 if (debugMode) {
+                    const hitboxWidth = propType.hitboxWidth;
+                    const hitboxHeight = propType.hitboxHeight;
+                    const hitboxX = prop.x - hitboxWidth / 2;
+                    const hitboxY = prop.y - hitboxHeight / 2;
+
                     ctx.strokeStyle = 'red';
                     ctx.lineWidth = 2;
-                    ctx.strokeRect(x, y, width, height);
+                    ctx.strokeRect(hitboxX, hitboxY, hitboxWidth, hitboxHeight);
                 }
             }
         });

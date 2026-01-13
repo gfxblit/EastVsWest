@@ -58,13 +58,13 @@ describe('WorldRenderer', () => {
         const propType = CONFIG.PROPS.TYPES[typeKey];
         const img = worldRenderer.propImages[typeKey];
 
-        const x = prop.x - propType.width / 2;
-        const y = prop.y - propType.height / 2;
+        const x = prop.x - propType.renderWidth / 2;
+        const y = prop.y - propType.renderHeight / 2;
         
         if (img && img.complete) {
-            expect(mockCtx.drawImage).toHaveBeenCalledWith(img, x, y, propType.width, propType.height);
+            expect(mockCtx.drawImage).toHaveBeenCalledWith(img, x, y, propType.renderWidth, propType.renderHeight);
         } else {
-            expect(mockCtx.fillRect).toHaveBeenCalledWith(x, y, propType.width, propType.height);
+            expect(mockCtx.fillRect).toHaveBeenCalledWith(x, y, propType.renderWidth, propType.renderHeight);
         }
       });
     });
@@ -100,8 +100,8 @@ describe('WorldRenderer', () => {
         // Arrange
         const rockType = CONFIG.PROPS.TYPES.ROCK;
         // Reset dimensions to verify update
-        rockType.width = 10; 
-        rockType.height = 10;
+        rockType.renderWidth = 10; 
+        rockType.renderHeight = 10;
 
         // Mock createImage to return an image with specific dimensions for the rock source
         mockAssetManager.createImage.mockImplementation((src) => {
@@ -123,8 +123,8 @@ describe('WorldRenderer', () => {
         // Assert
         expect(worldRenderer.propImages['ROCK']).toBeDefined();
         // Config should be updated to natural dimensions
-        expect(rockType.width).toBe(123);
-        expect(rockType.height).toBe(456);
+        expect(rockType.renderWidth).toBe(123);
+        expect(rockType.renderHeight).toBe(456);
     });
 
     test('ShouldRenderPropImageWhenAvailable', () => {

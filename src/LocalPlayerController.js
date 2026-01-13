@@ -144,8 +144,8 @@ export class LocalPlayerController {
       const propType = CONFIG.PROPS.TYPES[prop.type.toUpperCase()];
       if (!propType) continue;
 
-      const propHalfWidth = propType.width / 2;
-      const propHalfHeight = propType.height / 2;
+      const propHalfWidth = propType.hitboxWidth / 2;
+      const propHalfHeight = propType.hitboxHeight / 2;
 
       const propMinX = prop.x - propHalfWidth;
       const propMaxX = prop.x + propHalfWidth;
@@ -182,8 +182,8 @@ export class LocalPlayerController {
       const propType = CONFIG.PROPS.TYPES[prop.type.toUpperCase()];
       if (!propType) continue;
 
-      const propHalfWidth = propType.width / 2;
-      const propHalfHeight = propType.height / 2;
+      const propHalfWidth = propType.hitboxWidth / 2;
+      const propHalfHeight = propType.hitboxHeight / 2;
 
       const propMinX = prop.x - propHalfWidth;
       const propMaxX = prop.x + propHalfWidth;

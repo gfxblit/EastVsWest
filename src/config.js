@@ -288,8 +288,16 @@ export const CONFIG = {
   // Environmental Props
   PROPS: {
     TYPES: {
-      TREE: { width: 40, height: 40, color: '#2d5a27', type: 'tree' },
-      ROCK: { width: 60, height: 40, color: '#7a7a7a', type: 'rock', src: 'assets/props/rock.png' },
+      TREE: { 
+        renderWidth: 40, renderHeight: 40, 
+        hitboxWidth: 40, hitboxHeight: 40, 
+        color: '#2d5a27', type: 'tree' 
+      },
+      ROCK: { 
+        renderWidth: 60, renderHeight: 40, 
+        hitboxWidth: 50, hitboxHeight: 30, 
+        color: '#7a7a7a', type: 'rock', src: 'assets/props/rock.png' 
+      },
     },
     // Static map definition
     MAP: [
