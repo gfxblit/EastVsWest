@@ -65,7 +65,7 @@ export class Renderer {
     state.attackTimer = CONFIG.COMBAT.ATTACK_ANIMATION_DURATION_SECONDS;
   }
 
-  render(gameState, localPlayer = null, playersSnapshot = null, camera = null, deltaTime = 0.016) {
+  render(gameState, localPlayer = null, playersSnapshot = null, camera = null, deltaTime = 0.016, debugMode = false) {
     if (!this.ctx) return;
 
     if (camera) {
@@ -76,7 +76,7 @@ export class Renderer {
     if (camera) {
         this.ctx.translate(this.canvas.width / 2 - camera.x, this.canvas.height / 2 - camera.y);
     }
-    this.worldRenderer.render(this.ctx, camera, gameState.conflictZone);
+    this.worldRenderer.render(this.ctx, camera, gameState.conflictZone, debugMode);
 
     // Update visual states (attack animations)
     this.visualStates.forEach((state, id) => {
@@ -95,12 +95,12 @@ export class Renderer {
 
     // Render all players (in world coordinates)
     if (playersSnapshot) {
-      this.renderRemotePlayers(playersSnapshot, localPlayer, deltaTime);
+      this.renderRemotePlayers(playersSnapshot, localPlayer, deltaTime, debugMode);
     }
 
     // Render Local Player
     if (localPlayer) {
-        this.playerRenderer.render(this.ctx, localPlayer, true);
+        this.playerRenderer.render(this.ctx, localPlayer, true, debugMode);
     }
 
     // Render Loot
@@ -122,7 +122,7 @@ export class Renderer {
     }
   }
 
-  renderRemotePlayers(playersSnapshot, localPlayer, deltaTime) {
+  renderRemotePlayers(playersSnapshot, localPlayer, deltaTime, debugMode) {
       // Multiplayer mode: render remote players from snapshot
       const snapshotPlayers = playersSnapshot.getPlayers();
       // Use performance.now() if renderTime not provided (fallback)
@@ -169,7 +169,7 @@ export class Renderer {
           attackAnimTime: visualState ? visualState.attackTimer : 0, // Pass attack timer
           animationState: animState,
         };
-        this.playerRenderer.render(this.ctx, player, false);
+        this.playerRenderer.render(this.ctx, player, false, debugMode);
       });
 
       // Cleanup animation states and visual states for players who left

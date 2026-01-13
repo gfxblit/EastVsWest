@@ -1,0 +1,26 @@
+{
+  "config": {
+    "startX": 0,
+    "startY": 0,
+    "frameWidth": 190,
+    "frameHeight": 165,
+    "frameCount": 1,
+    "fps": 10,
+    "globalWidth": 256,
+    "globalHeight": 256
+  },
+  "bgRemoval": {
+    "enabled": true,
+    "keyColor": "#ff00ff",
+    "threshold": "23",
+    "erode": "2"
+  },
+  "sourceFilename": "rock.png",
+  "anchorOverrides": {},
+  "frameOverrides": {
+    "0": {
+      "x": 33,
+      "y": 48
+    }
+  }
+}

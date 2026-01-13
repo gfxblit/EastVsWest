@@ -1,0 +1,26 @@
+{
+  "config": {
+    "startX": 0,
+    "startY": 0,
+    "frameWidth": 100,
+    "frameHeight": 150,
+    "frameCount": 1,
+    "fps": 10,
+    "globalWidth": 100,
+    "globalHeight": 150
+  },
+  "bgRemoval": {
+    "enabled": true,
+    "keyColor": "#ff00ff",
+    "threshold": "42",
+    "erode": "1"
+  },
+  "sourceFilename": "tree.png",
+  "anchorOverrides": {},
+  "frameOverrides": {
+    "0": {
+      "x": 78,
+      "y": -3
+    }
+  }
+}

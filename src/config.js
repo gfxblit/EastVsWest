@@ -40,6 +40,7 @@ export const CONFIG = {
     DOUBLE_HANDED_SPEED_MODIFIER: 0.85, // -15% speed for double-handed weapons
     SPAWN_INVULNERABILITY_MS: 3000, // 3 seconds of invulnerability after spawn
     MAX_HEALTH: 100,
+    HITBOX_RADIUS: 40, // Collision half-width/height
   },
 
   // Conflict Zone Settings
@@ -195,6 +196,7 @@ export const CONFIG = {
     SPECIAL_ABILITY_KEY: 'KeyQ',
     INTERACT_KEY: 'KeyF',
     DEBUG_CYCLE_WEAPON_KEY: 'KeyT',
+    DEBUG_TOGGLE_KEY: 'KeyO',
     MAX_JOYSTICK_DISTANCE: 45, // Maximum distance for virtual joystick movement
   },
 
@@ -203,6 +205,7 @@ export const CONFIG = {
     GAME_SIMULATION_INTERVAL_MS: 50, // interval between position updates (20 Hz = 50ms)
     INTERPOLATION_DELAY_MS: 100,
     INTERPOLATION_BUFFER_SIZE: 3,
+    CLIENT_AUTHORITATIVE_FIELDS: ['position_x', 'position_y', 'rotation', 'velocity_x', 'velocity_y', 'is_connected'],
   },
 
   // Asset Settings
@@ -281,5 +284,29 @@ export const CONFIG = {
   BOT: {
     STOPPING_DISTANCE: 40,
     MOVEMENT_SPEED: 50,
+  },
+
+  // Environmental Props
+  PROPS: {
+    TYPES: {
+      TREE: { 
+        renderWidth: 70, renderHeight: 150, 
+        hitboxWidth: 60, hitboxHeight: 140, 
+        color: '#2d5a27', type: 'tree', src: 'assets/props/tree.png' 
+      },
+      ROCK: { 
+        renderWidth: 128, renderHeight: 100, 
+        hitboxWidth: 70, hitboxHeight: 50, 
+        color: '#7a7a7a', type: 'rock', src: 'assets/props/rock.png' 
+      },
+    },
+    // Static map definition
+    MAP: [
+      { id: 'tree_1', type: 'tree', x: 400, y: 400 },
+      { id: 'tree_2', type: 'tree', x: 450, y: 550 },
+      { id: 'rock_1', type: 'rock', x: 600, y: 300 },
+      { id: 'rock_2', type: 'rock', x: 1000, y: 600 },
+      { id: 'tree_3', type: 'tree', x: 1600, y: 1200 },
+    ]
   },
 };

@@ -30,6 +30,8 @@ export class Game {
     this.network = null;
     this.renderer = null;
     this.spectatingTargetId = null;
+    this.debugMode = false;
+    this.wasDebugToggled = false;
   }
 
   init(playersSnapshot = null, network = null, renderer = null) {
@@ -219,6 +221,14 @@ export class Game {
   }
 
   handleInput(inputState) {
+    if (inputState.toggleDebug && !this.wasDebugToggled) {
+        this.debugMode = !this.debugMode;
+        this.wasDebugToggled = true;
+        console.log(`Debug Mode: ${this.debugMode ? 'ON' : 'OFF'}`);
+    } else if (!inputState.toggleDebug) {
+        this.wasDebugToggled = false;
+    }
+
     if (this.localPlayerController) {
       this.localPlayerController.handleInput(inputState);
     }

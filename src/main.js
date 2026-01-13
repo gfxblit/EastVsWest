@@ -235,6 +235,15 @@ class App {
     manifest.push({ src: 'game-background.png', type: 'image' });
     manifest.push({ src: 'lobby-background.png', type: 'image' });
 
+    // Props
+    if (CONFIG.PROPS && CONFIG.PROPS.TYPES) {
+        Object.values(CONFIG.PROPS.TYPES).forEach(propType => {
+            if (propType.src) {
+                manifest.push({ src: propType.src, type: 'image' });
+            }
+        });
+    }
+
     console.log(`Loading ${manifest.length} assets...`);
     
     await this.assetManager.preloadAssets(manifest, (progress) => {
@@ -742,7 +751,7 @@ class App {
     }
 
     // Render
-    this.renderer.render(this.game.getState(), this.game.getLocalPlayer(), this.playersSnapshot, this.camera, deltaTime);
+    this.renderer.render(this.game.getState(), this.game.getLocalPlayer(), this.playersSnapshot, this.camera, deltaTime, this.game.debugMode);
 
     // Continue loop
     this.animationFrameId = requestAnimationFrame((timestamp) => this.gameLoop(timestamp));

@@ -1,0 +1,1 @@
+Generate a 3/4 view, pixel art sprite of 16-bit style pixel art fir tree, with green leaves and trunk, with lighting from top down. Entire tree visible. Magenta background (#FF00FF). Style: 16-bit pixel art, distinct outlines, flat shading.

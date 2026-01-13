@@ -1,0 +1,13 @@
+{
+  "sourceFilename": "rock.png",
+  "frameWidth": 256,
+  "frameHeight": 256,
+  "columns": 1,
+  "rows": 1,
+  "animations": {
+    "animation": {
+      "row": 0,
+      "frames": 1
+    }
+  }
+}

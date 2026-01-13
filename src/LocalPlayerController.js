@@ -1,5 +1,6 @@
 import { CONFIG } from './config.js';
 import { getDirectionFromVelocity, getDirectionFromRotation, AnimationState } from './animationHelper.js';
+import { resolveCollisionX, resolveCollisionY } from './physicsHelper.js';
 
 export class LocalPlayerController {
   constructor(network, initialData) {
@@ -118,9 +119,15 @@ export class LocalPlayerController {
   }
 
   #updatePhysics(deltaTime) {
-    // Update position based on velocity
-    this.player.x += this.player.velocity.x * deltaTime;
-    this.player.y += this.player.velocity.y * deltaTime;
+    const hitboxRadius = CONFIG.PLAYER.HITBOX_RADIUS;
+
+    // Apply X movement
+    let nextX = this.player.x + this.player.velocity.x * deltaTime;
+    this.player.x = resolveCollisionX(nextX, this.player.y, hitboxRadius);
+
+    // Apply Y movement
+    let nextY = this.player.y + this.player.velocity.y * deltaTime;
+    this.player.y = resolveCollisionY(this.player.x, nextY, hitboxRadius);
 
     // Keep player within world bounds
     this.player.x = Math.max(0, Math.min(CONFIG.WORLD.WIDTH, this.player.x));

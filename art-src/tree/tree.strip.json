@@ -1,0 +1,13 @@
+{
+  "sourceFilename": "tree.png",
+  "frameWidth": 100,
+  "frameHeight": 150,
+  "columns": 1,
+  "rows": 1,
+  "animations": {
+    "animation": {
+      "row": 0,
+      "frames": 1
+    }
+  }
+}

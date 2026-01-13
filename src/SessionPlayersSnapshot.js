@@ -296,10 +296,7 @@ export class SessionPlayersSnapshot {
             if (isHost) {
               // Host: Only update client-authoritative fields from DB
               // Preserve local host-authoritative fields (health, equipment, etc.)
-              const clientAuthFields = [
-                'position_x', 'position_y', 'rotation',
-                'velocity_x', 'velocity_y', 'is_connected'
-              ];
+              const clientAuthFields = CONFIG.NETWORK.CLIENT_AUTHORITATIVE_FIELDS;
               clientAuthFields.forEach(field => {
                 localPlayer[field] = dbPlayer[field];
               });

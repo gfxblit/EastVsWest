@@ -133,4 +133,33 @@ describe('BotController', () => {
       
       expect(lastUpdate.position_x !== initialX || lastUpdate.position_y !== 0).toBe(true);
   });
+
+  test('WhenBotMovesIntoProp_ShouldBeBlocked', () => {
+    // tree_1 is at 400, 400. Hitbox 60x140. X Range [370, 430].
+    // Bot collision logic will mirror player logic.
+
+    const botPlayer = mockSnapshot.getPlayers().get(botId);
+    const hitboxRadius = CONFIG.PLAYER.HITBOX_RADIUS;
+    
+    // Start bot just to the left of the tree.
+    // Left edge of tree = 370.
+    // Bot Right Edge = x + hitboxRadius.
+    // Start Bot at 370 - hitboxRadius - 10.
+    
+    botPlayer.position_x = 370 - hitboxRadius - 10;
+    botPlayer.position_y = 400; // Center Y
+    
+    // Set Target to the right of the tree (e.g. 500, 400)
+    mockSnapshot.getPlayers().get(targetId).position_x = 500;
+    mockSnapshot.getPlayers().get(targetId).position_y = 400;
+    
+    botController.update(0.5);
+
+    // Verify position in broadcast
+    const lastUpdate = mockNetwork.broadcastPlayerStateUpdate.mock.calls[mockNetwork.broadcastPlayerStateUpdate.mock.calls.length - 1][0];
+    
+    const expectedMaxX = 370 - hitboxRadius;
+    expect(lastUpdate.position_x).toBeLessThanOrEqual(expectedMaxX + 0.1);
+    expect(lastUpdate.position_x).toBeGreaterThan(botPlayer.position_x); // Should have moved some amount
+  });
 });

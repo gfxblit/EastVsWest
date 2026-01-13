@@ -1,5 +1,6 @@
 
 import { CONFIG } from './config.js';
+import { resolveCollisionX, resolveCollisionY } from './physicsHelper.js';
 
 export class BotController {
   constructor(botId, network, playersSnapshot, game) {
@@ -65,8 +66,19 @@ export class BotController {
     const moveX = Math.cos(angle) * speed * deltaTime;
     const moveY = Math.sin(angle) * speed * deltaTime;
 
-    const newX = Math.max(0, Math.min(CONFIG.WORLD.WIDTH, bot.position_x + moveX));
-    const newY = Math.max(0, Math.min(CONFIG.WORLD.HEIGHT, bot.position_y + moveY));
+    const hitboxRadius = CONFIG.PLAYER.HITBOX_RADIUS;
+
+    // Apply X movement and collision
+    let newX = bot.position_x + moveX;
+    newX = resolveCollisionX(newX, bot.position_y, hitboxRadius);
+
+    // Apply Y movement and collision
+    let newY = bot.position_y + moveY;
+    newY = resolveCollisionY(newX, newY, hitboxRadius);
+
+    // Clamp to world bounds
+    newX = Math.max(0, Math.min(CONFIG.WORLD.WIDTH, newX));
+    newY = Math.max(0, Math.min(CONFIG.WORLD.HEIGHT, newY));
 
     // Broadcast movement (Host is authoritative for bots)
     // SessionPlayersSnapshot listens to these broadcasts and updates locally
@@ -91,8 +103,19 @@ export class BotController {
     const moveX = Math.cos(this.wanderAngle) * speed * deltaTime;
     const moveY = Math.sin(this.wanderAngle) * speed * deltaTime;
 
-    const newX = Math.max(0, Math.min(CONFIG.WORLD.WIDTH, bot.position_x + moveX));
-    const newY = Math.max(0, Math.min(CONFIG.WORLD.HEIGHT, bot.position_y + moveY));
+    const hitboxRadius = CONFIG.PLAYER.HITBOX_RADIUS;
+
+    // Apply X movement and collision
+    let newX = bot.position_x + moveX;
+    newX = resolveCollisionX(newX, bot.position_y, hitboxRadius);
+
+    // Apply Y movement and collision
+    let newY = bot.position_y + moveY;
+    newY = resolveCollisionY(newX, newY, hitboxRadius);
+
+    // Clamp to world bounds
+    newX = Math.max(0, Math.min(CONFIG.WORLD.WIDTH, newX));
+    newY = Math.max(0, Math.min(CONFIG.WORLD.HEIGHT, newY));
     
     this.network.broadcastPlayerStateUpdate({
         player_id: this.botId,
