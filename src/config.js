@@ -13,6 +13,7 @@ export const CONFIG = {
     MATCH_DURATION_SECONDS: 300, // 5 minutes
     INITIAL_ZONE_SHRINK_DELAY_SECONDS: 60, // 1 minute before shrinking starts
     INITIAL_LOOT_COUNT: 20,
+    VICTORY_DELAY_MS: 3000,
   },
 
   // Canvas Settings

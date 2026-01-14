@@ -6,6 +6,7 @@ export class HostCombatManager {
     this.state = state; // Shared game state (conflict zone, etc.)
     this.healthUpdateAccumulator = 0;
     this.playerCooldowns = new Map(); // Track cooldowns independently of snapshot
+    this.isEnding = false;
   }
 
   update(deltaTime, playersSnapshot) {
@@ -135,7 +136,7 @@ export class HostCombatManager {
   }
 
   checkForWinCondition(playersSnapshot) {
-    if (!this.state.isRunning) return;
+    if (!this.state.isRunning || this.isEnding) return;
 
     const players = playersSnapshot.getPlayers();
     // Use a safety check for health to ensure we don't skip players with undefined health
@@ -144,6 +145,7 @@ export class HostCombatManager {
     // If 1 or fewer players remain alive, end the match
     // (If 0, it's a draw or everyone died)
     if (activePlayers.length <= 1) {
+      this.isEnding = true;
       const winner = activePlayers[0];
       
       const stats = Array.from(players.values()).map(p => ({
@@ -153,12 +155,14 @@ export class HostCombatManager {
         is_bot: !!p.is_bot
       }));
 
-      this.network.send('game_over', {
-        winner_id: winner ? (winner.player_id || winner.id) : null,
-        stats: stats
-      });
-      
-      this.state.isRunning = false;
+      setTimeout(() => {
+        this.network.send('game_over', {
+          winner_id: winner ? (winner.player_id || winner.id) : null,
+          stats: stats
+        });
+        
+        this.state.isRunning = false;
+      }, CONFIG.GAME.VICTORY_DELAY_MS || 3000);
     }
   }
 
