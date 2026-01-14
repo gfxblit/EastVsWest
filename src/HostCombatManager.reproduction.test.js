@@ -177,4 +177,75 @@ describe('HostCombatManager Reproduction', () => {
     }));
     expect(mockState.isRunning).toBe(false);
   });
+
+  test('WhenGhostPlayerPresent_ShouldNotPreventWinCondition', () => {
+    // Setup: Host (dead), Bot (alive), Ghost (disconnected/undefined health)
+    const hostPlayer = {
+      player_id: 'host-player-id',
+      name: 'Host',
+      health: 0,
+      is_bot: false
+    };
+    
+    const botPlayer = {
+      player_id: 'bot-player-id',
+      name: 'Bot',
+      health: 100,
+      is_bot: true
+    };
+
+    const ghostPlayer = {
+      player_id: 'ghost-player-id',
+      name: 'Ghost',
+      health: undefined, // Simulating undefined health
+      is_connected: false, // Simulating disconnected
+      is_bot: false
+    };
+
+    mockSnapshot.getPlayers.mockReturnValue(new Map([
+      ['host-player-id', hostPlayer],
+      ['bot-player-id', botPlayer],
+      ['ghost-player-id', ghostPlayer]
+    ]));
+
+    // Trigger check (using update loop to trigger)
+    manager.checkForWinCondition(mockSnapshot);
+
+    // Should trigger game over because only Bot is effectively active
+    jest.advanceTimersByTime(CONFIG.GAME.VICTORY_DELAY_MS);
+    
+    expect(mockNetwork.send).toHaveBeenCalledWith('game_over', expect.objectContaining({
+        winner_id: 'bot-player-id'
+    }));
+    expect(mockState.isRunning).toBe(false);
+  });
+
+  test('WhenPlayerDisconnected_ShouldNotCountAsActive', () => {
+    // Setup: Bot 1 (alive), Bot 2 (alive but disconnected)
+    const bot1 = {
+      player_id: 'bot-1-id',
+      health: 100,
+      is_connected: true
+    };
+    
+    const bot2 = {
+      player_id: 'bot-2-id',
+      health: 100,
+      is_connected: false // Disconnected but has health
+    };
+
+    mockSnapshot.getPlayers.mockReturnValue(new Map([
+      ['bot-1-id', bot1],
+      ['bot-2-id', bot2]
+    ]));
+
+    manager.checkForWinCondition(mockSnapshot);
+
+    jest.advanceTimersByTime(CONFIG.GAME.VICTORY_DELAY_MS);
+    
+    // Should win because bot2 is disconnected
+    expect(mockNetwork.send).toHaveBeenCalledWith('game_over', expect.objectContaining({
+        winner_id: 'bot-1-id'
+    }));
+  });
 });
