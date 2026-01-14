@@ -242,14 +242,18 @@ describe('Network Integration', () => {
    - Error conditions handled?
    - Real network communication tested (for network features)?
 5. If gaps are found, return to Phase 2.
-6. **Self-Review:** After all tests pass, execute the `pr-reviewer` skill to perform a final automated code review of your changes. Address any high-priority issues identified by the reviewer before proceeding to Phase 6.
+6. **MANDATORY Self-Review:** After ALL tests pass, you MUST execute the `activate_skill` tool with `name: 'pr-reviewer'`. 
+    - Perform a thorough self-review of your changes.
+    - Explicitly address all high-priority issues, logic errors, or style inconsistencies identified.
+    - If changes are made based on the review, re-run all tests to ensure continued correctness.
+    - You are not finished until the review is complete and all feedback is integrated.
 
 **Exit Criteria:**
 - ✅ 100% of requirements have passing **unit** tests
 - ✅ 100% of requirements have passing **integration** tests (if applicable)
 - ✅ No test failures in either test suite
-- ✅ `pr-reviewer` skill executed and feedback addressed
-- ✅ Code is clean and refactored
+- ✅ `pr-reviewer` skill activated, self-review performed, and all feedback addressed
+- ✅ Code is clean, refactored, and follows project standards
 
 ---
 
@@ -260,6 +264,7 @@ describe('Network Integration', () => {
    ```
    test: Add tests for [feature]
    feat: Implement [feature] with TDD approach
+   refactor: address review feedback on [component]
    refactor: Simplify [component] logic
    ```
    The committed changes will be available on the current branch. Push to origin. A human is then responsible for creating a Pull Request for review.
@@ -276,7 +281,7 @@ Use this checklist for each feature:
 - [ ] Phase 2: Failing tests written (unit tests + integration tests for network/database features)
 - [ ] Phase 3: Minimal implementation (all unit tests green, all integration tests green)
 - [ ] Phase 4: Refactored to clean, modular code (all tests still green)
-- [ ] Phase 5: Final verification passed (BOTH unit and integration tests) AND `pr-reviewer` skill executed
+- [ ] Phase 5: Final verification passed (BOTH unit and integration tests) AND **MANDATORY** `pr-reviewer` self-review complete
 - [ ] Phase 6: Changes committed
 
 ---
@@ -288,7 +293,7 @@ Use this checklist for each feature:
 ⚠️ **NEVER refactor before tests pass.**
 ⚠️ **NEVER commit failing tests.**
 ⚠️ **ALWAYS run tests after changes.**
-⚠️ **ALWAYS use the `pr-reviewer` skill after all tests pass.**
+⚠️ **ALWAYS activate the `pr-reviewer` skill and address feedback after tests pass.**
 ⚠️ **ALWAYS write BOTH unit tests AND integration tests for network/database features.**
 ⚠️ **ALWAYS run integration tests before considering a feature complete.**
 ⚠️ **ALWAYS clarify unclear requirements before coding.**
