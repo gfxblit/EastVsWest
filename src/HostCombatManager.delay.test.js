@@ -84,7 +84,7 @@ describe('HostCombatManager Victory Delay', () => {
 
     // Advance time by 3000ms (CONFIG.GAME.VICTORY_DELAY_MS)
     // We assume the config will be 3000ms
-    jest.advanceTimersByTime(3000);
+    jest.advanceTimersByTime(CONFIG.GAME.VICTORY_DELAY_MS);
 
     // Verify Game Over IS sent after delay
     expect(mockNetwork.send).toHaveBeenCalledWith('game_over', expect.objectContaining({

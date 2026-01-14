@@ -10,7 +10,7 @@ export class HostCombatManager {
   }
 
   update(deltaTime, playersSnapshot) {
-    if (!this.network?.isHost || !playersSnapshot) return;
+    if (!this.network?.isHost || !playersSnapshot || this.isEnding) return;
 
     // Accumulate time since last update
     this.healthUpdateAccumulator += deltaTime;
@@ -65,7 +65,7 @@ export class HostCombatManager {
   }
 
   handleAttackRequest(message, playersSnapshot) {
-    if (!this.network?.isHost || !playersSnapshot) return;
+    if (!this.network?.isHost || !playersSnapshot || this.isEnding) return;
 
     const attackerId = message.from;
     const { aim_x, aim_y, is_special } = message.data;

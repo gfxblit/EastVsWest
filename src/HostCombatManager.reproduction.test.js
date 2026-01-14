@@ -90,8 +90,9 @@ describe('HostCombatManager Reproduction', () => {
     // Active players should be 1 (Bot)
     
     // Advance time for delay
-    jest.advanceTimersByTime(3000);
+    jest.advanceTimersByTime(CONFIG.GAME.VICTORY_DELAY_MS);
 
+    // Game Over should be sent
     // Game Over should be sent
     expect(mockNetwork.send).toHaveBeenCalledWith('game_over', expect.objectContaining({
         winner_id: 'bot-player-id'
@@ -167,8 +168,9 @@ describe('HostCombatManager Reproduction', () => {
     expect(bot2.health).toBe(0);
 
     // Advance time for delay
-    jest.advanceTimersByTime(3000);
+    jest.advanceTimersByTime(CONFIG.GAME.VICTORY_DELAY_MS);
 
+    // Game Over should be sent
     // NOW Game Over should trigger
     expect(mockNetwork.send).toHaveBeenCalledWith('game_over', expect.objectContaining({
         winner_id: 'bot-1-id'
