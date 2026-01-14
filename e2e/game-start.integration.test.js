@@ -48,39 +48,43 @@ describe('Game Start Integration', () => {
     const { data: playerAuth } = await playerClient.auth.signInAnonymously();
     const playerNetwork = new Network();
     playerNetwork.initialize(playerClient, playerAuth.user.id);
-    await playerNetwork.joinGame(joinCode, 'Player1');
-
-    // 3. Set up listeners for game_start
-    let gameStartPayload = null;
-    playerNetwork.on('game_start', (payload) => {
-      gameStartPayload = payload;
-    });
-
-    // 4. Host starts game
-    await hostNetwork.startGame();
-
-    // 5. Wait for game_start broadcast
-    await waitFor(() => gameStartPayload !== null, 5000);
-
-    // 6. Verify payload contains players and bots
-    expect(gameStartPayload.data).toBeDefined();
-    expect(gameStartPayload.data.players).toBeDefined();
-    expect(Array.isArray(gameStartPayload.data.players)).toBe(true);
     
-    // Should have at least Host, Player1, and potentially Bots if minPlayers > 2
-    // Default MIN_PLAYERS is usually 4
-    expect(gameStartPayload.data.players.length).toBeGreaterThanOrEqual(2);
+    try {
+      await playerNetwork.joinGame(joinCode, 'Player1');
 
-    const playerIds = gameStartPayload.data.players.map(p => p.player_id);
-    expect(playerIds).toContain(hostNetwork.playerId);
-    expect(playerIds).toContain(playerNetwork.playerId);
+      // 3. Set up listeners for game_start
+      let gameStartPayload = null;
+      playerNetwork.on('game_start', (payload) => {
+        gameStartPayload = payload;
+      });
 
-    // Verify bots are included if any
-    const bots = gameStartPayload.data.players.filter(p => p.is_bot);
-    console.log(`Game started with ${bots.length} bots`);
+      // 4. Host starts game
+      await hostNetwork.startGame();
 
-    // Clean up
-    playerNetwork.disconnect();
-    await playerClient.auth.signOut();
+      // 5. Wait for game_start broadcast
+      await waitFor(() => gameStartPayload !== null, 5000);
+
+      // 6. Verify payload contains players and bots
+      expect(gameStartPayload.data).toBeDefined();
+      expect(gameStartPayload.data.players).toBeDefined();
+      expect(Array.isArray(gameStartPayload.data.players)).toBe(true);
+      
+      // Should have at least Host, Player1, and potentially Bots if minPlayers > 2
+      // Default MIN_PLAYERS is usually 4
+      expect(gameStartPayload.data.players.length).toBeGreaterThanOrEqual(2);
+
+      const playerIds = gameStartPayload.data.players.map(p => p.player_id);
+      expect(playerIds).toContain(hostNetwork.playerId);
+      expect(playerIds).toContain(playerNetwork.playerId);
+
+      // Verify bots are included if any
+      const bots = gameStartPayload.data.players.filter(p => p.is_bot);
+      expect(bots.length).toBeGreaterThanOrEqual(0);
+
+    } finally {
+      // Clean up
+      playerNetwork.disconnect();
+      await playerClient.auth.signOut();
+    }
   });
 });

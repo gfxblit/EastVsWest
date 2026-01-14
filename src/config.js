@@ -41,6 +41,7 @@ export const CONFIG = {
     SPAWN_INVULNERABILITY_MS: 3000, // 3 seconds of invulnerability after spawn
     MAX_HEALTH: 100,
     HITBOX_RADIUS: 40, // Collision half-width/height
+    SPAWN_RADIUS: 200, // Distance from center for distributed spawns
   },
 
   // Conflict Zone Settings

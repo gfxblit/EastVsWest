@@ -260,31 +260,54 @@ export class SessionManager {
             }
         }
 
-        // 2. Reset all players' state for a clean start
-        const { error: resetError } = await this.supabase
+        // 2. Get all players (including bots) to calculate distributed spawn positions
+        const { data: playersToReset, error: playersToResetError } = await this.supabase
             .from('session_players')
-            .update({
-                health: 100,
-                is_alive: true,
-                kills: 0,
-                damage_dealt: 0,
-                position_x: CONFIG.WORLD.WIDTH / 2,
-                position_y: CONFIG.WORLD.HEIGHT / 2,
-                equipped_weapon: 'fist'
-            })
+            .select('player_id')
             .eq('session_id', this.network.sessionId);
 
-        if (resetError) throw resetError;
+        if (playersToResetError) throw playersToResetError;
 
-        // 3. Update session status to active
-        const { error: updateError } = await this.supabase
+        // 3. Reset all players' state with distributed spawn positions
+        const centerX = CONFIG.WORLD.WIDTH / 2;
+        const centerY = CONFIG.WORLD.HEIGHT / 2;
+        const spawnRadius = CONFIG.PLAYER.SPAWN_RADIUS;
+        const totalPlayers = playersToReset.length;
+        const angleStep = totalPlayers > 0 ? (Math.PI * 2) / totalPlayers : 0;
+
+        const updatePromises = playersToReset.map((player, i) => {
+            const angle = i * angleStep;
+            const x = centerX + Math.cos(angle) * spawnRadius;
+            const y = centerY + Math.sin(angle) * spawnRadius;
+
+            return this.supabase
+                .from('session_players')
+                .update({
+                    health: 100,
+                    is_alive: true,
+                    kills: 0,
+                    damage_dealt: 0,
+                    position_x: x,
+                    position_y: y,
+                    equipped_weapon: 'fist'
+                })
+                .eq('session_id', this.network.sessionId)
+                .eq('player_id', player.player_id);
+        });
+
+        const results = await Promise.all(updatePromises);
+        const updateError = results.map(r => r.error).find(e => e);
+        if (updateError) throw updateError;
+
+        // 4. Update session status to active
+        const { error: updateErrorStatus } = await this.supabase
             .from('game_sessions')
             .update({ status: 'active' })
             .eq('id', this.network.sessionId);
 
-        if (updateError) throw updateError;
+        if (updateErrorStatus) throw updateErrorStatus;
 
-        // 4. Fetch final list of players (including bots) for atomic broadcast
+        // 5. Fetch final list of players (including bots) for atomic broadcast
         const { data: finalPlayers, error: finalPlayersError } = await this.supabase
             .from('session_players')
             .select('*')
