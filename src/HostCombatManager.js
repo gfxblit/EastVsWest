@@ -139,8 +139,19 @@ export class HostCombatManager {
     if (!this.state.isRunning || this.isEnding) return;
 
     const players = playersSnapshot.getPlayers();
-    // Use a safety check for health to ensure we don't skip players with undefined health
-    const activePlayers = Array.from(players.values()).filter(p => (p.health ?? 100) > 0);
+    
+    // Filter out inactive players:
+    // 1. Must not be explicitly disconnected
+    // 2. Must have > 0 health (undefined defaults to 100, assuming fresh spawn)
+    const activePlayers = Array.from(players.values()).filter(p => {
+      if (p.is_connected === false) return false;
+      return (p.health ?? 100) > 0;
+    });
+
+    if (CONFIG.DEBUG_COMBAT) {
+      console.log(`[HostCombatManager] Active players: ${activePlayers.length}`, 
+        activePlayers.map(p => `${p.player_name || p.name || 'Unknown'}(${p.health ?? 100}hp)`));
+    }
 
     // If 1 or fewer players remain alive, end the match
     // (If 0, it's a draw or everyone died)

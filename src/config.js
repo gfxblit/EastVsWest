@@ -6,6 +6,9 @@
  */
 
 export const CONFIG = {
+  // Debug flags
+  DEBUG_COMBAT: false,
+
   // Game Settings
   GAME: {
     MAX_PLAYERS: 12,
