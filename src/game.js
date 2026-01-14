@@ -220,6 +220,32 @@ export class Game {
     return this.getLocalPlayer();
   }
 
+  cycleSpectatorTarget() {
+    if (!this.playersSnapshot || !this.network) return;
+    
+    const players = Array.from(this.playersSnapshot.getPlayers().values());
+    // Filter for valid targets: Alive and not local player
+    const candidates = players.filter(p => p.health > 0 && p.player_id !== this.network.playerId);
+    
+    if (candidates.length === 0) return; // No one else to spectate
+    
+    // Sort candidates to ensure consistent order
+    candidates.sort((a, b) => a.player_id.localeCompare(b.player_id));
+    
+    // Find current index
+    let currentIndex = candidates.findIndex(p => p.player_id === this.spectatingTargetId);
+    
+    // If current target is not in candidates (e.g. they died), start from 0. 
+    // Otherwise go to next.
+    let nextIndex = 0;
+    if (currentIndex !== -1) {
+        nextIndex = (currentIndex + 1) % candidates.length;
+    }
+    
+    this.spectatingTargetId = candidates[nextIndex].player_id;
+    console.log(`Switched spectator target to: ${candidates[nextIndex].player_name} (${this.spectatingTargetId})`);
+  }
+
   handleInput(inputState) {
     if (inputState.toggleDebug && !this.wasDebugToggled) {
         this.debugMode = !this.debugMode;
