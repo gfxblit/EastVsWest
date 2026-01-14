@@ -1,0 +1,34 @@
+{
+  "frameWidth": 256,
+  "frameHeight": 256,
+  "columns": 5,
+  "rows": 4,
+  "directions": [
+    "south",
+    "east",
+    "north",
+    "west"
+  ],
+  "prompts": {
+    "south": {
+      "source": "south",
+      "flipped": false,
+      "text": "Based on the reference picture, generate a 1-row spritesheet containing exactly 5 frames of a walking animation toward the South (facing the camera). Each frame faces South. The sequence must show a logical walking cycle alternating between extended strides and centered passing positions. Ensure the limbs move in natural opposition and the torso bobs slightly to show weight transfer. Maintain the exact pixel scale, color palette, and head/body proportions from the reference image. Keep the background solid magenta (#FF00FF)."
+    },
+    "east": {
+      "source": "east",
+      "flipped": false,
+      "text": "Based on the reference picture, generate a 1-row spritesheet containing exactly 5 frames of a walking animation toward the East (right). The sequence must show a logical walking cycle: initial step, passing position, and contact. Ensure the character’s legs and arms move in opposition to maintain realism. Maintain the exact pixel scale, color palette, and head/body proportions from the reference image. Keep the background solid magenta (#FF00FF)."
+    },
+    "north": {
+      "source": "north",
+      "flipped": false,
+      "text": "Based on the reference picture, generate a 1-row spritesheet containing exactly 5 frames of a walking animation toward the North (up). **Each frame faces North**. The sequence must show a logical walking cycle alternating between extended strides and centered passing positions. Ensure the limbs move in natural opposition and the torso bobs slightly to show weight transfer. Maintain the exact pixel scale, color palette, and head/body proportions from the reference image. Keep the background solid magenta (#FF00FF)."
+    },
+    "west": {
+      "source": "east",
+      "flipped": true,
+      "text": "Based on the reference picture, generate a 1-row spritesheet containing exactly 5 frames of a walking animation toward the East (right). The sequence must show a logical walking cycle: initial step, passing position, and contact. Ensure the character’s legs and arms move in opposition to maintain realism. Maintain the exact pixel scale, color palette, and head/body proportions from the reference image. Keep the background solid magenta (#FF00FF)."
+    }
+  }
+}
