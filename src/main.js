@@ -259,6 +259,7 @@ class App {
     const startBtn = document.getElementById('start-game-btn');
     const leaveBtn = document.getElementById('leave-lobby-btn');
     const leaveSpectateBtn = document.getElementById('leave-spectate-btn');
+    const nextSpectateBtn = document.getElementById('next-spectate-btn');
 
     if (hostBtn) {
       hostBtn.addEventListener('click', () => this.hostGame());
@@ -278,6 +279,14 @@ class App {
 
     if (leaveSpectateBtn) {
       leaveSpectateBtn.addEventListener('click', () => this.leaveGame());
+    }
+
+    if (nextSpectateBtn) {
+      nextSpectateBtn.addEventListener('click', () => {
+        if (this.game) {
+          this.game.cycleSpectatorTarget();
+        }
+      });
     }
   }
 

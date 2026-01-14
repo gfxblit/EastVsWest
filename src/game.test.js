@@ -342,5 +342,34 @@ describe('Game', () => {
       
       expect(target.id).toBe('player-1');
     });
+
+    test('cycleSpectatorTarget_ShouldSwitchToNextAvailablePlayer', () => {
+      // Setup players: Local, Killer (Alive), Bystander (Alive), DeadGuy (Dead)
+      const players = new Map();
+      players.set('player-1', { player_id: 'player-1', health: 0 }); // Local (Dead)
+      players.set('killer-1', { player_id: 'killer-1', player_name: 'Killer', health: 100 });
+      players.set('bystander-1', { player_id: 'bystander-1', player_name: 'Bystander', health: 100 });
+      players.set('dead-1', { player_id: 'dead-1', player_name: 'DeadGuy', health: 0 });
+
+      mockSnapshot.getPlayers = jest.fn().mockReturnValue(players);
+      
+      // Start spectating Killer
+      game.spectatingTargetId = 'killer-1';
+
+      // First cycle: Should go to Bystander (alphabetically 'bystander-1' comes before 'killer-1' but we need to check sort order)
+      // IDs: 'bystander-1', 'killer-1'. 
+      // Current is 'killer-1'. Next in list (looping) is 'bystander-1'.
+      
+      game.cycleSpectatorTarget();
+      expect(game.spectatingTargetId).toBe('bystander-1');
+
+      // Second cycle: Should go back to Killer
+      game.cycleSpectatorTarget();
+      expect(game.spectatingTargetId).toBe('killer-1');
+      
+      // Ensure 'dead-1' was skipped
+      game.cycleSpectatorTarget(); 
+      expect(game.spectatingTargetId).toBe('bystander-1');
+    });
   });
 });
