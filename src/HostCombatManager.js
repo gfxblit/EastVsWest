@@ -138,7 +138,8 @@ export class HostCombatManager {
     if (!this.state.isRunning) return;
 
     const players = playersSnapshot.getPlayers();
-    const activePlayers = Array.from(players.values()).filter(p => p.health > 0);
+    // Use a safety check for health to ensure we don't skip players with undefined health
+    const activePlayers = Array.from(players.values()).filter(p => (p.health ?? 100) > 0);
 
     // If 1 or fewer players remain alive, end the match
     // (If 0, it's a draw or everyone died)
@@ -148,7 +149,8 @@ export class HostCombatManager {
       const stats = Array.from(players.values()).map(p => ({
         player_id: p.player_id || p.id,
         name: p.player_name || p.name || 'Unknown',
-        kills: p.kills || 0
+        kills: p.kills || 0,
+        is_bot: !!p.is_bot
       }));
 
       this.network.send('game_over', {
