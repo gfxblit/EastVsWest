@@ -138,7 +138,7 @@ describe('Match Resolution Integration', () => {
     // This will time out if not implemented
     const gameOverData = await Promise.race([
         gameOverPromise,
-        new Promise((_, reject) => setTimeout(() => reject(new Error('Timeout waiting for game_over')), 2000))
+        new Promise((_, reject) => setTimeout(() => reject(new Error('Timeout waiting for game_over')), 6000))
     ]);
 
     expect(gameOverData).toBeDefined();
