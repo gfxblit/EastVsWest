@@ -150,7 +150,7 @@ export class HostCombatManager {
 
     if (CONFIG.DEBUG_COMBAT) {
       console.log(`[HostCombatManager] Active players: ${activePlayers.length}`, 
-        activePlayers.map(p => `${p.name}(${p.health ?? 100}hp)`));
+        activePlayers.map(p => `${p.player_name || p.name || 'Unknown'}(${p.health ?? 100}hp)`));
     }
 
     // If 1 or fewer players remain alive, end the match
