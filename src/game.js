@@ -8,6 +8,7 @@ import { LocalPlayerController } from './LocalPlayerController.js';
 import { HostCombatManager } from './HostCombatManager.js';
 import { HostLootManager } from './HostLootManager.js';
 import { HostBotManager } from './HostBotManager.js';
+import { DebugUI } from './DebugUI.js';
 
 export class Game {
   constructor() {
@@ -32,6 +33,7 @@ export class Game {
     this.spectatingTargetId = null;
     this.debugMode = false;
     this.wasDebugToggled = false;
+    this.debugUI = new DebugUI();
   }
 
   init(playersSnapshot = null, network = null, renderer = null) {
@@ -251,6 +253,9 @@ export class Game {
         this.debugMode = !this.debugMode;
         this.wasDebugToggled = true;
         console.log(`Debug Mode: ${this.debugMode ? 'ON' : 'OFF'}`);
+        if (this.debugUI) {
+            this.debugUI.toggle();
+        }
     } else if (!inputState.toggleDebug) {
         this.wasDebugToggled = false;
     }
