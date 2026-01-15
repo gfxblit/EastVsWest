@@ -10,8 +10,10 @@ const UI_TEXT = {
 };
 
 export class DebugUI {
-  constructor() {
+  constructor(game = null) {
+    this.game = game;
     this.container = null;
+    this.pauseBtn = null;
     this.weaponSelect = null;
     this.selectedWeaponKey = null;
     this.isMinimized = false;
@@ -49,6 +51,18 @@ export class DebugUI {
     this.contentContainer = document.createElement('div');
     this.contentContainer.id = 'debug-content';
     this.container.appendChild(this.contentContainer);
+
+    // Create Pause/Resume Simulation Button
+    if (this.game) {
+      this.pauseBtn = document.createElement('button');
+      this.pauseBtn.id = 'debug-pause-simulation-btn';
+      this.pauseBtn.innerText = this.game.state.isRunning ? 'Pause Simulation' : 'Resume Simulation';
+      this.pauseBtn.addEventListener('click', () => {
+        this.game.state.isRunning = !this.game.state.isRunning;
+        this.pauseBtn.innerText = this.game.state.isRunning ? 'Pause Simulation' : 'Resume Simulation';
+      });
+      this.container.appendChild(this.pauseBtn);
+    }
 
     // Create Weapon Selector
     const selectLabel = document.createElement('label');
@@ -102,6 +116,15 @@ export class DebugUI {
 
   toggle() {
     this.container.classList.toggle('hidden');
+    if (!this.container.classList.contains('hidden')) {
+      this.updatePauseButtonText();
+    }
+  }
+
+  updatePauseButtonText() {
+    if (this.pauseBtn && this.game) {
+      this.pauseBtn.innerText = this.game.state.isRunning ? 'Pause Simulation' : 'Resume Simulation';
+    }
   }
 
   handleWeaponSelect(key) {

@@ -1,4 +1,3 @@
-
 import { jest } from '@jest/globals';
 import { CONFIG } from './config.js';
 
@@ -33,7 +32,10 @@ describe('DebugUI', () => {
     const module = await import('./DebugUI.js');
     DebugUI = module.DebugUI;
 
-    debugUI = new DebugUI();
+    const mockGame = {
+      state: { isRunning: true }
+    };
+    debugUI = new DebugUI(mockGame);
     container = document.getElementById('debug-ui-overlay');
   });
 
@@ -135,5 +137,35 @@ describe('DebugUI', () => {
     expect(debugUI.isMinimized).toBe(false);
     expect(minimizeBtn.innerText).toBe('-');
     expect(content.classList.contains('hidden')).toBe(false);
+  });
+
+  test('should have a pause/resume simulation button', () => {
+    const pauseBtn = container.querySelector('#debug-pause-simulation-btn');
+    expect(pauseBtn).not.toBeNull();
+    expect(pauseBtn.innerText).toBe('Pause Simulation');
+  });
+
+  test('clicking pause button should toggle game.state.isRunning', () => {
+    const mockGame = {
+        state: { isRunning: true }
+    };
+    // Re-initialize and replace container
+    document.body.innerHTML = '';
+    debugUI = new DebugUI(mockGame);
+    const pauseBtn = document.getElementById('debug-pause-simulation-btn');
+    
+    // Initial state
+    expect(mockGame.state.isRunning).toBe(true);
+    expect(pauseBtn.innerText).toBe('Pause Simulation');
+
+    // Click pause
+    pauseBtn.click();
+    expect(mockGame.state.isRunning).toBe(false);
+    expect(pauseBtn.innerText).toBe('Resume Simulation');
+
+    // Click resume
+    pauseBtn.click();
+    expect(mockGame.state.isRunning).toBe(true);
+    expect(pauseBtn.innerText).toBe('Pause Simulation');
   });
 });

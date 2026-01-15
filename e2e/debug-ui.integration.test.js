@@ -114,6 +114,78 @@ describe('Debug UI E2E', () => {
         expect(damageAfterReopen).toBe('999');
     });
 
+    test('Should allow pausing simulation', async () => {
+        await page.goto(baseUrl);
+        await page.waitForSelector('body.loaded');
+
+        // Mock network and game to bypass Supabase
+        await page.evaluate(() => {
+            window.app.network = {
+                playerId: 'local-player',
+                isHost: true,
+                initialize: () => { },
+                on: () => { },
+                hostGame: async () => ({ session: { id: 's1', join_code: 'DEBUG3' }, player: { id: 'local-player' } }),
+                startGame: async () => { },
+                startPeriodicPlayerStateWrite: () => { },
+                broadcastPlayerStateUpdate: () => { },
+                writePlayerStateToDB: async () => { },
+                send: () => { },
+                disconnect: () => { },
+            };
+
+            window.app.playersSnapshot = {
+                ready: async () => { },
+                getPlayers: () => new Map([['local-player', {
+                    player_id: 'local-player',
+                    player_name: 'DebugUser',
+                    health: 100,
+                    position_x: 100,
+                    position_y: 100
+                }]]),
+                getInterpolatedPlayerState: () => ({ x: 100, y: 100 }),
+                destroy: () => { }
+            };
+
+            window.app.hostGame = async function () {
+                this.ui.showJoinCode('DEBUG3');
+                this.startGame();
+            };
+        });
+
+        // Start game
+        await page.click('#host-game-btn');
+        await page.waitForSelector('#game-screen.active');
+        await page.waitForFunction(() => window.game && window.game.state.isRunning);
+
+        // Open Debug UI
+        await page.keyboard.press('o');
+        await page.waitForSelector('#debug-ui-overlay', { visible: true });
+        
+        // Pause simulation
+        await page.click('#debug-pause-simulation-btn');
+
+        // Get time immediately after pause
+        const pausedTime = await page.evaluate(() => window.game.state.gameTime);
+        
+        // Wait a bit
+        await new Promise(resolve => setTimeout(resolve, 500));
+        
+        // Time should NOT have changed
+        const timeAfterWait = await page.evaluate(() => window.game.state.gameTime);
+        expect(timeAfterWait).toBe(pausedTime);
+
+        // Resume simulation
+        await page.click('#debug-pause-simulation-btn');
+        
+        // Wait a bit
+        await new Promise(resolve => setTimeout(resolve, 500));
+        
+        // Time should HAVE changed
+        const resumedTime = await page.evaluate(() => window.game.state.gameTime);
+        expect(resumedTime).toBeGreaterThan(timeAfterWait);
+    });
+
     test('Should allow toggling Debug UI via touch button on small screens', async () => {
         // Set viewport to mobile size
         await page.setViewport({ width: 400, height: 800, isMobile: true, hasTouch: true });

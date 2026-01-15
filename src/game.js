@@ -34,7 +34,7 @@ export class Game {
     this.debugMode = false;
     this.lastDebugState = false;
     // Only create DebugUI in browser context where document is available
-    this.debugUI = typeof document !== 'undefined' ? new DebugUI() : null;
+    this.debugUI = typeof document !== 'undefined' ? new DebugUI(this) : null;
   }
 
   init(playersSnapshot = null, network = null, renderer = null) {
