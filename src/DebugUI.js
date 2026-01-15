@@ -1,5 +1,14 @@
 import { CONFIG } from './config.js';
 
+const UI_TEXT = {
+    TITLE: 'Weapon Config Debugger',
+    MINIMIZE: '-',
+    MAXIMIZE: '+',
+    SELECT_WEAPON_LABEL: 'Select Weapon: ',
+    EXPORT_BTN: 'Export to Clipboard',
+    CONFIG_EXPORT_PREFIX: 'export const WEAPONS = '
+};
+
 export class DebugUI {
   constructor() {
     this.container = null;
@@ -24,13 +33,13 @@ export class DebugUI {
 
     // Create Title
     const title = document.createElement('h3');
-    title.innerText = 'Weapon Config Debugger';
+    title.innerText = UI_TEXT.TITLE;
     header.appendChild(title);
 
     // Create Minimize Button
     this.minimizeBtn = document.createElement('button');
     this.minimizeBtn.id = 'debug-minimize-btn';
-    this.minimizeBtn.innerText = '-';
+    this.minimizeBtn.innerText = UI_TEXT.MINIMIZE;
     this.minimizeBtn.addEventListener('click', () => this.toggleMinimize());
     header.appendChild(this.minimizeBtn);
 
@@ -43,7 +52,7 @@ export class DebugUI {
 
     // Create Weapon Selector
     const selectLabel = document.createElement('label');
-    selectLabel.innerText = 'Select Weapon: ';
+    selectLabel.innerText = UI_TEXT.SELECT_WEAPON_LABEL;
     this.contentContainer.appendChild(selectLabel);
 
     this.weaponSelect = document.createElement('select');
@@ -67,7 +76,7 @@ export class DebugUI {
     // Create Export Button
     const exportBtn = document.createElement('button');
     exportBtn.id = 'debug-export-btn';
-    exportBtn.innerText = 'Export to Clipboard';
+    exportBtn.innerText = UI_TEXT.EXPORT_BTN;
     exportBtn.addEventListener('click', () => this.exportConfig());
     this.contentContainer.appendChild(exportBtn);
 
@@ -84,10 +93,10 @@ export class DebugUI {
     this.isMinimized = !this.isMinimized;
     if (this.isMinimized) {
         this.contentContainer.classList.add('hidden');
-        this.minimizeBtn.innerText = '+';
+        this.minimizeBtn.innerText = UI_TEXT.MAXIMIZE;
     } else {
         this.contentContainer.classList.remove('hidden');
-        this.minimizeBtn.innerText = '-';
+        this.minimizeBtn.innerText = UI_TEXT.MINIMIZE;
     }
   }
 
@@ -164,7 +173,7 @@ export class DebugUI {
   }
 
   exportConfig() {
-    const exportString = `export const WEAPONS = ${JSON.stringify(CONFIG.WEAPONS, null, 2)};`;
+    const exportString = `${UI_TEXT.CONFIG_EXPORT_PREFIX}${JSON.stringify(CONFIG.WEAPONS, null, 2)};`;
     
     // Attempt to write to clipboard
     if (navigator.clipboard && navigator.clipboard.writeText) {

@@ -490,7 +490,7 @@ button:active {
 
 /* Utility Classes */
 .hidden {
-  display: none !important;
+  display: none;
 }
 
 /* Lobby-specific styles */

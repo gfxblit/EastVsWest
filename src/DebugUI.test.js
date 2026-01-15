@@ -118,6 +118,9 @@ describe('DebugUI', () => {
   test('should toggle minimize state when button is clicked', () => {
     const minimizeBtn = container.querySelector('#debug-minimize-btn');
     expect(minimizeBtn).not.toBeNull();
+    // Assuming we can't easily access UI_TEXT from here without exporting it,
+    // but we can test the behavior.
+    // If UI_TEXT was exported, we'd use UI_TEXT.MINIMIZE.
     expect(minimizeBtn.innerText).toBe('-');
 
     // Minimize

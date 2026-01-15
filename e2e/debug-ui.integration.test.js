@@ -20,18 +20,20 @@ describe('Debug UI E2E', () => {
         await stopViteServer();
     });
 
-    test('Should allow configuring weapon stats in real-time', async () => {
-        await page.goto(baseUrl);
-        await page.waitForSelector('body.loaded');
+    async function setupMocks(page, options = {}) {
+        const {
+            playerId = 'local-player',
+            playerName = 'DebugUser',
+            joinCode = 'DEBUG1'
+        } = options;
 
-        // Mock network and game to bypass Supabase
-        await page.evaluate(() => {
+        await page.evaluate(({ playerId, playerName, joinCode }) => {
             window.app.network = {
-                playerId: 'local-player',
+                playerId,
                 isHost: true,
                 initialize: () => { },
                 on: () => { },
-                hostGame: async () => ({ session: { id: 's1', join_code: 'DEBUG1' }, player: { id: 'local-player' } }),
+                hostGame: async () => ({ session: { id: 's1', join_code: joinCode }, player: { id: playerId } }),
                 startGame: async () => { },
                 startPeriodicPlayerStateWrite: () => { },
                 broadcastPlayerStateUpdate: () => { },
@@ -42,9 +44,9 @@ describe('Debug UI E2E', () => {
 
             window.app.playersSnapshot = {
                 ready: async () => { },
-                getPlayers: () => new Map([['local-player', {
-                    player_id: 'local-player',
-                    player_name: 'DebugUser',
+                getPlayers: () => new Map([[playerId, {
+                    player_id: playerId,
+                    player_name: playerName,
                     health: 100,
                     position_x: 100,
                     position_y: 100
@@ -55,10 +57,17 @@ describe('Debug UI E2E', () => {
 
             // Mock hostGame to immediately start
             window.app.hostGame = async function () {
-                this.ui.showJoinCode('DEBUG1');
+                this.ui.showJoinCode(joinCode);
                 this.startGame();
             };
-        });
+        }, { playerId, playerName, joinCode });
+    }
+
+    test('Should allow configuring weapon stats in real-time', async () => {
+        await page.goto(baseUrl);
+        await page.waitForSelector('body.loaded');
+
+        await setupMocks(page, { joinCode: 'DEBUG1' });
 
         // Start game
         await page.click('#host-game-btn');
@@ -112,41 +121,7 @@ describe('Debug UI E2E', () => {
         await page.goto(`${baseUrl}?debug=true`);
         await page.waitForSelector('body.loaded');
 
-        // Setup mocks after page load
-        await page.evaluate(() => {
-            window.app.network = {
-                playerId: 'local-player',
-                isHost: true,
-                initialize: () => { },
-                on: () => { },
-                hostGame: async () => ({ session: { id: 's1', join_code: 'DEBUG2' }, player: { id: 'local-player' } }),
-                startGame: async () => { },
-                startPeriodicPlayerStateWrite: () => { },
-                broadcastPlayerStateUpdate: () => { },
-                writePlayerStateToDB: async () => { },
-                send: () => { },
-                disconnect: () => { },
-            };
-
-            window.app.playersSnapshot = {
-                ready: async () => { },
-                getPlayers: () => new Map([['local-player', {
-                    player_id: 'local-player',
-                    player_name: 'TouchUser',
-                    health: 100,
-                    position_x: 100,
-                    position_y: 100
-                }]]),
-                getInterpolatedPlayerState: () => ({ x: 100, y: 100 }),
-                destroy: () => { }
-            };
-
-            // Mock hostGame to immediately start
-            window.app.hostGame = async function () {
-                this.ui.showJoinCode('DEBUG2');
-                this.startGame();
-            };
-        });
+        await setupMocks(page, { playerName: 'TouchUser', joinCode: 'DEBUG2' });
 
         // Start game
         await page.click('#host-game-btn');
@@ -184,29 +159,7 @@ describe('Debug UI E2E', () => {
         await page.goto(baseUrl);
         await page.waitForSelector('body.loaded');
 
-        // Setup minimal mocks
-        await page.evaluate(() => {
-            window.app.network = {
-                playerId: 'host',
-                isHost: true,
-                initialize: () => { },
-                on: () => { },
-                hostGame: async () => ({ session: { id: 's1', join_code: 'DEBUG3' }, player: { id: 'host' } }),
-                startGame: () => { },
-                startPeriodicPlayerStateWrite: () => { },
-                broadcastPlayerStateUpdate: () => { },
-                writePlayerStateToDB: async () => { },
-                send: () => { },
-                disconnect: () => { },
-            };
-            window.app.playersSnapshot = {
-                ready: async () => { },
-                getPlayers: () => new Map(),
-                getInterpolatedPlayerState: () => ({ x: 0, y: 0 }),
-                destroy: () => { }
-            };
-            window.app.hostGame = async function () { this.startGame(); };
-        });
+        await setupMocks(page, { playerId: 'host', joinCode: 'DEBUG3' });
 
         // Start game and open debug UI
         await page.click('#host-game-btn');
