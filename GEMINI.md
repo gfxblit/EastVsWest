@@ -244,9 +244,10 @@ describe('Network Integration', () => {
 5. If gaps are found, return to Phase 2.
 6. **MANDATORY Self-Review:** After ALL tests pass, you MUST execute the `activate_skill` tool with `name: 'pr-reviewer'`. 
     - Perform a thorough self-review of your changes.
-    - Explicitly address all high-priority issues, logic errors, or style inconsistencies identified.
+    - **You MUST review all feedback provided by the tool.**
+    - **You MUST explicitly address all high and critical priority issues, logic errors, or style inconsistencies identified.**
     - If changes are made based on the review, re-run all tests to ensure continued correctness.
-    - You are not finished until the review is complete and all feedback is integrated.
+    - You are not finished until the review is complete and all high/critical feedback is integrated.
 
 **Exit Criteria:**
 - ✅ 100% of requirements have passing **unit** tests
@@ -293,7 +294,7 @@ Use this checklist for each feature:
 ⚠️ **NEVER refactor before tests pass.**
 ⚠️ **NEVER commit failing tests.**
 ⚠️ **ALWAYS run tests after changes.**
-⚠️ **ALWAYS activate the `pr-reviewer` skill and address feedback after tests pass.**
+⚠️ **ALWAYS activate the `pr-reviewer` skill after tests pass, perform a review, and address all high/critical feedback.**
 ⚠️ **ALWAYS write BOTH unit tests AND integration tests for network/database features.**
 ⚠️ **ALWAYS run integration tests before considering a feature complete.**
 ⚠️ **ALWAYS clarify unclear requirements before coding.**
