@@ -55,11 +55,15 @@ async function _startViteServer() {
       env.VITE_SUPABASE_ANON_KEY = process.env.SUPABASE_ANON_KEY;
     }
 
-    viteProcess = spawn('npm', ['run', 'dev', '--', '--port', String(port), '--strictPort'], {
+    viteProcess = spawn('npm', ['run', 'dev', '--', '--port', String(port), '--strictPort', '--no-open'], {
       cwd: projectRoot,
       stdio: 'pipe',
-      env
+      env,
+      detached: true, // Run in separate process group to prevent focus stealing on macOS
     });
+
+    // Prevent the parent process from waiting for the detached child
+    viteProcess.unref();
 
     let output = '';
     let startTimeout = null;

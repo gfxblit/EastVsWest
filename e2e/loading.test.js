@@ -10,8 +10,7 @@ describe('Game Loading', () => {
 
     beforeAll(async () => {
         viteUrl = await startViteServer();
-        const config = getPuppeteerConfig();
-        browser = await puppeteer.launch(config.launch);
+        browser = await puppeteer.launch(getPuppeteerConfig());
     });
 
     afterAll(async () => {

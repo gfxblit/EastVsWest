@@ -1,24 +1,83 @@
 /**
  * Puppeteer Configuration Helper
  * Abstracts browser executable path for different environments:
- * - Local development (macOS, Linux, Windows)
+ * - Local development (uses chrome-headless-shell to prevent focus stealing)
  * - GitHub Actions (CI/CD)
  * - Google Cloud Shell
  */
 
+import { homedir } from 'os';
+import { existsSync, readdirSync } from 'fs';
+import { join } from 'path';
+
+/**
+ * Finds the chrome-headless-shell binary in Puppeteer's cache
+ * This binary has no window manager integration and won't steal focus on macOS
+ * @returns {string|undefined} Path to chrome-headless-shell binary, or undefined if not found
+ */
+function findHeadlessShellBinary() {
+  const cacheDir = join(homedir(), '.cache', 'puppeteer', 'chrome-headless-shell');
+
+  if (!existsSync(cacheDir)) {
+    return undefined;
+  }
+
+  // Determine platform suffix
+  let platformDir;
+  if (process.platform === 'darwin') {
+    platformDir = process.arch === 'arm64' ? 'mac_arm' : 'mac';
+  } else if (process.platform === 'linux') {
+    platformDir = 'linux64';
+  } else if (process.platform === 'win32') {
+    platformDir = 'win64';
+  } else {
+    return undefined;
+  }
+
+  // Find matching version directory (e.g., mac_arm-143.0.7499.169)
+  const versions = readdirSync(cacheDir).filter(dir => dir.startsWith(platformDir));
+  if (versions.length === 0) {
+    return undefined;
+  }
+
+  // Use the most recent version (sorted alphabetically, higher version = later)
+  versions.sort().reverse();
+  const versionDir = versions[0];
+
+  // Determine binary subdirectory name
+  let binarySubdir;
+  if (process.platform === 'darwin') {
+    binarySubdir = process.arch === 'arm64' ? 'chrome-headless-shell-mac-arm64' : 'chrome-headless-shell-mac-x64';
+  } else if (process.platform === 'linux') {
+    binarySubdir = 'chrome-headless-shell-linux64';
+  } else if (process.platform === 'win32') {
+    binarySubdir = 'chrome-headless-shell-win64';
+  }
+
+  const binaryName = process.platform === 'win32' ? 'chrome-headless-shell.exe' : 'chrome-headless-shell';
+  const binaryPath = join(cacheDir, versionDir, binarySubdir, binaryName);
+
+  if (existsSync(binaryPath)) {
+    return binaryPath;
+  }
+
+  return undefined;
+}
+
 /**
  * Detects the appropriate Chrome executable path based on the environment
+ * @param {boolean} useHeadlessShell - Whether to prefer the headless shell binary
  * @returns {string|undefined} Chrome executable path, or undefined to use Puppeteer's bundled Chromium
  */
-function getExecutablePath() {
+function getExecutablePath(useHeadlessShell = false) {
   // If explicitly set via environment variable, use that
   if (process.env.PUPPETEER_EXECUTABLE_PATH) {
     return process.env.PUPPETEER_EXECUTABLE_PATH;
   }
 
-  // GitHub Actions - uses system Chrome
+  // GitHub Actions - uses Puppeteer's bundled Chromium
   if (process.env.CI && process.env.GITHUB_ACTIONS) {
-    return undefined; // Use Puppeteer's bundled Chromium
+    return undefined;
   }
 
   // Google Cloud Shell detection (has DEVSHELL_PROJECT_ID env var)
@@ -26,18 +85,13 @@ function getExecutablePath() {
     return '/usr/bin/google-chrome'; // Cloud Shell has Chrome at this path
   }
 
-  // Local development paths by platform
-  const platform = process.platform;
-
-  if (platform === 'darwin') {
-    // macOS
-    return '/Applications/Google Chrome.app/Contents/MacOS/Google Chrome';
-  } else if (platform === 'linux') {
-    // Linux (Ubuntu/Debian)
-    return '/usr/bin/google-chrome';
-  } else if (platform === 'win32') {
-    // Windows
-    return 'C:\\Program Files\\Google\\Chrome\\Application\\chrome.exe';
+  // For headless mode on macOS, try to use chrome-headless-shell to prevent focus stealing
+  // This is checked after CI/Cloud Shell to ensure those environments use their expected binaries
+  if (useHeadlessShell && process.platform === 'darwin') {
+    const shellBinary = findHeadlessShellBinary();
+    if (shellBinary) {
+      return shellBinary;
+    }
   }
 
   // Fallback to Puppeteer's bundled Chromium
@@ -50,10 +104,16 @@ function getExecutablePath() {
  * @returns {Object} Puppeteer launch options
  */
 export function getPuppeteerConfig(customOptions = {}) {
-  const executablePath = getExecutablePath();
+  const isHeadless = process.env.HEADLESS !== 'false';
+  const executablePath = getExecutablePath(isHeadless);
+
+  // If using chrome-headless-shell binary, we use headless: true (it's always headless)
+  // If using regular Chrome, we use headless: 'shell' mode
+  const usingShellBinary = executablePath && executablePath.includes('chrome-headless-shell');
 
   const baseConfig = {
-    headless: process.env.HEADLESS !== 'false' ? 'new' : false,
+    headless: isHeadless ? (usingShellBinary ? true : 'shell') : false,
+    pipe: isHeadless, // Use pipe transport to avoid window manager interaction on macOS
     args: [
       '--no-sandbox',
       '--disable-setuid-sandbox',
@@ -80,3 +140,6 @@ export function getPuppeteerConfig(customOptions = {}) {
     args: [...(baseConfig.args || []), ...(customOptions.args || [])],
   };
 }
+
+// Export for testing
+export { findHeadlessShellBinary, getExecutablePath };
