@@ -43,16 +43,15 @@ describe('DebugUI', () => {
 
   test('should not be visible on initialization', () => {
     expect(container).not.toBeNull();
-    // Initially handled by CSS, so inline style should be empty
-    expect(container.style.display).toBe('');
+    expect(container.classList.contains('hidden')).toBe(true);
   });
 
   test('toggle() should show and hide the overlay', () => {
     debugUI.toggle();
-    expect(container.style.display).toBe('block');
+    expect(container.classList.contains('hidden')).toBe(false);
     
     debugUI.toggle();
-    expect(container.style.display).toBe('none');
+    expect(container.classList.contains('hidden')).toBe(true);
   });
 
   test('should populate weapon selector with CONFIG.WEAPONS', () => {

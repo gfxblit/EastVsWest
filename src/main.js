@@ -29,7 +29,14 @@ export async function initializeDebugTools(env = import.meta.env, location = win
 }
 
 // Initialize debug tools asynchronously (non-blocking)
-initializeDebugTools().catch(err => console.warn('Failed to initialize debug tools:', err));
+initializeDebugTools().then(initialized => {
+  if (initialized) {
+    const debugBtn = document.getElementById('debug-toggle-btn');
+    if (debugBtn) {
+      debugBtn.classList.remove('hidden');
+    }
+  }
+}).catch(err => console.warn('Failed to initialize debug tools:', err));
 class App {
   constructor() {
     this.game = null;

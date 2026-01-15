@@ -13,6 +13,7 @@ export class DebugUI {
     // Create container
     this.container = document.createElement('div');
     this.container.id = 'debug-ui-overlay';
+    this.container.classList.add('hidden');
 
     // Create Title
     const title = document.createElement('h3');
@@ -59,11 +60,7 @@ export class DebugUI {
   }
 
   toggle() {
-    if (this.container.style.display === 'block') {
-      this.container.style.display = 'none';
-    } else {
-      this.container.style.display = 'block';
-    }
+    this.container.classList.toggle('hidden');
   }
 
   handleWeaponSelect(key) {
