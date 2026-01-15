@@ -253,7 +253,6 @@ export class Game {
     if (inputState.toggleDebug !== this.lastDebugState) {
       this.debugMode = inputState.toggleDebug;
       this.lastDebugState = inputState.toggleDebug;
-      console.log(`Debug Mode: ${this.debugMode ? 'ON' : 'OFF'}`);
       if (this.debugUI) {
         this.debugUI.toggle();
       }

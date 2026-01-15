@@ -137,7 +137,6 @@ export class SessionPlayersSnapshot {
    * Handle database change events
    */
   #handleDbEvent(payload) {
-    console.log(`[Snapshot] DB Event: ${payload.eventType} for table ${payload.table}`);
     const { eventType, new: newRecord, old: oldRecord } = payload;
 
     switch (eventType) {
@@ -202,7 +201,7 @@ export class SessionPlayersSnapshot {
       if (payload.rotation !== undefined) player.rotation = payload.rotation;
       if (payload.velocity_x !== undefined) player.velocity_x = payload.velocity_x;
       if (payload.velocity_y !== undefined) player.velocity_y = payload.velocity_y;
-      
+
       // Allow self-broadcast of health
       if (isFromSelf && payload.health !== undefined) {
         player.health = payload.health;
@@ -300,7 +299,7 @@ export class SessionPlayersSnapshot {
               clientAuthFields.forEach(field => {
                 localPlayer[field] = dbPlayer[field];
               });
-              
+
               // Also sync read-only metadata if needed, but safe to ignore for now
             } else {
               // Client: DB is authoritative (via Host), so update everything
