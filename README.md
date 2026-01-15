@@ -52,6 +52,39 @@ Here's the dev flow:
     npm run dev
     ```
 
+## Git Commit Convention
+
+This project uses a specific commit message format to ensure consistency and clarity.
+
+### Format
+Commit messages should follow this structure (Test results are MANDATORY for all changes):
+```
+<type>: <description>
+
+<Detailed explanation of changes, wrapped at 72 characters>
+
+Unit Test Results (MANDATORY - must run 'npm test'):
+<Summary of unit test results>
+
+E2E Test Results (MANDATORY - must run 'npm run test:e2e'):
+<Summary of E2E test results>
+
+Footer:
+<Reference to associated issues, e.g., Closes #247>
+```
+
+### Allowed Types
+- `feat`: A new feature
+- `fix`: A bug fix
+- `refactor`: A code change that neither fixes a bug nor adds a feature
+- `docs`: Documentation only changes
+- `style`: Changes that do not affect the meaning of the code (white-space, formatting, missing semi-colons, etc)
+- `test`: Adding missing tests or correcting existing tests
+- `chore`: Changes to the build process or auxiliary tools and libraries such as documentation generation
+
+### Setup
+The commit template is automatically configured when you run `npm run setup`. It sets the local `commit.template` to `.gitmessage`.
+
 ## Testing
 
 ### End-to-end Testing

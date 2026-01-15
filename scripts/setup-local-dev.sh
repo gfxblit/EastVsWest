@@ -101,6 +101,15 @@ else
     fi
 fi
 
+# 5. Git Commit Template Setup
+echo -e "\n${YELLOW}Setting up git commit template...${NC}"
+if [ -f .gitmessage ]; then
+    git config commit.template .gitmessage
+    echo -e "  ✅ Git commit template configured"
+else
+    echo -e "  ${RED}❌ .gitmessage not found. Cannot configure git commit template.${NC}"
+fi
+
 echo -e "\n${GREEN}Setup complete!${NC}"
 echo -e "To start the development server: ${YELLOW}npm run dev${NC}"
 echo -e "To run tests: ${YELLOW}npm test${NC}"
