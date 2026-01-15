@@ -13,8 +13,8 @@ describe('Git Commit Template', () => {
     test('should have the correct template content', () => {
         const content = fs.readFileSync(gitMessagePath, 'utf8');
         expect(content).toContain('<type>: <description>');
-        expect(content).toContain('Unit Test Results:');
-        expect(content).toContain('E2E Test Results:');
+        expect(content).toContain('Unit Test Results (MANDATORY - must run \'npm test\'):');
+        expect(content).toContain('E2E Test Results (MANDATORY - must run \'npm run test:e2e\'):');
         expect(content).toContain('Footer:');
     });
 

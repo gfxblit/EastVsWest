@@ -57,16 +57,16 @@ Here's the dev flow:
 This project uses a specific commit message format to ensure consistency and clarity.
 
 ### Format
-Commit messages should follow this structure:
+Commit messages should follow this structure (Test results are MANDATORY for all changes):
 ```
 <type>: <description>
 
 <Detailed explanation of changes, wrapped at 72 characters>
 
-Unit Test Results:
+Unit Test Results (MANDATORY - must run 'npm test'):
 <Summary of unit test results>
 
-E2E Test Results:
+E2E Test Results (MANDATORY - must run 'npm run test:e2e'):
 <Summary of E2E test results>
 
 Footer:

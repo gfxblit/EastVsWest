@@ -2,11 +2,11 @@
 
 <Detailed explanation of changes, wrapped at 72 characters>
 
-Unit Test Results:
-<Summary of unit test results>
+Unit Test Results (MANDATORY - must run 'npm test'):
+<Paste summary of unit test results here>
 
-E2E Test Results:
-<Summary of E2E test results>
+E2E Test Results (MANDATORY - must run 'npm run test:e2e'):
+<Paste summary of E2E test results here>
 
 Footer:
 <Reference to associated issues, e.g., Closes #247>
