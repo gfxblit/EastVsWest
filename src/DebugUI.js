@@ -5,6 +5,9 @@ export class DebugUI {
     this.container = null;
     this.weaponSelect = null;
     this.selectedWeaponKey = null;
+    this.isMinimized = false;
+    this.contentContainer = null;
+    this.minimizeBtn = null;
     
     this.init();
   }
@@ -15,15 +18,33 @@ export class DebugUI {
     this.container.id = 'debug-ui-overlay';
     this.container.classList.add('hidden');
 
+    // Create Header
+    const header = document.createElement('div');
+    header.id = 'debug-header';
+
     // Create Title
     const title = document.createElement('h3');
     title.innerText = 'Weapon Config Debugger';
-    this.container.appendChild(title);
+    header.appendChild(title);
+
+    // Create Minimize Button
+    this.minimizeBtn = document.createElement('button');
+    this.minimizeBtn.id = 'debug-minimize-btn';
+    this.minimizeBtn.innerText = '-';
+    this.minimizeBtn.addEventListener('click', () => this.toggleMinimize());
+    header.appendChild(this.minimizeBtn);
+
+    this.container.appendChild(header);
+
+    // Create Content Container (collapsible part)
+    this.contentContainer = document.createElement('div');
+    this.contentContainer.id = 'debug-content';
+    this.container.appendChild(this.contentContainer);
 
     // Create Weapon Selector
     const selectLabel = document.createElement('label');
     selectLabel.innerText = 'Select Weapon: ';
-    this.container.appendChild(selectLabel);
+    this.contentContainer.appendChild(selectLabel);
 
     this.weaponSelect = document.createElement('select');
     this.weaponSelect.id = 'debug-weapon-select';
@@ -37,18 +58,18 @@ export class DebugUI {
     });
 
     this.weaponSelect.addEventListener('change', (e) => this.handleWeaponSelect(e.target.value));
-    this.container.appendChild(this.weaponSelect);
+    this.contentContainer.appendChild(this.weaponSelect);
 
     // Create Form Container
     this.formContainer = document.createElement('div');
-    this.container.appendChild(this.formContainer);
+    this.contentContainer.appendChild(this.formContainer);
 
     // Create Export Button
     const exportBtn = document.createElement('button');
     exportBtn.id = 'debug-export-btn';
     exportBtn.innerText = 'Export to Clipboard';
     exportBtn.addEventListener('click', () => this.exportConfig());
-    this.container.appendChild(exportBtn);
+    this.contentContainer.appendChild(exportBtn);
 
     document.body.appendChild(this.container);
     
@@ -56,6 +77,17 @@ export class DebugUI {
     const firstKey = Object.keys(CONFIG.WEAPONS)[0];
     if (firstKey) {
         this.handleWeaponSelect(firstKey);
+    }
+  }
+
+  toggleMinimize() {
+    this.isMinimized = !this.isMinimized;
+    if (this.isMinimized) {
+        this.contentContainer.classList.add('hidden');
+        this.minimizeBtn.innerText = '+';
+    } else {
+        this.contentContainer.classList.remove('hidden');
+        this.minimizeBtn.innerText = '-';
     }
   }
 
