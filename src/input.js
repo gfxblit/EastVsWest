@@ -32,6 +32,8 @@ export class Input {
       currentY: 0,
     };
 
+    this.lastTouchTime = 0;
+
     // Touch UI elements
     this.touchControls = null;
     this.joystickBase = null;
@@ -39,6 +41,7 @@ export class Input {
     this.attackButton = null;
     this.abilityButton = null;
     this.interactButton = null;
+    this.debugToggleButton = null;
   }
 
   init(onInputChange) {
@@ -76,7 +79,7 @@ export class Input {
       this.inputState.interact = true;
       this.notifyChange();
     } else if (key === CONFIG.INPUT.DEBUG_TOGGLE_KEY) {
-      this.inputState.toggleDebug = true;
+      this.inputState.toggleDebug = !this.inputState.toggleDebug;
       this.notifyChange();
     }
   }
@@ -92,9 +95,6 @@ export class Input {
       this.notifyChange();
     } else if (key === CONFIG.INPUT.INTERACT_KEY) {
       this.inputState.interact = false;
-      this.notifyChange();
-    } else if (key === CONFIG.INPUT.DEBUG_TOGGLE_KEY) {
-      this.inputState.toggleDebug = false;
       this.notifyChange();
     }
   }
@@ -154,6 +154,9 @@ export class Input {
   }
 
   handleMouseMove(event) {
+    // Ignore mouse events if touch is active or was recently active
+    if (this.touchState.active || (Date.now() - this.lastTouchTime < 500)) return;
+
     const canvas = document.getElementById('game-canvas');
     if (!canvas) return;
 
@@ -164,6 +167,10 @@ export class Input {
   }
 
   handleMouseDown(event) {
+    // Only ignore if it's a ghost click on the canvas (where touch logic handles attack)
+    const isCanvas = event.target && event.target.tagName.toLowerCase() === 'canvas';
+    if (isCanvas && (this.touchState.active || (Date.now() - this.lastTouchTime < 500))) return;
+
     if (event.button === 0) {
       // Left mouse button
       this.inputState.attack = true;
@@ -172,6 +179,9 @@ export class Input {
   }
 
   handleMouseUp(event) {
+    const isCanvas = event.target && event.target.tagName.toLowerCase() === 'canvas';
+    if (isCanvas && (this.touchState.active || (Date.now() - this.lastTouchTime < 500))) return;
+
     if (event.button === 0) {
       // Left mouse button
       this.inputState.attack = false;
@@ -204,6 +214,7 @@ export class Input {
     this.attackButton = document.getElementById('attack-button');
     this.abilityButton = document.getElementById('ability-button');
     this.interactButton = document.getElementById('interact-button');
+    this.debugToggleButton = document.getElementById('debug-toggle-btn');
 
     if (!this.touchControls || !this.joystickBase || !this.joystickStick) {
       return;
@@ -250,6 +261,14 @@ export class Input {
       this.interactButton.addEventListener('touchend', this.boundHandlers.interactTouchEnd, { passive: false });
     }
 
+    // Setup debug toggle button
+    if (this.debugToggleButton) {
+      this.boundHandlers.debugTouchStart = this.handleDebugButtonTouchStart.bind(this);
+      this.boundHandlers.debugClick = this.handleDebugButtonClick.bind(this);
+      this.debugToggleButton.addEventListener('touchstart', this.boundHandlers.debugTouchStart, { passive: false });
+      this.debugToggleButton.addEventListener('click', this.boundHandlers.debugClick);
+    }
+
     // Setup cycle weapon button (debug)
     if (this.cycleWeaponButton) {
       this.boundHandlers.cycleWeaponTouchStart = this.handleCycleWeaponButtonTouchStart.bind(this);
@@ -264,10 +283,15 @@ export class Input {
    */
   isValidJoystickTouch(targetObj) {
     if (targetObj.target && targetObj.target.closest) {
-      // Don't start joystick if touch is on any button or UI element
-      return !targetObj.target.closest('button') && 
-             !targetObj.target.closest('.touch-btn') &&
-             !targetObj.target.closest('#spectator-controls');
+      const target = targetObj.target;
+
+      // If it's the debug button, definitely not a joystick touch
+      if (target.closest('.touch-debug-btn')) return false;
+      if (target.closest('#debug-ui-overlay')) return false;
+      if (target.closest('.touch-btn')) return false;
+
+      // Only the canvas should trigger the joystick
+      return target.tagName.toLowerCase() === 'canvas';
     }
     return true;
   }
@@ -277,17 +301,25 @@ export class Input {
    * @param {TouchEvent} event - The touch start event.
    */
   handleTouchStart(event) {
-    // Ignore if touch is on a button
+    this.lastTouchTime = Date.now();
+
+    // Check for debug button - it has its own listener, so just return to avoid joystick activation
+    // Note: We do NOT call handleDebugButtonTouchStart here - the button's own listener handles it
+    if (event.target && event.target.closest && event.target.closest('.touch-debug-btn')) {
+      return;
+    }
+
+    // Ignore if touch is on other UI element
     if (!this.isValidJoystickTouch(event)) {
       return;
     }
 
     event.preventDefault();
-    
+
     // Find a touch that isn't on a button to start the joystick
     const changedTouches = event.changedTouches || [];
-    const touch = Array.from(changedTouches).find(t => this.isValidJoystickTouch(t)) || 
-                  (event.touches && event.touches[0]);
+    const touch = Array.from(changedTouches).find(t => this.isValidJoystickTouch(t)) ||
+      (event.touches && event.touches[0]);
 
     if (!touch) return;
 
@@ -335,7 +367,7 @@ export class Input {
         break;
       }
     }
-    
+
     if (!touch) return;
 
     this.touchState.currentX = touch.clientX;
@@ -355,7 +387,7 @@ export class Input {
     // Check if the joystick touch ended
     const changedTouches = event.changedTouches || [];
     let joystickTouchEnded = Array.from(changedTouches).some(t => t.identifier === this.touchState.joystickTouchId);
-    
+
     // Fallback: if no touches remain, the joystick touch must have ended
     if (!joystickTouchEnded && event.touches && event.touches.length === 0) {
       joystickTouchEnded = true;
@@ -389,44 +421,81 @@ export class Input {
 
   handleAttackButtonTouchStart(event) {
     event.preventDefault();
+    event.stopPropagation();
     this.inputState.attack = true;
     this.notifyChange();
   }
 
   handleAttackButtonTouchEnd(event) {
     event.preventDefault();
+    event.stopPropagation();
     this.inputState.attack = false;
     this.notifyChange();
   }
 
   handleAbilityButtonTouchStart(event) {
     event.preventDefault();
+    event.stopPropagation();
     this.inputState.specialAbility = true;
     this.notifyChange();
   }
 
   handleAbilityButtonTouchEnd(event) {
     event.preventDefault();
+    event.stopPropagation();
     this.inputState.specialAbility = false;
     this.notifyChange();
   }
 
   handleInteractButtonTouchStart(event) {
     event.preventDefault();
+    event.stopPropagation();
     this.inputState.interact = true;
     this.notifyChange();
   }
 
   handleInteractButtonTouchEnd(event) {
     event.preventDefault();
+    event.stopPropagation();
     this.inputState.interact = false;
+    this.notifyChange();
+  }
+
+  handleDebugButtonTouchStart(event) {
+    if (event.cancelable) event.preventDefault();
+    event.stopPropagation();
+
+    // Track when we last toggled to debounce rapid events
+    this.lastDebugToggleTime = Date.now();
+
+    // Toggle the debug state
+    this.inputState.toggleDebug = !this.inputState.toggleDebug;
+    this.notifyChange();
+  }
+
+  handleDebugButtonClick(event) {
+    // Only handle click if it wasn't triggered by a touch event
+    // This prevents double-toggle on touch devices where touchstart AND click both fire
+    if (Date.now() - this.lastTouchTime < 500) {
+      return;
+    }
+
+    // Also debounce against rapid double-clicks
+    if (this.lastDebugToggleTime && Date.now() - this.lastDebugToggleTime < 100) {
+      return;
+    }
+
+    event.stopPropagation();
+
+    this.lastDebugToggleTime = Date.now();
+    this.inputState.toggleDebug = !this.inputState.toggleDebug;
     this.notifyChange();
   }
 
   detectTouchDevice() {
     const isTouchDevice = ('ontouchstart' in window) ||
-                          (navigator.maxTouchPoints > 0) ||
-                          (navigator.msMaxTouchPoints > 0);
+      (navigator.maxTouchPoints > 0) ||
+      (navigator.msMaxTouchPoints > 0);
 
     if (isTouchDevice || window.innerWidth <= 850) {
       if (this.touchControls) {
@@ -468,6 +537,11 @@ export class Input {
     if (this.interactButton && this.boundHandlers.interactTouchStart) {
       this.interactButton.removeEventListener('touchstart', this.boundHandlers.interactTouchStart);
       this.interactButton.removeEventListener('touchend', this.boundHandlers.interactTouchEnd);
+    }
+
+    if (this.debugToggleButton && this.boundHandlers.debugTouchStart) {
+      this.debugToggleButton.removeEventListener('touchstart', this.boundHandlers.debugTouchStart);
+      this.debugToggleButton.removeEventListener('click', this.boundHandlers.debugClick);
     }
   }
 }

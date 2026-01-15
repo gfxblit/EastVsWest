@@ -8,6 +8,7 @@ import { LocalPlayerController } from './LocalPlayerController.js';
 import { HostCombatManager } from './HostCombatManager.js';
 import { HostLootManager } from './HostLootManager.js';
 import { HostBotManager } from './HostBotManager.js';
+import { DebugUI } from './DebugUI.js';
 
 export class Game {
   constructor() {
@@ -31,7 +32,9 @@ export class Game {
     this.renderer = null;
     this.spectatingTargetId = null;
     this.debugMode = false;
-    this.wasDebugToggled = false;
+    this.lastDebugState = false;
+    // Only create DebugUI in browser context where document is available
+    this.debugUI = typeof document !== 'undefined' ? new DebugUI() : null;
   }
 
   init(playersSnapshot = null, network = null, renderer = null) {
@@ -42,25 +45,25 @@ export class Game {
 
     // Initialize Host Managers
     if (network && network.isHost) {
-        this.hostCombatManager = new HostCombatManager(network, this.state);
-        this.hostLootManager = new HostLootManager(network, this.state);
-        this.hostBotManager = new HostBotManager(network, this.playersSnapshot, this);
-        
-        network.on('attack_request', (msg) => {
-            this.hostCombatManager.handleAttackRequest(msg, this.playersSnapshot);
-            // Also trigger animation for bots or self if needed (LocalPlayerController handles self)
-            this.handleAttackAnimation(msg);
-        });
-        network.on('pickup_request', (msg) => this.hostLootManager.handlePickupRequest(msg, this.playersSnapshot));
-        network.on('request_loot_sync', (msg) => this.hostLootManager.handleLootSyncRequest(msg));
-        
-        // Initial loot spawn
-        if (this.state.loot.length === 0) {
-          this.hostLootManager.spawnRandomLoot(CONFIG.GAME.INITIAL_LOOT_COUNT);
-        }
-        
-        // Initialize existing bots
-        this.hostBotManager.initExistingBots();
+      this.hostCombatManager = new HostCombatManager(network, this.state);
+      this.hostLootManager = new HostLootManager(network, this.state);
+      this.hostBotManager = new HostBotManager(network, this.playersSnapshot, this);
+
+      network.on('attack_request', (msg) => {
+        this.hostCombatManager.handleAttackRequest(msg, this.playersSnapshot);
+        // Also trigger animation for bots or self if needed (LocalPlayerController handles self)
+        this.handleAttackAnimation(msg);
+      });
+      network.on('pickup_request', (msg) => this.hostLootManager.handlePickupRequest(msg, this.playersSnapshot));
+      network.on('request_loot_sync', (msg) => this.hostLootManager.handleLootSyncRequest(msg));
+
+      // Initial loot spawn
+      if (this.state.loot.length === 0) {
+        this.hostLootManager.spawnRandomLoot(CONFIG.GAME.INITIAL_LOOT_COUNT);
+      }
+
+      // Initialize existing bots
+      this.hostBotManager.initExistingBots();
     }
 
     if (network) {
@@ -72,20 +75,20 @@ export class Game {
     }
 
     if (network && !network.isHost) {
-        // Periodically request loot sync until we receive it
-        // This handles cases where the initial request is lost or sent before the host is ready
-        const requestSync = () => {
-             if (!this.state.lootSynced) {
-                 network.send('request_loot_sync', {});
-             } else {
-                 clearInterval(syncInterval);
-             }
-        };
-        const syncInterval = setInterval(requestSync, 2000);
-        requestSync(); // Initial call
-        
-        // Stop retrying after 30 seconds
-        setTimeout(() => clearInterval(syncInterval), 30000);
+      // Periodically request loot sync until we receive it
+      // This handles cases where the initial request is lost or sent before the host is ready
+      const requestSync = () => {
+        if (!this.state.lootSynced) {
+          network.send('request_loot_sync', {});
+        } else {
+          clearInterval(syncInterval);
+        }
+      };
+      const syncInterval = setInterval(requestSync, 2000);
+      requestSync(); // Initial call
+
+      // Stop retrying after 30 seconds
+      setTimeout(() => clearInterval(syncInterval), 30000);
     }
 
     // Initialize Local Player Controller
@@ -94,7 +97,7 @@ export class Game {
       const snapshotPlayersMap = playersSnapshot.getPlayers();
       localPlayerData = snapshotPlayersMap.get(network.playerId);
     }
-    
+
     this.localPlayerController = new LocalPlayerController(network, localPlayerData);
 
     // Initialize previous health for all players in renderer (if available)
@@ -124,10 +127,10 @@ export class Game {
     if (this.hostCombatManager) {
       this.hostCombatManager.update(deltaTime, this.playersSnapshot);
     }
-    
+
     // Update Bots (Host only)
     if (this.hostBotManager) {
-        this.hostBotManager.update(deltaTime);
+      this.hostBotManager.update(deltaTime);
     }
   }
 
@@ -145,7 +148,7 @@ export class Game {
   handleAttackAnimation(message) {
     if (!this.renderer) return;
     const attackerId = message.from;
-    
+
     // Skip local player (already handled in LocalPlayerController)
     const localPlayer = this.localPlayerController?.getPlayer();
     if (localPlayer && attackerId === localPlayer.id) return;
@@ -172,11 +175,11 @@ export class Game {
       // Merge or replace loot? For initial sync, replacing or merging unique items is best.
       // We'll use a Map to merge by ID to avoid duplicates if some were already present
       const lootMap = new Map(this.state.loot.map(item => [item.id, item]));
-      
+
       loot.forEach(item => {
         lootMap.set(item.id, item);
       });
-      
+
       this.state.loot = Array.from(lootMap.values());
       this.state.lootSynced = true; // Mark as synced
     }
@@ -195,64 +198,64 @@ export class Game {
     if (this.spectatingTargetId && this.playersSnapshot) {
       const players = this.playersSnapshot.getPlayers();
       const target = players.get(this.spectatingTargetId);
-      
+
       const interpolated = this.playersSnapshot.getInterpolatedPlayerState(this.spectatingTargetId, performance.now());
       if (interpolated) {
-        return { 
+        return {
           id: this.spectatingTargetId,
-          x: interpolated.x, 
+          x: interpolated.x,
           y: interpolated.y,
           name: target ? target.player_name : 'Unknown'
         };
       }
-      
+
       if (target) {
         return {
-           id: this.spectatingTargetId,
-           x: target.position_x,
-           y: target.position_y,
-           name: target.player_name
+          id: this.spectatingTargetId,
+          x: target.position_x,
+          y: target.position_y,
+          name: target.player_name
         };
       }
     }
-    
+
     // Default to local player
     return this.getLocalPlayer();
   }
 
   cycleSpectatorTarget() {
     if (!this.playersSnapshot || !this.network) return;
-    
+
     const players = Array.from(this.playersSnapshot.getPlayers().values());
     // Filter for valid targets: Alive and not local player
     const candidates = players.filter(p => p.health > 0 && p.player_id !== this.network.playerId);
-    
+
     if (candidates.length === 0) return; // No one else to spectate
-    
+
     // Sort candidates to ensure consistent order
     candidates.sort((a, b) => a.player_id.localeCompare(b.player_id));
-    
+
     // Find current index
     let currentIndex = candidates.findIndex(p => p.player_id === this.spectatingTargetId);
-    
+
     // If current target is not in candidates (e.g. they died), start from 0. 
     // Otherwise go to next.
     let nextIndex = 0;
     if (currentIndex !== -1) {
-        nextIndex = (currentIndex + 1) % candidates.length;
+      nextIndex = (currentIndex + 1) % candidates.length;
     }
-    
+
     this.spectatingTargetId = candidates[nextIndex].player_id;
     console.log(`Switched spectator target to: ${candidates[nextIndex].player_name} (${this.spectatingTargetId})`);
   }
 
   handleInput(inputState) {
-    if (inputState.toggleDebug && !this.wasDebugToggled) {
-        this.debugMode = !this.debugMode;
-        this.wasDebugToggled = true;
-        console.log(`Debug Mode: ${this.debugMode ? 'ON' : 'OFF'}`);
-    } else if (!inputState.toggleDebug) {
-        this.wasDebugToggled = false;
+    if (inputState.toggleDebug !== this.lastDebugState) {
+      this.debugMode = inputState.toggleDebug;
+      this.lastDebugState = inputState.toggleDebug;
+      if (this.debugUI) {
+        this.debugUI.toggle();
+      }
     }
 
     if (this.localPlayerController) {

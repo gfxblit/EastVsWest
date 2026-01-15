@@ -5,7 +5,7 @@ export class HostLootManager {
     this.network = network;
     this.state = state; // Shared game state
     this.nextLootId = 1; // Counter for unique loot IDs
-    
+
     this.#setupListeners();
   }
 
@@ -16,7 +16,6 @@ export class HostLootManager {
       if (payload.table === 'session_players' && payload.eventType === 'INSERT') {
         const newPlayerId = payload.new.player_id;
         if (newPlayerId !== this.network.playerId) {
-          console.log(`Host: New player ${newPlayerId} joined, syncing loot...`);
           this.syncLootToPlayer(newPlayerId);
         }
       }
@@ -34,11 +33,11 @@ export class HostLootManager {
     };
 
     this.state.loot.push(lootItem);
-    
+
     if (this.network?.isHost) {
       this.network.send('loot_spawned', lootItem);
     }
-    
+
     return lootItem;
   }
 
@@ -46,10 +45,10 @@ export class HostLootManager {
     if (!this.network?.isHost) return;
 
     const weaponTypes = Object.values(CONFIG.WEAPONS).filter(w => w.id !== 'fist');
-    
+
     for (let i = 0; i < count; i++) {
       const randomWeapon = weaponTypes[Math.floor(Math.random() * weaponTypes.length)];
-      
+
       // Random position with some padding from edges
       const padding = 50;
       const x = padding + Math.random() * (CONFIG.WORLD.WIDTH - padding * 2);
@@ -79,8 +78,8 @@ export class HostLootManager {
   }
 
   handleLootSyncRequest(message) {
-      if (!this.network?.isHost) return;
-      this.syncLootToPlayer(message.from);
+    if (!this.network?.isHost) return;
+    this.syncLootToPlayer(message.from);
   }
 
   handlePickupRequest(message, playersSnapshot) {
@@ -88,7 +87,7 @@ export class HostLootManager {
 
     const playerId = message.from;
     const { loot_id } = message.data;
-    
+
     const players = playersSnapshot.getPlayers();
     const player = players.get(playerId);
     const lootItem = this.state.loot.find(item => item.id === loot_id);
@@ -106,7 +105,7 @@ export class HostLootManager {
 
     // Handle pickup
     const oldWeapon = player.equipped_weapon;
-    
+
     // Update player weapon
     player.equipped_weapon = lootItem.item_id;
 
