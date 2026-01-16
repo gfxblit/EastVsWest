@@ -111,6 +111,51 @@ describe('WorkflowManager', () => {
     expect(result.messages[0].content).toBe('Mocked Code Response');
   });
 
+  test('should run tests via npm test', async () => {
+    // Setup mock spawn to emit data
+    const mockChild = new EventEmitter();
+    mockChild.stdout = new EventEmitter();
+    mockChild.stderr = new EventEmitter();
+    mockSpawn.mockReturnValue(mockChild);
+
+    const testPromise = workflow.testRunner({});
+
+    // Simulate passing tests
+    setTimeout(() => {
+        mockChild.stdout.emit('data', Buffer.from('Test Suites: 1 passed, 1 total'));
+        mockChild.emit('close', 0);
+    }, 10);
+
+    const result = await testPromise;
+
+    expect(mockSpawn).toHaveBeenCalled();
+    const args = mockSpawn.mock.calls[0];
+    expect(args[0]).toBe('npm');
+    expect(args[1]).toEqual(['test']);
+    expect(result.test_output).toBe('PASS');
+  });
+
+  test('should handle failing tests', async () => {
+     // Setup mock spawn to emit data
+     const mockChild = new EventEmitter();
+     mockChild.stdout = new EventEmitter();
+     mockChild.stderr = new EventEmitter();
+     mockSpawn.mockReturnValue(mockChild);
+ 
+     const testPromise = workflow.testRunner({});
+ 
+     // Simulate failing tests
+     setTimeout(() => {
+         mockChild.stdout.emit('data', Buffer.from('FAIL  some.test.js'));
+         mockChild.emit('close', 1);
+     }, 10);
+ 
+     const result = await testPromise;
+ 
+     expect(result.test_output).toContain('FAIL');
+     expect(result.test_output).toContain('FAIL  some.test.js');
+  });
+
   describe('Tools', () => {
     test('readFile should call fs.readFile', async () => {
       const result = await workflow.readFile('test.txt');

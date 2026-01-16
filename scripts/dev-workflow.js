@@ -83,6 +83,50 @@ export class WorkflowManager {
   // --- Helpers ---
 
   /**
+   * Invokes a shell command and streams output to stdout.
+   * @param {string} command - The command to run (e.g., 'npm').
+   * @param {Array} args - Arguments for the command.
+   * @returns {Promise<string>} The combined stdout/stderr output.
+   */
+  async runCommand(command, args = []) {
+    return new Promise((resolve, reject) => {
+      const child = spawn(command, args, {
+        stdio: ['ignore', 'pipe', 'pipe'],
+        shell: false 
+      });
+
+      let fullOutput = '';
+      
+      child.stdout.on('data', (data) => {
+        const chunk = data.toString();
+        process.stdout.write(chunk);
+        fullOutput += chunk;
+      });
+
+      child.stderr.on('data', (data) => {
+        const chunk = data.toString();
+        process.stderr.write(chunk);
+        fullOutput += chunk;
+      });
+
+      child.on('close', (code) => {
+        if (code !== 0) {
+          // Resolve with output even on failure, so we can analyze it
+          // But maybe we should throw? The caller needs to know it failed.
+          // For tests, exit code 1 means "fail" but we want the output text.
+          resolve(fullOutput); 
+        } else {
+          resolve(fullOutput);
+        }
+      });
+      
+      child.on('error', (err) => {
+        reject(err);
+      });
+    });
+  }
+
+  /**
    * Invokes the Gemini CLI with a prompt.
    * Streams output to stdout and returns the full response.
    * @param {string} prompt - The prompt to send.
@@ -186,11 +230,17 @@ export class WorkflowManager {
     console.log("--- Test Runner Node ---");
     // Run tests
     try {
-      // In a real scenario, we run the project's tests
-      // const { stdout, stderr } = await execPromise('npm test');
-      // return { test_output: stdout + stderr };
+      console.log("Running npm test...");
+      // Using 'npm' command, arguments 'test'
+      // Note: On Windows this might need 'npm.cmd', but for now assuming *nix environment as per "darwin"
+      const output = await this.runCommand('npm', ['test']);
       
-      console.log("Simulating tests passing...");
+      // Check for common failure indicators in output if exit code isn't reliably checked by runCommand wrapper
+      // (runCommand resolves even on error, so we inspect output)
+      if (output.includes('FAIL') || output.includes('failed')) {
+         return { test_output: "FAIL:\n" + output };
+      }
+      
       return { test_output: "PASS" };
     } catch (error) {
       return { test_output: "FAIL: " + error.message };
