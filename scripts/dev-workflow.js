@@ -110,7 +110,8 @@ export class WorkflowManager {
 
       child.stderr.on('data', (data) => {
         const chunk = data.toString();
-        process.stderr.write(chunk); // Stream stderr to console
+        // Do not stream stderr to console to avoid noise (e.g. tool logs)
+        // process.stderr.write(chunk); 
         errorOutput += chunk;
       });
 
