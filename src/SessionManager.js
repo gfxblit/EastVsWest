@@ -75,7 +75,11 @@ export class SessionManager {
         this.network.joinCode = joinCode;
         this.network.hostId = session.host_id;
 
-        // 2. Client-authoritative join: Self-insert into session_players FIRST
+        // 2. Subscribe to channel FIRST so we can receive broadcasts (e.g., loot_sync)
+        // before the host sees us via postgres_changes INSERT event
+        await this.network._subscribeToChannel(session.realtime_channel_name);
+
+        // 3. Client-authoritative join: Self-insert into session_players
         let playerRecord;
 
         const { data: newPlayerRecord, error: insertError } = await this.supabase
@@ -110,9 +114,6 @@ export class SessionManager {
         } else {
             playerRecord = newPlayerRecord;
         }
-
-        // 3. Subscribe to channel and postgres changes
-        await this.network._subscribeToChannel(session.realtime_channel_name);
 
         this.network.connected = true;
 
@@ -161,21 +162,21 @@ export class SessionManager {
 
         // Get current players sorted by join time from database
         const { data: players, error: playersError } = await this.supabase
-          .from('session_players')
-          .select('*')
-          .eq('session_id', this.network.sessionId)
-          .order('joined_at', { ascending: true });
+            .from('session_players')
+            .select('*')
+            .eq('session_id', this.network.sessionId)
+            .order('joined_at', { ascending: true });
 
         if (playersError) {
-          console.error(`Failed to fetch players for max enforcement: ${playersError.message}`);
-          return;
+            console.error(`Failed to fetch players for max enforcement: ${playersError.message}`);
+            return;
         }
 
         const { data: session } = await this.supabase
-          .from('game_sessions')
-          .select('max_players')
-          .eq('id', this.network.sessionId)
-          .single();
+            .from('game_sessions')
+            .select('max_players')
+            .eq('id', this.network.sessionId)
+            .single();
 
         if (!session) {
             console.error('Failed to fetch session for max enforcement');
@@ -183,14 +184,14 @@ export class SessionManager {
         }
 
         if (players.length > session.max_players) {
-          console.log(`Host: Session full (${players.length}/${session.max_players}). Evicting latest joiners.`);
-          const excessPlayers = players.slice(session.max_players);
-          for (const p of excessPlayers) {
-            await this.supabase
-              .from('session_players')
-              .delete()
-              .eq('id', p.id);
-          }
+            console.log(`Host: Session full (${players.length}/${session.max_players}). Evicting latest joiners.`);
+            const excessPlayers = players.slice(session.max_players);
+            for (const p of excessPlayers) {
+                await this.supabase
+                    .from('session_players')
+                    .delete()
+                    .eq('id', p.id);
+            }
         }
     }
 
@@ -212,14 +213,14 @@ export class SessionManager {
             const botsNeeded = minPlayers - playerCount;
             const botRecords = [];
             const weaponIds = Object.keys(CONFIG.WEAPONS);
-            
+
             // Fallback for crypto.randomUUID in insecure contexts (HTTP)
             const generateUUID = () => {
                 if (typeof crypto.randomUUID === 'function') {
                     return crypto.randomUUID();
                 }
                 // Basic fallback using getRandomValues
-                return ([1e7]+-1e3+-4e3+-8e3+-1e11).replace(/[018]/g, c =>
+                return ([1e7] + -1e3 + -4e3 + -8e3 + -1e11).replace(/[018]/g, c =>
                     (c ^ crypto.getRandomValues(new Uint8Array(1))[0] & 15 >> c / 4).toString(16)
                 );
             };
@@ -227,7 +228,7 @@ export class SessionManager {
             for (let i = 1; i <= botsNeeded; i++) {
                 const botId = generateUUID();
                 const botName = `Bot-${i}`;
-                
+
                 // Random weapon selection with safety fallback
                 const randomWeapon = weaponIds.length > 0
                     ? CONFIG.WEAPONS[weaponIds[Math.floor(Math.random() * weaponIds.length)]].id
@@ -314,7 +315,7 @@ export class SessionManager {
             .eq('session_id', this.network.sessionId);
 
         if (finalPlayersError) throw finalPlayersError;
-        
+
         // Broadcast start event so clients transition UI
         // Include full player list for immediate client-side sync
         this.network.send('game_start', {

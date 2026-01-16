@@ -16,7 +16,12 @@ export class HostLootManager {
       if (payload.table === 'session_players' && payload.eventType === 'INSERT') {
         const newPlayerId = payload.new.player_id;
         if (newPlayerId !== this.network.playerId) {
-          this.syncLootToPlayer(newPlayerId);
+          // Small delay to allow the new player's channel to fully stabilize
+          // after their subscription promise resolves. Without this, the initial
+          // loot_sync message may be lost in Supabase Realtime buffering.
+          setTimeout(() => {
+            this.syncLootToPlayer(newPlayerId);
+          }, 100);
         }
       }
     });
