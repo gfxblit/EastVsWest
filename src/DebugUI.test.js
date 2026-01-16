@@ -108,4 +108,32 @@ describe('DebugUI', () => {
     expect(copiedText).toContain('export const WEAPONS = {');
     expect(copiedText).toContain('baseDamage'); // Should contain some content
   });
+
+  test('should start maximized by default', () => {
+    expect(debugUI.isMinimized).toBe(false);
+    const content = container.querySelector('#debug-content');
+    expect(content.classList.contains('hidden')).toBe(false);
+  });
+
+  test('should toggle minimize state when button is clicked', () => {
+    const minimizeBtn = container.querySelector('#debug-minimize-btn');
+    expect(minimizeBtn).not.toBeNull();
+    // Assuming we can't easily access UI_TEXT from here without exporting it,
+    // but we can test the behavior.
+    // If UI_TEXT was exported, we'd use UI_TEXT.MINIMIZE.
+    expect(minimizeBtn.innerText).toBe('-');
+
+    // Minimize
+    minimizeBtn.click();
+    expect(debugUI.isMinimized).toBe(true);
+    expect(minimizeBtn.innerText).toBe('+');
+    const content = container.querySelector('#debug-content');
+    expect(content.classList.contains('hidden')).toBe(true);
+
+    // Maximize
+    minimizeBtn.click();
+    expect(debugUI.isMinimized).toBe(false);
+    expect(minimizeBtn.innerText).toBe('-');
+    expect(content.classList.contains('hidden')).toBe(false);
+  });
 });
