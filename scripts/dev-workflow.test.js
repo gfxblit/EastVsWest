@@ -118,7 +118,7 @@ describe('WorkflowManager', () => {
     mockChild.stderr = new EventEmitter();
     mockSpawn.mockReturnValue(mockChild);
 
-    const testPromise = workflow.testRunner({});
+    const testPromise = workflow.testRunner({ retry_count: 0 });
 
     // Simulate passing tests
     setTimeout(() => {
@@ -135,14 +135,14 @@ describe('WorkflowManager', () => {
     expect(result.test_output).toBe('PASS');
   });
 
-  test('should handle failing tests', async () => {
+  test('should increment retry count on failing tests', async () => {
      // Setup mock spawn to emit data
      const mockChild = new EventEmitter();
      mockChild.stdout = new EventEmitter();
      mockChild.stderr = new EventEmitter();
      mockSpawn.mockReturnValue(mockChild);
  
-     const testPromise = workflow.testRunner({});
+     const testPromise = workflow.testRunner({ retry_count: 1 });
  
      // Simulate failing tests
      setTimeout(() => {
@@ -153,7 +153,51 @@ describe('WorkflowManager', () => {
      const result = await testPromise;
  
      expect(result.test_output).toContain('FAIL');
-     expect(result.test_output).toContain('FAIL  some.test.js');
+     expect(result.retry_count).toBe(2);
+  });
+
+  test('should parse "APPROVED" from reviewer', async () => {
+     // Setup mock spawn
+     const mockChild = new EventEmitter();
+     mockChild.stdout = new EventEmitter();
+     mockChild.stderr = new EventEmitter();
+     mockSpawn.mockReturnValue(mockChild);
+ 
+     const reviewPromise = workflow.reviewer({ 
+         test_output: "PASS", 
+         retry_count: 0 
+     });
+ 
+     setTimeout(() => {
+         mockChild.stdout.emit('data', Buffer.from('APPROVED'));
+         mockChild.emit('close', 0);
+     }, 10);
+ 
+     const result = await reviewPromise;
+     expect(result.review_status).toBe('approved');
+     expect(result.retry_count).toBe(0);
+  });
+
+  test('should reject if reviewer says anything other than "APPROVED"', async () => {
+     // Setup mock spawn
+     const mockChild = new EventEmitter();
+     mockChild.stdout = new EventEmitter();
+     mockChild.stderr = new EventEmitter();
+     mockSpawn.mockReturnValue(mockChild);
+ 
+     const reviewPromise = workflow.reviewer({ 
+         test_output: "PASS", 
+         retry_count: 0 
+     });
+ 
+     setTimeout(() => {
+         mockChild.stdout.emit('data', Buffer.from('Looks good but please fix indentation'));
+         mockChild.emit('close', 0);
+     }, 10);
+ 
+     const result = await reviewPromise;
+     expect(result.review_status).toBe('rejected');
+     expect(result.retry_count).toBe(1);
   });
 
   describe('Tools', () => {
@@ -172,19 +216,27 @@ describe('WorkflowManager', () => {
 
   describe('Conditional Logic', () => {
     test('shouldContinueFromTest returns reviewer on PASS', () => {
-      expect(workflow.shouldContinueFromTest({ test_output: 'PASS' })).toBe('reviewer');
+      expect(workflow.shouldContinueFromTest({ test_output: 'PASS', retry_count: 0 })).toBe('reviewer');
     });
 
-    test('shouldContinueFromTest returns coder on FAIL', () => {
-      expect(workflow.shouldContinueFromTest({ test_output: 'FAIL: error' })).toBe('coder');
+    test('shouldContinueFromTest returns coder on FAIL with retries < 4', () => {
+      expect(workflow.shouldContinueFromTest({ test_output: 'FAIL: error', retry_count: 3 })).toBe('coder');
+    });
+
+    test('shouldContinueFromTest returns END on FAIL with retries > 3', () => {
+      expect(workflow.shouldContinueFromTest({ test_output: 'FAIL: error', retry_count: 4 })).toBe('END');
     });
 
     test('shouldContinueFromReview returns END on approved', () => {
-      expect(workflow.shouldContinueFromReview({ review_status: 'approved' })).toBe('END');
+      expect(workflow.shouldContinueFromReview({ review_status: 'approved', retry_count: 0 })).toBe('END');
     });
 
-    test('shouldContinueFromReview returns coder on rejected', () => {
-      expect(workflow.shouldContinueFromReview({ review_status: 'rejected' })).toBe('coder');
+    test('shouldContinueFromReview returns coder on rejected with retries < 4', () => {
+      expect(workflow.shouldContinueFromReview({ review_status: 'rejected', retry_count: 3 })).toBe('coder');
+    });
+
+    test('shouldContinueFromReview returns END on rejected with retries > 3', () => {
+      expect(workflow.shouldContinueFromReview({ review_status: 'rejected', retry_count: 4 })).toBe('END');
     });
   });
 });

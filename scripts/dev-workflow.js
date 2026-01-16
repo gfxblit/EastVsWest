@@ -66,6 +66,15 @@ const agentStateChannels = {
   review_status: {
     value: updateLatest,
     default: () => "pending",
+  },
+
+  /**
+   * The number of times the workflow has looped back to the Coder.
+   * Integer count.
+   */
+  retry_count: {
+    value: updateLatest,
+    default: () => 0,
   }
 };
 
@@ -105,15 +114,13 @@ export class WorkflowManager {
 
       child.stderr.on('data', (data) => {
         const chunk = data.toString();
-        process.stderr.write(chunk);
+        // Do not stream stderr to console to avoid noise (e.g. tool logs)
+        // process.stderr.write(chunk); 
         fullOutput += chunk;
       });
 
       child.on('close', (code) => {
         if (code !== 0) {
-          // Resolve with output even on failure, so we can analyze it
-          // But maybe we should throw? The caller needs to know it failed.
-          // For tests, exit code 1 means "fail" but we want the output text.
           resolve(fullOutput); 
         } else {
           resolve(fullOutput);
@@ -228,42 +235,57 @@ export class WorkflowManager {
 
   async testRunner(state) {
     console.log("--- Test Runner Node ---");
+    const { retry_count } = state;
+    
     // Run tests
     try {
       console.log("Running npm test...");
-      // Using 'npm' command, arguments 'test'
-      // Note: On Windows this might need 'npm.cmd', but for now assuming *nix environment as per "darwin"
       const output = await this.runCommand('npm', ['test']);
       
-      // Check for common failure indicators in output if exit code isn't reliably checked by runCommand wrapper
-      // (runCommand resolves even on error, so we inspect output)
       if (output.includes('FAIL') || output.includes('failed')) {
-         return { test_output: "FAIL:\n" + output };
+         // Increment retry count on failure
+         return { 
+             test_output: "FAIL:\n" + output,
+             retry_count: retry_count + 1
+         };
       }
       
       return { test_output: "PASS" };
     } catch (error) {
-      return { test_output: "FAIL: " + error.message };
+      return { 
+          test_output: "FAIL: " + error.message,
+          retry_count: retry_count + 1
+      };
     }
   }
 
   async reviewer(state) {
-    const { messages, test_output } = state;
+    const { messages, test_output, retry_count } = state;
     console.log("--- Reviewer Node ---");
     
     if (!test_output.includes("PASS")) {
-       return { review_status: "rejected", messages: [new SystemMessage("Tests failed.")] };
+       return { 
+           review_status: "rejected", 
+           messages: [new SystemMessage("Tests failed.")],
+           retry_count: retry_count + 1
+       };
     }
 
-    const systemPrompt = "You are a senior reviewer. Review the implementation. Output 'Approved' if good, or feedback if not.";
+    const systemPrompt = `You are a senior reviewer. Review the implementation. 
+    If the code looks correct and safe, output exactly "APPROVED". 
+    Otherwise, output "REJECTED" followed by a concise explanation of why.`;
+    
     const reviewContent = await this.invokeGemini(systemPrompt);
     
-    const isApproved = reviewContent.toLowerCase().includes("approved");
+    // Strict check for "APPROVED" at the start of the response
+    const isApproved = reviewContent.trim().toUpperCase().startsWith("APPROVED");
     console.log(`\nReview decision: ${isApproved ? "Approved" : "Rejected"}`);
     
+    // If rejected, increment retry count
     return { 
       review_status: isApproved ? "approved" : "rejected",
-      messages: [new SystemMessage(reviewContent)]
+      messages: [new SystemMessage(reviewContent)],
+      retry_count: isApproved ? retry_count : retry_count + 1
     };
   }
 
@@ -273,6 +295,13 @@ export class WorkflowManager {
     if (state.test_output && state.test_output.includes("PASS")) {
       return "reviewer";
     }
+    
+    // Check retries
+    if (state.retry_count > 3) {
+      console.log("Max retries exceeded. Aborting.");
+      return END;
+    }
+    
     return "coder";
   }
 
@@ -280,6 +309,13 @@ export class WorkflowManager {
     if (state.review_status === "approved") {
       return END;
     }
+    
+    // Check retries
+    if (state.retry_count > 3) {
+      console.log("Max retries exceeded. Aborting.");
+      return END;
+    }
+    
     return "coder";
   }
 
@@ -303,7 +339,8 @@ export class WorkflowManager {
       this.shouldContinueFromTest.bind(this),
       {
         reviewer: "reviewer",
-        coder: "coder"
+        coder: "coder",
+        [END]: END
       }
     );
 
@@ -327,6 +364,7 @@ export class WorkflowManager {
     
     const initialState = {
       messages: [new HumanMessage(input)],
+      retry_count: 0
     };
 
     return await this.graph.invoke(initialState);
@@ -343,8 +381,16 @@ if (process.argv[1] === __filename) {
 
   const workflow = new WorkflowManager();
   workflow.run(prompt).then((result) => {
-    console.log("Workflow completed.");
+    // Check final state for success
+    if (result.review_status === "approved" && (!result.test_output || result.test_output.includes("PASS"))) {
+        console.log("Workflow completed successfully.");
+        process.exit(0);
+    } else {
+        console.error("Workflow failed to converge.");
+        process.exit(1);
+    }
   }).catch(err => {
     console.error("Workflow failed:", err);
+    process.exit(1);
   });
 }
