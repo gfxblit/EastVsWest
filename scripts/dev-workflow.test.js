@@ -67,17 +67,14 @@ describe('WorkflowManager', () => {
     
     // Verify Nodes
     const addedNodes = mockStateGraphInstance.addNode.mock.calls.map(args => args[0]);
-    expect(addedNodes).toContain('planner');
-    expect(addedNodes).toContain('human_feedback');
     expect(addedNodes).toContain('coder');
     expect(addedNodes).toContain('test_runner');
     expect(addedNodes).toContain('reviewer');
 
-    // Verify Edges (Basic flow)
+    // Verify Edges (Simplified flow)
     const edges = mockStateGraphInstance.addEdge.mock.calls;
     expect(edges).toEqual(expect.arrayContaining([
-      ['START', 'planner'],
-      ['planner', 'human_feedback'],
+      ['START', 'coder'],
       ['coder', 'test_runner']
     ]));
   });
@@ -87,31 +84,31 @@ describe('WorkflowManager', () => {
     expect(result).toBeDefined();
   });
 
-  test('should invoke gemini cli for planner via spawn', async () => {
+  test('should invoke gemini cli for coder via spawn', async () => {
     // Setup mock spawn to emit data
     const mockChild = new EventEmitter();
     mockChild.stdout = new EventEmitter();
     mockChild.stderr = new EventEmitter();
     mockSpawn.mockReturnValue(mockChild);
 
-    // Trigger planner
+    // Trigger coder
     const state = { messages: [{ content: 'Build a login form' }] };
-    const plannerPromise = workflow.planner(state);
+    const coderPromise = workflow.coder(state);
 
     // Simulate process execution
     setTimeout(() => {
       mockChild.stdout.emit('data', Buffer.from('Mocked '));
-      mockChild.stdout.emit('data', Buffer.from('Gemini Response'));
+      mockChild.stdout.emit('data', Buffer.from('Code Response'));
       mockChild.emit('close', 0);
     }, 10);
 
-    const result = await plannerPromise;
+    const result = await coderPromise;
     
     expect(mockSpawn).toHaveBeenCalled();
     const args = mockSpawn.mock.calls[0];
     expect(args[0]).toBe('gemini');
     expect(args[1][0]).toContain('Build a login form');
-    expect(result.plan).toBe('Mocked Gemini Response');
+    expect(result.messages[0].content).toBe('Mocked Code Response');
   });
 
   describe('Tools', () => {
@@ -129,14 +126,6 @@ describe('WorkflowManager', () => {
   });
 
   describe('Conditional Logic', () => {
-    test('shouldContinueFromFeedback returns coder on Approved', () => {
-      expect(workflow.shouldContinueFromFeedback({ feedback: 'Approved' })).toBe('coder');
-    });
-
-    test('shouldContinueFromFeedback returns planner on Rejection', () => {
-      expect(workflow.shouldContinueFromFeedback({ feedback: 'Rejected' })).toBe('planner');
-    });
-
     test('shouldContinueFromTest returns reviewer on PASS', () => {
       expect(workflow.shouldContinueFromTest({ test_output: 'PASS' })).toBe('reviewer');
     });
