@@ -31,6 +31,10 @@ class EventEmitter {
       this.events[eventName].forEach(listener => listener(...args));
     }
   }
+
+  clearEventListeners() {
+    this.events = {};
+  }
 }
 
 export class Network extends EventEmitter {
@@ -55,16 +59,16 @@ export class Network extends EventEmitter {
   }
 
   async hostGame(playerName) {
-      return this.sessionManager.hostGame(playerName);
+    return this.sessionManager.hostGame(playerName);
   }
 
   async joinGame(joinCode, playerName) {
-      return this.sessionManager.joinGame(joinCode, playerName);
+    return this.sessionManager.joinGame(joinCode, playerName);
   }
 
   async startGame() {
-      if (!this.isHost) throw new Error('Only the host can start the game.');
-      return this.sessionManager.startGame();
+    if (!this.isHost) throw new Error('Only the host can start the game.');
+    return this.sessionManager.startGame();
   }
 
   _subscribeToChannel(channelName) {
@@ -104,7 +108,7 @@ export class Network extends EventEmitter {
             this.connected = true;
             resolve();
           } else if (status === 'CHANNEL_ERROR' || status === 'TIMED_OUT' || status === 'CLOSED') {
-             reject(new Error(`Failed to subscribe to channel: ${status} ${error ? error.message : ''}`));
+            reject(new Error(`Failed to subscribe to channel: ${status} ${error ? error.message : ''}`));
           }
         });
     });
@@ -122,7 +126,7 @@ export class Network extends EventEmitter {
   }
 
   async _enforceMaxPlayers() {
-      return this.sessionManager.enforceMaxPlayers();
+    return this.sessionManager.enforceMaxPlayers();
   }
 
   // FUTURE: Host-authoritative health persistence (not yet implemented)
@@ -274,7 +278,7 @@ export class Network extends EventEmitter {
    * Leave the current game session and clean up database records
    */
   async leaveGame() {
-      return this.sessionManager.leaveGame();
+    return this.sessionManager.leaveGame();
   }
 
   disconnect() {
@@ -284,5 +288,7 @@ export class Network extends EventEmitter {
       this.channel = null;
     }
     this.connected = false;
+    // Clear all event listeners to prevent test pollution
+    this.events = {};
   }
 }

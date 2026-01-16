@@ -62,18 +62,18 @@ describe('Client Interpolation Integration (Real Network)', () => {
 
     // 2. Setup Renderer (for interpolation logic)
     const mockCtx = {
-      fillRect: () => {},
-      save: () => {},
-      restore: () => {},
-      translate: () => {},
-      rotate: () => {},
-      drawImage: () => {},
-      beginPath: () => {},
-      arc: () => {},
-      rect: () => {},
-      fill: () => {},
-      stroke: () => {},
-      fillText: () => {},
+      fillRect: () => { },
+      save: () => { },
+      restore: () => { },
+      translate: () => { },
+      rotate: () => { },
+      drawImage: () => { },
+      beginPath: () => { },
+      arc: () => { },
+      rect: () => { },
+      fill: () => { },
+      stroke: () => { },
+      fillText: () => { },
       measureText: () => ({ width: 0 }),
       createPattern: () => ({}),
       strokeStyle: '',
@@ -94,6 +94,9 @@ describe('Client Interpolation Integration (Real Network)', () => {
       playerSnapshot.destroy();
       playerSnapshot = null;
     }
+    // Clear event listeners to prevent handlers from previous games accumulating
+    if (hostNetwork) hostNetwork.clearEventListeners();
+    if (playerNetwork) playerNetwork.clearEventListeners();
   });
 
   afterAll(async () => {
@@ -142,7 +145,7 @@ describe('Client Interpolation Integration (Real Network)', () => {
 
     const playerViewOfHost = playerSnapshot.getPlayers().get(hostUser.id);
     const history = playerViewOfHost.positionHistory;
-    
+
     expect(history.length).toBe(CONFIG.NETWORK.INTERPOLATION_BUFFER_SIZE);
 
     // 6. Test Interpolation Logic with real timestamps
@@ -150,12 +153,12 @@ describe('Client Interpolation Integration (Real Network)', () => {
     const t1 = history[0].timestamp;
     const t2 = history[1].timestamp;
     const midpoint = t1 + (t2 - t1) / 2;
-    
+
     // To target 'midpoint' time, we must pass 'midpoint + delay' to interpolatePosition
     const renderTime = midpoint + CONFIG.NETWORK.INTERPOLATION_DELAY_MS;
-    
+
     const result = playerSnapshot.getInterpolatedPlayerState(hostUser.id, renderTime);
-    
+
     // halfway between 0 and 5 is 2.5
     expect(result.x).toBeCloseTo(2.5, 1);
     expect(result.y).toBe(0);
@@ -164,14 +167,14 @@ describe('Client Interpolation Integration (Real Network)', () => {
   test('should animate remote players based on interpolated velocity', async () => {
     // 1. Host Game
     const { session } = await hostNetwork.hostGame('HostAnimate');
-    
+
     // 2. Join Game
     await playerNetwork.joinGame(session.join_code, 'PlayerAnimate');
 
     // 3. Setup Snapshot on Player side
     playerSnapshot = new SessionPlayersSnapshot(playerNetwork, session.id);
     await playerSnapshot.ready();
-    
+
     // Wait for host player to appear in snapshot
     await waitFor(() => playerSnapshot.getPlayers().has(hostUser.id), 5000);
 
@@ -200,21 +203,21 @@ describe('Client Interpolation Integration (Real Network)', () => {
     const startTime = performance.now();
     const duration = 500; // 0.5s of animation
     const fps = 60;
-    const dt = 1/fps;
+    const dt = 1 / fps;
     const mockGameState = {
       conflictZone: { centerX: 0, centerY: 0, radius: 1000 },
       loot: []
     };
 
-    for (let t = 0; t < duration; t += (1000/fps)) {
+    for (let t = 0; t < duration; t += (1000 / fps)) {
       renderer.render(mockGameState, null, playerSnapshot, null, dt);
-      await new Promise(resolve => setTimeout(resolve, 1000/fps));
+      await new Promise(resolve => setTimeout(resolve, 1000 / fps));
     }
 
     // 6. Verify Animation State
     const playerViewOfHost = playerSnapshot.getPlayers().get(hostUser.id);
     const animState = renderer.remoteAnimationStates.get(hostUser.id);
-    
+
     expect(animState).toBeDefined();
     // At 100px/s, it should be moving, so frame should have advanced from 0
     expect(animState.currentFrame).toBeGreaterThan(0);
