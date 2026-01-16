@@ -2,6 +2,7 @@
  * @jest-environment node
  */
 import { jest, describe, test, expect, beforeEach } from '@jest/globals';
+import EventEmitter from 'events';
 
 // Capture mock instances to verify calls
 const mockStateGraphInstance = {
@@ -21,11 +22,10 @@ jest.unstable_mockModule('@langchain/langgraph', () => ({
 }));
 
 // Mock child_process for gemini CLI calls
+const mockSpawn = jest.fn();
 jest.unstable_mockModule('child_process', () => ({
-  exec: jest.fn((cmd, cb) => {
-    // default success
-    cb(null, { stdout: 'Mocked Gemini Response', stderr: '' });
-  })
+  spawn: mockSpawn,
+  exec: jest.fn() // Keeping exec mock just in case, though unused now
 }));
 
 jest.unstable_mockModule('readline/promises', () => ({
@@ -47,7 +47,6 @@ jest.unstable_mockModule('fs/promises', () => ({
 // Dynamic import of the module under test
 const { WorkflowManager } = await import('./dev-workflow.js');
 const fs = (await import('fs/promises')).default;
-const { exec } = await import('child_process');
 
 describe('WorkflowManager', () => {
   let workflow;
@@ -58,7 +57,7 @@ describe('WorkflowManager', () => {
     mockStateGraphInstance.addEdge.mockClear();
     mockStateGraphInstance.addConditionalEdges.mockClear();
     mockStateGraphInstance.setEntryPoint.mockClear();
-    exec.mockClear();
+    mockSpawn.mockClear();
     
     workflow = new WorkflowManager();
   });
@@ -88,16 +87,30 @@ describe('WorkflowManager', () => {
     expect(result).toBeDefined();
   });
 
-  test('should invoke gemini cli for planner', async () => {
-    // We need to manually call the planner method to verify the internal logic
-    // since we mocked the graph execution which bypasses the real nodes in workflow.run()
+  test('should invoke gemini cli for planner via spawn', async () => {
+    // Setup mock spawn to emit data
+    const mockChild = new EventEmitter();
+    mockChild.stdout = new EventEmitter();
+    mockChild.stderr = new EventEmitter();
+    mockSpawn.mockReturnValue(mockChild);
+
+    // Trigger planner
     const state = { messages: [{ content: 'Build a login form' }] };
-    const result = await workflow.planner(state);
+    const plannerPromise = workflow.planner(state);
+
+    // Simulate process execution
+    setTimeout(() => {
+      mockChild.stdout.emit('data', Buffer.from('Mocked '));
+      mockChild.stdout.emit('data', Buffer.from('Gemini Response'));
+      mockChild.emit('close', 0);
+    }, 10);
+
+    const result = await plannerPromise;
     
-    expect(exec).toHaveBeenCalled();
-    const cmd = exec.mock.calls[0][0];
-    expect(cmd).toContain('gemini');
-    expect(cmd).toContain('Build a login form');
+    expect(mockSpawn).toHaveBeenCalled();
+    const args = mockSpawn.mock.calls[0];
+    expect(args[0]).toBe('gemini');
+    expect(args[1][0]).toContain('Build a login form');
     expect(result.plan).toBe('Mocked Gemini Response');
   });
 

@@ -1,6 +1,6 @@
 import { StateGraph, START, END } from '@langchain/langgraph';
 import { HumanMessage, SystemMessage } from '@langchain/core/messages';
-import { exec } from 'child_process';
+import { spawn } from 'child_process';
 import util from 'util';
 import fs from 'fs/promises';
 import readline from 'readline/promises';
@@ -10,7 +10,6 @@ import path from 'path';
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
-const execPromise = util.promisify(exec);
 
 // --- State Reducers ---
 
@@ -103,28 +102,49 @@ export class WorkflowManager {
 
   /**
    * Invokes the Gemini CLI with a prompt.
+   * Streams output to stdout and returns the full response.
    * @param {string} prompt - The prompt to send.
    * @param {Array} history - (Optional) Message history to contextualize the request.
    * @returns {Promise<string>} The generated response.
    */
   async invokeGemini(prompt, history = []) {
-    // In a real implementation, we might serialize history to a temp file or JSON arg.
-    // For this shell-out version, we'll simplify and just send the prompt.
-    // If the `gemini` tool supports history, we'd pass it here.
-    
-    // Construct the command. Escaping quotes is critical but simplified here.
-    // We assume the prompt is safe or the user accepts the risk in this dev script.
-    const escapedPrompt = prompt.replace(/"/g, '\"');
-    const command = `gemini "${escapedPrompt}"`;
-    
-    try {
-      const { stdout } = await execPromise(command);
-      return stdout.trim();
-    } catch (error) {
-      console.error("Error invoking Gemini CLI:", error.message);
-      // Fallback for tests or missing tool
-      return "Error: Could not run gemini command.";
-    }
+    return new Promise((resolve, reject) => {
+      // Basic escaping for the prompt. 
+      // In a production environment, use a more robust argument parsing or pass via stdin/file.
+      const escapedPrompt = prompt.replace(/"/g, '\\"');
+      
+      const child = spawn('gemini', [escapedPrompt], {
+        stdio: ['ignore', 'pipe', 'pipe'],
+        shell: true
+      });
+
+      let fullOutput = '';
+      let errorOutput = '';
+
+      child.stdout.on('data', (data) => {
+        const chunk = data.toString();
+        process.stdout.write(chunk); // Stream to console
+        fullOutput += chunk;
+      });
+
+      child.stderr.on('data', (data) => {
+        const chunk = data.toString();
+        process.stderr.write(chunk); // Stream stderr to console
+        errorOutput += chunk;
+      });
+
+      child.on('close', (code) => {
+        if (code !== 0) {
+          reject(new Error(`Gemini CLI exited with code ${code}: ${errorOutput}`));
+        } else {
+          resolve(fullOutput.trim());
+        }
+      });
+
+      child.on('error', (err) => {
+        reject(err);
+      });
+    });
   }
 
   // --- Tools ---
@@ -171,7 +191,7 @@ export class WorkflowManager {
     const fullPrompt = `${systemPrompt}\n\nRequest: ${userRequest}`;
 
     const planContent = await this.invokeGemini(fullPrompt);
-    console.log("Plan generated.");
+    console.log("\nPlan generated.");
 
     return { 
       plan: planContent,
@@ -182,12 +202,12 @@ export class WorkflowManager {
   async humanFeedback(state) {
     const { plan } = state;
     console.log("--- Human Feedback Node ---");
-    console.log("Proposed Plan:\n", plan);
+    // Plan is already streamed to stdout by invokeGemini
     
     const rl = readline.createInterface({ input, output });
     
     try {
-      const answer = await rl.question('Do you approve this plan? (yes/no/feedback): ');
+      const answer = await rl.question('\nDo you approve this plan? (yes/no/feedback): ');
       rl.close();
 
       if (answer.toLowerCase() === 'yes' || answer.toLowerCase() === 'y') {
@@ -211,7 +231,7 @@ export class WorkflowManager {
     For this step, please just output the code changes in markdown blocks.`;
     
     const codeContent = await this.invokeGemini(systemPrompt);
-    console.log("Coding complete.");
+    console.log("\nCoding complete.");
 
     return { 
       code_status: "coded",
@@ -246,7 +266,7 @@ export class WorkflowManager {
     const reviewContent = await this.invokeGemini(systemPrompt);
     
     const isApproved = reviewContent.toLowerCase().includes("approved");
-    console.log(`Review decision: ${isApproved ? "Approved" : "Rejected"}`);
+    console.log(`\nReview decision: ${isApproved ? "Approved" : "Rejected"}`);
     
     return { 
       review_status: isApproved ? "approved" : "rejected",
