@@ -20,10 +20,12 @@ jest.unstable_mockModule('@langchain/langgraph', () => ({
   END: 'END'
 }));
 
-jest.unstable_mockModule('@langchain/google-genai', () => ({
-  ChatGoogleGenerativeAI: jest.fn().mockImplementation(() => ({
-    invoke: jest.fn().mockResolvedValue({ content: 'Mocked Plan' })
-  }))
+// Mock child_process for gemini CLI calls
+jest.unstable_mockModule('child_process', () => ({
+  exec: jest.fn((cmd, cb) => {
+    // default success
+    cb(null, { stdout: 'Mocked Gemini Response', stderr: '' });
+  })
 }));
 
 jest.unstable_mockModule('readline/promises', () => ({
@@ -45,6 +47,7 @@ jest.unstable_mockModule('fs/promises', () => ({
 // Dynamic import of the module under test
 const { WorkflowManager } = await import('./dev-workflow.js');
 const fs = (await import('fs/promises')).default;
+const { exec } = await import('child_process');
 
 describe('WorkflowManager', () => {
   let workflow;
@@ -55,6 +58,7 @@ describe('WorkflowManager', () => {
     mockStateGraphInstance.addEdge.mockClear();
     mockStateGraphInstance.addConditionalEdges.mockClear();
     mockStateGraphInstance.setEntryPoint.mockClear();
+    exec.mockClear();
     
     workflow = new WorkflowManager();
   });
@@ -82,6 +86,19 @@ describe('WorkflowManager', () => {
   test('should execute the workflow', async () => {
     const result = await workflow.run('Implement feature X');
     expect(result).toBeDefined();
+  });
+
+  test('should invoke gemini cli for planner', async () => {
+    // We need to manually call the planner method to verify the internal logic
+    // since we mocked the graph execution which bypasses the real nodes in workflow.run()
+    const state = { messages: [{ content: 'Build a login form' }] };
+    const result = await workflow.planner(state);
+    
+    expect(exec).toHaveBeenCalled();
+    const cmd = exec.mock.calls[0][0];
+    expect(cmd).toContain('gemini');
+    expect(cmd).toContain('Build a login form');
+    expect(result.plan).toBe('Mocked Gemini Response');
   });
 
   describe('Tools', () => {
