@@ -371,5 +371,63 @@ describe('Game', () => {
       game.cycleSpectatorTarget(); 
       expect(game.spectatingTargetId).toBe('bystander-1');
     });
+
+  describe('Game Simulation Pause', () => {
+    let mockNetwork;
+    let mockSnapshot;
+
+    beforeEach(() => {
+      mockNetwork = { 
+        playerId: 'player-1', 
+        on: jest.fn(), 
+        send: jest.fn(),
+        isHost: true 
+      };
+      
+      mockSnapshot = { 
+        getPlayers: jest.fn().mockReturnValue(new Map([
+          ['player-1', { player_id: 'player-1', health: 100 }]
+        ]))
+      };
+      
+      game.init(mockSnapshot, mockNetwork);
+    });
+
+    test('WhenPaused_ShouldNotProcessLootSpawnedEvents', () => {
+      // 1. Pause the game
+      game.state.isRunning = false;
+      
+      // 2. Simulate incoming loot_spawned event
+      // Find the handler
+      const lootSpawnedHandler = mockNetwork.on.mock.calls.find(call => call[0] === 'loot_spawned')[1];
+      expect(lootSpawnedHandler).toBeDefined();
+
+      const lootItem = { id: 'loot-pause-test', type: 'weapon', item_id: 'spear', x: 100, y: 100 };
+      
+      // 3. Trigger event
+      lootSpawnedHandler({ data: lootItem });
+
+      // 4. Assert that loot was NOT added because simulation is paused
+      expect(game.state.loot).not.toContainEqual(lootItem);
+    });
+
+    test('WhenPaused_ShouldNotProcessAttackRequests', () => {
+      // 1. Pause the game
+      game.state.isRunning = false;
+      
+      // 2. Simulate incoming attack_request
+      const attackHandler = mockNetwork.on.mock.calls.find(call => call[0] === 'attack_request')[1];
+      expect(attackHandler).toBeDefined();
+
+      // Mock hostCombatManager to verify it's not called
+      const spy = jest.spyOn(game.hostCombatManager, 'handleAttackRequest');
+
+      // 3. Trigger event
+      attackHandler({ from: 'player-2', data: {} });
+
+      // 4. Assert that combat manager was NOT invoked
+      expect(spy).not.toHaveBeenCalled();
+    });
   });
+});
 });
