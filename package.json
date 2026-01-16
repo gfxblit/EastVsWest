@@ -42,7 +42,12 @@
     "vite": "^5.4.11"
   },
   "dependencies": {
+    "@langchain/core": "^1.1.15",
+    "@langchain/google-genai": "^2.1.10",
+    "@langchain/langgraph": "^1.1.0",
     "@supabase/supabase-js": "^2.89.0",
-    "eruda": "^3.4.3"
+    "dotenv": "^17.2.3",
+    "eruda": "^3.4.3",
+    "zod": "^4.3.5"
   }
 }
