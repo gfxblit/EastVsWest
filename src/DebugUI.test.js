@@ -163,4 +163,10 @@ describe('DebugUI', () => {
     expect(mockGame.state.isRunning).toBe(true);
     expect(pauseBtn.innerText).toBe('Pause Simulation');
   });
+
+  test('destroy() should remove the container from DOM', () => {
+    expect(document.getElementById('debug-ui-overlay')).not.toBeNull();
+    debugUI.destroy();
+    expect(document.getElementById('debug-ui-overlay')).toBeNull();
+  });
 });

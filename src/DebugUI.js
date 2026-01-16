@@ -207,4 +207,10 @@ export class DebugUI {
         console.log(exportString);
     }
   }
+
+  destroy() {
+    if (this.container && this.container.parentNode) {
+      this.container.parentNode.removeChild(this.container);
+    }
+  }
 }

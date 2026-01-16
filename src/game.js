@@ -282,4 +282,10 @@ export class Game {
   getLocalPlayer() {
     return this.localPlayerController?.getPlayer();
   }
+
+  destroy() {
+    if (this.debugUI) {
+      this.debugUI.destroy();
+    }
+  }
 }
