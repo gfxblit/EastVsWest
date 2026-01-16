@@ -17,6 +17,7 @@ describe('DebugUI', () => {
   let debugUI;
   let container;
   let CONFIG;
+  let mockGame;
 
   beforeEach(async () => {
     jest.resetModules(); // Reset modules to ensure fresh CONFIG import if needed
@@ -32,7 +33,7 @@ describe('DebugUI', () => {
     const module = await import('./DebugUI.js');
     DebugUI = module.DebugUI;
 
-    const mockGame = {
+    mockGame = {
       state: { isRunning: true }
     };
     debugUI = new DebugUI(mockGame);
@@ -146,13 +147,7 @@ describe('DebugUI', () => {
   });
 
   test('clicking pause button should toggle game.state.isRunning', () => {
-    const mockGame = {
-        state: { isRunning: true }
-    };
-    // Re-initialize and replace container
-    document.body.innerHTML = '';
-    debugUI = new DebugUI(mockGame);
-    const pauseBtn = document.getElementById('debug-pause-simulation-btn');
+    const pauseBtn = container.querySelector('#debug-pause-simulation-btn');
     
     // Initial state
     expect(mockGame.state.isRunning).toBe(true);

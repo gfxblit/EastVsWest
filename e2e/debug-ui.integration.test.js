@@ -67,7 +67,7 @@ describe('Debug UI E2E', () => {
         await page.goto(baseUrl);
         await page.waitForSelector('body.loaded');
 
-        await setupMocks(page, { joinCode: 'DEBUG1' });
+        await setupMocks(page, { joinCode: 'DEBUG1', playerName: 'DebugUser' });
 
         // Start game
         await page.click('#host-game-btn');
@@ -119,39 +119,7 @@ describe('Debug UI E2E', () => {
         await page.waitForSelector('body.loaded');
 
         // Mock network and game to bypass Supabase
-        await page.evaluate(() => {
-            window.app.network = {
-                playerId: 'local-player',
-                isHost: true,
-                initialize: () => { },
-                on: () => { },
-                hostGame: async () => ({ session: { id: 's1', join_code: 'DEBUG3' }, player: { id: 'local-player' } }),
-                startGame: async () => { },
-                startPeriodicPlayerStateWrite: () => { },
-                broadcastPlayerStateUpdate: () => { },
-                writePlayerStateToDB: async () => { },
-                send: () => { },
-                disconnect: () => { },
-            };
-
-            window.app.playersSnapshot = {
-                ready: async () => { },
-                getPlayers: () => new Map([['local-player', {
-                    player_id: 'local-player',
-                    player_name: 'DebugUser',
-                    health: 100,
-                    position_x: 100,
-                    position_y: 100
-                }]]),
-                getInterpolatedPlayerState: () => ({ x: 100, y: 100 }),
-                destroy: () => { }
-            };
-
-            window.app.hostGame = async function () {
-                this.ui.showJoinCode('DEBUG3');
-                this.startGame();
-            };
-        });
+        await setupMocks(page, { joinCode: 'DEBUG3', playerName: 'DebugUser' });
 
         // Start game
         await page.click('#host-game-btn');
@@ -193,6 +161,7 @@ describe('Debug UI E2E', () => {
         await page.goto(`${baseUrl}?debug=true`);
         await page.waitForSelector('body.loaded');
 
+        // Setup mocks after page load
         await setupMocks(page, { playerName: 'TouchUser', joinCode: 'DEBUG2' });
 
         // Start game

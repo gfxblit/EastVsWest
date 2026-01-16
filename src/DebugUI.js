@@ -59,7 +59,7 @@ export class DebugUI {
       this.pauseBtn.innerText = this.game.state.isRunning ? 'Pause Simulation' : 'Resume Simulation';
       this.pauseBtn.addEventListener('click', () => {
         this.game.state.isRunning = !this.game.state.isRunning;
-        this.pauseBtn.innerText = this.game.state.isRunning ? 'Pause Simulation' : 'Resume Simulation';
+        this.updatePauseButtonText();
       });
       this.container.appendChild(this.pauseBtn);
     }
