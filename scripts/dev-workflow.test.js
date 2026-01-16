@@ -107,7 +107,8 @@ describe('WorkflowManager', () => {
     expect(mockSpawn).toHaveBeenCalled();
     const args = mockSpawn.mock.calls[0];
     expect(args[0]).toBe('gemini');
-    expect(args[1][0]).toContain('Build a login form');
+    expect(args[1]).toContain('--yolo');
+    expect(args[1][args[1].length - 1]).toContain('Build a login form');
     expect(result.messages[0].content).toBe('Mocked Code Response');
   });
 

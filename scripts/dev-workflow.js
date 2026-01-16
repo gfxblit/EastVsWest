@@ -137,15 +137,15 @@ export class WorkflowManager {
    * Invokes the Gemini CLI with a prompt.
    * Streams output to stdout and returns the full response.
    * @param {string} prompt - The prompt to send.
-   * @param {Array} history - (Optional) Message history to contextualize the request.
+   * @param {Array} args - (Optional) Additional CLI arguments.
    * @returns {Promise<string>} The generated response.
    */
-  async invokeGemini(prompt, history = []) {
+  async invokeGemini(prompt, args = []) {
     return new Promise((resolve, reject) => {
       // With shell: false, we don't need to manually escape quotes.
       // Node.js will pass the prompt argument directly to the executable.
       
-      const child = spawn('gemini', [prompt], {
+      const child = spawn('gemini', [...args, prompt], {
         stdio: ['ignore', 'pipe', 'pipe'],
         shell: false 
       });
@@ -224,7 +224,7 @@ export class WorkflowManager {
     You have access to the file system.
     Please output the code changes in markdown blocks.`;
     
-    const codeContent = await this.invokeGemini(systemPrompt);
+    const codeContent = await this.invokeGemini(systemPrompt, ['--yolo']);
     console.log("\nCoding complete.");
 
     return { 
