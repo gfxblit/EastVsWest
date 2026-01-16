@@ -753,10 +753,11 @@ button:active {
   padding: 5px;
 }
 
-#debug-export-btn {
-  margin-top: 15px;
+#debug-export-btn,
+#debug-pause-simulation-btn {
+  margin-top: 10px;
   width: 100%;
-  padding: 5px;
+  padding: 8px;
   cursor: pointer;
   background-color: #4CAF50;
   color: white;
@@ -764,11 +765,23 @@ button:active {
   border-radius: 4px;
   text-shadow: none;
   box-shadow: none;
-  font-size: 1rem;
+  font-size: 0.9rem;
+  font-family: monospace;
+}
+
+#debug-pause-simulation-btn {
+  background-color: #2196F3;
+  margin-bottom: 10px;
 }
 
 #debug-export-btn:hover {
   background-color: #45a049;
+  transform: none;
+  box-shadow: none;
+}
+
+#debug-pause-simulation-btn:hover {
+  background-color: #1976D2;
   transform: none;
   box-shadow: none;
 }

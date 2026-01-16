@@ -34,7 +34,7 @@ export class Game {
     this.debugMode = false;
     this.lastDebugState = false;
     // Only create DebugUI in browser context where document is available
-    this.debugUI = typeof document !== 'undefined' ? new DebugUI() : null;
+    this.debugUI = typeof document !== 'undefined' ? new DebugUI(this) : null;
   }
 
   init(playersSnapshot = null, network = null, renderer = null) {
@@ -50,12 +50,19 @@ export class Game {
       this.hostBotManager = new HostBotManager(network, this.playersSnapshot, this);
 
       network.on('attack_request', (msg) => {
+        if (!this.state.isRunning) return;
         this.hostCombatManager.handleAttackRequest(msg, this.playersSnapshot);
         // Also trigger animation for bots or self if needed (LocalPlayerController handles self)
         this.handleAttackAnimation(msg);
       });
-      network.on('pickup_request', (msg) => this.hostLootManager.handlePickupRequest(msg, this.playersSnapshot));
-      network.on('request_loot_sync', (msg) => this.hostLootManager.handleLootSyncRequest(msg));
+      network.on('pickup_request', (msg) => {
+        if (!this.state.isRunning) return;
+        this.hostLootManager.handlePickupRequest(msg, this.playersSnapshot);
+      });
+      network.on('request_loot_sync', (msg) => {
+        if (!this.state.isRunning) return;
+        this.hostLootManager.handleLootSyncRequest(msg);
+      });
 
       // Initial loot spawn
       if (this.state.loot.length === 0) {
@@ -146,6 +153,7 @@ export class Game {
   }
 
   handleAttackAnimation(message) {
+    if (!this.state.isRunning) return;
     if (!this.renderer) return;
     const attackerId = message.from;
 
@@ -157,6 +165,7 @@ export class Game {
   }
 
   handleLootSpawned(message) {
+    if (!this.state.isRunning) return;
     const lootItem = message.data;
     // Avoid duplicates
     if (!this.state.loot.find(item => item.id === lootItem.id)) {
@@ -165,11 +174,13 @@ export class Game {
   }
 
   handleLootPickedUp(message) {
+    if (!this.state.isRunning) return;
     const { loot_id } = message.data;
     this.state.loot = this.state.loot.filter(item => item.id !== loot_id);
   }
 
   handleLootSync(message) {
+    if (!this.state.isRunning) return;
     const { loot } = message.data;
     if (Array.isArray(loot)) {
       // Merge or replace loot? For initial sync, replacing or merging unique items is best.
@@ -186,6 +197,7 @@ export class Game {
   }
 
   handlePlayerDeath(message) {
+    if (!this.state.isRunning) return;
     const { victim_id, killer_id } = message.data;
     if (this.network && victim_id === this.network.playerId) {
       console.log(`You were killed by ${killer_id}. Switching to spectator mode.`);
@@ -269,5 +281,11 @@ export class Game {
 
   getLocalPlayer() {
     return this.localPlayerController?.getPlayer();
+  }
+
+  destroy() {
+    if (this.debugUI) {
+      this.debugUI.destroy();
+    }
   }
 }

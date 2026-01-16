@@ -67,7 +67,7 @@ describe('Debug UI E2E', () => {
         await page.goto(baseUrl);
         await page.waitForSelector('body.loaded');
 
-        await setupMocks(page, { joinCode: 'DEBUG1' });
+        await setupMocks(page, { joinCode: 'DEBUG1', playerName: 'DebugUser' });
 
         // Start game
         await page.click('#host-game-btn');
@@ -114,6 +114,46 @@ describe('Debug UI E2E', () => {
         expect(damageAfterReopen).toBe('999');
     });
 
+    test('Should allow pausing simulation', async () => {
+        await page.goto(baseUrl);
+        await page.waitForSelector('body.loaded');
+
+        // Mock network and game to bypass Supabase
+        await setupMocks(page, { joinCode: 'DEBUG3', playerName: 'DebugUser' });
+
+        // Start game
+        await page.click('#host-game-btn');
+        await page.waitForSelector('#game-screen.active');
+        await page.waitForFunction(() => window.game && window.game.state.isRunning);
+
+        // Open Debug UI
+        await page.keyboard.press('o');
+        await page.waitForSelector('#debug-ui-overlay', { visible: true });
+        
+        // Pause simulation
+        await page.click('#debug-pause-simulation-btn');
+
+        // Get time immediately after pause
+        const pausedTime = await page.evaluate(() => window.game.state.gameTime);
+        
+        // Wait a bit
+        await new Promise(resolve => setTimeout(resolve, 500));
+        
+        // Time should NOT have changed
+        const timeAfterWait = await page.evaluate(() => window.game.state.gameTime);
+        expect(timeAfterWait).toBe(pausedTime);
+
+        // Resume simulation
+        await page.click('#debug-pause-simulation-btn');
+        
+        // Wait a bit
+        await new Promise(resolve => setTimeout(resolve, 500));
+        
+        // Time should HAVE changed
+        const resumedTime = await page.evaluate(() => window.game.state.gameTime);
+        expect(resumedTime).toBeGreaterThan(timeAfterWait);
+    });
+
     test('Should allow toggling Debug UI via touch button on small screens', async () => {
         // Set viewport to mobile size
         await page.setViewport({ width: 400, height: 800, isMobile: true, hasTouch: true });
@@ -121,6 +161,7 @@ describe('Debug UI E2E', () => {
         await page.goto(`${baseUrl}?debug=true`);
         await page.waitForSelector('body.loaded');
 
+        // Setup mocks after page load
         await setupMocks(page, { playerName: 'TouchUser', joinCode: 'DEBUG2' });
 
         // Start game

@@ -317,6 +317,9 @@ class App {
     this.network.on('game_over', (payload) => {
       console.log('Match ended', payload);
       this.stopGameLoop();
+      if (this.game) {
+        this.game.destroy();
+      }
       this.game = null;
       this.ui.showSpectatorControls(false);
 
@@ -538,6 +541,9 @@ class App {
     }
 
     this.stopGameLoop();
+    if (this.game) {
+      this.game.destroy();
+    }
     this.game = null;
     this.lastWeaponId = null;
     this.lastArmorId = null;
@@ -564,6 +570,9 @@ class App {
     }
 
     this.stopGameLoop();
+    if (this.game) {
+      this.game.destroy();
+    }
     this.game = null;
     this.lastWeaponId = null;
     this.lastArmorId = null;
@@ -619,6 +628,10 @@ class App {
     if (!canvas) {
       console.error('Canvas element not found');
       return;
+    }
+
+    if (this.game) {
+      this.game.destroy();
     }
 
     this.renderer = new Renderer(canvas, this.assetManager);
@@ -807,6 +820,9 @@ class App {
     this.stopGameLoop();
     if (this.network) {
       this.network.disconnect();
+    }
+    if (this.game) {
+      this.game.destroy();
     }
     this.game = null;
     this.playersSnapshot = null;
