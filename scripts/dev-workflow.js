@@ -109,13 +109,12 @@ export class WorkflowManager {
    */
   async invokeGemini(prompt, history = []) {
     return new Promise((resolve, reject) => {
-      // Basic escaping for the prompt. 
-      // In a production environment, use a more robust argument parsing or pass via stdin/file.
-      const escapedPrompt = prompt.replace(/"/g, '\\"');
+      // With shell: false, we don't need to manually escape quotes.
+      // Node.js will pass the prompt argument directly to the executable.
       
-      const child = spawn('gemini', [escapedPrompt], {
+      const child = spawn('gemini', [prompt], {
         stdio: ['ignore', 'pipe', 'pipe'],
-        shell: true
+        shell: false 
       });
 
       let fullOutput = '';
