@@ -275,6 +275,10 @@ export class WorkflowManager {
         
         Please fix the code to satisfy the reviewer and the original request: ${initialRequest}.
         Make sure to commit your fixes.`;
+    } else if (review_status === "needs_commit") {
+        systemPrompt = `You have uncommitted changes that prevent PR creation. 
+        Please review your changes and commit them using git.
+        Original request: ${initialRequest}`;
     }
     
     const codeContent = await this.invokeGemini(systemPrompt, ['--yolo']);
@@ -364,12 +368,14 @@ export class WorkflowManager {
 
       this.logger.log(`On feature branch: ${branchName}`);
 
-      // 2. Ensure all changes are committed
+      // 2. Check for uncommitted changes
       const { output: statusOutput } = await this.runCommand('git', ['status', '--porcelain']);
       if (statusOutput.trim()) {
-        this.logger.log("Uncommitted changes found. Staging and committing...");
-        await this.runCommand('git', ['add', '.']);
-        await this.runCommand('git', ['commit', '-m', 'chore: finalize changes for PR']);
+        this.logger.log("Uncommitted changes found. Returning to coder to finalize commits.");
+        return { 
+          review_status: "needs_commit",
+          messages: [new SystemMessage("Uncommitted changes found. Please ensure all changes are committed before creating a PR.")]
+        };
       }
 
       // 3. Push to origin
@@ -430,6 +436,16 @@ export class WorkflowManager {
     return "coder";
   }
 
+  shouldContinueFromPrCreator(state) {
+    if (state.review_status === "pr_created" || state.review_status === "pr_skipped") {
+      return END;
+    }
+    
+    // If pr_failed or needs_commit, return to coder
+    this.logger.log(`PR Creator failed or needs commit (status: ${state.review_status}). Returning to coder.`);
+    return "coder";
+  }
+
   createGraph() {
     const workflow = new StateGraph({
       channels: agentStateChannels
@@ -466,7 +482,14 @@ export class WorkflowManager {
       }
     );
 
-    workflow.addEdge("pr_creator", END);
+    workflow.addConditionalEdges(
+      "pr_creator",
+      this.shouldContinueFromPrCreator.bind(this),
+      {
+        coder: "coder",
+        [END]: END
+      }
+    );
 
     this.graph = workflow.compile();
     return this.graph;
