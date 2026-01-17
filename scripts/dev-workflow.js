@@ -658,6 +658,12 @@ export class WorkflowManager {
 
 // CLI Entry Point
 if (process.argv[1] === __filename) {
+  if (!process.env.NTFY_CHANNEL) {
+    console.error("Error: NTFY_CHANNEL environment variable is not defined.");
+    console.error("This is required for workflow notifications. Please set it in your environment or .env file.");
+    process.exit(1);
+  }
+
   const args = process.argv.slice(2);
   let startNode = "coder";
   let verbose = false;
