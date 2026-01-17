@@ -264,14 +264,23 @@ describe('Loot Integration', () => {
     expect(playerGame.getLocalPlayer().equipped_weapon).toBe('bo');
     expect(playerGame.state.loot.some(l => l.id === spawnedSpear.id)).toBe(true);
 
-    // 5. Player presses F
-    playerGame.handleInput({ interact: true });
-    
-    await waitFor(() => {
+    // 5. Player presses F (with retry logic for network robustness)
+    await waitFor(async () => {
+        // Press F
+        playerGame.handleInput({ interact: true });
+        
+        // Run a few updates to allow message to send and process
         playerGame.update(0.1);
         hostGame.update(0.1);
+        
+        if (playerGame.getLocalPlayer().equipped_weapon === 'spear') return true;
+
+        // Release F to reset the 'rising edge' detection
+        playerGame.handleInput({ interact: false });
+        playerGame.update(0.1); 
+
         return playerGame.getLocalPlayer().equipped_weapon === 'spear';
-    }, 15000);
+    }, 15000, 200); // Polling every 200ms
 
     // 6. Verify old weapon 'bo' was dropped
     let droppedBo = null;

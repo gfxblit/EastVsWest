@@ -22,7 +22,7 @@ export class HostLootManager {
     });
   }
 
-  spawnLoot(itemId, x, y, type = 'weapon') {
+  spawnLoot(itemId, x, y, type = 'weapon', broadcast = true) {
     const lootId = `loot-${this.nextLootId++}`;
     const lootItem = {
       id: lootId,
@@ -34,7 +34,7 @@ export class HostLootManager {
 
     this.state.loot.push(lootItem);
 
-    if (this.network?.isHost) {
+    if (this.network?.isHost && broadcast) {
       this.network.send('loot_spawned', lootItem);
     }
 
@@ -54,8 +54,13 @@ export class HostLootManager {
       const x = padding + Math.random() * (CONFIG.WORLD.WIDTH - padding * 2);
       const y = padding + Math.random() * (CONFIG.WORLD.HEIGHT - padding * 2);
 
-      this.spawnLoot(randomWeapon.id, x, y);
+      this.spawnLoot(randomWeapon.id, x, y, 'weapon', false);
     }
+
+    // Send a single sync message for all initial loot
+    this.network.send('loot_sync', {
+      loot: this.state.loot
+    });
   }
 
   syncLootToPlayer(playerId) {
