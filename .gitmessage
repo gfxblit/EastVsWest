@@ -1,4 +1,4 @@
-<type>: <description>
+<type>: <description> (issue-<id>)
 
 <Detailed explanation of changes, wrapped at 72 characters>
 
@@ -9,4 +9,10 @@ E2E Test Results (MANDATORY - must run 'npm run test:e2e'):
 <Paste summary of E2E test results here>
 
 Footer:
-<Reference to associated issues, e.g., Closes #247>
+<Reference to associated issues, e.g., Closes #258>
+
+# Hints:
+# - Keep the subject line short (under 50 chars if possible).
+# - Use the imperative mood (e.g., "Add feature" not "Added feature").
+# - Include the issue ID in the subject line.
+# - The body should explain *why* and *what*, not just *how*.

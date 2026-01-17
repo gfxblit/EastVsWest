@@ -258,19 +258,28 @@ describe('Network Integration', () => {
 
 ---
 
-## Phase 6: Commit Changes to a branch and Push to Origin
+## Phase 6: Land the Plane
 
 **Process:**
-1. Commit all changes with descriptive messages:
-   ```
-   test: Add tests for [feature]
-   feat: Implement [feature] with TDD approach
-   refactor: address review feedback on [component]
-   refactor: Simplify [component] logic
-   ```
-   The committed changes will be available on the current branch. Push to origin. A human is then responsible for creating a Pull Request for review.
+1. **Commit Changes:**
+   - Review your changes with `git status` and `git diff`.
+   - Create a **concise** commit message following the format: `<type>: <description> (issue-<id>)`.
+     - Example: `feat: Add double-jump mechanic (issue-123)`
+     - Example: `fix: Resolve null pointer in combat loop (issue-456)`
+   - The description should be brief and focused on *why* the change was made.
+   - In the commit message body, add `Closes #<id>` in the footer to automatically close the issue upon merging the PR.
+2. **Push to Origin:**
+   - Execute `git push`.
+   - **CRITICAL:** The plane has not landed until the push completes successfully.
+   - If the push fails, resolve the issues and try again. do not stop until the code is safely on the remote.
+3. **Create Pull Request:**
+   - Execute `gh pr create --fill` to create a PR using the commit info.
+   - **CRITICAL:** Do NOT close the issue yourself. The issue will be closed automatically when the PR is merged by the user.
 
-**Exit Criteria:** Changes committed with descriptive messages.
+**Exit Criteria:**
+- ✅ Changes committed with a concise message including the issue ID.
+- ✅ `git push` executed successfully.
+- ✅ Pull Request created.
 
 ---
 
