@@ -310,8 +310,8 @@ export class WorkflowManager {
     
     const reviewContent = await this.invokeGemini(systemPrompt);
     
-    // Strict check for "APPROVED" at the start of the response
-    const isApproved = reviewContent.trim().toUpperCase().startsWith("APPROVED");
+    // Flexible check for "APPROVED" as a standalone word in the response
+    const isApproved = /\bAPPROVED\b/i.test(reviewContent);
     this.logger.log(`\nReview decision: ${isApproved ? "Approved" : "Rejected"}`);
     
     // If rejected, increment retry count

@@ -199,50 +199,49 @@ describe('WorkflowManager', () => {
      expect(result.messages[0].content).toContain('Tests failed (Unit)');
   });
 
-  test('should parse "APPROVED" from reviewer', async () => {
-     // Setup mock spawn
-     const mockChild = new EventEmitter();
-     mockChild.stdout = new EventEmitter();
-     mockChild.stderr = new EventEmitter();
-     mockSpawn.mockReturnValue(mockChild);
- 
-     const reviewPromise = workflow.reviewer({ 
-         test_output: "PASS", 
-         retry_count: 0 
-     });
- 
-     setTimeout(() => {
-         mockChild.stdout.emit('data', Buffer.from('APPROVED'));
-         mockChild.emit('close', 0);
-     }, 10);
- 
-     const result = await reviewPromise;
-     expect(result.review_status).toBe('approved');
-     expect(result.retry_count).toBe(0);
-  });
-
-  test('should reject if reviewer says anything other than "APPROVED"', async () => {
-     // Setup mock spawn
-     const mockChild = new EventEmitter();
-     mockChild.stdout = new EventEmitter();
-     mockChild.stderr = new EventEmitter();
-     mockSpawn.mockReturnValue(mockChild);
- 
-     const reviewPromise = workflow.reviewer({ 
-         test_output: "PASS", 
-         retry_count: 0 
-     });
- 
-     setTimeout(() => {
-         mockChild.stdout.emit('data', Buffer.from('Looks good but please fix indentation'));
-         mockChild.emit('close', 0);
-     }, 10);
- 
-     const result = await reviewPromise;
-     expect(result.review_status).toBe('rejected');
-     expect(result.retry_count).toBe(1);
-  });
-
+    test('should parse "APPROVED" from reviewer even with preamble', async () => {
+       // Setup mock spawn
+       const mockChild = new EventEmitter();
+       mockChild.stdout = new EventEmitter();
+       mockChild.stderr = new EventEmitter();
+       mockSpawn.mockReturnValue(mockChild);
+   
+       const reviewPromise = workflow.reviewer({ 
+           test_output: "PASS", 
+           retry_count: 0 
+       });
+   
+       setTimeout(() => {
+           mockChild.stdout.emit('data', Buffer.from('Thinking... The code looks good.\nAPPROVED'));
+           mockChild.emit('close', 0);
+       }, 10);
+   
+       const result = await reviewPromise;
+       expect(result.review_status).toBe('approved');
+       expect(result.retry_count).toBe(0);
+    });
+   
+    test('should reject if reviewer does not include "APPROVED"', async () => {
+       // Setup mock spawn
+       const mockChild = new EventEmitter();
+       mockChild.stdout = new EventEmitter();
+       mockChild.stderr = new EventEmitter();
+       mockSpawn.mockReturnValue(mockChild);
+   
+       const reviewPromise = workflow.reviewer({ 
+           test_output: "PASS", 
+           retry_count: 0 
+       });
+   
+       setTimeout(() => {
+           mockChild.stdout.emit('data', Buffer.from('REJECTED: Please fix indentation'));
+           mockChild.emit('close', 0);
+       }, 10);
+   
+       const result = await reviewPromise;
+       expect(result.review_status).toBe('rejected');
+       expect(result.retry_count).toBe(1);
+    });
   describe('Tools', () => {
     test('readFile should call fs.readFile', async () => {
       const result = await workflow.readFile('test.txt');
