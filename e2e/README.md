@@ -69,22 +69,20 @@ The tests use an abstracted Puppeteer configuration (`e2e/helpers/puppeteer-conf
 
 ### Supported Environments
 
-1. **Local macOS**: Uses `/Applications/Google Chrome.app/Contents/MacOS/Google Chrome`
-2. **Local Linux**: Uses `/usr/bin/google-chrome`
-3. **Local Windows**: Uses `C:\Program Files\Google\Chrome\Application\chrome.exe`
-4. **GitHub Actions**: Uses Puppeteer's bundled Chromium
-5. **Google Cloud Shell**: Uses `/usr/bin/google-chrome`
+1. **Local Development (macOS, Linux, Windows)**: Uses Puppeteer's bundled Chromium by default to avoid focus stealing and dock/taskbar interruptions.
+2. **GitHub Actions**: Uses Puppeteer's bundled Chromium.
+3. **Google Cloud Shell**: Uses `/usr/bin/google-chrome`.
 
 ### Custom Executable Path
 
-You can override the automatic detection with an environment variable:
+By default, tests run using the bundled Chromium. If you need to use a specific browser installation (e.g., for debugging or testing with a specific Chrome version), you can use the `PUPPETEER_EXECUTABLE_PATH` environment variable:
 
 ```bash
 # Use a custom Chrome installation
-PUPPETEER_EXECUTABLE_PATH=/path/to/chrome npm run test:e2e
+PUPPETEER_EXECUTABLE_PATH="/Applications/Google Chrome.app/Contents/MacOS/Google Chrome" npm run test:e2e
 
-# Use Puppeteer's bundled Chromium
-PUPPETEER_EXECUTABLE_PATH="" npm run test:e2e
+# Example for Linux
+PUPPETEER_EXECUTABLE_PATH="/usr/bin/google-chrome" npm run test:e2e
 ```
 
 ### Debug Configuration
@@ -164,18 +162,16 @@ channel = client.channel('game_session:CODE', {
 
 If tests fail to launch the browser, try:
 
-1. **Verify Chrome is installed:**
+1. **Verify bundled Chromium is installed:**
+   Ensure `npm install` was successful and `node_modules/puppeteer` contains the bundled browser.
+
+2. **Use system Chrome (as fallback):**
    ```bash
    # macOS
-   ls /Applications/Google\ Chrome.app/Contents/MacOS/Google\ Chrome
+   PUPPETEER_EXECUTABLE_PATH="/Applications/Google Chrome.app/Contents/MacOS/Google Chrome" npm run test:e2e
 
-   # Linux/Cloud Shell
-   which google-chrome
-   ```
-
-2. **Use bundled Chromium:**
-   ```bash
-   PUPPETEER_EXECUTABLE_PATH="" npm run test:e2e
+   # Linux
+   PUPPETEER_EXECUTABLE_PATH="/usr/bin/google-chrome" npm run test:e2e
    ```
 
 3. **Check configuration:**
