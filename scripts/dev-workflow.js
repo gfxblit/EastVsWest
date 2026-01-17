@@ -11,6 +11,12 @@ import path from 'path';
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
 
+const DEFAULT_MODELS = [
+  'gemini-3-pro-preview',
+  'gemini-3-flash-preview',
+  'gemini-2.5-pro'
+];
+
 // --- State Reducers ---
 
 /**
@@ -135,18 +141,47 @@ export class WorkflowManager {
   }
 
   /**
-   * Invokes the Gemini CLI with a prompt.
+   * Invokes the Gemini CLI with a prompt, supporting model fallback.
    * Streams output to stdout and returns the full response.
    * @param {string} prompt - The prompt to send.
    * @param {Array} args - (Optional) Additional CLI arguments.
    * @returns {Promise<string>} The generated response.
    */
   async invokeGemini(prompt, args = []) {
+    for (let i = 0; i < DEFAULT_MODELS.length; i++) {
+      const model = DEFAULT_MODELS[i];
+      try {
+        return await this._executeGemini(prompt, model, args);
+      } catch (error) {
+        const isQuotaError = error.message.includes('TerminalQuotaError') || error.message.includes('429');
+        const isLastModel = i === DEFAULT_MODELS.length - 1;
+
+        if (isQuotaError && !isLastModel) {
+          const nextModel = DEFAULT_MODELS[i + 1];
+          this.logger.log(`Quota exhausted for ${model}. Falling back to ${nextModel}...`);
+          continue;
+        }
+
+        if (isQuotaError && isLastModel) {
+          throw new Error(`All models exhausted. Last error: ${error.message}`);
+        }
+
+        // Non-quota error, fail immediately
+        throw error;
+      }
+    }
+  }
+
+  /**
+   * Internal method to execute the Gemini CLI with a specific model.
+   * @private
+   */
+  async _executeGemini(prompt, model, args = []) {
     return new Promise((resolve, reject) => {
       // With shell: false, we don't need to manually escape quotes.
       // Node.js will pass the prompt argument directly to the executable.
       
-      const child = spawn('gemini', [...args, prompt], {
+      const child = spawn('gemini', ['-m', model, ...args, prompt], {
         stdio: ['ignore', 'pipe', 'pipe'],
         shell: false 
       });
