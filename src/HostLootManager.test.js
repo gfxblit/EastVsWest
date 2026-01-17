@@ -150,8 +150,10 @@ describe('HostLootManager', () => {
 
     // Assert
     expect(state.loot).toHaveLength(5);
-    expect(mockNetwork.send).toHaveBeenCalledTimes(5);
-    expect(mockNetwork.send).toHaveBeenCalledWith('loot_spawned', expect.any(Object));
+    expect(mockNetwork.send).toHaveBeenCalledTimes(1);
+    expect(mockNetwork.send).toHaveBeenCalledWith('loot_sync', expect.objectContaining({
+      loot: expect.any(Array)
+    }));
     
     // Check that items are within bounds
     state.loot.forEach(item => {
