@@ -221,8 +221,10 @@ export class WorkflowManager {
     const initialRequest = messages[0].content;
     
     let systemPrompt = `You are a software engineer. Implement the following request: ${initialRequest}. 
-    You have access to the file system.
-    Please output the code changes in markdown blocks.`;
+    You have access to the file system and git.
+    
+    IMPORTANT: You MUST commit your changes using git. You may create multiple commits if it makes sense for the task.
+    Please output the code changes in markdown blocks as well for the conversation record.`;
 
     // Add context from failures if applicable
     if (test_output && (test_output.includes("FAIL") || test_output.includes("failed"))) {
@@ -231,7 +233,8 @@ export class WorkflowManager {
         TEST OUTPUT:
         ${test_output}
         
-        Please fix the code to satisfy the tests and the original request: ${initialRequest}`;
+        Please fix the code to satisfy the tests and the original request: ${initialRequest}.
+        Make sure to commit your fixes.`;
     } else if (review_status === "rejected") {
         const lastMessage = messages[messages.length - 1];
         systemPrompt = `Your previous implementation was rejected by the reviewer.
@@ -239,7 +242,8 @@ export class WorkflowManager {
         REVIEWER FEEDBACK:
         ${lastMessage.content}
         
-        Please fix the code to satisfy the reviewer and the original request: ${initialRequest}`;
+        Please fix the code to satisfy the reviewer and the original request: ${initialRequest}.
+        Make sure to commit your fixes.`;
     }
     
     const codeContent = await this.invokeGemini(systemPrompt, ['--yolo']);
@@ -305,10 +309,14 @@ export class WorkflowManager {
     }
 
     const systemPrompt = `You are a senior reviewer. Review the implementation. 
-    If the code looks correct and safe, output exactly "APPROVED". 
+    You have access to the file system and git.
+    
+    You SHOULD use git tools (like 'git log' and 'git diff') to examine the coder's commits and the changes made.
+    
+    If the code looks correct, safe, and follows the requirements, output "APPROVED". 
     Otherwise, output "REJECTED" followed by a concise explanation of why.`;
     
-    const reviewContent = await this.invokeGemini(systemPrompt);
+    const reviewContent = await this.invokeGemini(systemPrompt, ['--yolo']);
     
     // Flexible check for "APPROVED" as a standalone word in the response
     const isApproved = /\bAPPROVED\b/i.test(reviewContent);
