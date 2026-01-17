@@ -53,6 +53,7 @@ describe('WorkflowManager', () => {
     mockStateGraphInstance.addConditionalEdges.mockClear();
     mockStateGraphInstance.setEntryPoint.mockClear();
     mockSpawn.mockClear();
+    delete process.env.NTFY_CHANNEL;
     
     workflow = new WorkflowManager({ log: () => {} }, "coder");
   });
@@ -338,6 +339,39 @@ describe('WorkflowManager', () => {
   });
 
   describe('Tools', () => {
+    test('getTmuxSession should return session name from tmux', async () => {
+      mockSpawn.mockImplementation((cmd) => {
+        const mockChild = new EventEmitter();
+        mockChild.stdout = new EventEmitter();
+        mockChild.stderr = new EventEmitter();
+        setTimeout(() => {
+          if (cmd === 'tmux') {
+            mockChild.stdout.emit('data', Buffer.from('my-session\n'));
+          }
+          mockChild.emit('close', 0);
+        }, 1);
+        return mockChild;
+      });
+
+      const session = await workflow.getTmuxSession();
+      expect(session).toBe('my-session');
+    });
+
+    test('getTmuxSession should return no-tmux on error', async () => {
+      mockSpawn.mockImplementation(() => {
+        const mockChild = new EventEmitter();
+        mockChild.stdout = new EventEmitter();
+        mockChild.stderr = new EventEmitter();
+        setTimeout(() => {
+          mockChild.emit('error', new Error('tmux not found'));
+        }, 1);
+        return mockChild;
+      });
+
+      const session = await workflow.getTmuxSession();
+      expect(session).toBe('no-tmux');
+    });
+
     test('readFile should call fs.readFile', async () => {
       fs.readFile.mockResolvedValue('content');
       const result = await workflow.readFile('test.txt');
@@ -402,6 +436,79 @@ describe('WorkflowManager', () => {
 
       const result = await promise;
       expect(result.output).toBe('Red Text');
+    });
+  });
+
+  describe('Notifications', () => {
+    test('notify should do nothing if NTFY_CHANNEL is not set', async () => {
+      await workflow.notify('Title', 'Message');
+      expect(mockSpawn).not.toHaveBeenCalled();
+    });
+
+    test('notify should call curl if NTFY_CHANNEL is set', async () => {
+      process.env.NTFY_CHANNEL = 'test-channel';
+      
+      // Mock tmux and curl responses
+      mockSpawn.mockImplementation((cmd, args) => {
+        const mockChild = new EventEmitter();
+        mockChild.stdout = new EventEmitter();
+        mockChild.stderr = new EventEmitter();
+        setTimeout(() => {
+          if (cmd === 'tmux') {
+            mockChild.stdout.emit('data', Buffer.from('test-session\n'));
+          }
+          mockChild.emit('close', 0);
+        }, 1);
+        return mockChild;
+      });
+
+      await workflow.notify('Title', 'Message', 4);
+
+      expect(mockSpawn).toHaveBeenCalledWith('curl', expect.arrayContaining([
+        '-sS',
+        '-H', 'Title: Title',
+        '-H', 'Priority: 4',
+        '-d', expect.stringContaining('Session: test-session\nMessage'),
+        'https://ntfy.sh/test-channel'
+      ]), expect.anything());
+    });
+
+    test('testRunner should notify on failure', async () => {
+        process.env.NTFY_CHANNEL = 'test-channel';
+        const spy = jest.spyOn(workflow, 'notify');
+        
+        mockSpawn.mockImplementation(() => {
+            const mockChild = new EventEmitter();
+            mockChild.stdout = new EventEmitter();
+            mockChild.stderr = new EventEmitter();
+            setTimeout(() => {
+                mockChild.stdout.emit('data', Buffer.from('FAIL tests'));
+                mockChild.emit('close', 1);
+            }, 1);
+            return mockChild;
+        });
+
+        await workflow.testRunner({ retry_count: 0 });
+        expect(spy).toHaveBeenCalledWith('Workflow: Tests Failed', expect.stringContaining('Unit tests failed'), 4);
+    });
+
+    test('reviewer should notify on rejection', async () => {
+        process.env.NTFY_CHANNEL = 'test-channel';
+        const spy = jest.spyOn(workflow, 'notify');
+        
+        mockSpawn.mockImplementation(() => {
+            const mockChild = new EventEmitter();
+            mockChild.stdout = new EventEmitter();
+            mockChild.stderr = new EventEmitter();
+            setTimeout(() => {
+                mockChild.stdout.emit('data', Buffer.from('REJECTED because reasons'));
+                mockChild.emit('close', 0);
+            }, 1);
+            return mockChild;
+        });
+
+        await workflow.reviewer({ test_output: 'PASS', retry_count: 0 });
+        expect(spy).toHaveBeenCalledWith('Workflow: Review Rejected', expect.stringContaining('Reviewer rejected'), 4);
     });
   });
 

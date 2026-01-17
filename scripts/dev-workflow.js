@@ -81,6 +81,15 @@ const agentStateChannels = {
   retry_count: {
     value: updateLatest,
     default: () => 0,
+  },
+
+  /**
+   * The URL of the created or existing Pull Request.
+   * String content.
+   */
+  pr_url: {
+    value: updateLatest,
+    default: () => "",
   }
 };
 
@@ -285,6 +294,48 @@ export class WorkflowManager {
     }
   }
 
+  /**
+   * Retrieves the current tmux session name.
+   * @returns {Promise<string>} The session name or 'no-tmux' as fallback.
+   */
+  async getTmuxSession() {
+    try {
+      const { output } = await this.runCommand('tmux', ['display-message', '-p', '#S']);
+      if (output && output.trim()) {
+        return output.trim();
+      }
+    } catch (e) {
+      // Silence tmux errors
+    }
+    return 'no-tmux';
+  }
+
+  /**
+   * Sends a notification to ntfy.sh if NTFY_CHANNEL is set.
+   * @param {string} title - The notification title.
+   * @param {string} message - The notification message.
+   * @param {number} priority - Priority (1-5, default 3).
+   */
+  async notify(title, message, priority = 3) {
+    const channel = process.env.NTFY_CHANNEL;
+    if (!channel) return;
+
+    const sessionName = await this.getTmuxSession();
+    const fullMessage = `Session: ${sessionName}\n${message}`;
+
+    try {
+      await this.runCommand('curl', [
+        '-sS',
+        '-H', `Title: ${title}`,
+        '-H', `Priority: ${priority.toString()}`,
+        '-d', fullMessage,
+        `https://ntfy.sh/${channel}`
+      ]);
+    } catch (error) {
+      this.logger.log(`Failed to send notification: ${error.message}`);
+    }
+  }
+
   // --- Nodes ---
 
   async coder(state) {
@@ -349,6 +400,8 @@ export class WorkflowManager {
       const { output: unitOutput, exitCode } = await this.runCommand('npm', ['test']);
       
       if (exitCode !== 0 || unitOutput.includes('FAIL') || unitOutput.includes('failed')) {
+         const message = retry_count >= 3 ? "Max retries exceeded. Aborting." : "Unit tests failed. Returning to coder.";
+         await this.notify("Workflow: Tests Failed", message, 4);
          // Increment retry count on failure
          return { 
              test_output: "FAIL (Unit):\n" + unitOutput,
@@ -405,6 +458,11 @@ export class WorkflowManager {
     const isApproved = /\bAPPROVED\b/i.test(reviewContent);
     this.logger.log(`\nReview decision: ${isApproved ? "Approved" : "Rejected"}`);
     
+    if (!isApproved) {
+      const message = retry_count >= 3 ? "Max retries exceeded. Aborting." : "Reviewer rejected the implementation. Returning to coder.";
+      await this.notify("Workflow: Review Rejected", message, 4);
+    }
+
     // If rejected, increment retry count
     return { 
       review_status: isApproved ? "approved" : "rejected",
@@ -433,6 +491,8 @@ export class WorkflowManager {
       const { output: statusOutput } = await this.runCommand('git', ['status', '--porcelain']);
       if (statusOutput.trim()) {
         this.logger.log("Uncommitted changes found. Returning to coder to finalize commits.");
+        const message = retry_count >= 3 ? "Max retries exceeded. Aborting due to uncommitted changes." : "Uncommitted changes found. Returning to coder.";
+        await this.notify("Workflow: Uncommitted Changes", message, 4);
         return { 
           review_status: "needs_commit",
           messages: [new SystemMessage("Uncommitted changes found. Please ensure all changes are committed before creating a PR.")],
@@ -458,6 +518,7 @@ export class WorkflowManager {
           const prUrl = urlMatch ? urlMatch[0] : "existing PR";
           return { 
             review_status: "pr_created",
+            pr_url: prUrl,
             messages: [new SystemMessage(`PR already exists: ${prUrl}`)]
           };
         }
@@ -467,10 +528,13 @@ export class WorkflowManager {
 
       return { 
         review_status: "pr_created",
+        pr_url: prOutput.trim(),
         messages: [new SystemMessage(`PR Created: ${prOutput.trim()}`)]
       };
     } catch (error) {
       this.logger.log(`Error in PR creation: ${error.message}`);
+      const message = retry_count >= 3 ? "Max retries exceeded. Aborting." : `Failed to create PR: ${error.message}`;
+      await this.notify("Workflow: PR Failed", message, 5);
       return { 
         review_status: "pr_failed",
         messages: [new SystemMessage(`Failed to create PR: ${error.message}`)],
@@ -600,6 +664,12 @@ export class WorkflowManager {
 
 // CLI Entry Point
 if (process.argv[1] === __filename) {
+  if (!process.env.NTFY_CHANNEL) {
+    console.error("Error: NTFY_CHANNEL environment variable is not defined.");
+    console.error("This is required for workflow notifications. Please set it in your environment or .env file.");
+    process.exit(1);
+  }
+
   const args = process.argv.slice(2);
   let startNode = "coder";
   let verbose = false;
@@ -624,26 +694,37 @@ if (process.argv[1] === __filename) {
 
   const workflow = new WorkflowManager(console, startNode, verbose);
   console.log(`Starting workflow at node: ${startNode}`);
-  workflow.run(prompt).then((result) => {
+  workflow.run(prompt).then(async (result) => {
     // Check final state for success
     if (result.review_status === "pr_created") {
-        console.log("Workflow completed successfully. PR created.");
+        const msg = `Workflow completed successfully. PR created: ${result.pr_url || "N/A"}`;
+        console.log(msg);
+        await workflow.notify("Workflow: Success", msg, 3);
         process.exit(0);
     } else if (result.review_status === "pr_skipped") {
-        console.log("Workflow completed successfully. PR skipped (not on a feature branch).");
+        const msg = "Workflow completed successfully. PR skipped (not on a feature branch).";
+        console.log(msg);
+        await workflow.notify("Workflow: Success", msg, 3);
         process.exit(0);
     } else if (result.review_status === "pr_failed") {
-        console.error("Workflow completed code/tests but failed to create PR.");
+        const msg = "Workflow completed code/tests but failed to create PR.";
+        console.error(msg);
+        await workflow.notify("Workflow: PR Failed", msg, 5);
         process.exit(1);
     } else if (result.review_status === "approved" && (!result.test_output || result.test_output.includes("PASS"))) {
-        console.log("Workflow completed successfully (no PR).");
+        const msg = "Workflow completed successfully (no PR).";
+        console.log(msg);
+        await workflow.notify("Workflow: Success", msg, 3);
         process.exit(0);
     } else {
-        console.error("Workflow failed to converge.");
+        const msg = "Workflow failed to converge.";
+        console.error(msg);
+        await workflow.notify("Workflow: Failed", msg, 5);
         process.exit(1);
     }
-  }).catch(err => {
+  }).catch(async err => {
     console.error("Workflow failed:", err);
+    await workflow.notify("Workflow: Error", `Workflow failed with error: ${err.message}`, 5);
     process.exit(1);
   });
 }
