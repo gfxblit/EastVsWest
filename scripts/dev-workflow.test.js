@@ -59,7 +59,7 @@ describe('WorkflowManager', () => {
     mockStateGraphInstance.setEntryPoint.mockClear();
     mockSpawn.mockClear();
     
-    workflow = new WorkflowManager();
+    workflow = new WorkflowManager({ log: () => {} });
   });
 
   test('should create a state graph with all required nodes', () => {
@@ -112,27 +112,67 @@ describe('WorkflowManager', () => {
     expect(result.messages[0].content).toBe('Mocked Code Response');
   });
 
-  test('should run tests via npm test', async () => {
-    // Setup mock spawn to emit data
+  test('should include test failure in coder prompt', async () => {
+    // Setup mock spawn
     const mockChild = new EventEmitter();
     mockChild.stdout = new EventEmitter();
     mockChild.stderr = new EventEmitter();
     mockSpawn.mockReturnValue(mockChild);
 
+    // Trigger coder with failed state
+    const state = { 
+        messages: [{ content: 'Fix bug' }], 
+        test_output: "FAIL: Something broke",
+        review_status: "pending"
+    };
+    const coderPromise = workflow.coder(state);
+
+    setTimeout(() => {
+      mockChild.stdout.emit('data', Buffer.from('Mocked Response'));
+      mockChild.emit('close', 0);
+    }, 10);
+
+    await coderPromise;
+    
+    expect(mockSpawn).toHaveBeenCalled();
+    const args = mockSpawn.mock.calls[0];
+    expect(args[1][args[1].length - 1]).toContain('Your previous implementation failed tests');
+    expect(args[1][args[1].length - 1]).toContain('FAIL: Something broke');
+  });
+
+  test('should run tests via npm test and npm run test:e2e', async () => {
+    // Setup mock spawn to emit data for two calls
+    const mockChild1 = new EventEmitter();
+    mockChild1.stdout = new EventEmitter();
+    mockChild1.stderr = new EventEmitter();
+    
+    const mockChild2 = new EventEmitter();
+    mockChild2.stdout = new EventEmitter();
+    mockChild2.stderr = new EventEmitter();
+
+    mockSpawn
+      .mockReturnValueOnce(mockChild1)
+      .mockReturnValueOnce(mockChild2);
+
     const testPromise = workflow.testRunner({ retry_count: 0 });
 
-    // Simulate passing tests
+    // Simulate passing unit tests
     setTimeout(() => {
-        mockChild.stdout.emit('data', Buffer.from('Test Suites: 1 passed, 1 total'));
-        mockChild.emit('close', 0);
+        mockChild1.stdout.emit('data', Buffer.from('Test Suites: 1 passed, 1 total'));
+        mockChild1.emit('close', 0);
     }, 10);
+
+    // Simulate passing e2e tests
+    setTimeout(() => {
+        mockChild2.stdout.emit('data', Buffer.from('PASS e2e'));
+        mockChild2.emit('close', 0);
+    }, 20);
 
     const result = await testPromise;
 
-    expect(mockSpawn).toHaveBeenCalled();
-    const args = mockSpawn.mock.calls[0];
-    expect(args[0]).toBe('npm');
-    expect(args[1]).toEqual(['test']);
+    expect(mockSpawn).toHaveBeenCalledTimes(2);
+    expect(mockSpawn.mock.calls[0][1]).toEqual(['test']);
+    expect(mockSpawn.mock.calls[1][1]).toEqual(['run', 'test:e2e']);
     expect(result.test_output).toBe('PASS');
   });
 
@@ -155,6 +195,8 @@ describe('WorkflowManager', () => {
  
      expect(result.test_output).toContain('FAIL');
      expect(result.retry_count).toBe(2);
+     expect(result.messages).toHaveLength(1);
+     expect(result.messages[0].content).toContain('Tests failed (Unit)');
   });
 
   test('should parse "APPROVED" from reviewer', async () => {

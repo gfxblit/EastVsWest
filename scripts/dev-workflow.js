@@ -85,8 +85,9 @@ const agentStateChannels = {
  * Uses the `gemini` CLI tool for LLM inference instead of direct API calls.
  */
 export class WorkflowManager {
-  constructor() {
+  constructor(logger = console) {
     this.graph = null;
+    this.logger = logger;
   }
 
   // --- Helpers ---
@@ -108,7 +109,7 @@ export class WorkflowManager {
       
       child.stdout.on('data', (data) => {
         const chunk = data.toString();
-        process.stdout.write(chunk);
+        this.logger.log(chunk);
         fullOutput += chunk;
       });
 
@@ -155,7 +156,7 @@ export class WorkflowManager {
 
       child.stdout.on('data', (data) => {
         const chunk = data.toString();
-        process.stdout.write(chunk); // Stream to console
+        this.logger.log(chunk); // Stream to console
         fullOutput += chunk;
       });
 
@@ -213,19 +214,36 @@ export class WorkflowManager {
   // --- Nodes ---
 
   async coder(state) {
-    const { messages } = state;
-    console.log("--- Coder Node ---");
+    const { messages, test_output, review_status } = state;
+    this.logger.log("--- Coder Node ---");
     
-    // Extract the user's initial request or latest human message
-    const lastMessage = messages[messages.length - 1];
-    const userRequest = lastMessage.content;
-
-    const systemPrompt = `You are a software engineer. Implement the following request: ${userRequest}. 
+    // Extract the user's initial request (always the first message)
+    const initialRequest = messages[0].content;
+    
+    let systemPrompt = `You are a software engineer. Implement the following request: ${initialRequest}. 
     You have access to the file system.
     Please output the code changes in markdown blocks.`;
+
+    // Add context from failures if applicable
+    if (test_output && (test_output.includes("FAIL") || test_output.includes("failed"))) {
+        systemPrompt = `Your previous implementation failed tests. 
+        
+        TEST OUTPUT:
+        ${test_output}
+        
+        Please fix the code to satisfy the tests and the original request: ${initialRequest}`;
+    } else if (review_status === "rejected") {
+        const lastMessage = messages[messages.length - 1];
+        systemPrompt = `Your previous implementation was rejected by the reviewer.
+        
+        REVIEWER FEEDBACK:
+        ${lastMessage.content}
+        
+        Please fix the code to satisfy the reviewer and the original request: ${initialRequest}`;
+    }
     
     const codeContent = await this.invokeGemini(systemPrompt, ['--yolo']);
-    console.log("\nCoding complete.");
+    this.logger.log("\nCoding complete.");
 
     return { 
       code_status: "coded",
@@ -234,19 +252,34 @@ export class WorkflowManager {
   }
 
   async testRunner(state) {
-    console.log("--- Test Runner Node ---");
+    this.logger.log("--- Test Runner Node ---");
     const { retry_count } = state;
     
     // Run tests
     try {
-      console.log("Running npm test...");
-      const output = await this.runCommand('npm', ['test']);
+      this.logger.log("Running npm test...");
+      const unitOutput = await this.runCommand('npm', ['test']);
       
-      if (output.includes('FAIL') || output.includes('failed')) {
+      if (unitOutput.includes('FAIL') || unitOutput.includes('failed')) {
          // Increment retry count on failure
          return { 
-             test_output: "FAIL:\n" + output,
-             retry_count: retry_count + 1
+             test_output: "FAIL (Unit):\n" + unitOutput,
+             retry_count: retry_count + 1,
+             messages: [new SystemMessage("Tests failed (Unit):\n" + unitOutput)]
+         };
+      }
+
+      this.logger.log("Running npm run test:e2e...");
+      const e2eOutput = await this.runCommand('npm', ['run', 'test:e2e']);
+      
+      // Check for failures in E2E
+      // Check for "FAIL", "failed" (Jest) and "npm ERR!" (Script exit code != 0)
+      if (e2eOutput.includes('FAIL') || e2eOutput.includes('failed') || e2eOutput.includes('npm ERR!')) {
+         // Increment retry count on failure
+         return { 
+             test_output: "FAIL (E2E):\n" + e2eOutput,
+             retry_count: retry_count + 1,
+             messages: [new SystemMessage("Tests failed (E2E):\n" + e2eOutput)]
          };
       }
       
@@ -261,7 +294,7 @@ export class WorkflowManager {
 
   async reviewer(state) {
     const { messages, test_output, retry_count } = state;
-    console.log("--- Reviewer Node ---");
+    this.logger.log("--- Reviewer Node ---");
     
     if (!test_output.includes("PASS")) {
        return { 
@@ -279,7 +312,7 @@ export class WorkflowManager {
     
     // Strict check for "APPROVED" at the start of the response
     const isApproved = reviewContent.trim().toUpperCase().startsWith("APPROVED");
-    console.log(`\nReview decision: ${isApproved ? "Approved" : "Rejected"}`);
+    this.logger.log(`\nReview decision: ${isApproved ? "Approved" : "Rejected"}`);
     
     // If rejected, increment retry count
     return { 
@@ -292,13 +325,13 @@ export class WorkflowManager {
   // --- Conditional Logic ---
   
   shouldContinueFromTest(state) {
-    if (state.test_output && state.test_output.includes("PASS")) {
+    if (state.test_output === "PASS") {
       return "reviewer";
     }
     
     // Check retries
     if (state.retry_count > 3) {
-      console.log("Max retries exceeded. Aborting.");
+      this.logger.log("Max retries exceeded. Aborting.");
       return END;
     }
     
@@ -312,7 +345,7 @@ export class WorkflowManager {
     
     // Check retries
     if (state.retry_count > 3) {
-      console.log("Max retries exceeded. Aborting.");
+      this.logger.log("Max retries exceeded. Aborting.");
       return END;
     }
     
