@@ -49,7 +49,7 @@ describe('WorkflowManager', () => {
     mockStateGraphInstance.setEntryPoint.mockClear();
     mockSpawn.mockClear();
     
-    workflow = new WorkflowManager({ log: () => {} });
+    workflow = new WorkflowManager({ log: () => {} }, "coder");
   });
 
   test('should create a state graph with all required nodes', () => {
@@ -58,6 +58,28 @@ describe('WorkflowManager', () => {
     expect(mockStateGraphInstance.addNode).toHaveBeenCalledWith('test_runner', expect.any(Function));
     expect(mockStateGraphInstance.addNode).toHaveBeenCalledWith('reviewer', expect.any(Function));
     expect(mockStateGraphInstance.addNode).toHaveBeenCalledWith('pr_creator', expect.any(Function));
+  });
+
+  test('should allow custom entry point', () => {
+    workflow = new WorkflowManager({ log: () => {} }, "reviewer");
+    workflow.createGraph();
+    
+    const edges = mockStateGraphInstance.addEdge.mock.calls;
+    expect(edges).toEqual(expect.arrayContaining([
+      ['START', 'reviewer']
+    ]));
+  });
+
+  test('should fallback to coder for invalid entry point and log valid nodes', () => {
+    const logs = [];
+    workflow = new WorkflowManager({ log: (msg) => logs.push(msg) }, "invalid");
+    workflow.createGraph();
+    
+    const edges = mockStateGraphInstance.addEdge.mock.calls;
+    expect(edges).toEqual(expect.arrayContaining([
+      ['START', 'coder']
+    ]));
+    expect(logs.some(l => l.includes('Valid nodes are: coder, test_runner, reviewer, pr_creator'))).toBe(true);
   });
 
   test('should execute the workflow', async () => {
@@ -316,14 +338,57 @@ describe('WorkflowManager', () => {
       const promise = workflow.runCommand('ls');
 
       setTimeout(() => {
-        // Red color: \x1B[31m
-        mockChild.stdout.emit('data', Buffer.from('\x1B[31mRed Text\x1B[0m'));
-        mockChild.emit('close', 0);
-      }, 10);
-
-      const result = await promise;
-      
-      expect(result.output).toBe('Red Text');
-    });
-  });
-});
+              // Red color: \x1B[31m
+              mockChild.stdout.emit('data', Buffer.from('\x1B[31mRed Text\x1B[0m'));
+              mockChild.emit('close', 0);
+            }, 10);
+        
+            const result = await promise;
+            
+            expect(result.output).toBe('Red Text');
+          });
+        
+          describe('Verbose Logging', () => {
+            test('coder node should log system prompt when verbose is true', async () => {
+              const logs = [];
+              const mockChild = new EventEmitter();
+              mockChild.stdout = new EventEmitter();
+              mockChild.stderr = new EventEmitter();
+              mockSpawn.mockReturnValue(mockChild);
+        
+              const verboseWorkflow = new WorkflowManager({ log: (msg) => logs.push(msg) }, "coder", true);
+              const coderPromise = verboseWorkflow.coder({ messages: [{ content: 'Test prompt' }] });
+        
+              setTimeout(() => {
+                mockChild.stdout.emit('data', Buffer.from('Response'));
+                mockChild.emit('close', 0);
+              }, 10);
+        
+              await coderPromise;
+              expect(logs.some(l => l.includes('[VERBOSE] Coder System Prompt'))).toBe(true);
+            });
+        
+            test('reviewer node should log system prompt when verbose is true', async () => {
+              const logs = [];
+              const mockChild = new EventEmitter();
+              mockChild.stdout = new EventEmitter();
+              mockChild.stderr = new EventEmitter();
+              mockSpawn.mockReturnValue(mockChild);
+        
+              const verboseWorkflow = new WorkflowManager({ log: (msg) => logs.push(msg) }, "reviewer", true);
+              const reviewPromise = verboseWorkflow.reviewer({ 
+                test_output: "PASS", 
+                retry_count: 0,
+                messages: [] 
+              });
+        
+              setTimeout(() => {
+                mockChild.stdout.emit('data', Buffer.from('APPROVED'));
+                mockChild.emit('close', 0);
+              }, 10);
+        
+              await reviewPromise;
+              expect(logs.some(l => l.includes('[VERBOSE] Reviewer System Prompt'))).toBe(true);
+            });
+          });
+        });});

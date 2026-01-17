@@ -91,9 +91,11 @@ const agentStateChannels = {
  * Uses the `gemini` CLI tool for LLM inference instead of direct API calls.
  */
 export class WorkflowManager {
-  constructor(logger = console) {
+  constructor(logger = console, startNode = "coder", verbose = false) {
     this.graph = null;
     this.logger = logger;
+    this.startNode = startNode;
+    this.verbose = verbose;
   }
 
   // --- Helpers ---
@@ -315,7 +317,13 @@ export class WorkflowManager {
         ${lastMessage.content}
         
         Please fix the code to satisfy the reviewer and the original request: ${initialRequest}.
-        Make sure to commit your fixes.`;
+        Original request: ${initialRequest}`;
+    }
+    
+    if (this.verbose) {
+      this.logger.log("\n--- [VERBOSE] Coder System Prompt ---");
+      this.logger.log(systemPrompt);
+      this.logger.log("------------------------------------\n");
     }
 
     const codeContent = await this.invokeGemini(systemPrompt, ['--yolo']);
@@ -372,6 +380,12 @@ export class WorkflowManager {
     If the code looks correct, safe, and follows the requirements, output "APPROVED". 
     Otherwise, output "REJECTED" followed by a concise explanation of why.`;
     
+    if (this.verbose) {
+      this.logger.log("\n--- [VERBOSE] Reviewer System Prompt ---");
+      this.logger.log(systemPrompt);
+      this.logger.log("--------------------------------------\n");
+    }
+
     const reviewContent = await this.invokeGemini(systemPrompt, ['--yolo']);
     
     // Flexible check for "APPROVED" as a standalone word in the response
@@ -482,7 +496,16 @@ export class WorkflowManager {
     workflow.addNode("pr_creator", this.prCreator.bind(this));
 
     // Add Edges
-    workflow.addEdge(START, "coder");
+    const validNodes = ["coder", "test_runner", "reviewer", "pr_creator"];
+    const entryNode = validNodes.includes(this.startNode) ? this.startNode : "coder";
+    
+    if (entryNode !== this.startNode) {
+      this.logger.log(`Warning: Invalid start node "${this.startNode}".`);
+      this.logger.log(`Valid nodes are: ${validNodes.join(", ")}`);
+      this.logger.log(`Falling back to "coder".`);
+    }
+
+    workflow.addEdge(START, entryNode);
     
     workflow.addEdge("coder", "test_runner");
 
@@ -525,7 +548,9 @@ export class WorkflowManager {
     
     const initialState = {
       messages: [new HumanMessage(input)],
-      retry_count: 0
+      retry_count: 0,
+      test_output: (this.startNode === "reviewer" || this.startNode === "pr_creator") ? "" : "",
+      review_status: this.startNode === "pr_creator" ? "approved" : "pending"
     };
 
     return await this.graph.invoke(initialState);
@@ -534,13 +559,30 @@ export class WorkflowManager {
 
 // CLI Entry Point
 if (process.argv[1] === __filename) {
-  const prompt = process.argv[2];
-  if (!prompt) {
-    console.error("Please provide a prompt argument.");
-    process.exit(1);
+  const args = process.argv.slice(2);
+  let startNode = "coder";
+  let verbose = false;
+  let promptParts = [];
+
+  for (let i = 0; i < args.length; i++) {
+    if ((args[i] === "--start" || args[i] === "-s") && i + 1 < args.length) {
+      startNode = args[i+1];
+      i++; // Skip the next arg
+    } else if (args[i] === "--verbose" || args[i] === "-v") {
+      verbose = true;
+    } else {
+      promptParts.push(args[i]);
+    }
   }
 
-  const workflow = new WorkflowManager();
+  const prompt = promptParts.join(" ") || "Continue development and verify implementation.";
+
+  if (args.length === 0) {
+    console.log("Usage: node scripts/dev-workflow.js [-s coder|test_runner|reviewer|pr_creator] [-v|--verbose] [prompt]");
+  }
+
+  const workflow = new WorkflowManager(console, startNode, verbose);
+  console.log(`Starting workflow at node: ${startNode}`);
   workflow.run(prompt).then((result) => {
     // Check final state for success
     if (result.review_status === "pr_created") {
