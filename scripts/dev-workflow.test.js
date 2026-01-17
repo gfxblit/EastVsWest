@@ -70,12 +70,18 @@ describe('WorkflowManager', () => {
     expect(addedNodes).toContain('coder');
     expect(addedNodes).toContain('test_runner');
     expect(addedNodes).toContain('reviewer');
+    expect(addedNodes).toContain('pr_creator');
 
     // Verify Edges (Simplified flow)
     const edges = mockStateGraphInstance.addEdge.mock.calls;
     expect(edges).toEqual(expect.arrayContaining([
       ['START', 'coder'],
       ['coder', 'test_runner']
+    ]));
+
+    const conditionalEdges = mockStateGraphInstance.addConditionalEdges.mock.calls;
+    expect(conditionalEdges).toEqual(expect.arrayContaining([
+      ['pr_creator', expect.any(Function), expect.objectContaining({ coder: 'coder', END: 'END' })]
     ]));
   });
 
@@ -196,7 +202,7 @@ describe('WorkflowManager', () => {
        mockChild.stderr = new EventEmitter();
        mockSpawn.mockReturnValue(mockChild);
    
-       const reviewPromise = workflow.reviewer({ 
+       const reviewPromise = workflow.reviewer({
            test_output: "PASS", 
            retry_count: 0 
        });
@@ -218,7 +224,7 @@ describe('WorkflowManager', () => {
        mockChild.stderr = new EventEmitter();
        mockSpawn.mockReturnValue(mockChild);
    
-       const reviewPromise = workflow.reviewer({ 
+       const reviewPromise = workflow.reviewer({
            test_output: "PASS", 
            retry_count: 0 
        });
@@ -232,6 +238,109 @@ describe('WorkflowManager', () => {
        expect(result.review_status).toBe('rejected');
        expect(result.retry_count).toBe(1);
     });
+
+    test('should push changes and create PR in prCreator', async () => {
+      // Setup mock spawn for git and gh commands
+      mockSpawn.mockImplementation((cmd, args) => {
+        const mockChild = new EventEmitter();
+        mockChild.stdout = new EventEmitter();
+        mockChild.stderr = new EventEmitter();
+        
+        setTimeout(() => {
+          if (cmd === 'git' && args[0] === 'branch') {
+            mockChild.stdout.emit('data', Buffer.from('feature-branch\n'));
+          } else if (cmd === 'git' && args[0] === 'status') {
+            mockChild.stdout.emit('data', Buffer.from('')); // No changes
+          } else if (cmd === 'git' && args[0] === 'push') {
+            mockChild.stdout.emit('data', Buffer.from('Everything up-to-date\n'));
+          } else if (cmd === 'gh' && args[0] === 'pr') {
+            mockChild.stdout.emit('data', Buffer.from('https://github.com/org/repo/pull/1\n'));
+          }
+          mockChild.emit('close', 0);
+        }, 1);
+        
+        return mockChild;
+      });
+
+      const result = await workflow.prCreator({});
+      
+      expect(mockSpawn).toHaveBeenCalledWith('git', ['branch', '--show-current'], expect.anything());
+      expect(result.review_status).toBe('pr_created');
+      expect(result.messages[0].content).toContain('PR Created');
+    });
+
+    test('should skip PR creation if on main branch', async () => {
+      mockSpawn.mockImplementation((cmd, args) => {
+        const mockChild = new EventEmitter();
+        mockChild.stdout = new EventEmitter();
+        mockChild.stderr = new EventEmitter();
+        
+        setTimeout(() => {
+          if (cmd === 'git' && args[0] === 'branch') {
+            mockChild.stdout.emit('data', Buffer.from('main\n'));
+          }
+          mockChild.emit('close', 0);
+        }, 1);
+        
+        return mockChild;
+      });
+
+      const result = await workflow.prCreator({});
+      expect(result.review_status).toBe('pr_skipped');
+    });
+
+    test('should report failure if gh pr create fails', async () => {
+      mockSpawn.mockImplementation((cmd, args) => {
+        const mockChild = new EventEmitter();
+        mockChild.stdout = new EventEmitter();
+        mockChild.stderr = new EventEmitter();
+        
+        setTimeout(() => {
+          if (cmd === 'git' && args[0] === 'branch') {
+            mockChild.stdout.emit('data', Buffer.from('feature-branch\n'));
+          } else if (cmd === 'git' && args[0] === 'status') {
+            mockChild.stdout.emit('data', Buffer.from(''));
+          } else if (cmd === 'git' && args[0] === 'push') {
+            mockChild.emit('close', 0);
+          } else if (cmd === 'gh' && args[0] === 'pr') {
+            mockChild.stdout.emit('data', Buffer.from('error: could not create PR\n'));
+            mockChild.emit('close', 1);
+          }
+          mockChild.emit('close', 0);
+        }, 1);
+        
+        return mockChild;
+      });
+
+      const result = await workflow.prCreator({});
+      expect(result.review_status).toBe('pr_failed');
+      expect(result.messages[0].content).toContain('Failed to create PR');
+    });
+
+    test('should return needs_commit in prCreator if changes are uncommitted', async () => {
+      mockSpawn.mockImplementation((cmd, args) => {
+        const mockChild = new EventEmitter();
+        mockChild.stdout = new EventEmitter();
+        mockChild.stderr = new EventEmitter();
+        
+        setTimeout(() => {
+          if (cmd === 'git' && args[0] === 'branch') {
+            mockChild.stdout.emit('data', Buffer.from('feature-branch\n'));
+          } else if (cmd === 'git' && args[0] === 'status') {
+            mockChild.stdout.emit('data', Buffer.from('M somefile.js\n'));
+          }
+          mockChild.emit('close', 0);
+        }, 1);
+        
+        return mockChild;
+      });
+
+      const result = await workflow.prCreator({});
+      
+      expect(result.review_status).toBe('needs_commit');
+      expect(result.messages[0].content).toContain('Uncommitted changes found');
+    });
+
   describe('Tools', () => {
     test('readFile should call fs.readFile', async () => {
       const result = await workflow.readFile('test.txt');
@@ -259,8 +368,8 @@ describe('WorkflowManager', () => {
       expect(workflow.shouldContinueFromTest({ test_output: 'FAIL: error', retry_count: 4 })).toBe('END');
     });
 
-    test('shouldContinueFromReview returns END on approved', () => {
-      expect(workflow.shouldContinueFromReview({ review_status: 'approved', retry_count: 0 })).toBe('END');
+    test('shouldContinueFromReview returns pr_creator on approved', () => {
+      expect(workflow.shouldContinueFromReview({ review_status: 'approved', retry_count: 0 })).toBe('pr_creator');
     });
 
     test('shouldContinueFromReview returns coder on rejected with retries < 4', () => {
@@ -269,6 +378,16 @@ describe('WorkflowManager', () => {
 
     test('shouldContinueFromReview returns END on rejected with retries > 3', () => {
       expect(workflow.shouldContinueFromReview({ review_status: 'rejected', retry_count: 4 })).toBe('END');
+    });
+
+    test('shouldContinueFromPrCreator returns END on pr_created or pr_skipped', () => {
+      expect(workflow.shouldContinueFromPrCreator({ review_status: 'pr_created' })).toBe('END');
+      expect(workflow.shouldContinueFromPrCreator({ review_status: 'pr_skipped' })).toBe('END');
+    });
+
+    test('shouldContinueFromPrCreator returns coder on needs_commit or pr_failed', () => {
+      expect(workflow.shouldContinueFromPrCreator({ review_status: 'needs_commit' })).toBe('coder');
+      expect(workflow.shouldContinueFromPrCreator({ review_status: 'pr_failed' })).toBe('coder');
     });
   });
 });
