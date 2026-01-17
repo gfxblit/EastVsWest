@@ -25,7 +25,7 @@ const DEFAULT_MODELS = [
  * @param {Array} next - New messages to append.
  * @returns {Array} The updated message history.
  */
-const aggregateMessages = (current, next) => current.concat(next);
+export const aggregateMessages = (current, next) => current.concat(next);
 
 /**
  * Updates the state with the latest value. 
@@ -34,7 +34,7 @@ const aggregateMessages = (current, next) => current.concat(next);
  * @param {any} next - New value.
  * @returns {any} The updated value.
  */
-const updateLatest = (current, next) => next ? next : current;
+export const updateLatest = (current, next) => next !== undefined ? next : current;
 
 // Define the state channels with clear descriptions
 const agentStateChannels = {
@@ -91,12 +91,49 @@ const agentStateChannels = {
  * Uses the `gemini` CLI tool for LLM inference instead of direct API calls.
  */
 export class WorkflowManager {
-  constructor(logger = console) {
+  constructor(logger = console, startNode = "coder", verbose = false) {
     this.graph = null;
     this.logger = logger;
+    this.startNode = startNode;
+    this.verbose = verbose;
   }
 
   // --- Helpers ---
+
+  /**
+   * Streams a chunk of output to the configured logger.
+   * Handles direct stdout writing for console to avoid extra newlines.
+   * @param {string} chunk - The cleaned output chunk.
+   * @private
+   */
+  _streamOutput(chunk) {
+    if (!chunk) return;
+    if (this.logger === console) {
+      process.stdout.write(chunk);
+    } else {
+      this.logger.log(chunk);
+    }
+  }
+
+  /**
+   * Cleans a chunk of output by removing null bytes, non-printable control 
+   * characters, and other disruptive symbols that can break terminal 
+   * rendering or confuse LLM context. Preserves Tabs, Newlines, and CR.
+   * @param {string} chunk - The raw output chunk.
+   * @returns {string} The cleaned chunk.
+   * @private
+   */
+  _cleanChunk(chunk) {
+    if (typeof chunk !== 'string') return chunk;
+    
+    // Remove ANSI escape codes (e.g., colors) to avoid leaving junk like [31m
+    // This matches the most common CSI (Control Sequence Introducer) sequences
+    const withoutAnsi = chunk.replace(/\x1B\[[0-9;]*[a-zA-Z]/g, '');
+
+    // Remove disruptive control characters, including null bytes (\x00).
+    // Matches \x00-\x08, \x0B-\x0C, \x0E-\x1F, \x7F (excluding \x09 TAB, \x0A LF, \x0D CR)
+    return withoutAnsi.replace(/[\x00-\x08\x0B\x0C\x0E-\x1F\x7F]/g, '');
+  }
 
   /**
    * Invokes a shell command and streams output to stdout.
@@ -114,16 +151,19 @@ export class WorkflowManager {
       let fullOutput = '';
       
       child.stdout.on('data', (data) => {
-        const chunk = data.toString();
-        this.logger.log(chunk);
-        fullOutput += chunk;
+        const chunk = this._cleanChunk(data.toString());
+        if (chunk) {
+          this._streamOutput(chunk);
+          fullOutput += chunk;
+        }
       });
 
       child.stderr.on('data', (data) => {
-        const chunk = data.toString();
-        // Do not stream stderr to console to avoid noise (e.g. tool logs)
-        // process.stderr.write(chunk); 
-        fullOutput += chunk;
+        const chunk = this._cleanChunk(data.toString());
+        if (chunk) {
+          // Do not stream stderr to console to avoid noise (e.g. tool logs)
+          fullOutput += chunk;
+        }
       });
 
       child.on('close', (code) => {
@@ -186,16 +226,19 @@ export class WorkflowManager {
       let errorOutput = '';
 
       child.stdout.on('data', (data) => {
-        const chunk = data.toString();
-        this.logger.log(chunk); // Stream to console
-        fullOutput += chunk;
+        const chunk = this._cleanChunk(data.toString());
+        if (chunk) {
+          this._streamOutput(chunk); // Stream to console
+          fullOutput += chunk;
+        }
       });
 
       child.stderr.on('data', (data) => {
-        const chunk = data.toString();
-        // Do not stream stderr to console to avoid noise (e.g. tool logs)
-        // process.stderr.write(chunk); 
-        errorOutput += chunk;
+        const chunk = this._cleanChunk(data.toString());
+        if (chunk) {
+          // Do not stream stderr to console to avoid noise (e.g. tool logs)
+          errorOutput += chunk;
+        }
       });
 
       child.on('close', (code) => {
@@ -281,6 +324,12 @@ export class WorkflowManager {
         Original request: ${initialRequest}`;
     }
     
+    if (this.verbose) {
+      this.logger.log("\n--- [VERBOSE] Coder System Prompt ---");
+      this.logger.log(systemPrompt);
+      this.logger.log("------------------------------------\n");
+    }
+
     const codeContent = await this.invokeGemini(systemPrompt, ['--yolo']);
     this.logger.log("\nCoding complete.");
 
@@ -321,7 +370,7 @@ export class WorkflowManager {
     const { messages, test_output, retry_count } = state;
     this.logger.log("--- Reviewer Node ---");
     
-    if (!test_output.includes("PASS")) {
+    if (test_output && !test_output.includes("PASS")) {
        return { 
            review_status: "rejected", 
            messages: [new SystemMessage("Tests failed.")],
@@ -334,11 +383,22 @@ export class WorkflowManager {
     
     MANDATORY: You MUST activate the 'pr-reviewer' skill to perform a thorough review of the changes.
     
-    You SHOULD use git tools (like 'git log' and 'git diff') to examine the coder's commits and the changes made.
+    You MUST examine all commits and the full diff between the current branch and 'origin/main'.
+    Use tools like 'git log origin/main..HEAD' to see the commit history and 'git diff origin/main..HEAD' to review the code changes.
+    
+    You MUST evaluate commit granularity. Reject the implementation if:
+    1. Commits are too large: They bundle multiple unrelated tasks or ideas, making them difficult to review (cognitive overload).
+    2. Commits are too small: There are too many tiny, fragmented commits that lack independent value and should have been grouped or squashed.
     
     If the code looks correct, safe, and follows the requirements, output "APPROVED". 
     Otherwise, output "REJECTED" followed by a concise explanation of why.`;
     
+    if (this.verbose) {
+      this.logger.log("\n--- [VERBOSE] Reviewer System Prompt ---");
+      this.logger.log(systemPrompt);
+      this.logger.log("--------------------------------------\n");
+    }
+
     const reviewContent = await this.invokeGemini(systemPrompt, ['--yolo']);
     
     // Flexible check for "APPROVED" as a standalone word in the response
@@ -355,6 +415,7 @@ export class WorkflowManager {
 
   async prCreator(state) {
     this.logger.log("--- PR Creator Node ---");
+    const { retry_count } = state;
     
     try {
       // 1. Check if on a feature branch
@@ -374,7 +435,8 @@ export class WorkflowManager {
         this.logger.log("Uncommitted changes found. Returning to coder to finalize commits.");
         return { 
           review_status: "needs_commit",
-          messages: [new SystemMessage("Uncommitted changes found. Please ensure all changes are committed before creating a PR.")]
+          messages: [new SystemMessage("Uncommitted changes found. Please ensure all changes are committed before creating a PR.")],
+          retry_count: retry_count + 1
         };
       }
 
@@ -389,6 +451,16 @@ export class WorkflowManager {
       this.logger.log("Creating Pull Request...");
       const { output: prOutput, exitCode: prCode } = await this.runCommand('gh', ['pr', 'create', '--fill']);
       if (prCode !== 0) {
+        if (prOutput.includes("already exists")) {
+          this.logger.log("PR already exists. Treating as success.");
+          // Try to extract the URL from the error message
+          const urlMatch = prOutput.match(/https:\/\/github\.com\/[^\s]+/);
+          const prUrl = urlMatch ? urlMatch[0] : "existing PR";
+          return { 
+            review_status: "pr_created",
+            messages: [new SystemMessage(`PR already exists: ${prUrl}`)]
+          };
+        }
         throw new Error(`PR creation failed (exit ${prCode}): ${prOutput.trim()}`);
       }
       this.logger.log(`PR created: ${prOutput.trim()}`);
@@ -401,7 +473,8 @@ export class WorkflowManager {
       this.logger.log(`Error in PR creation: ${error.message}`);
       return { 
         review_status: "pr_failed",
-        messages: [new SystemMessage(`Failed to create PR: ${error.message}`)]
+        messages: [new SystemMessage(`Failed to create PR: ${error.message}`)],
+        retry_count: retry_count + 1
       };
     }
   }
@@ -441,6 +514,12 @@ export class WorkflowManager {
       return END;
     }
     
+    // Check retries to avoid infinite loops
+    if (state.retry_count > 3) {
+      this.logger.log("Max retries exceeded in PR Creator. Aborting.");
+      return END;
+    }
+
     // If pr_failed or needs_commit, return to coder
     this.logger.log(`PR Creator failed or needs commit (status: ${state.review_status}). Returning to coder.`);
     return "coder";
@@ -458,7 +537,16 @@ export class WorkflowManager {
     workflow.addNode("pr_creator", this.prCreator.bind(this));
 
     // Add Edges
-    workflow.addEdge(START, "coder");
+    const validNodes = ["coder", "test_runner", "reviewer", "pr_creator"];
+    const entryNode = validNodes.includes(this.startNode) ? this.startNode : "coder";
+    
+    if (entryNode !== this.startNode) {
+      this.logger.log(`Warning: Invalid start node "${this.startNode}".`);
+      this.logger.log(`Valid nodes are: ${validNodes.join(", ")}`);
+      this.logger.log(`Falling back to "coder".`);
+    }
+
+    workflow.addEdge(START, entryNode);
     
     workflow.addEdge("coder", "test_runner");
 
@@ -486,7 +574,6 @@ export class WorkflowManager {
       "pr_creator",
       this.shouldContinueFromPrCreator.bind(this),
       {
-        coder: "coder",
         [END]: END
       }
     );
@@ -502,7 +589,9 @@ export class WorkflowManager {
     
     const initialState = {
       messages: [new HumanMessage(input)],
-      retry_count: 0
+      retry_count: 0,
+      test_output: (this.startNode === "reviewer" || this.startNode === "pr_creator") ? "" : "",
+      review_status: this.startNode === "pr_creator" ? "approved" : "pending"
     };
 
     return await this.graph.invoke(initialState);
@@ -511,13 +600,30 @@ export class WorkflowManager {
 
 // CLI Entry Point
 if (process.argv[1] === __filename) {
-  const prompt = process.argv[2];
-  if (!prompt) {
-    console.error("Please provide a prompt argument.");
-    process.exit(1);
+  const args = process.argv.slice(2);
+  let startNode = "coder";
+  let verbose = false;
+  let promptParts = [];
+
+  for (let i = 0; i < args.length; i++) {
+    if ((args[i] === "--start" || args[i] === "-s") && i + 1 < args.length) {
+      startNode = args[i+1];
+      i++; // Skip the next arg
+    } else if (args[i] === "--verbose" || args[i] === "-v") {
+      verbose = true;
+    } else {
+      promptParts.push(args[i]);
+    }
   }
 
-  const workflow = new WorkflowManager();
+  const prompt = promptParts.join(" ") || "Continue development and verify implementation.";
+
+  if (args.length === 0) {
+    console.log("Usage: node scripts/dev-workflow.js [-s coder|test_runner|reviewer|pr_creator] [-v|--verbose] [prompt]");
+  }
+
+  const workflow = new WorkflowManager(console, startNode, verbose);
+  console.log(`Starting workflow at node: ${startNode}`);
   workflow.run(prompt).then((result) => {
     // Check final state for success
     if (result.review_status === "pr_created") {
