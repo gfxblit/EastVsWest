@@ -247,6 +247,8 @@ describe('WorkflowManager', () => {
             mockChild.stdout.emit('data', Buffer.from('feature-branch\n'));
           } else if (cmd === 'git' && args[0] === 'status') {
             mockChild.stdout.emit('data', Buffer.from('')); // No changes
+          } else if (cmd === 'git' && args[0] === 'push') {
+            mockChild.stdout.emit('data', Buffer.from('Everything up-to-date\n'));
           } else if (cmd === 'gh' && args[0] === 'pr') {
             mockChild.stdout.emit('data', Buffer.from('https://github.com/org/repo/pull/1\n'));
           }
@@ -259,8 +261,90 @@ describe('WorkflowManager', () => {
       const result = await workflow.prCreator({});
       
       expect(mockSpawn).toHaveBeenCalledWith('git', ['branch', '--show-current'], expect.anything());
-      expect(result.review_status).toBe('completed');
+      expect(result.review_status).toBe('pr_created');
       expect(result.messages[0].content).toContain('PR Created');
+    });
+
+    test('should skip PR creation if on main branch', async () => {
+      mockSpawn.mockImplementation((cmd, args) => {
+        const mockChild = new EventEmitter();
+        mockChild.stdout = new EventEmitter();
+        mockChild.stderr = new EventEmitter();
+        
+        setTimeout(() => {
+          if (cmd === 'git' && args[0] === 'branch') {
+            mockChild.stdout.emit('data', Buffer.from('main\n'));
+          }
+          mockChild.emit('close', 0);
+        }, 1);
+        
+        return mockChild;
+      });
+
+      const result = await workflow.prCreator({});
+      expect(result.review_status).toBe('pr_skipped');
+    });
+
+    test('should report failure if gh pr create fails', async () => {
+      mockSpawn.mockImplementation((cmd, args) => {
+        const mockChild = new EventEmitter();
+        mockChild.stdout = new EventEmitter();
+        mockChild.stderr = new EventEmitter();
+        
+        setTimeout(() => {
+          if (cmd === 'git' && args[0] === 'branch') {
+            mockChild.stdout.emit('data', Buffer.from('feature-branch\n'));
+          } else if (cmd === 'git' && args[0] === 'status') {
+            mockChild.stdout.emit('data', Buffer.from(''));
+          } else if (cmd === 'git' && args[0] === 'push') {
+            mockChild.emit('close', 0);
+          } else if (cmd === 'gh' && args[0] === 'pr') {
+            mockChild.stdout.emit('data', Buffer.from('error: could not create PR\n'));
+            mockChild.emit('close', 1);
+          }
+          mockChild.emit('close', 0);
+        }, 1);
+        
+        return mockChild;
+      });
+
+      const result = await workflow.prCreator({});
+      expect(result.review_status).toBe('pr_failed');
+      expect(result.messages[0].content).toContain('Failed to create PR');
+    });
+
+    test('should stage and commit uncommitted changes in prCreator', async () => {
+      mockSpawn.mockImplementation((cmd, args) => {
+        const mockChild = new EventEmitter();
+        mockChild.stdout = new EventEmitter();
+        mockChild.stderr = new EventEmitter();
+        
+        setTimeout(() => {
+          if (cmd === 'git' && args[0] === 'branch') {
+            mockChild.stdout.emit('data', Buffer.from('feature-branch\n'));
+          } else if (cmd === 'git' && args[0] === 'status') {
+            mockChild.stdout.emit('data', Buffer.from('M somefile.js\n'));
+          } else if (cmd === 'git' && args[0] === 'add') {
+            mockChild.emit('close', 0);
+          } else if (cmd === 'git' && args[0] === 'commit') {
+            mockChild.emit('close', 0);
+          } else if (cmd === 'git' && args[0] === 'push') {
+            mockChild.emit('close', 0);
+          } else if (cmd === 'gh' && args[0] === 'pr') {
+            mockChild.stdout.emit('data', Buffer.from('https://github.com/org/repo/pull/1\n'));
+            mockChild.emit('close', 0);
+          }
+          mockChild.emit('close', 0);
+        }, 1);
+        
+        return mockChild;
+      });
+
+      const result = await workflow.prCreator({});
+      
+      expect(mockSpawn).toHaveBeenCalledWith('git', ['add', '.'], expect.anything());
+      expect(mockSpawn).toHaveBeenCalledWith('git', ['commit', '-m', 'chore: finalize changes for PR'], expect.anything());
+      expect(result.review_status).toBe('pr_created');
     });
 
   describe('Tools', () => {

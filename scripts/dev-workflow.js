@@ -127,11 +127,7 @@ export class WorkflowManager {
       });
 
       child.on('close', (code) => {
-        if (code !== 0) {
-          resolve(fullOutput); 
-        } else {
-          resolve(fullOutput);
-        }
+        resolve({ output: fullOutput, exitCode: code });
       });
       
       child.on('error', (err) => {
@@ -297,9 +293,9 @@ export class WorkflowManager {
     // Run tests
     try {
       this.logger.log("Running npm test...");
-      const unitOutput = await this.runCommand('npm', ['test']);
+      const { output: unitOutput, exitCode } = await this.runCommand('npm', ['test']);
       
-      if (unitOutput.includes('FAIL') || unitOutput.includes('failed')) {
+      if (exitCode !== 0 || unitOutput.includes('FAIL') || unitOutput.includes('failed')) {
          // Increment retry count on failure
          return { 
              test_output: "FAIL (Unit):\n" + unitOutput,
@@ -358,17 +354,19 @@ export class WorkflowManager {
     
     try {
       // 1. Check if on a feature branch
-      const branchName = (await this.runCommand('git', ['branch', '--show-current'])).trim();
-      if (branchName === 'main' || branchName === 'master' || !branchName) {
+      const { output: branchOutput, exitCode: branchCode } = await this.runCommand('git', ['branch', '--show-current']);
+      const branchName = branchOutput.trim();
+      
+      if (branchCode !== 0 || branchName === 'main' || branchName === 'master' || !branchName) {
         this.logger.log("Not on a feature branch. Skipping PR creation.");
-        return { review_status: "completed" };
+        return { review_status: "pr_skipped" };
       }
 
       this.logger.log(`On feature branch: ${branchName}`);
 
-      // 2. Ensure all changes are committed (the coder should have done this, but let's be safe)
-      const status = await this.runCommand('git', ['status', '--porcelain']);
-      if (status.trim()) {
+      // 2. Ensure all changes are committed
+      const { output: statusOutput } = await this.runCommand('git', ['status', '--porcelain']);
+      if (statusOutput.trim()) {
         this.logger.log("Uncommitted changes found. Staging and committing...");
         await this.runCommand('git', ['add', '.']);
         await this.runCommand('git', ['commit', '-m', 'chore: finalize changes for PR']);
@@ -376,21 +374,27 @@ export class WorkflowManager {
 
       // 3. Push to origin
       this.logger.log("Pushing to origin...");
-      await this.runCommand('git', ['push', '-u', 'origin', branchName]);
+      const { output: pushOutput, exitCode: pushCode } = await this.runCommand('git', ['push', '-u', 'origin', branchName]);
+      if (pushCode !== 0) {
+        throw new Error(`Git push failed (exit ${pushCode}): ${pushOutput.trim()}`);
+      }
 
       // 4. Create PR
       this.logger.log("Creating Pull Request...");
-      const prOutput = await this.runCommand('gh', ['pr', 'create', '--fill']);
+      const { output: prOutput, exitCode: prCode } = await this.runCommand('gh', ['pr', 'create', '--fill']);
+      if (prCode !== 0) {
+        throw new Error(`PR creation failed (exit ${prCode}): ${prOutput.trim()}`);
+      }
       this.logger.log(`PR created: ${prOutput.trim()}`);
 
       return { 
-        review_status: "completed",
+        review_status: "pr_created",
         messages: [new SystemMessage(`PR Created: ${prOutput.trim()}`)]
       };
     } catch (error) {
       this.logger.log(`Error in PR creation: ${error.message}`);
       return { 
-        review_status: "completed",
+        review_status: "pr_failed",
         messages: [new SystemMessage(`Failed to create PR: ${error.message}`)]
       };
     }
@@ -493,9 +497,15 @@ if (process.argv[1] === __filename) {
   const workflow = new WorkflowManager();
   workflow.run(prompt).then((result) => {
     // Check final state for success
-    if (result.review_status === "completed") {
-        console.log("Workflow completed successfully with PR.");
+    if (result.review_status === "pr_created") {
+        console.log("Workflow completed successfully. PR created.");
         process.exit(0);
+    } else if (result.review_status === "pr_skipped") {
+        console.log("Workflow completed successfully. PR skipped (not on a feature branch).");
+        process.exit(0);
+    } else if (result.review_status === "pr_failed") {
+        console.error("Workflow completed code/tests but failed to create PR.");
+        process.exit(1);
     } else if (result.review_status === "approved" && (!result.test_output || result.test_output.includes("PASS"))) {
         console.log("Workflow completed successfully (no PR).");
         process.exit(0);
