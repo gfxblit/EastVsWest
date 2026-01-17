@@ -353,6 +353,49 @@ export class WorkflowManager {
     };
   }
 
+  async prCreator(state) {
+    this.logger.log("--- PR Creator Node ---");
+    
+    try {
+      // 1. Check if on a feature branch
+      const branchName = (await this.runCommand('git', ['branch', '--show-current'])).trim();
+      if (branchName === 'main' || branchName === 'master' || !branchName) {
+        this.logger.log("Not on a feature branch. Skipping PR creation.");
+        return { review_status: "completed" };
+      }
+
+      this.logger.log(`On feature branch: ${branchName}`);
+
+      // 2. Ensure all changes are committed (the coder should have done this, but let's be safe)
+      const status = await this.runCommand('git', ['status', '--porcelain']);
+      if (status.trim()) {
+        this.logger.log("Uncommitted changes found. Staging and committing...");
+        await this.runCommand('git', ['add', '.']);
+        await this.runCommand('git', ['commit', '-m', 'chore: finalize changes for PR']);
+      }
+
+      // 3. Push to origin
+      this.logger.log("Pushing to origin...");
+      await this.runCommand('git', ['push', '-u', 'origin', branchName]);
+
+      // 4. Create PR
+      this.logger.log("Creating Pull Request...");
+      const prOutput = await this.runCommand('gh', ['pr', 'create', '--fill']);
+      this.logger.log(`PR created: ${prOutput.trim()}`);
+
+      return { 
+        review_status: "completed",
+        messages: [new SystemMessage(`PR Created: ${prOutput.trim()}`)]
+      };
+    } catch (error) {
+      this.logger.log(`Error in PR creation: ${error.message}`);
+      return { 
+        review_status: "completed",
+        messages: [new SystemMessage(`Failed to create PR: ${error.message}`)]
+      };
+    }
+  }
+
   // --- Conditional Logic ---
   
   shouldContinueFromTest(state) {
@@ -371,7 +414,7 @@ export class WorkflowManager {
 
   shouldContinueFromReview(state) {
     if (state.review_status === "approved") {
-      return END;
+      return "pr_creator";
     }
     
     // Check retries
@@ -392,6 +435,7 @@ export class WorkflowManager {
     workflow.addNode("coder", this.coder.bind(this));
     workflow.addNode("test_runner", this.testRunner.bind(this));
     workflow.addNode("reviewer", this.reviewer.bind(this));
+    workflow.addNode("pr_creator", this.prCreator.bind(this));
 
     // Add Edges
     workflow.addEdge(START, "coder");
@@ -412,10 +456,13 @@ export class WorkflowManager {
       "reviewer",
       this.shouldContinueFromReview.bind(this),
       {
-        [END]: END,
-        coder: "coder"
+        pr_creator: "pr_creator",
+        coder: "coder",
+        [END]: END
       }
     );
+
+    workflow.addEdge("pr_creator", END);
 
     this.graph = workflow.compile();
     return this.graph;
@@ -446,8 +493,11 @@ if (process.argv[1] === __filename) {
   const workflow = new WorkflowManager();
   workflow.run(prompt).then((result) => {
     // Check final state for success
-    if (result.review_status === "approved" && (!result.test_output || result.test_output.includes("PASS"))) {
-        console.log("Workflow completed successfully.");
+    if (result.review_status === "completed") {
+        console.log("Workflow completed successfully with PR.");
+        process.exit(0);
+    } else if (result.review_status === "approved" && (!result.test_output || result.test_output.includes("PASS"))) {
+        console.log("Workflow completed successfully (no PR).");
         process.exit(0);
     } else {
         console.error("Workflow failed to converge.");
