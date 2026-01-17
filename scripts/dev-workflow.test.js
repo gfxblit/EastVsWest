@@ -181,14 +181,33 @@ describe('WorkflowManager', () => {
     expect(updateLatest(undefined, 0)).toBe(0);
   });
 
-  test('aggregateMessages should append messages', () => {
-    const current = ['a'];
-    const next = ['b', 'c'];
-    expect(aggregateMessages(current, next)).toEqual(['a', 'b', 'c']);
-  });
-
-  describe('invokeGemini fallback', () => {
-    let logs = [];
+      test('aggregateMessages should append messages', () => {
+      const current = ['a'];
+      const next = ['b', 'c'];
+      expect(aggregateMessages(current, next)).toEqual(['a', 'b', 'c']);
+    });
+  
+    test('should allow review to proceed if test_output is empty', async () => {
+      const mockChild = new EventEmitter();
+      mockChild.stdout = new EventEmitter();
+      mockChild.stderr = new EventEmitter();
+      mockSpawn.mockReturnValue(mockChild);
+  
+      const reviewPromise = workflow.reviewer({
+          test_output: "", // Empty output (e.g. started at reviewer)
+          retry_count: 0 
+      });
+  
+      setTimeout(() => {
+          mockChild.stdout.emit('data', Buffer.from('Thinking...\nAPPROVED'));
+          mockChild.emit('close', 0);
+      }, 10);
+  
+      const result = await reviewPromise;
+      expect(result.review_status).toBe('approved');
+    });
+  
+    describe('invokeGemini fallback', () => {    let logs = [];
     beforeEach(() => {
       logs = [];
       workflow.logger = { log: (msg) => logs.push(msg) };
@@ -387,8 +406,232 @@ describe('WorkflowManager', () => {
                 mockChild.emit('close', 0);
               }, 10);
         
-              await reviewPromise;
-              expect(logs.some(l => l.includes('[VERBOSE] Reviewer System Prompt'))).toBe(true);
-            });
-          });
-        });});
+                    await reviewPromise;
+        
+                    expect(logs.some(l => l.includes('[VERBOSE] Reviewer System Prompt'))).toBe(true);
+        
+                  });
+        
+                });
+        
+              
+        
+                describe('Conditional Logic', () => {
+        
+                  test('shouldContinueFromTest returns reviewer on PASS', () => {
+        
+                    expect(workflow.shouldContinueFromTest({ test_output: 'PASS' })).toBe('reviewer');
+        
+                  });
+        
+              
+        
+                  test('shouldContinueFromTest returns coder on FAIL and increments retry', () => {
+        
+                    expect(workflow.shouldContinueFromTest({ test_output: 'FAIL', retry_count: 0 })).toBe('coder');
+        
+                  });
+        
+              
+        
+                  test('shouldContinueFromReview returns pr_creator on approved', () => {
+        
+                    expect(workflow.shouldContinueFromReview({ review_status: 'approved' })).toBe('pr_creator');
+        
+                  });
+        
+              
+        
+                  test('shouldContinueFromReview returns coder on rejected', () => {
+        
+                    expect(workflow.shouldContinueFromReview({ review_status: 'rejected', retry_count: 0 })).toBe('coder');
+        
+                  });
+        
+              
+        
+                  test('shouldContinueFromPrCreator returns coder on needs_commit or pr_failed', () => {
+        
+                    expect(workflow.shouldContinueFromPrCreator({ review_status: 'needs_commit', retry_count: 0 })).toBe('coder');
+        
+                    expect(workflow.shouldContinueFromPrCreator({ review_status: 'pr_failed', retry_count: 0 })).toBe('coder');
+        
+                  });
+        
+              
+        
+                  test('shouldContinueFromPrCreator returns END on pr_failed with retries > 3', () => {
+        
+                    expect(workflow.shouldContinueFromPrCreator({ review_status: 'pr_failed', retry_count: 4 })).toBe('END');
+        
+                  });
+        
+                });
+        
+              
+        
+                describe('PR Creator', () => {
+        
+                  test('should push changes and create PR in prCreator', async () => {
+        
+                    // Setup mock spawn for git and gh commands
+        
+                    mockSpawn.mockImplementation((cmd, args) => {
+        
+                      const mockChild = new EventEmitter();
+        
+                      mockChild.stdout = new EventEmitter();
+        
+                      mockChild.stderr = new EventEmitter();
+        
+                      
+        
+                      setTimeout(() => {
+        
+                        if (cmd === 'git' && args[0] === 'branch') {
+        
+                          mockChild.stdout.emit('data', Buffer.from('feature-branch\n'));
+        
+                        } else if (cmd === 'git' && args[0] === 'status') {
+        
+                          mockChild.stdout.emit('data', Buffer.from(''));
+        
+                        } else if (cmd === 'git' && args[0] === 'push') {
+        
+                          mockChild.emit('close', 0);
+        
+                        } else if (cmd === 'gh' && args[0] === 'pr') {
+        
+                          mockChild.stdout.emit('data', Buffer.from('https://github.com/org/repo/pull/1\n'));
+        
+                          mockChild.emit('close', 0);
+        
+                        }
+        
+                        mockChild.emit('close', 0);
+        
+                      }, 1);
+        
+                      
+        
+                      return mockChild;
+        
+                    });
+        
+              
+        
+                    const result = await workflow.prCreator({});
+        
+                    expect(result.review_status).toBe('pr_created');
+        
+                    expect(result.messages[0].content).toContain('PR Created');
+        
+                  });
+        
+              
+        
+                  test('should treat already existing PR as success in prCreator', async () => {
+        
+                    mockSpawn.mockImplementation((cmd, args) => {
+        
+                      const mockChild = new EventEmitter();
+        
+                      mockChild.stdout = new EventEmitter();
+        
+                      mockChild.stderr = new EventEmitter();
+        
+                      
+        
+                      setTimeout(() => {
+        
+                        if (cmd === 'git' && args[0] === 'branch') {
+        
+                          mockChild.stdout.emit('data', Buffer.from('feature-branch\n'));
+        
+                        } else if (cmd === 'git' && args[0] === 'status') {
+        
+                          mockChild.stdout.emit('data', Buffer.from(''));
+        
+                        } else if (cmd === 'git' && args[0] === 'push') {
+        
+                          mockChild.emit('close', 0);
+        
+                        } else if (cmd === 'gh' && args[0] === 'pr') {
+        
+                          mockChild.stdout.emit('data', Buffer.from('a pull request for branch "feature-branch" already exists: https://github.com/org/repo/pull/1\n'));
+        
+                          mockChild.emit('close', 1);
+        
+                        }
+        
+                        mockChild.emit('close', 0);
+        
+                      }, 1);
+        
+                      
+        
+                      return mockChild;
+        
+                    });
+        
+              
+        
+                    const result = await workflow.prCreator({});
+        
+                    expect(result.review_status).toBe('pr_created');
+        
+                    expect(result.messages[0].content).toContain('PR already exists');
+        
+                    expect(result.messages[0].content).toContain('https://github.com/org/repo/pull/1');
+        
+                  });
+        
+              
+        
+                  test('should return needs_commit in prCreator if changes are uncommitted', async () => {
+        
+                    mockSpawn.mockImplementation((cmd, args) => {
+        
+                      const mockChild = new EventEmitter();
+        
+                      mockChild.stdout = new EventEmitter();
+        
+                      mockChild.stderr = new EventEmitter();
+        
+                      
+        
+                      setTimeout(() => {
+        
+                        if (cmd === 'git' && args[0] === 'branch') {
+        
+                          mockChild.stdout.emit('data', Buffer.from('feature-branch\n'));
+        
+                        } else if (cmd === 'git' && args[0] === 'status') {
+        
+                          mockChild.stdout.emit('data', Buffer.from('M somefile.js\n'));
+        
+                        }
+        
+                        mockChild.emit('close', 0);
+        
+                      }, 1);
+        
+                      
+        
+                      return mockChild;
+        
+                    });
+        
+              
+        
+                    const result = await workflow.prCreator({ retry_count: 0 });
+        
+                    expect(result.review_status).toBe('needs_commit');
+        
+                    expect(result.messages[0].content).toContain('Uncommitted changes found');
+        
+                  });
+        
+                });
+        
+              });});

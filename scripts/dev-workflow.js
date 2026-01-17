@@ -317,6 +317,10 @@ export class WorkflowManager {
         ${lastMessage.content}
         
         Please fix the code to satisfy the reviewer and the original request: ${initialRequest}.
+        Make sure to commit your fixes.`;
+    } else if (review_status === "needs_commit") {
+        systemPrompt = `You have uncommitted changes that prevent PR creation. 
+        Please review your changes and commit them using git.
         Original request: ${initialRequest}`;
     }
     
@@ -377,6 +381,15 @@ export class WorkflowManager {
     const systemPrompt = `You are a senior reviewer. Review the implementation. 
     You have access to the file system and git.
     
+    MANDATORY: You MUST activate the 'pr-reviewer' skill to perform a thorough review of the changes.
+    
+    You MUST examine all commits and the full diff between the current branch and 'origin/main'.
+    Use tools like 'git log origin/main..HEAD' to see the commit history and 'git diff origin/main..HEAD' to review the code changes.
+    
+    You MUST evaluate commit granularity. Reject the implementation if:
+    1. Commits are too large: They bundle multiple unrelated tasks or ideas, making them difficult to review (cognitive overload).
+    2. Commits are too small: There are too many tiny, fragmented commits that lack independent value and should have been grouped or squashed.
+    
     If the code looks correct, safe, and follows the requirements, output "APPROVED". 
     Otherwise, output "REJECTED" followed by a concise explanation of why.`;
     
@@ -402,6 +415,7 @@ export class WorkflowManager {
 
   async prCreator(state) {
     this.logger.log("--- PR Creator Node ---");
+    const { retry_count } = state;
     
     try {
       // 1. Check if on a feature branch
@@ -418,8 +432,12 @@ export class WorkflowManager {
       // 2. Check for uncommitted changes
       const { output: statusOutput } = await this.runCommand('git', ['status', '--porcelain']);
       if (statusOutput.trim()) {
-        this.logger.log("Uncommitted changes found. PR creation aborted.");
-        return { review_status: "pr_failed" };
+        this.logger.log("Uncommitted changes found. Returning to coder to finalize commits.");
+        return { 
+          review_status: "needs_commit",
+          messages: [new SystemMessage("Uncommitted changes found. Please ensure all changes are committed before creating a PR.")],
+          retry_count: retry_count + 1
+        };
       }
 
       // 3. Push to origin
@@ -433,6 +451,16 @@ export class WorkflowManager {
       this.logger.log("Creating Pull Request...");
       const { output: prOutput, exitCode: prCode } = await this.runCommand('gh', ['pr', 'create', '--fill']);
       if (prCode !== 0) {
+        if (prOutput.includes("already exists")) {
+          this.logger.log("PR already exists. Treating as success.");
+          // Try to extract the URL from the error message
+          const urlMatch = prOutput.match(/https:\/\/github\.com\/[^\s]+/);
+          const prUrl = urlMatch ? urlMatch[0] : "existing PR";
+          return { 
+            review_status: "pr_created",
+            messages: [new SystemMessage(`PR already exists: ${prUrl}`)]
+          };
+        }
         throw new Error(`PR creation failed (exit ${prCode}): ${prOutput.trim()}`);
       }
       this.logger.log(`PR created: ${prOutput.trim()}`);
@@ -445,7 +473,8 @@ export class WorkflowManager {
       this.logger.log(`Error in PR creation: ${error.message}`);
       return { 
         review_status: "pr_failed",
-        messages: [new SystemMessage(`Failed to create PR: ${error.message}`)]
+        messages: [new SystemMessage(`Failed to create PR: ${error.message}`)],
+        retry_count: retry_count + 1
       };
     }
   }
@@ -481,7 +510,19 @@ export class WorkflowManager {
   }
 
   shouldContinueFromPrCreator(state) {
-    return END;
+    if (state.review_status === "pr_created" || state.review_status === "pr_skipped") {
+      return END;
+    }
+    
+    // Check retries to avoid infinite loops
+    if (state.retry_count > 3) {
+      this.logger.log("Max retries exceeded in PR Creator. Aborting.");
+      return END;
+    }
+
+    // If pr_failed or needs_commit, return to coder
+    this.logger.log(`PR Creator failed or needs commit (status: ${state.review_status}). Returning to coder.`);
+    return "coder";
   }
 
   createGraph() {
