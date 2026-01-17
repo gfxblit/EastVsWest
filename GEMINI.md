@@ -272,14 +272,10 @@ describe('Network Integration', () => {
    - Execute `git push`.
    - **CRITICAL:** The plane has not landed until the push completes successfully.
    - If the push fails, resolve the issues and try again. do not stop until the code is safely on the remote.
-3. **Create Pull Request:**
-   - Execute `gh pr create --fill` to create a PR using the commit info.
-   - **CRITICAL:** Do NOT close the issue yourself. The issue will be closed automatically when the PR is merged by the user.
 
 **Exit Criteria:**
 - ✅ Changes committed with a concise message including the issue ID.
 - ✅ `git push` executed successfully.
-- ✅ Pull Request created.
 
 ---
 
