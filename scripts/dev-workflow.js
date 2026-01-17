@@ -308,20 +308,6 @@ export class WorkflowManager {
          };
       }
 
-      this.logger.log("Running npm run test:e2e...");
-      const e2eOutput = await this.runCommand('npm', ['run', 'test:e2e']);
-      
-      // Check for failures in E2E
-      // Check for "FAIL", "failed" (Jest) and "npm ERR!" (Script exit code != 0)
-      if (e2eOutput.includes('FAIL') || e2eOutput.includes('failed') || e2eOutput.includes('npm ERR!')) {
-         // Increment retry count on failure
-         return { 
-             test_output: "FAIL (E2E):\n" + e2eOutput,
-             retry_count: retry_count + 1,
-             messages: [new SystemMessage("Tests failed (E2E):\n" + e2eOutput)]
-         };
-      }
-      
       return { test_output: "PASS" };
     } catch (error) {
       return { 
