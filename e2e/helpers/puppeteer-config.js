@@ -16,7 +16,7 @@ import { join } from 'path';
  * @returns {string|undefined} Path to chrome-headless-shell binary, or undefined if not found
  */
 function findHeadlessShellBinary() {
-  const cacheDir = join(homedir(), '.cache', 'puppeteer', 'chrome-headless-shell');
+  const cacheDir = join(process.platform === 'darwin' ? join(homedir(), 'Library', 'Caches', 'puppeteer') : join(homedir(), '.cache', 'puppeteer'), 'chrome-headless-shell');
 
   if (!existsSync(cacheDir)) {
     return undefined;
