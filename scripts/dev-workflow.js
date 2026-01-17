@@ -25,7 +25,7 @@ const DEFAULT_MODELS = [
  * @param {Array} next - New messages to append.
  * @returns {Array} The updated message history.
  */
-const aggregateMessages = (current, next) => current.concat(next);
+export const aggregateMessages = (current, next) => current.concat(next);
 
 /**
  * Updates the state with the latest value. 
@@ -34,7 +34,7 @@ const aggregateMessages = (current, next) => current.concat(next);
  * @param {any} next - New value.
  * @returns {any} The updated value.
  */
-const updateLatest = (current, next) => next ? next : current;
+export const updateLatest = (current, next) => next !== undefined ? next : current;
 
 // Define the state channels with clear descriptions
 const agentStateChannels = {
@@ -99,6 +99,41 @@ export class WorkflowManager {
   // --- Helpers ---
 
   /**
+   * Streams a chunk of output to the configured logger.
+   * Handles direct stdout writing for console to avoid extra newlines.
+   * @param {string} chunk - The cleaned output chunk.
+   * @private
+   */
+  _streamOutput(chunk) {
+    if (!chunk) return;
+    if (this.logger === console) {
+      process.stdout.write(chunk);
+    } else {
+      this.logger.log(chunk);
+    }
+  }
+
+  /**
+   * Cleans a chunk of output by removing null bytes, non-printable control 
+   * characters, and other disruptive symbols that can break terminal 
+   * rendering or confuse LLM context. Preserves Tabs, Newlines, and CR.
+   * @param {string} chunk - The raw output chunk.
+   * @returns {string} The cleaned chunk.
+   * @private
+   */
+  _cleanChunk(chunk) {
+    if (typeof chunk !== 'string') return chunk;
+    
+    // Remove ANSI escape codes (e.g., colors) to avoid leaving junk like [31m
+    // This matches the most common CSI (Control Sequence Introducer) sequences
+    const withoutAnsi = chunk.replace(/\x1B\[[0-9;]*[a-zA-Z]/g, '');
+
+    // Remove disruptive control characters, including null bytes (\x00).
+    // Matches \x00-\x08, \x0B-\x0C, \x0E-\x1F, \x7F (excluding \x09 TAB, \x0A LF, \x0D CR)
+    return withoutAnsi.replace(/[\x00-\x08\x0B\x0C\x0E-\x1F\x7F]/g, '');
+  }
+
+  /**
    * Invokes a shell command and streams output to stdout.
    * @param {string} command - The command to run (e.g., 'npm').
    * @param {Array} args - Arguments for the command.
@@ -114,16 +149,19 @@ export class WorkflowManager {
       let fullOutput = '';
       
       child.stdout.on('data', (data) => {
-        const chunk = data.toString();
-        this.logger.log(chunk);
-        fullOutput += chunk;
+        const chunk = this._cleanChunk(data.toString());
+        if (chunk) {
+          this._streamOutput(chunk);
+          fullOutput += chunk;
+        }
       });
 
       child.stderr.on('data', (data) => {
-        const chunk = data.toString();
-        // Do not stream stderr to console to avoid noise (e.g. tool logs)
-        // process.stderr.write(chunk); 
-        fullOutput += chunk;
+        const chunk = this._cleanChunk(data.toString());
+        if (chunk) {
+          // Do not stream stderr to console to avoid noise (e.g. tool logs)
+          fullOutput += chunk;
+        }
       });
 
       child.on('close', (code) => {
@@ -186,16 +224,19 @@ export class WorkflowManager {
       let errorOutput = '';
 
       child.stdout.on('data', (data) => {
-        const chunk = data.toString();
-        this.logger.log(chunk); // Stream to console
-        fullOutput += chunk;
+        const chunk = this._cleanChunk(data.toString());
+        if (chunk) {
+          this._streamOutput(chunk); // Stream to console
+          fullOutput += chunk;
+        }
       });
 
       child.stderr.on('data', (data) => {
-        const chunk = data.toString();
-        // Do not stream stderr to console to avoid noise (e.g. tool logs)
-        // process.stderr.write(chunk); 
-        errorOutput += chunk;
+        const chunk = this._cleanChunk(data.toString());
+        if (chunk) {
+          // Do not stream stderr to console to avoid noise (e.g. tool logs)
+          errorOutput += chunk;
+        }
       });
 
       child.on('close', (code) => {
@@ -275,12 +316,8 @@ export class WorkflowManager {
         
         Please fix the code to satisfy the reviewer and the original request: ${initialRequest}.
         Make sure to commit your fixes.`;
-    } else if (review_status === "needs_commit") {
-        systemPrompt = `You have uncommitted changes that prevent PR creation. 
-        Please review your changes and commit them using git.
-        Original request: ${initialRequest}`;
     }
-    
+
     const codeContent = await this.invokeGemini(systemPrompt, ['--yolo']);
     this.logger.log("\nCoding complete.");
 
@@ -321,7 +358,7 @@ export class WorkflowManager {
     const { messages, test_output, retry_count } = state;
     this.logger.log("--- Reviewer Node ---");
     
-    if (!test_output.includes("PASS")) {
+    if (test_output && !test_output.includes("PASS")) {
        return { 
            review_status: "rejected", 
            messages: [new SystemMessage("Tests failed.")],
@@ -331,10 +368,6 @@ export class WorkflowManager {
 
     const systemPrompt = `You are a senior reviewer. Review the implementation. 
     You have access to the file system and git.
-    
-    MANDATORY: You MUST activate the 'pr-reviewer' skill to perform a thorough review of the changes.
-    
-    You SHOULD use git tools (like 'git log' and 'git diff') to examine the coder's commits and the changes made.
     
     If the code looks correct, safe, and follows the requirements, output "APPROVED". 
     Otherwise, output "REJECTED" followed by a concise explanation of why.`;
@@ -371,11 +404,8 @@ export class WorkflowManager {
       // 2. Check for uncommitted changes
       const { output: statusOutput } = await this.runCommand('git', ['status', '--porcelain']);
       if (statusOutput.trim()) {
-        this.logger.log("Uncommitted changes found. Returning to coder to finalize commits.");
-        return { 
-          review_status: "needs_commit",
-          messages: [new SystemMessage("Uncommitted changes found. Please ensure all changes are committed before creating a PR.")]
-        };
+        this.logger.log("Uncommitted changes found. PR creation aborted.");
+        return { review_status: "pr_failed" };
       }
 
       // 3. Push to origin
@@ -437,13 +467,7 @@ export class WorkflowManager {
   }
 
   shouldContinueFromPrCreator(state) {
-    if (state.review_status === "pr_created" || state.review_status === "pr_skipped") {
-      return END;
-    }
-    
-    // If pr_failed or needs_commit, return to coder
-    this.logger.log(`PR Creator failed or needs commit (status: ${state.review_status}). Returning to coder.`);
-    return "coder";
+    return END;
   }
 
   createGraph() {
@@ -486,7 +510,6 @@ export class WorkflowManager {
       "pr_creator",
       this.shouldContinueFromPrCreator.bind(this),
       {
-        coder: "coder",
         [END]: END
       }
     );
