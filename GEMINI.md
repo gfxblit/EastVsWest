@@ -267,7 +267,6 @@ describe('Network Integration', () => {
      - Example: `feat: Add double-jump mechanic (issue-123)`
      - Example: `fix: Resolve null pointer in combat loop (issue-456)`
    - The description should be brief and focused on *why* the change was made.
-   - In the commit message body, add `Closes #<id>` in the footer to automatically close the issue upon merging the PR.
 2. **Push to Origin:**
    - Execute `git push`.
    - **CRITICAL:** The plane has not landed until the push completes successfully.
