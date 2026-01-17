@@ -285,6 +285,41 @@ export class WorkflowManager {
     }
   }
 
+  /**
+   * Sends a notification to ntfy.sh if NTFY_CHANNEL is set.
+   * @param {string} title - The notification title.
+   * @param {string} message - The notification message.
+   * @param {number} priority - Priority (1-5, default 3).
+   */
+  async notify(title, message, priority = 3) {
+    const channel = process.env.NTFY_CHANNEL;
+    if (!channel) return;
+
+    let sessionName = 'N/A';
+    try {
+      // Use tmux to get the session name if available
+      const { output } = await this.runCommand('tmux', ['display-message', '-p', '#S']);
+      sessionName = output.trim();
+    } catch (e) {
+      // Silence tmux errors
+    }
+
+    const fullMessage = `Session: ${sessionName}\n${message}`;
+
+    try {
+      await fetch(`https://ntfy.sh/${channel}`, {
+        method: 'POST',
+        headers: {
+          'Title': title,
+          'Priority': priority.toString(),
+        },
+        body: fullMessage
+      });
+    } catch (error) {
+      this.logger.log(`Failed to send notification: ${error.message}`);
+    }
+  }
+
   // --- Nodes ---
 
   async coder(state) {
@@ -349,6 +384,8 @@ export class WorkflowManager {
       const { output: unitOutput, exitCode } = await this.runCommand('npm', ['test']);
       
       if (exitCode !== 0 || unitOutput.includes('FAIL') || unitOutput.includes('failed')) {
+         const message = retry_count >= 3 ? "Max retries exceeded. Aborting." : "Unit tests failed. Returning to coder.";
+         await this.notify("Workflow: Tests Failed", message, 4);
          // Increment retry count on failure
          return { 
              test_output: "FAIL (Unit):\n" + unitOutput,
@@ -405,6 +442,11 @@ export class WorkflowManager {
     const isApproved = /\bAPPROVED\b/i.test(reviewContent);
     this.logger.log(`\nReview decision: ${isApproved ? "Approved" : "Rejected"}`);
     
+    if (!isApproved) {
+      const message = retry_count >= 3 ? "Max retries exceeded. Aborting." : "Reviewer rejected the implementation. Returning to coder.";
+      await this.notify("Workflow: Review Rejected", message, 4);
+    }
+
     // If rejected, increment retry count
     return { 
       review_status: isApproved ? "approved" : "rejected",
@@ -424,6 +466,7 @@ export class WorkflowManager {
       
       if (branchCode !== 0 || branchName === 'main' || branchName === 'master' || !branchName) {
         this.logger.log("Not on a feature branch. Skipping PR creation.");
+        await this.notify("Workflow: Success", "Workflow completed successfully, but PR was skipped (not on a feature branch).", 3);
         return { review_status: "pr_skipped" };
       }
 
@@ -456,6 +499,7 @@ export class WorkflowManager {
           // Try to extract the URL from the error message
           const urlMatch = prOutput.match(/https:\/\/github\.com\/[^\s]+/);
           const prUrl = urlMatch ? urlMatch[0] : "existing PR";
+          await this.notify("Workflow: Success", `PR already exists: ${prUrl}`, 3);
           return { 
             review_status: "pr_created",
             messages: [new SystemMessage(`PR already exists: ${prUrl}`)]
@@ -464,6 +508,7 @@ export class WorkflowManager {
         throw new Error(`PR creation failed (exit ${prCode}): ${prOutput.trim()}`);
       }
       this.logger.log(`PR created: ${prOutput.trim()}`);
+      await this.notify("Workflow: Success", `PR created: ${prOutput.trim()}`, 3);
 
       return { 
         review_status: "pr_created",
@@ -471,6 +516,8 @@ export class WorkflowManager {
       };
     } catch (error) {
       this.logger.log(`Error in PR creation: ${error.message}`);
+      const message = retry_count >= 3 ? "Max retries exceeded. Aborting." : `Failed to create PR: ${error.message}`;
+      await this.notify("Workflow: PR Failed", message, 5);
       return { 
         review_status: "pr_failed",
         messages: [new SystemMessage(`Failed to create PR: ${error.message}`)],
@@ -642,8 +689,9 @@ if (process.argv[1] === __filename) {
         console.error("Workflow failed to converge.");
         process.exit(1);
     }
-  }).catch(err => {
+  }).catch(async err => {
     console.error("Workflow failed:", err);
+    await workflow.notify("Workflow: Error", `Workflow failed with error: ${err.message}`, 5);
     process.exit(1);
   });
 }

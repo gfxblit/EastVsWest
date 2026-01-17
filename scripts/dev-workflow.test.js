@@ -43,6 +43,9 @@ jest.unstable_mockModule('fs/promises', () => ({
 const { WorkflowManager, updateLatest, aggregateMessages } = await import('./dev-workflow.js');
 const fs = (await import('fs/promises')).default;
 
+// Mock global fetch
+global.fetch = jest.fn();
+
 describe('WorkflowManager', () => {
   let workflow;
 
@@ -53,6 +56,8 @@ describe('WorkflowManager', () => {
     mockStateGraphInstance.addConditionalEdges.mockClear();
     mockStateGraphInstance.setEntryPoint.mockClear();
     mockSpawn.mockClear();
+    global.fetch.mockReset();
+    delete process.env.NTFY_CHANNEL;
     
     workflow = new WorkflowManager({ log: () => {} }, "coder");
   });
@@ -402,6 +407,109 @@ describe('WorkflowManager', () => {
 
       const result = await promise;
       expect(result.output).toBe('Red Text');
+    });
+  });
+
+  describe('Notifications', () => {
+    test('notify should do nothing if NTFY_CHANNEL is not set', async () => {
+      await workflow.notify('Title', 'Message');
+      expect(global.fetch).not.toHaveBeenCalled();
+    });
+
+    test('notify should send POST request if NTFY_CHANNEL is set', async () => {
+      process.env.NTFY_CHANNEL = 'test-channel';
+      global.fetch.mockResolvedValue({ ok: true });
+      
+      // Mock tmux response
+      mockSpawn.mockImplementation((cmd, args) => {
+        const mockChild = new EventEmitter();
+        mockChild.stdout = new EventEmitter();
+        mockChild.stderr = new EventEmitter();
+        setTimeout(() => {
+          if (cmd === 'tmux') {
+            mockChild.stdout.emit('data', Buffer.from('test-session\n'));
+          }
+          mockChild.emit('close', 0);
+        }, 1);
+        return mockChild;
+      });
+
+      await workflow.notify('Title', 'Message', 4);
+
+      expect(global.fetch).toHaveBeenCalledWith('https://ntfy.sh/test-channel', {
+        method: 'POST',
+        headers: {
+          'Title': 'Title',
+          'Priority': '4',
+        },
+        body: expect.stringContaining('Session: test-session\nMessage')
+      });
+    });
+
+    test('testRunner should notify on failure', async () => {
+        process.env.NTFY_CHANNEL = 'test-channel';
+        const spy = jest.spyOn(workflow, 'notify');
+        
+        mockSpawn.mockImplementation(() => {
+            const mockChild = new EventEmitter();
+            mockChild.stdout = new EventEmitter();
+            mockChild.stderr = new EventEmitter();
+            setTimeout(() => {
+                mockChild.stdout.emit('data', Buffer.from('FAIL tests'));
+                mockChild.emit('close', 1);
+            }, 1);
+            return mockChild;
+        });
+
+        await workflow.testRunner({ retry_count: 0 });
+        expect(spy).toHaveBeenCalledWith('Workflow: Tests Failed', expect.stringContaining('Unit tests failed'), 4);
+    });
+
+    test('reviewer should notify on rejection', async () => {
+        process.env.NTFY_CHANNEL = 'test-channel';
+        const spy = jest.spyOn(workflow, 'notify');
+        
+        mockSpawn.mockImplementation(() => {
+            const mockChild = new EventEmitter();
+            mockChild.stdout = new EventEmitter();
+            mockChild.stderr = new EventEmitter();
+            setTimeout(() => {
+                mockChild.stdout.emit('data', Buffer.from('REJECTED because reasons'));
+                mockChild.emit('close', 0);
+            }, 1);
+            return mockChild;
+        });
+
+        await workflow.reviewer({ test_output: 'PASS', retry_count: 0 });
+        expect(spy).toHaveBeenCalledWith('Workflow: Review Rejected', expect.stringContaining('Reviewer rejected'), 4);
+    });
+
+    test('prCreator should notify on success', async () => {
+        process.env.NTFY_CHANNEL = 'test-channel';
+        const spy = jest.spyOn(workflow, 'notify');
+        
+        mockSpawn.mockImplementation((cmd, args) => {
+            const mockChild = new EventEmitter();
+            mockChild.stdout = new EventEmitter();
+            mockChild.stderr = new EventEmitter();
+            setTimeout(() => {
+                if (cmd === 'git' && args[0] === 'branch') {
+                    mockChild.stdout.emit('data', Buffer.from('feature-branch\n'));
+                } else if (cmd === 'git' && args[0] === 'status') {
+                    mockChild.stdout.emit('data', Buffer.from(''));
+                } else if (cmd === 'git' && args[0] === 'push') {
+                    mockChild.emit('close', 0);
+                } else if (cmd === 'gh' && args[0] === 'pr') {
+                    mockChild.stdout.emit('data', Buffer.from('https://github.com/org/repo/pull/1\n'));
+                    mockChild.emit('close', 0);
+                }
+                mockChild.emit('close', 0);
+            }, 1);
+            return mockChild;
+        });
+
+        await workflow.prCreator({ retry_count: 0 });
+        expect(spy).toHaveBeenCalledWith('Workflow: Success', expect.stringContaining('PR created'), 3);
     });
   });
 
