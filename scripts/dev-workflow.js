@@ -311,6 +311,8 @@ export class WorkflowManager {
     const systemPrompt = `You are a senior reviewer. Review the implementation. 
     You have access to the file system and git.
     
+    MANDATORY: You MUST activate the 'pr-reviewer' skill to perform a thorough review of the changes.
+    
     You SHOULD use git tools (like 'git log' and 'git diff') to examine the coder's commits and the changes made.
     
     If the code looks correct, safe, and follows the requirements, output "APPROVED". 
