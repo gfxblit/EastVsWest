@@ -140,19 +140,14 @@ describe('WorkflowManager', () => {
     expect(args[1][args[1].length - 1]).toContain('FAIL: Something broke');
   });
 
-  test('should run tests via npm test and npm run test:e2e', async () => {
-    // Setup mock spawn to emit data for two calls
+  test('should run only unit tests via npm test', async () => {
+    // Setup mock spawn to emit data for one call
     const mockChild1 = new EventEmitter();
     mockChild1.stdout = new EventEmitter();
     mockChild1.stderr = new EventEmitter();
     
-    const mockChild2 = new EventEmitter();
-    mockChild2.stdout = new EventEmitter();
-    mockChild2.stderr = new EventEmitter();
-
     mockSpawn
-      .mockReturnValueOnce(mockChild1)
-      .mockReturnValueOnce(mockChild2);
+      .mockReturnValueOnce(mockChild1);
 
     const testPromise = workflow.testRunner({ retry_count: 0 });
 
@@ -162,17 +157,12 @@ describe('WorkflowManager', () => {
         mockChild1.emit('close', 0);
     }, 10);
 
-    // Simulate passing e2e tests
-    setTimeout(() => {
-        mockChild2.stdout.emit('data', Buffer.from('PASS e2e'));
-        mockChild2.emit('close', 0);
-    }, 20);
-
     const result = await testPromise;
 
-    expect(mockSpawn).toHaveBeenCalledTimes(2);
+    expect(mockSpawn).toHaveBeenCalledTimes(1);
     expect(mockSpawn.mock.calls[0][1]).toEqual(['test']);
-    expect(mockSpawn.mock.calls[1][1]).toEqual(['run', 'test:e2e']);
+    // Ensure we did NOT call e2e tests
+    expect(mockSpawn).not.toHaveBeenCalledWith('npm', ['run', 'test:e2e']);
     expect(result.test_output).toBe('PASS');
   });
 
