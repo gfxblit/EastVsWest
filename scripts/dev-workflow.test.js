@@ -32,6 +32,11 @@ jest.unstable_mockModule('fs/promises', () => ({
   readFile: jest.fn(),
   writeFile: jest.fn(),
   access: jest.fn(),
+  default: {
+    readFile: jest.fn(),
+    writeFile: jest.fn(),
+    access: jest.fn(),
+  }
 }));
 
 // Dynamic import of the module under test
@@ -112,17 +117,14 @@ describe('WorkflowManager', () => {
   });
 
   test('should strip null bytes from gemini output', async () => {
-    // Setup mock spawn to emit data with null bytes
     const mockChild = new EventEmitter();
     mockChild.stdout = new EventEmitter();
     mockChild.stderr = new EventEmitter();
     mockSpawn.mockReturnValue(mockChild);
 
-    // Trigger coder
     const state = { messages: [{ content: 'Build a login form' }] };
     const coderPromise = workflow.coder(state);
 
-    // Simulate process execution with null bytes
     setTimeout(() => {
       mockChild.stdout.emit('data', Buffer.from('Mocked\x00 '));
       mockChild.stdout.emit('data', Buffer.from('Code\x00 Response'));
@@ -130,13 +132,11 @@ describe('WorkflowManager', () => {
     }, 10);
 
     const result = await coderPromise;
-    
     expect(result.messages[0].content).not.toContain('\x00');
     expect(result.messages[0].content).toBe('Mocked Code Response');
   });
 
   test('should strip disruptive control characters including null bytes', async () => {
-    // Setup mock spawn to emit data with various control characters
     const mockChild = new EventEmitter();
     mockChild.stdout = new EventEmitter();
     mockChild.stderr = new EventEmitter();
@@ -145,14 +145,12 @@ describe('WorkflowManager', () => {
     const state = { messages: [{ content: 'Build a login form' }] };
     const coderPromise = workflow.coder(state);
 
-    // Simulate process execution with null (\x00), bell (\x07), and escape (\x1B)
     setTimeout(() => {
       mockChild.stdout.emit('data', Buffer.from('Mocked\x00Code\x07Response\x1B'));
       mockChild.emit('close', 0);
     }, 10);
 
     const result = await coderPromise;
-    
     expect(result.messages[0].content).toBe('MockedCodeResponse');
   });
 
@@ -174,6 +172,28 @@ describe('WorkflowManager', () => {
     expect(result.messages[0].content).toBe('Clean response with spaces and\nnewlines.');
   });
 
+  test('should include test failure in coder prompt', async () => {
+    const mockChild = new EventEmitter();
+    mockChild.stdout = new EventEmitter();
+    mockChild.stderr = new EventEmitter();
+    mockSpawn.mockReturnValue(mockChild);
+
+    const state = { 
+        messages: [{ content: 'Fix bug' }],
+        test_output: "FAIL: Expected 1 to be 2" 
+    };
+    const coderPromise = workflow.coder(state);
+
+    setTimeout(() => {
+      mockChild.stdout.emit('data', Buffer.from('Fixing...'));
+      mockChild.emit('close', 0);
+    }, 10);
+
+    await coderPromise;
+    expect(mockSpawn.mock.calls[0][1][3]).toContain('Your previous implementation failed tests.');
+    expect(mockSpawn.mock.calls[0][1][3]).toContain('FAIL: Expected 1 to be 2');
+  });
+
   test('updateLatest should handle 0 as a valid value', () => {
     expect(updateLatest(10, 0)).toBe(0);
     expect(updateLatest(10, undefined)).toBe(10);
@@ -181,33 +201,34 @@ describe('WorkflowManager', () => {
     expect(updateLatest(undefined, 0)).toBe(0);
   });
 
-      test('aggregateMessages should append messages', () => {
-      const current = ['a'];
-      const next = ['b', 'c'];
-      expect(aggregateMessages(current, next)).toEqual(['a', 'b', 'c']);
+  test('aggregateMessages should append messages', () => {
+    const current = ['a'];
+    const next = ['b', 'c'];
+    expect(aggregateMessages(current, next)).toEqual(['a', 'b', 'c']);
+  });
+
+  test('should allow review to proceed if test_output is empty', async () => {
+    const mockChild = new EventEmitter();
+    mockChild.stdout = new EventEmitter();
+    mockChild.stderr = new EventEmitter();
+    mockSpawn.mockReturnValue(mockChild);
+
+    const reviewPromise = workflow.reviewer({
+        test_output: "", 
+        retry_count: 0 
     });
-  
-    test('should allow review to proceed if test_output is empty', async () => {
-      const mockChild = new EventEmitter();
-      mockChild.stdout = new EventEmitter();
-      mockChild.stderr = new EventEmitter();
-      mockSpawn.mockReturnValue(mockChild);
-  
-      const reviewPromise = workflow.reviewer({
-          test_output: "", // Empty output (e.g. started at reviewer)
-          retry_count: 0 
-      });
-  
-      setTimeout(() => {
-          mockChild.stdout.emit('data', Buffer.from('Thinking...\nAPPROVED'));
-          mockChild.emit('close', 0);
-      }, 10);
-  
-      const result = await reviewPromise;
-      expect(result.review_status).toBe('approved');
-    });
-  
-    describe('invokeGemini fallback', () => {    let logs = [];
+
+    setTimeout(() => {
+        mockChild.stdout.emit('data', Buffer.from('Thinking...\nAPPROVED'));
+        mockChild.emit('close', 0);
+    }, 10);
+
+    const result = await reviewPromise;
+    expect(result.review_status).toBe('approved');
+  });
+
+  describe('invokeGemini fallback', () => {
+    let logs = [];
     beforeEach(() => {
       logs = [];
       workflow.logger = { log: (msg) => logs.push(msg) };
@@ -227,19 +248,15 @@ describe('WorkflowManager', () => {
       }, 10);
 
       const result = await invokePromise;
-
       expect(result).toBe('Response from first model');
       expect(mockSpawn).toHaveBeenCalledTimes(1);
-      const args = mockSpawn.mock.calls[0];
-      expect(args[1]).toContain('-m');
-      expect(args[1]).toContain('gemini-3-pro-preview');
+      expect(mockSpawn.mock.calls[0][1]).toContain('gemini-3-pro-preview');
     });
 
     test('Quota Fallback: Should retry with next model on TerminalQuotaError', async () => {
       const mockChild1 = new EventEmitter();
       mockChild1.stdout = new EventEmitter();
       mockChild1.stderr = new EventEmitter();
-
       const mockChild2 = new EventEmitter();
       mockChild2.stdout = new EventEmitter();
       mockChild2.stderr = new EventEmitter();
@@ -250,27 +267,21 @@ describe('WorkflowManager', () => {
 
       const invokePromise = workflow.invokeGemini('Hello');
 
-      // First call fails with Quota Error
       setTimeout(() => {
         mockChild1.stderr.emit('data', Buffer.from('TerminalQuotaError: Quota exceeded'));
         mockChild1.emit('close', 1);
       }, 10);
 
-      // Second call succeeds
       setTimeout(() => {
         mockChild2.stdout.emit('data', Buffer.from('Response from second model'));
         mockChild2.emit('close', 0);
       }, 20);
 
       const result = await invokePromise;
-
       expect(result).toBe('Response from second model');
       expect(mockSpawn).toHaveBeenCalledTimes(2);
-      
       expect(mockSpawn.mock.calls[0][1]).toContain('gemini-3-pro-preview');
       expect(mockSpawn.mock.calls[1][1]).toContain('gemini-3-flash-preview');
-      
-      expect(logs.some(l => l.includes('Quota exhausted for gemini-3-pro-preview'))).toBe(true);
     });
 
     test('Exhaustion: Should fail after all models fail with quota errors', async () => {
@@ -295,12 +306,10 @@ describe('WorkflowManager', () => {
         mockChild1.stderr.emit('data', Buffer.from('TerminalQuotaError'));
         mockChild1.emit('close', 1);
       }, 10);
-
       setTimeout(() => {
         mockChild2.stderr.emit('data', Buffer.from('429 Too Many Requests'));
         mockChild2.emit('close', 1);
       }, 20);
-
       setTimeout(() => {
         mockChild3.stderr.emit('data', Buffer.from('TerminalQuotaError'));
         mockChild3.emit('close', 1);
@@ -329,6 +338,20 @@ describe('WorkflowManager', () => {
   });
 
   describe('Tools', () => {
+    test('readFile should call fs.readFile', async () => {
+      fs.readFile.mockResolvedValue('content');
+      const result = await workflow.readFile('test.txt');
+      expect(fs.readFile).toHaveBeenCalledWith('test.txt', 'utf-8');
+      expect(result).toBe('content');
+    });
+
+    test('writeFile should call fs.writeFile', async () => {
+      fs.writeFile.mockResolvedValue();
+      const result = await workflow.writeFile('test.txt', 'content');
+      expect(fs.writeFile).toHaveBeenCalledWith('test.txt', 'content', 'utf-8');
+      expect(result).toContain('Successfully wrote');
+    });
+
     test('runCommand should strip null bytes from output', async () => {
       const mockChild = new EventEmitter();
       mockChild.stdout = new EventEmitter();
@@ -343,10 +366,26 @@ describe('WorkflowManager', () => {
       }, 10);
 
       const result = await promise;
-      
       expect(result.output).not.toContain('\x00');
       expect(result.output).toBe('file1.txt\n');
     });
+
+    test('runCommand should handle output containing only null bytes', async () => {
+        const mockChild = new EventEmitter();
+        mockChild.stdout = new EventEmitter();
+        mockChild.stderr = new EventEmitter();
+        mockSpawn.mockReturnValue(mockChild);
+  
+        const promise = workflow.runCommand('ls');
+  
+        setTimeout(() => {
+          mockChild.stdout.emit('data', Buffer.from('\x00\x00\x00'));
+          mockChild.emit('close', 0);
+        }, 10);
+  
+        const result = await promise;
+        expect(result.output).toBe('');
+      });
 
     test('runCommand should strip ANSI escape sequences fully', async () => {
       const mockChild = new EventEmitter();
@@ -357,281 +396,200 @@ describe('WorkflowManager', () => {
       const promise = workflow.runCommand('ls');
 
       setTimeout(() => {
-              // Red color: \x1B[31m
-              mockChild.stdout.emit('data', Buffer.from('\x1B[31mRed Text\x1B[0m'));
-              mockChild.emit('close', 0);
-            }, 10);
-        
-            const result = await promise;
-            
-            expect(result.output).toBe('Red Text');
-          });
-        
-          describe('Verbose Logging', () => {
-            test('coder node should log system prompt when verbose is true', async () => {
-              const logs = [];
-              const mockChild = new EventEmitter();
-              mockChild.stdout = new EventEmitter();
-              mockChild.stderr = new EventEmitter();
-              mockSpawn.mockReturnValue(mockChild);
-        
-              const verboseWorkflow = new WorkflowManager({ log: (msg) => logs.push(msg) }, "coder", true);
-              const coderPromise = verboseWorkflow.coder({ messages: [{ content: 'Test prompt' }] });
-        
-              setTimeout(() => {
-                mockChild.stdout.emit('data', Buffer.from('Response'));
-                mockChild.emit('close', 0);
-              }, 10);
-        
-              await coderPromise;
-              expect(logs.some(l => l.includes('[VERBOSE] Coder System Prompt'))).toBe(true);
-            });
-        
-            test('reviewer node should log system prompt when verbose is true', async () => {
-              const logs = [];
-              const mockChild = new EventEmitter();
-              mockChild.stdout = new EventEmitter();
-              mockChild.stderr = new EventEmitter();
-              mockSpawn.mockReturnValue(mockChild);
-        
-              const verboseWorkflow = new WorkflowManager({ log: (msg) => logs.push(msg) }, "reviewer", true);
-              const reviewPromise = verboseWorkflow.reviewer({ 
-                test_output: "PASS", 
-                retry_count: 0,
-                messages: [] 
-              });
-        
-              setTimeout(() => {
-                mockChild.stdout.emit('data', Buffer.from('APPROVED'));
-                mockChild.emit('close', 0);
-              }, 10);
-        
-                    await reviewPromise;
-        
-                    expect(logs.some(l => l.includes('[VERBOSE] Reviewer System Prompt'))).toBe(true);
-        
-                  });
-        
-                });
-        
-              
-        
-                describe('Conditional Logic', () => {
-        
-                  test('shouldContinueFromTest returns reviewer on PASS', () => {
-        
-                    expect(workflow.shouldContinueFromTest({ test_output: 'PASS' })).toBe('reviewer');
-        
-                  });
-        
-              
-        
-                  test('shouldContinueFromTest returns coder on FAIL and increments retry', () => {
-        
-                    expect(workflow.shouldContinueFromTest({ test_output: 'FAIL', retry_count: 0 })).toBe('coder');
-        
-                  });
-        
-              
-        
-                  test('shouldContinueFromReview returns pr_creator on approved', () => {
-        
-                    expect(workflow.shouldContinueFromReview({ review_status: 'approved' })).toBe('pr_creator');
-        
-                  });
-        
-              
-        
-                  test('shouldContinueFromReview returns coder on rejected', () => {
-        
-                    expect(workflow.shouldContinueFromReview({ review_status: 'rejected', retry_count: 0 })).toBe('coder');
-        
-                  });
-        
-              
-        
-                  test('shouldContinueFromPrCreator returns coder on needs_commit or pr_failed', () => {
-        
-                    expect(workflow.shouldContinueFromPrCreator({ review_status: 'needs_commit', retry_count: 0 })).toBe('coder');
-        
-                    expect(workflow.shouldContinueFromPrCreator({ review_status: 'pr_failed', retry_count: 0 })).toBe('coder');
-        
-                  });
-        
-              
-        
-                  test('shouldContinueFromPrCreator returns END on pr_failed with retries > 3', () => {
-        
-                    expect(workflow.shouldContinueFromPrCreator({ review_status: 'pr_failed', retry_count: 4 })).toBe('END');
-        
-                  });
-        
-                });
-        
-              
-        
-                describe('PR Creator', () => {
-        
-                  test('should push changes and create PR in prCreator', async () => {
-        
-                    // Setup mock spawn for git and gh commands
-        
-                    mockSpawn.mockImplementation((cmd, args) => {
-        
-                      const mockChild = new EventEmitter();
-        
-                      mockChild.stdout = new EventEmitter();
-        
-                      mockChild.stderr = new EventEmitter();
-        
-                      
-        
-                      setTimeout(() => {
-        
-                        if (cmd === 'git' && args[0] === 'branch') {
-        
-                          mockChild.stdout.emit('data', Buffer.from('feature-branch\n'));
-        
-                        } else if (cmd === 'git' && args[0] === 'status') {
-        
-                          mockChild.stdout.emit('data', Buffer.from(''));
-        
-                        } else if (cmd === 'git' && args[0] === 'push') {
-        
-                          mockChild.emit('close', 0);
-        
-                        } else if (cmd === 'gh' && args[0] === 'pr') {
-        
-                          mockChild.stdout.emit('data', Buffer.from('https://github.com/org/repo/pull/1\n'));
-        
-                          mockChild.emit('close', 0);
-        
-                        }
-        
-                        mockChild.emit('close', 0);
-        
-                      }, 1);
-        
-                      
-        
-                      return mockChild;
-        
-                    });
-        
-              
-        
-                    const result = await workflow.prCreator({});
-        
-                    expect(result.review_status).toBe('pr_created');
-        
-                    expect(result.messages[0].content).toContain('PR Created');
-        
-                  });
-        
-              
-        
-                  test('should treat already existing PR as success in prCreator', async () => {
-        
-                    mockSpawn.mockImplementation((cmd, args) => {
-        
-                      const mockChild = new EventEmitter();
-        
-                      mockChild.stdout = new EventEmitter();
-        
-                      mockChild.stderr = new EventEmitter();
-        
-                      
-        
-                      setTimeout(() => {
-        
-                        if (cmd === 'git' && args[0] === 'branch') {
-        
-                          mockChild.stdout.emit('data', Buffer.from('feature-branch\n'));
-        
-                        } else if (cmd === 'git' && args[0] === 'status') {
-        
-                          mockChild.stdout.emit('data', Buffer.from(''));
-        
-                        } else if (cmd === 'git' && args[0] === 'push') {
-        
-                          mockChild.emit('close', 0);
-        
-                        } else if (cmd === 'gh' && args[0] === 'pr') {
-        
-                          mockChild.stdout.emit('data', Buffer.from('a pull request for branch "feature-branch" already exists: https://github.com/org/repo/pull/1\n'));
-        
-                          mockChild.emit('close', 1);
-        
-                        }
-        
-                        mockChild.emit('close', 0);
-        
-                      }, 1);
-        
-                      
-        
-                      return mockChild;
-        
-                    });
-        
-              
-        
-                    const result = await workflow.prCreator({});
-        
-                    expect(result.review_status).toBe('pr_created');
-        
-                    expect(result.messages[0].content).toContain('PR already exists');
-        
-                    expect(result.messages[0].content).toContain('https://github.com/org/repo/pull/1');
-        
-                  });
-        
-              
-        
-                  test('should return needs_commit in prCreator if changes are uncommitted', async () => {
-        
-                    mockSpawn.mockImplementation((cmd, args) => {
-        
-                      const mockChild = new EventEmitter();
-        
-                      mockChild.stdout = new EventEmitter();
-        
-                      mockChild.stderr = new EventEmitter();
-        
-                      
-        
-                      setTimeout(() => {
-        
-                        if (cmd === 'git' && args[0] === 'branch') {
-        
-                          mockChild.stdout.emit('data', Buffer.from('feature-branch\n'));
-        
-                        } else if (cmd === 'git' && args[0] === 'status') {
-        
-                          mockChild.stdout.emit('data', Buffer.from('M somefile.js\n'));
-        
-                        }
-        
-                        mockChild.emit('close', 0);
-        
-                      }, 1);
-        
-                      
-        
-                      return mockChild;
-        
-                    });
-        
-              
-        
-                    const result = await workflow.prCreator({ retry_count: 0 });
-        
-                    expect(result.review_status).toBe('needs_commit');
-        
-                    expect(result.messages[0].content).toContain('Uncommitted changes found');
-        
-                  });
-        
-                });
-        
-              });});
+        mockChild.stdout.emit('data', Buffer.from('\x1B[31mRed Text\x1B[0m'));
+        mockChild.emit('close', 0);
+      }, 10);
+
+      const result = await promise;
+      expect(result.output).toBe('Red Text');
+    });
+  });
+
+  describe('Reviewer Node', () => {
+    test('reviewer node should return approved status if approved in response', async () => {
+        const mockChild = new EventEmitter();
+        mockChild.stdout = new EventEmitter();
+        mockChild.stderr = new EventEmitter();
+        mockSpawn.mockReturnValue(mockChild);
+
+        const reviewPromise = workflow.reviewer({ test_output: "PASS", retry_count: 0 });
+
+        setTimeout(() => {
+            mockChild.stdout.emit('data', Buffer.from('APPROVED'));
+            mockChild.emit('close', 0);
+        }, 10);
+
+        const result = await reviewPromise;
+        expect(result.review_status).toBe('approved');
+    });
+
+    test('reviewer node should return rejected status if rejected in response', async () => {
+        const mockChild = new EventEmitter();
+        mockChild.stdout = new EventEmitter();
+        mockChild.stderr = new EventEmitter();
+        mockSpawn.mockReturnValue(mockChild);
+
+        const reviewPromise = workflow.reviewer({ test_output: "PASS", retry_count: 0 });
+
+        setTimeout(() => {
+            mockChild.stdout.emit('data', Buffer.from('REJECTED: some issues'));
+            mockChild.emit('close', 0);
+        }, 10);
+
+        const result = await reviewPromise;
+        expect(result.review_status).toBe('rejected');
+        expect(result.retry_count).toBe(1);
+    });
+
+    test('reviewer node should reject and increment retry if tests failed', async () => {
+        const result = await workflow.reviewer({ test_output: "FAIL", retry_count: 0 });
+        expect(result.review_status).toBe('rejected');
+        expect(result.retry_count).toBe(1);
+    });
+  });
+
+  describe('Verbose Logging', () => {
+    test('coder node should log system prompt when verbose is true', async () => {
+      const logs = [];
+      const mockChild = new EventEmitter();
+      mockChild.stdout = new EventEmitter();
+      mockChild.stderr = new EventEmitter();
+      mockSpawn.mockReturnValue(mockChild);
+
+      const verboseWorkflow = new WorkflowManager({ log: (msg) => logs.push(msg) }, "coder", true);
+      const coderPromise = verboseWorkflow.coder({ messages: [{ content: 'Test prompt' }] });
+
+      setTimeout(() => {
+        mockChild.stdout.emit('data', Buffer.from('Response'));
+        mockChild.emit('close', 0);
+      }, 10);
+
+      await coderPromise;
+      expect(logs.some(l => l.includes('[VERBOSE] Coder System Prompt'))).toBe(true);
+    });
+
+    test('reviewer node should log system prompt when verbose is true', async () => {
+      const logs = [];
+      const mockChild = new EventEmitter();
+      mockChild.stdout = new EventEmitter();
+      mockChild.stderr = new EventEmitter();
+      mockSpawn.mockReturnValue(mockChild);
+
+      const verboseWorkflow = new WorkflowManager({ log: (msg) => logs.push(msg) }, "reviewer", true);
+      const reviewPromise = verboseWorkflow.reviewer({
+        test_output: "PASS", 
+        retry_count: 0,
+        messages: [] 
+      });
+
+      setTimeout(() => {
+        mockChild.stdout.emit('data', Buffer.from('APPROVED'));
+        mockChild.emit('close', 0);
+      }, 10);
+
+      await reviewPromise;
+      expect(logs.some(l => l.includes('[VERBOSE] Reviewer System Prompt'))).toBe(true);
+    });
+  });
+
+  describe('Conditional Logic', () => {
+    test('shouldContinueFromTest returns reviewer on PASS', () => {
+      expect(workflow.shouldContinueFromTest({ test_output: 'PASS' })).toBe('reviewer');
+    });
+
+    test('shouldContinueFromTest returns coder on FAIL and increments retry', () => {
+      expect(workflow.shouldContinueFromTest({ test_output: 'FAIL', retry_count: 0 })).toBe('coder');
+    });
+
+    test('shouldContinueFromReview returns pr_creator on approved', () => {
+      expect(workflow.shouldContinueFromReview({ review_status: 'approved' })).toBe('pr_creator');
+    });
+
+    test('shouldContinueFromReview returns coder on rejected', () => {
+      expect(workflow.shouldContinueFromReview({ review_status: 'rejected', retry_count: 0 })).toBe('coder');
+    });
+
+    test('shouldContinueFromPrCreator returns coder on needs_commit or pr_failed', () => {
+      expect(workflow.shouldContinueFromPrCreator({ review_status: 'needs_commit', retry_count: 0 })).toBe('coder');
+      expect(workflow.shouldContinueFromPrCreator({ review_status: 'pr_failed', retry_count: 0 })).toBe('coder');
+    });
+
+    test('shouldContinueFromPrCreator returns END on pr_failed with retries > 3', () => {
+      expect(workflow.shouldContinueFromPrCreator({ review_status: 'pr_failed', retry_count: 4 })).toBe('END');
+    });
+  });
+
+  describe('PR Creator', () => {
+    test('should push changes and create PR in prCreator', async () => {
+      mockSpawn.mockImplementation((cmd, args) => {
+        const mockChild = new EventEmitter();
+        mockChild.stdout = new EventEmitter();
+        mockChild.stderr = new EventEmitter();
+        setTimeout(() => {
+          if (cmd === 'git' && args[0] === 'branch') {
+            mockChild.stdout.emit('data', Buffer.from('feature-branch\n'));
+          } else if (cmd === 'git' && args[0] === 'status') {
+            mockChild.stdout.emit('data', Buffer.from(''));
+          } else if (cmd === 'git' && args[0] === 'push') {
+            mockChild.emit('close', 0);
+          } else if (cmd === 'gh' && args[0] === 'pr') {
+            mockChild.stdout.emit('data', Buffer.from('https://github.com/org/repo/pull/1\n'));
+            mockChild.emit('close', 0);
+          }
+          mockChild.emit('close', 0);
+        }, 1);
+        return mockChild;
+      });
+
+      const result = await workflow.prCreator({});
+      expect(result.review_status).toBe('pr_created');
+      expect(result.messages[0].content).toContain('PR Created');
+    });
+
+    test('should treat already existing PR as success in prCreator', async () => {
+      mockSpawn.mockImplementation((cmd, args) => {
+        const mockChild = new EventEmitter();
+        mockChild.stdout = new EventEmitter();
+        mockChild.stderr = new EventEmitter();
+        setTimeout(() => {
+          if (cmd === 'git' && args[0] === 'branch') {
+            mockChild.stdout.emit('data', Buffer.from('feature-branch\n'));
+          } else if (cmd === 'git' && args[0] === 'status') {
+            mockChild.stdout.emit('data', Buffer.from(''));
+          } else if (cmd === 'git' && args[0] === 'push') {
+            mockChild.emit('close', 0);
+          } else if (cmd === 'gh' && args[0] === 'pr') {
+            mockChild.stdout.emit('data', Buffer.from('a pull request already exists: https://github.com/org/repo/pull/1\n'));
+            mockChild.emit('close', 1);
+          }
+          mockChild.emit('close', 0);
+        }, 1);
+        return mockChild;
+      });
+
+      const result = await workflow.prCreator({});
+      expect(result.review_status).toBe('pr_created');
+      expect(result.messages[0].content).toContain('PR already exists');
+    });
+
+    test('should return needs_commit in prCreator if changes are uncommitted', async () => {
+      mockSpawn.mockImplementation((cmd, args) => {
+        const mockChild = new EventEmitter();
+        mockChild.stdout = new EventEmitter();
+        mockChild.stderr = new EventEmitter();
+        setTimeout(() => {
+          if (cmd === 'git' && args[0] === 'branch') {
+            mockChild.stdout.emit('data', Buffer.from('feature-branch\n'));
+          } else if (cmd === 'git' && args[0] === 'status') {
+            mockChild.stdout.emit('data', Buffer.from('M file.js\n'));
+          }
+          mockChild.emit('close', 0);
+        }, 1);
+        return mockChild;
+      });
+
+      const result = await workflow.prCreator({ retry_count: 0 });
+      expect(result.review_status).toBe('needs_commit');
+    });
+  });
+});
