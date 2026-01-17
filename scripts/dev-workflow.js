@@ -81,6 +81,15 @@ const agentStateChannels = {
   retry_count: {
     value: updateLatest,
     default: () => 0,
+  },
+
+  /**
+   * The URL of the created or existing Pull Request.
+   * String content.
+   */
+  pr_url: {
+    value: updateLatest,
+    default: () => "",
   }
 };
 
@@ -502,6 +511,7 @@ export class WorkflowManager {
           await this.notify("Workflow: Success", `PR already exists: ${prUrl}`, 3);
           return { 
             review_status: "pr_created",
+            pr_url: prUrl,
             messages: [new SystemMessage(`PR already exists: ${prUrl}`)]
           };
         }
@@ -512,6 +522,7 @@ export class WorkflowManager {
 
       return { 
         review_status: "pr_created",
+        pr_url: prOutput.trim(),
         messages: [new SystemMessage(`PR Created: ${prOutput.trim()}`)]
       };
     } catch (error) {
@@ -674,7 +685,7 @@ if (process.argv[1] === __filename) {
   workflow.run(prompt).then((result) => {
     // Check final state for success
     if (result.review_status === "pr_created") {
-        console.log("Workflow completed successfully. PR created.");
+        console.log(`Workflow completed successfully. PR created: ${result.pr_url || "N/A"}`);
         process.exit(0);
     } else if (result.review_status === "pr_skipped") {
         console.log("Workflow completed successfully. PR skipped (not on a feature branch).");
