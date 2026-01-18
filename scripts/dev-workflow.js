@@ -369,8 +369,6 @@ export class WorkflowManager {
     const { messages, issue_url } = state;
     this.logger.log("--- Planner Node ---");
 
-    const rl = readline.createInterface({ input, output });
-    
     let currentIssueUrl = issue_url;
     if (!currentIssueUrl) {
       const initialRequest = messages[0].content;
@@ -392,12 +390,15 @@ export class WorkflowManager {
       this.logger.log(`Warning: Failed to fetch issue details. Proceeding without issue context.`);
     }
 
-    let planApproved = false;
+    const rl = readline.createInterface({ input, output });
     let finalPlan = "";
-    let feedback = "";
 
-    while (!planApproved) {
-      const systemPrompt = `You are a technical architect. Based on the following GitHub issue and user feedback, generate a detailed implementation plan.
+    try {
+      let planApproved = false;
+      let feedback = "";
+
+      while (!planApproved) {
+        const systemPrompt = `You are a technical architect. Based on the following GitHub issue and user feedback, generate a detailed implementation plan.
       
       ISSUE CONTENT:
       ${issueContent}
@@ -413,24 +414,25 @@ export class WorkflowManager {
       
       Format the output clearly for a human to review.`;
 
-      this.logger.log("\nGenerating plan...");
-      finalPlan = await this.invokeGemini(systemPrompt, ['--yolo']);
-      
-      this.logger.log("\n--- PROPOSED PLAN ---");
-      this.logger.log(finalPlan);
-      this.logger.log("\n---------------------\n");
+        this.logger.log("\nGenerating plan...");
+        finalPlan = await this.invokeGemini(systemPrompt, ['--yolo']);
+        
+        this.logger.log("\n--- PROPOSED PLAN ---");
+        this.logger.log(finalPlan);
+        this.logger.log("\n---------------------\n");
 
-      const answer = await rl.question("Do you approve this plan? (yes/no/feedback): ");
-      const trimmedAnswer = answer.toLowerCase().trim();
+        const answer = await rl.question("Do you approve this plan? (yes/no/feedback): ");
+        const trimmedAnswer = answer.toLowerCase().trim();
 
-      if (trimmedAnswer === 'yes' || trimmedAnswer === 'y') {
-        planApproved = true;
-      } else {
-        feedback = await rl.question("Please provide feedback or specific requirements: ");
+        if (trimmedAnswer === 'yes' || trimmedAnswer === 'y') {
+          planApproved = true;
+        } else {
+          feedback = await rl.question("Please provide feedback or specific requirements: ");
+        }
       }
+    } finally {
+      rl.close();
     }
-
-    rl.close();
 
     this.logger.log("Plan approved. Commenting on GitHub issue...");
     await this.runCommand('gh', ['issue', 'comment', currentIssueUrl, '--body', `## Approved Implementation Plan\n\n${finalPlan}`]);

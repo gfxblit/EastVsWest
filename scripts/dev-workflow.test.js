@@ -173,9 +173,39 @@ describe('WorkflowManager', () => {
         const result = await workflow.planner(state);
   
         expect(result.plan_approved).toBe(true);
-        expect(mockSpawn).toHaveBeenCalledTimes(4); // 1 (gh view) + 1 (gemini v1) + 1 (gemini v2) + 1 (gh comment)
-        expect(mockRlInstance.question).toHaveBeenCalledTimes(3);
+      expect(mockSpawn).toHaveBeenCalledTimes(4); // 1 (gh view) + 1 (gemini v1) + 1 (gemini v2) + 1 (gh comment)
+      expect(mockRlInstance.question).toHaveBeenCalledTimes(3);
+      expect(mockRlInstance.close).toHaveBeenCalled();
+    });
+
+    test('should NOT create readline if no issue URL is found', async () => {
+      const state = { messages: [{ content: 'no url here' }], issue_url: '' };
+      await workflow.planner(state);
+      expect(readline.createInterface).not.toHaveBeenCalled();
+    });
+
+    test('should close readline if an error occurs during planning', async () => {
+      const issueUrl = 'https://github.com/gfxblit/EastVsWest/issues/271';
+      const state = { messages: [{ content: issueUrl }], issue_url: issueUrl };
+      
+      mockSpawn.mockImplementation((cmd, args) => {
+        const mockChild = new EventEmitter();
+        mockChild.stdout = new EventEmitter();
+        mockChild.stderr = new EventEmitter();
+        setTimeout(() => {
+          if (cmd === 'gh' && args[0] === 'issue' && args[1] === 'view') {
+            mockChild.stdout.emit('data', Buffer.from('Issue Body'));
+            mockChild.emit('close', 0);
+          } else {
+            mockChild.emit('error', new Error('Gemini failed'));
+          }
+        }, 1);
+        return mockChild;
       });
+
+      await expect(workflow.planner(state)).rejects.toThrow();
+      expect(mockRlInstance.close).toHaveBeenCalled();
+    });
   });
 
   test('coder node should use final_plan if available', async () => {
