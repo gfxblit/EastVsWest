@@ -122,8 +122,8 @@ describe('Combat Integration', () => {
         .eq('player_id', playerUserId)
     ]);
 
-    // Small sleep to let Realtime catch up
-    await new Promise(resolve => setTimeout(resolve, 100));
+    // Longer sleep to let Realtime catch up with postgres_changes events
+    await new Promise(resolve => setTimeout(resolve, 500));
 
     // Wait for state to sync in snapshots
     await waitFor(() => {
