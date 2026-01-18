@@ -362,6 +362,8 @@ export class WorkflowManager {
 
     let systemPrompt = `You are a software engineer. Implement the following request: ${initialRequest}. 
     You have access to the file system and git.
+
+    MANDATORY: You MUST activate the 'tdd-guide' skill to ensure a Test-Driven Development workflow.
     
     IMPORTANT: You MUST commit your changes using git. You may create multiple commits if it makes sense for the task.
     Please output the code changes in markdown blocks as well for the conversation record.`;
