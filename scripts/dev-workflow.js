@@ -766,6 +766,34 @@ export class WorkflowManager {
     workflow.addEdge("planner", "coder");
     workflow.addEdge("coder", "test_runner");
 
+    workflow.addConditionalEdges(
+      "test_runner",
+      this.shouldContinueFromTest.bind(this),
+      {
+        reviewer: "reviewer",
+        coder: "coder",
+        [END]: END
+      }
+    );
+
+    workflow.addConditionalEdges(
+      "reviewer",
+      this.shouldContinueFromReview.bind(this),
+      {
+        pr_creator: "pr_creator",
+        coder: "coder",
+        [END]: END
+      }
+    );
+
+    workflow.addConditionalEdges(
+      "pr_creator",
+      this.shouldContinueFromPrCreator.bind(this),
+      {
+        [END]: END
+      }
+    );
+
     this.graph = workflow.compile();
     return this.graph;
   }

@@ -83,6 +83,41 @@ describe('WorkflowManager', () => {
     expect(mockStateGraphInstance.compile).toHaveBeenCalled(); // Ensure compile is called
   });
 
+  test('should add all required conditional edges for workflow transitions', () => {
+    workflow.createGraph();
+    
+    // Check test_runner transitions
+    expect(mockStateGraphInstance.addConditionalEdges).toHaveBeenCalledWith(
+      'test_runner',
+      expect.any(Function),
+      expect.objectContaining({
+        reviewer: 'reviewer',
+        coder: 'coder',
+        END: 'END'
+      })
+    );
+
+    // Check reviewer transitions
+    expect(mockStateGraphInstance.addConditionalEdges).toHaveBeenCalledWith(
+      'reviewer',
+      expect.any(Function),
+      expect.objectContaining({
+        pr_creator: 'pr_creator',
+        coder: 'coder',
+        END: 'END'
+      })
+    );
+
+    // Check pr_creator transitions
+    expect(mockStateGraphInstance.addConditionalEdges).toHaveBeenCalledWith(
+      'pr_creator',
+      expect.any(Function),
+      expect.objectContaining({
+        END: 'END'
+      })
+    );
+  });
+
   test('should compile successfully when startNode is "planner"', () => {
     workflow = new WorkflowManager({ log: () => {} }, "planner");
     expect(() => workflow.createGraph()).not.toThrow();
