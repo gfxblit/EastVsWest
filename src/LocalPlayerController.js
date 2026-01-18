@@ -47,6 +47,9 @@ export class LocalPlayerController {
       lastSpecialTime: 0,
       isAttacking: false,
       attackAnimTime: 0,
+      stunnedUntil: 0,
+      isLunging: false,
+      lungeTime: 0,
       velocity: {
         x: data?.velocity_x || 0,
         y: data?.velocity_y || 0
@@ -66,19 +69,36 @@ export class LocalPlayerController {
   update(deltaTime, playersSnapshot, loot = []) {
     if (!this.player) return;
 
-    // If dead, ensure velocity is zero and skip movement/animation updates
-    if (this.isDead()) {
+    // Handle Stunned State
+    if (Date.now() < this.player.stunnedUntil) {
+      this.player.velocity = { x: 0, y: 0 };
+      this.player.isAttacking = false;
+      this.player.isLunging = false;
+    } 
+    // Handle Lunge State
+    else if (this.player.isLunging) {
+        this.player.lungeTime -= deltaTime;
+        if (this.player.lungeTime <= 0) {
+            this.player.isLunging = false;
+            this.player.velocity = { x: 0, y: 0 };
+        }
+        this.#updatePhysics(deltaTime);
+        this.#updateAnimation(deltaTime);
+    }
+    // Normal State
+    else if (this.isDead()) {
+      // If dead, ensure velocity is zero and skip movement/animation updates
       this.player.velocity = { x: 0, y: 0 };
       this.player.isAttacking = false;
     } else {
       this.#updatePhysics(deltaTime);
       this.#updateAnimation(deltaTime);
       this.#handleLootInteraction(loot);
-    }
-    
-    // Handle Attack/Special Ability continuously if button is held
-    if (this.inputState.attack || this.inputState.specialAbility) {
-      this.#handleAttack(this.inputState);
+      
+      // Handle Attack/Special Ability continuously if button is held
+      if (this.inputState.attack || this.inputState.specialAbility) {
+        this.#handleAttack(this.inputState);
+      }
     }
     
     if (playersSnapshot) {
@@ -190,6 +210,9 @@ export class LocalPlayerController {
       if (snapshotData.equipped_armor !== undefined) {
         this.player.armor = snapshotData.equipped_armor;
       }
+      if (snapshotData.stunned_until !== undefined) {
+        this.player.stunnedUntil = snapshotData.stunned_until;
+      }
     }
   }
 
@@ -243,10 +266,12 @@ export class LocalPlayerController {
 
     // Update stored input state
     this.inputState = { ...this.inputState, ...inputState };
-    // Disable input if dead
-    if (this.isDead()) {
+    
+    // Disable input if dead, stunned, or lunging
+    if (this.isDead() || Date.now() < this.player.stunnedUntil || this.player.isLunging) {
       this.inputState.attack = false;
       this.inputState.specialAbility = false;
+      // If stunned or lunging, we don't update velocity from input
       return;
     }
 
@@ -295,6 +320,20 @@ export class LocalPlayerController {
         this.player.lastSpecialTime = now;
       } else {
         this.player.lastAttackTime = now;
+      }
+
+      // Special Ability Logic: Spear Lunge
+      if (isSpecial && weaponConfig.specialAbility === 'lunge') {
+         this.player.isLunging = true;
+         this.player.lungeTime = 0.2; // 200ms dash
+         
+         // Calculate lunge velocity (3x speed)
+         const speed = CONFIG.PLAYER.BASE_MOVEMENT_SPEED * 3;
+         const angle = this.player.rotation - Math.PI / 2;
+         this.player.velocity = {
+             x: Math.cos(angle) * speed,
+             y: Math.sin(angle) * speed
+         };
       }
 
       // Set local animation state
