@@ -48,12 +48,15 @@ describe('Loot Integration', () => {
       new Promise(resolve => warmupChannel2.subscribe(status => status === 'SUBSCRIBED' && resolve()))
     ]);
 
+    // Keep channels connected briefly to ensure WebSocket is stable
+    await new Promise(resolve => setTimeout(resolve, 200));
+
     // Clean up warmup channels
     await hostSupabase.removeChannel(warmupChannel1);
     await playerSupabase.removeChannel(warmupChannel2);
 
-    // Brief delay after warmup
-    await new Promise(resolve => setTimeout(resolve, 100));
+    // Longer delay after warmup to ensure connection is fully stable
+    await new Promise(resolve => setTimeout(resolve, 300));
   });
 
   beforeEach(async () => {
