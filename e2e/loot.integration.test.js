@@ -37,6 +37,23 @@ describe('Loot Integration', () => {
 
     hostUserId = hostAuth.user.id;
     playerUserId = playerAuth.user.id;
+
+    // Warm up Supabase Realtime connections to avoid cold-start timing issues
+    // This establishes the WebSocket connection before the actual tests run
+    const warmupChannel1 = hostSupabase.channel('warmup-host');
+    const warmupChannel2 = playerSupabase.channel('warmup-player');
+
+    await Promise.all([
+      new Promise(resolve => warmupChannel1.subscribe(status => status === 'SUBSCRIBED' && resolve())),
+      new Promise(resolve => warmupChannel2.subscribe(status => status === 'SUBSCRIBED' && resolve()))
+    ]);
+
+    // Clean up warmup channels
+    await hostSupabase.removeChannel(warmupChannel1);
+    await playerSupabase.removeChannel(warmupChannel2);
+
+    // Brief delay after warmup
+    await new Promise(resolve => setTimeout(resolve, 100));
   });
 
   beforeEach(async () => {
