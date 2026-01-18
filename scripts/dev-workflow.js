@@ -101,24 +101,6 @@ const agentStateChannels = {
     value: updateLatest,
     default: () => '',
   },
-
-  /**
-   * Whether the plan has been approved by a human.
-   * Boolean.
-   */
-  plan_approved: {
-    value: updateLatest,
-    default: () => false,
-  },
-
-  /**
-   * The finalized plan after human approval.
-   * String content.
-   */
-  final_plan: {
-    value: updateLatest,
-    default: () => '',
-  },
 };
 
 /**
@@ -128,7 +110,7 @@ const agentStateChannels = {
  * Uses the `gemini` CLI tool for LLM inference instead of direct API calls.
  */
 export class WorkflowManager {
-  constructor(logger = console, startNode = 'coder', verbose = false) {
+  constructor(logger = console, startNode = undefined, verbose = false) {
     this.graph = null;
     this.logger = logger;
     this.startNode = startNode;
@@ -371,113 +353,8 @@ export class WorkflowManager {
 
   // --- Nodes ---
 
-  async planner(state) {
-    const { messages, issue_url } = state;
-    this.logger.log('--- Planner Node ---');
-
-    let currentIssueUrl = issue_url;
-    if (!currentIssueUrl) {
-      const initialRequest = messages[0].content;
-      const issueMatch = initialRequest.match(/https:\/\/github\.com\/[^\s]+\/issues\/\d+/);
-      if (issueMatch) {
-        currentIssueUrl = issueMatch[0];
-      }
-    }
-
-    if (!currentIssueUrl) {
-      this.logger.log('No issue URL found. Skipping planner.');
-      return { plan_approved: true };
-    }
-
-    this.logger.log(`Fetching issue details for: ${currentIssueUrl}...`);
-    const { output: issueContent, exitCode } = await this.runCommand('gh', [
-      'issue',
-      'view',
-      currentIssueUrl,
-    ]);
-
-    if (exitCode !== 0) {
-      this.logger.log('Warning: Failed to fetch issue details. Proceeding without issue context.');
-    }
-
-    const rl = readline.createInterface({ input, output });
-    let finalPlan = '';
-
-    try {
-      let planApproved = false;
-      let feedback = '';
-
-      while (!planApproved) {
-        const systemPrompt = `You are a technical architect. Based on the following GitHub issue and user feedback, generate a detailed implementation plan.
-      
-      ISSUE CONTENT:
-      ${issueContent}
-      
-      PREVIOUS FEEDBACK:
-      ${feedback || 'None'}
-      
-      The plan MUST include:
-      1. Requirements Summary: Clear list of what needs to be done.
-      2. Importance: Why this change is needed.
-      3. Test Plan: How the changes will be verified (Unit, Integration, E2E).
-      4. Implementation Plan: Step-by-step technical approach.
-      
-      Format the output clearly and concisely for a human to review, with low cognitive overhead.
-      
-      CRITICAL: You are in PLANNING MODE. ONLY generate the architectural plan and technical approach. 
-      DO NOT start implementing any code. 
-      DO NOT use any tools that modify the filesystem (like write_file, replace, etc.).
-      You MAY use tools to read the codebase (like read_file, search_file_content) to inform your plan.
-      NEVER submit code changes or run implementation-related commands in this phase.`;
-
-        this.logger.log('\nGenerating plan...');
-        const plannerAllowedTools = [
-          'read_file',
-          'search_file_content',
-          'list_directory',
-          'glob',
-          'delegate_to_agent',
-        ];
-        finalPlan = await this.invokeGemini(
-          systemPrompt,
-          plannerAllowedTools.flatMap((tool) => ['--allowed-tools', tool]),
-        );
-
-        this.logger.log('\n--- PROPOSED PLAN ---');
-        this.logger.log(finalPlan);
-        this.logger.log('\n---------------------\n');
-
-        const answer = await rl.question('Do you approve this plan? (yes/no/feedback): ');
-        const trimmedAnswer = answer.toLowerCase().trim();
-
-        if (trimmedAnswer === 'yes' || trimmedAnswer === 'y') {
-          planApproved = true;
-        } else {
-          feedback = await rl.question('Please provide feedback or specific requirements: ');
-        }
-      }
-    } finally {
-      rl.close();
-    }
-
-    this.logger.log('Plan approved. Commenting on GitHub issue...');
-    await this.runCommand('gh', [
-      'issue',
-      'comment',
-      currentIssueUrl,
-      '--body',
-      `## Approved Implementation Plan\n\n${finalPlan}`,
-    ]);
-
-    return {
-      issue_url: currentIssueUrl,
-      plan_approved: true,
-      final_plan: finalPlan,
-    };
-  }
-
   async coder(state) {
-    const { messages, test_output, review_status, final_plan } = state;
+    const { messages, test_output, review_status } = state;
     this.logger.log('--- Coder Node ---');
 
     // Extract the user's initial request (always the first message)
@@ -489,10 +366,6 @@ export class WorkflowManager {
     IMPORTANT: You MUST commit your changes using git. You may create multiple commits if it makes sense for the task.
     Please output the code changes in markdown blocks as well for the conversation record.`;
 
-    if (final_plan) {
-      systemPrompt += `\n\nAPPROVED PLAN:\n${final_plan}`;
-    }
-
     // Add context from failures if applicable
     if (test_output && (test_output.includes('FAIL') || test_output.includes('failed'))) {
       systemPrompt = `Your previous implementation failed tests. 
@@ -501,10 +374,6 @@ export class WorkflowManager {
         ${test_output}
         
         Please fix the code to satisfy the tests and the original request: ${initialRequest}.`;
-
-      if (final_plan) {
-        systemPrompt += `\n\nFollow the approved plan:\n${final_plan}`;
-      }
 
       systemPrompt += '\n\nMake sure to commit your fixes.';
     } else if (review_status === 'rejected') {
@@ -516,19 +385,11 @@ export class WorkflowManager {
         
         Please fix the code to satisfy the reviewer and the original request: ${initialRequest}.`;
 
-      if (final_plan) {
-        systemPrompt += `\n\nFollow the approved plan:\n${final_plan}`;
-      }
-
       systemPrompt += '\n\nMake sure to commit your fixes.';
     } else if (review_status === 'needs_commit') {
       systemPrompt = `You have uncommitted changes that prevent PR creation. 
         Please review your changes and commit them using git.
         Original request: ${initialRequest}`;
-
-      if (final_plan) {
-        systemPrompt += `\n\nFollow the approved plan:\n${final_plan}`;
-      }
     }
 
     if (this.verbose) {
@@ -781,14 +642,13 @@ export class WorkflowManager {
     });
 
     // Add Nodes
-    workflow.addNode('planner', this.planner.bind(this));
     workflow.addNode('coder', this.coder.bind(this));
     workflow.addNode('test_runner', this.testRunner.bind(this));
     workflow.addNode('reviewer', this.reviewer.bind(this));
     workflow.addNode('pr_creator', this.prCreator.bind(this));
 
     // Define valid starting nodes
-    const validNodes = ['planner', 'coder', 'test_runner', 'reviewer', 'pr_creator'];
+    const validNodes = ['coder', 'test_runner', 'reviewer', 'pr_creator'];
     // Determine the actual entry node based on this.startNode
     const entryNode = validNodes.includes(this.startNode) ? this.startNode : 'coder';
 
@@ -812,7 +672,6 @@ export class WorkflowManager {
       Object.fromEntries(validNodes.map((node) => [node, node])),
     );
 
-    workflow.addEdge('planner', 'coder');
     workflow.addEdge('coder', 'test_runner');
 
     workflow.addConditionalEdges('test_runner', this.shouldContinueFromTest.bind(this), {
@@ -838,9 +697,13 @@ export class WorkflowManager {
   async run(input) {
     // Detect if input is a GitHub issue URL to set initial node to planner
     const issueMatch = input.match(/https:\/\/github\.com\/[^\s]+\/issues\/\d+/);
-    if (issueMatch && this.startNode === 'coder') {
-      this.startNode = 'planner';
+
+    // Auto-detect start node if not explicitly provided
+    if (!this.startNode) {
+      this.startNode = 'coder';
     }
+
+    this.logger.log(`Starting workflow at node: ${this.startNode}`);
 
     if (!this.graph) {
       this.createGraph();
@@ -869,7 +732,7 @@ if (process.argv[1] === __filename) {
   }
 
   const args = process.argv.slice(2);
-  let startNode = 'coder';
+  let startNode = undefined;
   let verbose = false;
   const promptParts = [];
 
@@ -893,7 +756,6 @@ if (process.argv[1] === __filename) {
   }
 
   const workflow = new WorkflowManager(console, startNode, verbose);
-  console.log(`Starting workflow at node: ${startNode}`);
   workflow
     .run(prompt)
     .then(async (result) => {
