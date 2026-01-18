@@ -396,6 +396,25 @@ describe('WorkflowManager', () => {
       await expect(invokePromise).rejects.toThrow(/Gemini CLI exited with code 1/);
       expect(mockSpawn).toHaveBeenCalledTimes(1);
     });
+
+    test('Preferred Model: Should use preferred model first', async () => {
+      const mockChild = new EventEmitter();
+      mockChild.stdout = new EventEmitter();
+      mockChild.stderr = new EventEmitter();
+      mockSpawn.mockReturnValue(mockChild);
+
+      const invokePromise = workflow.invokeGemini('Hello', [], 'gemini-2.5-pro');
+
+      setTimeout(() => {
+        mockChild.stdout.emit('data', Buffer.from('Response'));
+        mockChild.emit('close', 0);
+      }, 10);
+
+      await invokePromise;
+      expect(mockSpawn).toHaveBeenCalled();
+      const callArgs = mockSpawn.mock.calls[0][1];
+      expect(callArgs).toContain('gemini-2.5-pro');
+    });
   });
 
   describe('Tools', () => {
@@ -627,6 +646,29 @@ describe('WorkflowManager', () => {
       const result = await workflow.reviewer({ test_output: 'FAIL', retry_count: 0 });
       expect(result.review_status).toBe('rejected');
       expect(result.retry_count).toBe(1);
+    });
+
+    test('reviewer node should use gemini-2.5-pro as the primary model', async () => {
+      const mockChild = new EventEmitter();
+      mockChild.stdout = new EventEmitter();
+      mockChild.stderr = new EventEmitter();
+      mockSpawn.mockReturnValue(mockChild);
+
+      const reviewPromise = workflow.reviewer({ test_output: 'PASS', retry_count: 0 });
+
+      setTimeout(() => {
+        mockChild.stdout.emit('data', Buffer.from('APPROVED'));
+        mockChild.emit('close', 0);
+      }, 10);
+
+      await reviewPromise;
+
+      // Verify that the first call to spawn (for gemini) used gemini-2.5-pro
+      expect(mockSpawn).toHaveBeenCalled();
+      const callArgs = mockSpawn.mock.calls[0][1];
+      const modelIndex = callArgs.indexOf('-m');
+      expect(modelIndex).toBeGreaterThan(-1);
+      expect(callArgs[modelIndex + 1]).toBe('gemini-2.5-pro');
     });
   });
 

@@ -200,21 +200,32 @@ export class WorkflowManager {
    * Streams output to stdout and returns the full response.
    * @param {string} prompt - The prompt to send.
    * @param {Array} args - (Optional) Additional CLI arguments.
+   * @param {string} preferredModel - (Optional) Preferred model to use first.
    * @returns {Promise<string>} The generated response.
    */
-  async invokeGemini(prompt, args = []) {
-    for (let i = 0; i < DEFAULT_MODELS.length; i++) {
-      const model = DEFAULT_MODELS[i];
+  async invokeGemini(prompt, args = [], preferredModel = null) {
+    const models = [...DEFAULT_MODELS];
+    
+    if (preferredModel) {
+      const index = models.indexOf(preferredModel);
+      if (index > -1) {
+        models.splice(index, 1);
+      }
+      models.unshift(preferredModel);
+    }
+
+    for (let i = 0; i < models.length; i++) {
+      const model = models[i];
       try {
         this.logger.log(`Using model: ${model}`);
         return await this._executeGemini(prompt, model, args);
       } catch (error) {
         const isQuotaError =
           error.message.includes('TerminalQuotaError') || error.message.includes('429');
-        const isLastModel = i === DEFAULT_MODELS.length - 1;
+        const isLastModel = i === models.length - 1;
 
         if (isQuotaError && !isLastModel) {
-          const nextModel = DEFAULT_MODELS[i + 1];
+          const nextModel = models[i + 1];
           this.logger.log(`Quota exhausted for ${model}. Falling back to ${nextModel}...`);
           continue;
         }
@@ -474,7 +485,7 @@ export class WorkflowManager {
       this.logger.log('--------------------------------------\n');
     }
 
-    const reviewContent = await this.invokeGemini(systemPrompt, ['--yolo']);
+    const reviewContent = await this.invokeGemini(systemPrompt, ['--yolo'], 'gemini-2.5-pro');
 
     // Flexible check for "APPROVED" as a standalone word in the response
     const isApproved = /\bAPPROVED\b/i.test(reviewContent);
