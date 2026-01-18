@@ -70,12 +70,11 @@ describe('WorkflowManager', () => {
     mockRlInstance.close.mockClear();
     delete process.env.NTFY_CHANNEL;
 
-    workflow = new WorkflowManager({ log: () => {} }, 'coder');
+    workflow = new WorkflowManager({ log: () => {} });
   });
 
   test('should create a state graph with all required nodes and compile successfully', () => {
     workflow.createGraph();
-    expect(mockStateGraphInstance.addNode).toHaveBeenCalledWith('planner', expect.any(Function));
     expect(mockStateGraphInstance.addNode).toHaveBeenCalledWith('coder', expect.any(Function));
     expect(mockStateGraphInstance.addNode).toHaveBeenCalledWith(
       'test_runner',
@@ -121,7 +120,7 @@ describe('WorkflowManager', () => {
     );
   });
 
-  const validStartNodes = ['planner', 'coder', 'test_runner', 'reviewer', 'pr_creator'];
+  const validStartNodes = ['coder', 'test_runner', 'reviewer', 'pr_creator'];
 
   test.each(validStartNodes)('should compile successfully when startNode is "%s"', (startNode) => {
     workflow = new WorkflowManager({ log: () => {} }, startNode);
@@ -144,145 +143,9 @@ describe('WorkflowManager', () => {
     expect(mockStateGraphInstance.compile).toHaveBeenCalled();
     expect(
       logs.some((l) =>
-        l.includes('Valid nodes are: planner, coder, test_runner, reviewer, pr_creator'),
+        l.includes('Valid nodes are: coder, test_runner, reviewer, pr_creator'),
       ),
     ).toBe(true);
-  });
-
-  test('should detect issue URL and start at planner', async () => {
-    const issueUrl = 'https://github.com/gfxblit/EastVsWest/issues/271';
-    await workflow.run(issueUrl);
-    expect(workflow.startNode).toBe('planner');
-  });
-
-  describe('Planner Node', () => {
-    test('should fetch issue, generate plan, and wait for approval', async () => {
-      const issueUrl = 'https://github.com/gfxblit/EastVsWest/issues/271';
-      const state = { messages: [{ content: issueUrl }], issue_url: issueUrl };
-
-      // Mock gh issue view
-      mockSpawn.mockImplementation((cmd, args) => {
-        const mockChild = new EventEmitter();
-        mockChild.stdout = new EventEmitter();
-        mockChild.stderr = new EventEmitter();
-        setTimeout(() => {
-          if (cmd === 'gh' && args[0] === 'issue' && args[1] === 'view') {
-            mockChild.stdout.emit('data', Buffer.from('Issue Title\nIssue Body'));
-          } else if (cmd === 'gemini') {
-            mockChild.stdout.emit('data', Buffer.from('Proposed Plan'));
-          } else if (cmd === 'gh' && args[1] === 'comment') {
-            mockChild.emit('close', 0);
-          }
-          mockChild.emit('close', 0);
-        }, 1);
-        return mockChild;
-      });
-
-      mockRlInstance.question.mockResolvedValueOnce('yes');
-
-      const result = await workflow.planner(state);
-
-      expect(result.plan_approved).toBe(true);
-      expect(result.final_plan).toBe('Proposed Plan');
-      expect(mockSpawn).toHaveBeenCalledWith(
-        'gh',
-        expect.arrayContaining(['issue', 'view', issueUrl]),
-        expect.anything(),
-      );
-      expect(mockSpawn).toHaveBeenCalledWith(
-        'gh',
-        expect.arrayContaining(['issue', 'comment', issueUrl]),
-        expect.anything(),
-      );
-      expect(mockRlInstance.question).toHaveBeenCalledWith(
-        expect.stringContaining('Do you approve this plan?'),
-      );
-    });
-
-    test('should handle feedback and regenerate plan', async () => {
-      const issueUrl = 'https://github.com/gfxblit/EastVsWest/issues/271';
-      const state = { messages: [{ content: issueUrl }], issue_url: issueUrl };
-
-      mockSpawn.mockImplementation((cmd, args) => {
-        const mockChild = new EventEmitter();
-        mockChild.stdout = new EventEmitter();
-        mockChild.stderr = new EventEmitter();
-        setTimeout(() => {
-          if (cmd === 'gh' && args[0] === 'issue' && args[1] === 'view') {
-            mockChild.stdout.emit('data', Buffer.from('Issue Body'));
-          } else if (cmd === 'gemini') {
-            mockChild.stdout.emit('data', Buffer.from('Plan V1'));
-          } else if (cmd === 'gh' && args[1] === 'comment') {
-            mockChild.emit('close', 0);
-          }
-          mockChild.emit('close', 0);
-        }, 1);
-        return mockChild;
-      });
-
-      mockRlInstance.question
-        .mockResolvedValueOnce('no') // Disapprove
-        .mockResolvedValueOnce('Add more tests') // Feedback
-        .mockResolvedValueOnce('yes'); // Approve second version
-
-      const result = await workflow.planner(state);
-
-      expect(result.plan_approved).toBe(true);
-      expect(mockSpawn).toHaveBeenCalledTimes(4); // 1 (gh view) + 1 (gemini v1) + 1 (gemini v2) + 1 (gh comment)
-      expect(mockRlInstance.question).toHaveBeenCalledTimes(3);
-      expect(mockRlInstance.close).toHaveBeenCalled();
-    });
-
-    test('should NOT create readline if no issue URL is found', async () => {
-      const state = { messages: [{ content: 'no url here' }], issue_url: '' };
-      await workflow.planner(state);
-      expect(readline.createInterface).not.toHaveBeenCalled();
-    });
-
-    test('should close readline if an error occurs during planning', async () => {
-      const issueUrl = 'https://github.com/gfxblit/EastVsWest/issues/271';
-      const state = { messages: [{ content: issueUrl }], issue_url: issueUrl };
-
-      mockSpawn.mockImplementation((cmd, args) => {
-        const mockChild = new EventEmitter();
-        mockChild.stdout = new EventEmitter();
-        mockChild.stderr = new EventEmitter();
-        setTimeout(() => {
-          if (cmd === 'gh' && args[0] === 'issue' && args[1] === 'view') {
-            mockChild.stdout.emit('data', Buffer.from('Issue Body'));
-            mockChild.emit('close', 0);
-          } else {
-            mockChild.emit('error', new Error('Gemini failed'));
-          }
-        }, 1);
-        return mockChild;
-      });
-
-      await expect(workflow.planner(state)).rejects.toThrow();
-      expect(mockRlInstance.close).toHaveBeenCalled();
-    });
-  });
-
-  test('coder node should use final_plan if available', async () => {
-    const mockChild = new EventEmitter();
-    mockChild.stdout = new EventEmitter();
-    mockChild.stderr = new EventEmitter();
-    mockSpawn.mockReturnValue(mockChild);
-
-    const state = {
-      messages: [{ content: 'Build a login form' }],
-      final_plan: 'Use React and Tailwind',
-    };
-    const coderPromise = workflow.coder(state);
-
-    setTimeout(() => {
-      mockChild.stdout.emit('data', Buffer.from('Mocked Code Response'));
-      mockChild.emit('close', 0);
-    }, 10);
-
-    await coderPromise;
-    expect(mockSpawn.mock.calls[0][1][3]).toContain('APPROVED PLAN:');
-    expect(mockSpawn.mock.calls[0][1][3]).toContain('Use React and Tailwind');
   });
 
   test('coder node should invoke gemini and return coded status', async () => {
