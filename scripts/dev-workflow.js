@@ -690,6 +690,7 @@ export class WorkflowManager {
 
     workflow.addConditionalEdges('pr_creator', this.shouldContinueFromPrCreator.bind(this), {
       [END]: END,
+      coder: 'coder',
     });
 
     this.graph = workflow.compile();
