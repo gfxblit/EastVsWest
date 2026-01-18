@@ -412,7 +412,7 @@ export class WorkflowManager {
       3. Test Plan: How the changes will be verified (Unit, Integration, E2E).
       4. Implementation Plan: Step-by-step technical approach.
       
-      Format the output clearly for a human to review.`;
+      Format the output clearly and concisely for a human to review, with low cognitive overhead.`;
 
         this.logger.log("\nGenerating plan...");
         finalPlan = await this.invokeGemini(systemPrompt, ['--yolo']);
