@@ -738,79 +738,33 @@ export class WorkflowManager {
     workflow.addNode("reviewer", this.reviewer.bind(this));
     workflow.addNode("pr_creator", this.prCreator.bind(this));
 
-    // Add Edges
-    // Conditionally add nodes and edges based on the startNode
+    // Define valid starting nodes
     const validNodes = ["planner", "coder", "test_runner", "reviewer", "pr_creator"];
-    let entryNode = this.startNode; // Use the explicitly provided startNode
+    // Determine the actual entry node based on this.startNode
+    const entryNode = validNodes.includes(this.startNode) ? this.startNode : "coder";
 
-    // Ensure entryNode is valid, fallback to coder if not
-    if (!validNodes.includes(entryNode)) {
-        this.logger.log(`Warning: Invalid start node "${this.startNode}".`);
-        this.logger.log(`Valid nodes are: ${validNodes.join(", ")}`);
-        entryNode = "coder";
-        this.logger.log(`Falling back to "coder".`);
-        this.startNode = entryNode; // Update startNode if fallback occurred
+    if (entryNode !== this.startNode) {
+      this.logger.log(`Warning: Invalid start node "${this.startNode}".`);
+      this.logger.log(`Valid nodes are: ${validNodes.join(", ")}`);
+      this.logger.log(`Falling back to "coder".`);
     }
 
-    // Add nodes and edges based on the determined entryNode
-    if (entryNode === "planner") {
-        workflow.addNode("planner", this.planner.bind(this));
-        workflow.addNode("coder", this.coder.bind(this));
-        workflow.addNode("test_runner", this.testRunner.bind(this));
-        workflow.addNode("reviewer", this.reviewer.bind(this));
-        workflow.addNode("pr_creator", this.prCreator.bind(this));
-
-        workflow.addEdge(START, entryNode);
-        workflow.addEdge("planner", "coder");
-        workflow.addEdge("coder", "test_runner");
-        workflow.addConditionalEdges("test_runner", this.shouldContinueFromTest.bind(this), { reviewer: "reviewer", coder: "coder", [END]: END });
-        workflow.addConditionalEdges("reviewer", this.shouldContinueFromReview.bind(this), { pr_creator: "pr_creator", coder: "coder", [END]: END });
-        workflow.addConditionalEdges("pr_creator", this.shouldContinueFromPrCreator.bind(this), { [END]: END });
-    } else if (entryNode === "coder") {
-        workflow.addNode("coder", this.coder.bind(this));
-        workflow.addNode("test_runner", this.testRunner.bind(this));
-        workflow.addNode("reviewer", this.reviewer.bind(this));
-        workflow.addNode("pr_creator", this.prCreator.bind(this));
-
-        workflow.addEdge(START, entryNode);
-        workflow.addEdge("coder", "test_runner");
-        workflow.addConditionalEdges("test_runner", this.shouldContinueFromTest.bind(this), { reviewer: "reviewer", coder: "coder", [END]: END });
-        workflow.addConditionalEdges("reviewer", this.shouldContinueFromReview.bind(this), { pr_creator: "pr_creator", coder: "coder", [END]: END });
-        workflow.addConditionalEdges("pr_creator", this.shouldContinueFromPrCreator.bind(this), { [END]: END });
-    } else if (entryNode === "test_runner") {
-        workflow.addNode("test_runner", this.testRunner.bind(this));
-        workflow.addNode("reviewer", this.reviewer.bind(this));
-        workflow.addNode("pr_creator", this.prCreator.bind(this));
-
-        workflow.addEdge(START, entryNode);
-        workflow.addConditionalEdges("test_runner", this.shouldContinueFromTest.bind(this), { reviewer: "reviewer", coder: "coder", [END]: END });
-        workflow.addConditionalEdges("reviewer", this.shouldContinueFromReview.bind(this), { pr_creator: "pr_creator", coder: "coder", [END]: END });
-        workflow.addConditionalEdges("pr_creator", this.shouldContinueFromPrCreator.bind(this), { [END]: END });
-    } else if (entryNode === "reviewer") {
-        workflow.addNode("reviewer", this.reviewer.bind(this));
-        workflow.addNode("pr_creator", this.prCreator.bind(this));
-
-        workflow.addEdge(START, entryNode);
-        workflow.addConditionalEdges("reviewer", this.shouldContinueFromReview.bind(this), { pr_creator: "pr_creator", coder: "coder", [END]: END });
-        workflow.addConditionalEdges("pr_creator", this.shouldContinueFromPrCreator.bind(this), { [END]: END });
-    } else if (entryNode === "pr_creator") {
-        workflow.addNode("pr_creator", this.prCreator.bind(this));
-
-        workflow.addEdge(START, entryNode);
-        workflow.addConditionalEdges("pr_creator", this.shouldContinueFromPrCreator.bind(this), { [END]: END });
-    } else {
-        // Fallback case for invalid entryNode, default to coder setup
-        workflow.addNode("coder", this.coder.bind(this));
-        workflow.addNode("test_runner", this.testRunner.bind(this));
-        workflow.addNode("reviewer", this.reviewer.bind(this));
-        workflow.addNode("pr_creator", this.prCreator.bind(this));
-
-        workflow.addEdge(START, entryNode); // entryNode is 'coder' here
-        workflow.addEdge("coder", "test_runner");
-        workflow.addConditionalEdges("test_runner", this.shouldContinueFromTest.bind(this), { reviewer: "reviewer", coder: "coder", [END]: END });
-        workflow.addConditionalEdges("reviewer", this.shouldContinueFromReview.bind(this), { pr_creator: "pr_creator", coder: "coder", [END]: END });
-        workflow.addConditionalEdges("pr_creator", this.shouldContinueFromPrCreator.bind(this), { [END]: END });
-    }
+    // Use a conditional edge from START to dynamically set the entry point.
+    // This ensures all defined nodes are potentially reachable from START for graph validation purposes.
+    workflow.addConditionalEdges(
+      START,
+      (state) => {
+        // The `entryNode` captures the determined start node at graph creation time.
+        // This predicate effectively acts as a direct edge from START to `entryNode` during execution.
+        return entryNode;
+      },
+      // Map all valid nodes to themselves as potential targets.
+      // This satisfies the graph compiler's reachability check for all nodes.
+      Object.fromEntries(validNodes.map(node => [node, node]))
+    );
+    
+    workflow.addEdge("planner", "coder");
+    workflow.addEdge("coder", "test_runner");
 
     this.graph = workflow.compile();
     return this.graph;

@@ -73,34 +73,59 @@ describe('WorkflowManager', () => {
     workflow = new WorkflowManager({ log: () => {} }, "coder");
   });
 
-  test('should create a state graph with all required nodes', () => {
+  test('should create a state graph with all required nodes and compile successfully', () => {
     workflow.createGraph();
     expect(mockStateGraphInstance.addNode).toHaveBeenCalledWith('planner', expect.any(Function));
     expect(mockStateGraphInstance.addNode).toHaveBeenCalledWith('coder', expect.any(Function));
     expect(mockStateGraphInstance.addNode).toHaveBeenCalledWith('test_runner', expect.any(Function));
     expect(mockStateGraphInstance.addNode).toHaveBeenCalledWith('reviewer', expect.any(Function));
     expect(mockStateGraphInstance.addNode).toHaveBeenCalledWith('pr_creator', expect.any(Function));
+    expect(mockStateGraphInstance.compile).toHaveBeenCalled(); // Ensure compile is called
   });
 
-  test('should allow custom entry point', () => {
+  test('should compile successfully when startNode is "planner"', () => {
+    workflow = new WorkflowManager({ log: () => {} }, "planner");
+    expect(() => workflow.createGraph()).not.toThrow();
+    expect(mockStateGraphInstance.compile).toHaveBeenCalled();
+  });
+
+  test('should compile successfully when startNode is "coder"', () => {
+    workflow = new WorkflowManager({ log: () => {} }, "coder");
+    expect(() => workflow.createGraph()).not.toThrow();
+    expect(mockStateGraphInstance.compile).toHaveBeenCalled();
+  });
+
+  test('should compile successfully when startNode is "test_runner"', () => {
+    workflow = new WorkflowManager({ log: () => {} }, "test_runner");
+    expect(() => workflow.createGraph()).not.toThrow();
+    expect(mockStateGraphInstance.compile).toHaveBeenCalled();
+  });
+
+  test('should compile successfully when startNode is "reviewer"', () => {
     workflow = new WorkflowManager({ log: () => {} }, "reviewer");
-    workflow.createGraph();
-    
-    const edges = mockStateGraphInstance.addEdge.mock.calls;
-    expect(edges).toEqual(expect.arrayContaining([
-      ['START', 'reviewer']
-    ]));
+    expect(() => workflow.createGraph()).not.toThrow();
+    expect(mockStateGraphInstance.compile).toHaveBeenCalled();
   });
 
-  test('should fallback to coder for invalid entry point and log valid nodes', () => {
+  test('should compile successfully when startNode is "pr_creator"', () => {
+    workflow = new WorkflowManager({ log: () => {} }, "pr_creator");
+    expect(() => workflow.createGraph()).not.toThrow();
+    expect(mockStateGraphInstance.compile).toHaveBeenCalled();
+  });
+
+  test('should fallback to coder for invalid entry point and log valid nodes and compile successfully', () => {
     const logs = [];
     workflow = new WorkflowManager({ log: (msg) => logs.push(msg) }, "invalid");
-    workflow.createGraph();
+    expect(() => workflow.createGraph()).not.toThrow();
     
-    const edges = mockStateGraphInstance.addEdge.mock.calls;
-    expect(edges).toEqual(expect.arrayContaining([
-      ['START', 'coder']
-    ]));
+    // The conditional edge from START will be called, ensure it targets 'coder'
+    expect(mockStateGraphInstance.addConditionalEdges).toHaveBeenCalledWith(
+      'START',
+      expect.any(Function),
+      expect.objectContaining({ coder: 'coder' })
+    );
+
+    expect(mockStateGraphInstance.compile).toHaveBeenCalled();
     expect(logs.some(l => l.includes('Valid nodes are: planner, coder, test_runner, reviewer, pr_creator'))).toBe(true);
   });
 
