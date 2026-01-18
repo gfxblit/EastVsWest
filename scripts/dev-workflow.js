@@ -14,7 +14,8 @@ const __dirname = path.dirname(__filename);
 const DEFAULT_MODELS = [
   'gemini-3-pro-preview',
   'gemini-3-flash-preview',
-  'gemini-2.5-pro'
+  'gemini-2.5-pro',
+  'gemini-2.5-flash'
 ];
 
 // --- State Reducers ---

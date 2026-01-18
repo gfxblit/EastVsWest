@@ -431,11 +431,15 @@ describe('WorkflowManager', () => {
       const mockChild3 = new EventEmitter();
       mockChild3.stdout = new EventEmitter();
       mockChild3.stderr = new EventEmitter();
+      const mockChild4 = new EventEmitter();
+      mockChild4.stdout = new EventEmitter();
+      mockChild4.stderr = new EventEmitter();
 
       mockSpawn
         .mockReturnValueOnce(mockChild1)
         .mockReturnValueOnce(mockChild2)
-        .mockReturnValueOnce(mockChild3);
+        .mockReturnValueOnce(mockChild3)
+        .mockReturnValueOnce(mockChild4);
 
       const invokePromise = workflow.invokeGemini('Hello');
 
@@ -451,9 +455,13 @@ describe('WorkflowManager', () => {
         mockChild3.stderr.emit('data', Buffer.from('TerminalQuotaError'));
         mockChild3.emit('close', 1);
       }, 30);
+      setTimeout(() => {
+        mockChild4.stderr.emit('data', Buffer.from('TerminalQuotaError'));
+        mockChild4.emit('close', 1);
+      }, 40);
 
       await expect(invokePromise).rejects.toThrow(/All models exhausted/);
-      expect(mockSpawn).toHaveBeenCalledTimes(3);
+      expect(mockSpawn).toHaveBeenCalledTimes(4);
     });
 
     test('Immediate Failure: Should not fallback on non-quota errors', async () => {
