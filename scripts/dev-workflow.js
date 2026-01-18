@@ -412,10 +412,22 @@ export class WorkflowManager {
       3. Test Plan: How the changes will be verified (Unit, Integration, E2E).
       4. Implementation Plan: Step-by-step technical approach.
       
-      Format the output clearly and concisely for a human to review, with low cognitive overhead.`;
+      Format the output clearly and concisely for a human to review, with low cognitive overhead.
+      
+      CRITICAL: You are in PLANNING MODE. ONLY generate the architectural plan and technical approach. 
+      DO NOT start implementing any code. 
+      DO NOT use any tools that modify the filesystem (like write_file, replace, etc.).
+      You MAY use tools to read the codebase (like read_file, search_file_content) to inform your plan.
+      NEVER submit code changes or run implementation-related commands in this phase.`;
 
         this.logger.log("\nGenerating plan...");
-        finalPlan = await this.invokeGemini(systemPrompt, ['--yolo']);
+        finalPlan = await this.invokeGemini(systemPrompt, [
+          '--allowed-tools', 'read_file',
+          '--allowed-tools', 'search_file_content',
+          '--allowed-tools', 'list_directory',
+          '--allowed-tools', 'glob',
+          '--allowed-tools', 'delegate_to_agent'
+        ]);
         
         this.logger.log("\n--- PROPOSED PLAN ---");
         this.logger.log(finalPlan);
