@@ -97,20 +97,42 @@ export class HostCombatManager {
     const aimAngle = Math.atan2(aim_y - attacker.position_y, aim_x - attacker.position_x);
     const arc = this.#calculateAttackArc(weaponConfig, is_special);
     
+    // Special Ability adjustments
+    let effectiveRange = weaponConfig.range;
+    if (is_special && weaponConfig.specialAbility === 'lunge') {
+        effectiveRange += 100; // Extend range for lunge
+    }
+
     const updates = [];
     for (const [victimId, victim] of players) {
       if (victimId === attackerId || victim.health <= 0) continue;
 
-      if (this.#isTargetInAttackArc(attacker, victim, aimAngle, arc, weaponConfig.range)) {
+      if (this.#isTargetInAttackArc(attacker, victim, aimAngle, arc, effectiveRange)) {
         const damage = this.#calculateDamage(attacker, victim, weaponConfig, is_special);
         const newHealth = Math.max(0, victim.health - damage);
 
         if (newHealth !== victim.health) {
           victim.health = newHealth;
-          updates.push({
+          const update = {
             player_id: victimId,
             health: newHealth
-          });
+          };
+
+          // Apply Status Effects for Special Abilities
+          if (is_special) {
+              let stunDuration = 0;
+              if (weaponConfig.specialAbility === 'smash') stunDuration = 1000; // 1s stun
+              if (weaponConfig.specialAbility === 'charged_smack') stunDuration = 1000; // 1s stun
+              if (weaponConfig.specialAbility === 'grab_throw') stunDuration = 500; // 0.5s stun (Grab)
+
+              if (stunDuration > 0) {
+                  const stunUntil = Date.now() + stunDuration;
+                  victim.stunned_until = stunUntil;
+                  update.stunned_until = stunUntil;
+              }
+          }
+          
+          updates.push(update);
 
           // Handle Death and Kills
           if (newHealth <= 0) {
