@@ -18,7 +18,11 @@
     "test:join": "node scripts/join-test.js",
     "repl": "node scripts/player-repl.js",
     "dev:workflow": "node scripts/dev-workflow.js",
-    "generate-spritesheet": "node scripts/generate-spritesheet.js"
+    "generate-spritesheet": "node scripts/generate-spritesheet.js",
+    "lint": "eslint .",
+    "lint:fix": "eslint . --fix",
+    "format": "prettier --write \"**/*.{js,json,css,md}\"",
+    "format:check": "prettier --check \"**/*.{js,json,css,md}\""
   },
   "keywords": [
     "game",
@@ -30,12 +34,15 @@
   "author": "",
   "license": "MIT",
   "devDependencies": {
+    "@eslint/js": "^9.39.2",
     "@types/jest": "^29.5.12",
     "autoprefixer": "^10.4.23",
+    "eslint": "^9.39.2",
     "jest": "^29.7.0",
     "jest-environment-jsdom": "^29.7.0",
     "node-fetch": "^3.3.2",
     "postcss": "^8.5.6",
+    "prettier": "^3.8.0",
     "puppeteer": "^24.34.0",
     "sharp": "^0.34.5",
     "supabase": "^2.71.0",
