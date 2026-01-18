@@ -224,6 +224,7 @@ export class WorkflowManager {
     for (let i = 0; i < DEFAULT_MODELS.length; i++) {
       const model = DEFAULT_MODELS[i];
       try {
+        this.logger.log(`Using model: ${model}`);
         return await this._executeGemini(prompt, model, args);
       } catch (error) {
         const isQuotaError = error.message.includes('TerminalQuotaError') || error.message.includes('429');
