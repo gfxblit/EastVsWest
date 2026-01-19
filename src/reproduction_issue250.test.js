@@ -7,7 +7,6 @@ describe('Issue 250 Reproduction - Touch Dragging Fails', () => {
   let mockCallback;
   let mockCanvas;
   let mockJoystickBase;
-  let mockTouchControls;
 
   beforeEach(() => {
     document.body.innerHTML = `
@@ -28,7 +27,6 @@ describe('Issue 250 Reproduction - Touch Dragging Fails', () => {
 
     mockCanvas = document.getElementById('game-canvas');
     mockJoystickBase = document.getElementById('joystick-base');
-    mockTouchControls = document.getElementById('touch-controls');
 
     // Mock getBoundingClientRect
     mockCanvas.getBoundingClientRect = jest.fn(() => ({
