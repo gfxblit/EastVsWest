@@ -553,8 +553,10 @@ button:active {
 .touch-buttons {
   display: none;
   position: fixed;
-  bottom: 30px;
+  /* Position container on the bottom right to avoid conflict with the left-hand joystick */
+  bottom: 40px;
   right: 30px;
+  /* Fixed size container allows for precise "encircling" layout of action buttons */
   width: 180px;
   height: 180px;
   z-index: 1000;
@@ -584,6 +586,7 @@ button:active {
   display: flex;
   justify-content: center;
   align-items: center;
+  /* Use absolute positioning to encircle the primary attack button */
   position: absolute;
   overflow: hidden;
   /* Re-enable pointer events for the buttons themselves */
@@ -611,6 +614,7 @@ button:active {
 }
 
 .attack-btn {
+  /* Primary attack button is larger and in the bottom-right corner */
   width: 90px;
   height: 90px;
   background: linear-gradient(to bottom, #c86a5a 0%, #a84a3d 100%);
@@ -629,12 +633,14 @@ button:active {
 }
 
 .ability-btn {
+  /* Ability (Q) button positioned above the attack button */
   background: linear-gradient(to bottom, #7fb069 0%, #5a8f4f 100%);
   bottom: 100px;
   right: 10px;
 }
 
 .interact-btn {
+  /* Interact (F) button positioned to the left of the attack button */
   background: linear-gradient(to bottom, #74a5d4 0%, #5a86b8 100%);
   bottom: 70px;
   right: 90px;
