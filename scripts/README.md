@@ -112,22 +112,4 @@ node scripts/generate_vfx.js --source public/assets/vfx/slash-original.png --inp
 - **Down**: Rotated 90 degrees.
 - **Prefixing**: Automatically uses the source filename (minus `-original`) as a prefix for the outputs (e.g., `slash-up.png`).
 
-## Agentic Dev Workflow
 
-The `dev-workflow.js` script automates the TDD cycle using LangGraph and Gemini. It orchestrates coding, testing, and review phases.
-
-### Usage
-
-```bash
-node scripts/dev-workflow.js [-s coder|test_runner|reviewer|pr_creator] [-v|--verbose] [prompt]
-```
-
-### Notifications
-
-You can receive system notifications via [ntfy.sh](https://ntfy.sh) by setting the `NTFY_CHANNEL` environment variable. Notifications are sent on workflow completion (success/abort) and critical failures (test failures, review rejections, PR issues).
-
-```bash
-NTFY_CHANNEL="your-unique-channel" node scripts/dev-workflow.js "Implement double jump"
-```
-
-The notification includes the current `tmux` session name (if applicable) and the status of the workflow.

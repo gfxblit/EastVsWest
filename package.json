@@ -17,7 +17,6 @@
     "test:watch": "node --no-warnings --experimental-vm-modules node_modules/jest/bin/jest.js --watch",
     "test:join": "node scripts/join-test.js",
     "repl": "node scripts/player-repl.js",
-    "dev:workflow": "node scripts/dev-workflow.js",
     "generate-spritesheet": "node scripts/generate-spritesheet.js",
     "lint": "eslint .",
     "lint:fix": "eslint . --fix",
@@ -50,11 +49,7 @@
     "vite": "^5.4.11"
   },
   "dependencies": {
-    "@langchain/core": "^1.1.15",
-    "@langchain/langgraph": "^1.1.0",
     "@supabase/supabase-js": "^2.89.0",
-    "dotenv": "^17.2.3",
-    "eruda": "^3.4.3",
-    "zod": "^4.3.5"
+    "eruda": "^3.4.3"
   }
 }
