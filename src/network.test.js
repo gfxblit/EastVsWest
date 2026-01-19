@@ -255,34 +255,6 @@ describe('Network', () => {
       mockSupabaseClient.from = jest.fn((table) => {
         if (table === 'session_players') {
           return {
-            // Mock snapshot fetch
-            select: jest.fn().mockImplementation((_query) => {
-              // If it's the snapshot fetch (no arguments usually in this mock setup unless chain is inspected)
-              // But here we rely on the chain.
-              // Let's inspect the chain structure carefully.
-              // The logic is: insert -> if err -> select(single) -> then snapshot select(all)
-              
-              // Simplification: Return a chain that mocks both paths
-              return {
-                eq: jest.fn().mockImplementation((col, _val) => {
-                  if (col === 'session_id') {
-                    // Return object that handles next .eq or .then (snapshot)
-                    const nextChain = {
-                      eq: jest.fn().mockImplementation((_col2, _val2) => {
-                        // Path: fetch existing player
-                        return {
-                          single: jest.fn().mockResolvedValue({ data: mockExistingPlayer, error: null }),
-                        };
-                      }),
-                    };
-                    // Make nextChain also behave like a promise for the snapshot fetch
-                    nextChain.then = (cb) => Promise.resolve({ data: [mockHostPlayer, mockExistingPlayer], error: null }).then(cb);
-                    return nextChain;
-                  }
-                }),
-              };
-            }),
-            
             insert: jest.fn().mockReturnValue({
               select: jest.fn().mockReturnValue({
                 single: jest.fn().mockResolvedValue({ 
@@ -291,8 +263,35 @@ describe('Network', () => {
                 }),
               }),
             }),
+            select: jest.fn().mockImplementation(() => {
+              const chain = {};
+              chain.eq = jest.fn().mockImplementation((col, val) => {
+                if (col === 'session_id') {
+                  // After session_id, we might have another eq(player_id) or just the result
+                  const subChain = {};
+                  subChain.eq = jest.fn().mockImplementation((col2, val2) => {
+                    if (col2 === 'player_id') {
+                      return {
+                        single: jest.fn().mockResolvedValue({ data: mockExistingPlayer, error: null })
+                      };
+                    }
+                    return subChain;
+                  });
+                  // For the snapshot fetch: .eq('session_id', id) returns a promise-like object
+                  subChain.then = (resolve) => resolve({ data: [mockHostPlayer, mockExistingPlayer], error: null });
+                  return subChain;
+                }
+                return chain;
+              });
+              return chain;
+            })
           };
         }
+        return {
+          select: jest.fn().mockReturnThis(),
+          eq: jest.fn().mockReturnThis(),
+          single: jest.fn().mockResolvedValue({ data: null, error: null })
+        };
       });
 
       const result = await network.joinGame(MOCK_JOIN_CODE, MOCK_PLAYER_NAME);

@@ -1,6 +1,6 @@
 import { createClient } from '@supabase/supabase-js';
 import { Network } from '../src/network';
-import { waitFor } from './helpers/wait-utils.js';
+import { waitFor } from './helpers/test-utils.js';
 
 // Ensure your local Supabase URL and anon key are set as environment variables
 const supabaseUrl = process.env.SUPABASE_URL;

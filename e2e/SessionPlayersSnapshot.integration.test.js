@@ -1,7 +1,7 @@
 import { createClient } from '@supabase/supabase-js';
 import { SessionPlayersSnapshot } from '../src/SessionPlayersSnapshot.js';
 import { Network } from '../src/network.js';
-import { waitFor } from './helpers/wait-utils.js';
+import { waitFor } from './helpers/test-utils.js';
 
 const supabaseUrl = process.env.SUPABASE_URL;
 const supabaseAnonKey = process.env.SUPABASE_ANON_KEY;

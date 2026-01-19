@@ -4,7 +4,7 @@ import { Game } from '../src/game.js';
 import { Network } from '../src/network.js';
 import { CONFIG } from '../src/config.js';
 import { SessionPlayersSnapshot } from '../src/SessionPlayersSnapshot.js';
-import { waitFor } from './helpers/wait-utils.js';
+import { waitFor } from './helpers/test-utils.js';
 
 describe('Health Synchronization Integration', () => {
   let hostClient, playerClient;

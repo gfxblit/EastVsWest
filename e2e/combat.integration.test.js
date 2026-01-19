@@ -3,7 +3,7 @@ import { jest } from '@jest/globals';
 import { Network } from '../src/network';
 import { Game } from '../src/game';
 import { SessionPlayersSnapshot } from '../src/SessionPlayersSnapshot';
-import { waitFor } from './helpers/wait-utils.js';
+import { waitFor } from './helpers/test-utils.js';
 import { CONFIG } from '../src/config.js';
 
 const supabaseUrl = process.env.SUPABASE_URL;

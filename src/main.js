@@ -625,6 +625,15 @@ class App {
   startGame() {
     console.log('Entering game screen...');
 
+    // Stop any existing game loop and clean up
+    this.stopGameLoop();
+    if (this.game) {
+      this.game.destroy();
+    }
+    if (this.handleResize) {
+      window.removeEventListener('resize', this.handleResize);
+    }
+
     // Stop lobby polling
     this.stopLobbyPolling();
 
@@ -636,10 +645,6 @@ class App {
     if (!canvas) {
       console.error('Canvas element not found');
       return;
-    }
-
-    if (this.game) {
-      this.game.destroy();
     }
 
     this.renderer = new Renderer(canvas, this.assetManager);

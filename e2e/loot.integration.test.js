@@ -2,7 +2,7 @@ import { createClient } from '@supabase/supabase-js';
 import { Network } from '../src/network';
 import { Game } from '../src/game';
 import { SessionPlayersSnapshot } from '../src/SessionPlayersSnapshot';
-import { waitFor } from './helpers/wait-utils.js';
+import { waitFor } from './helpers/test-utils.js';
 import { CONFIG } from '../src/config';
 
 const supabaseUrl = process.env.SUPABASE_URL;

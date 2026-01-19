@@ -5,7 +5,7 @@ import { SessionPlayersSnapshot } from '../src/SessionPlayersSnapshot';
 import { Renderer } from '../src/renderer';
 import { AssetManager } from '../src/AssetManager';
 import { CONFIG } from '../src/config';
-import { waitFor } from './helpers/wait-utils.js';
+import { waitFor } from './helpers/test-utils.js';
 
 const supabaseUrl = process.env.SUPABASE_URL;
 const supabaseAnonKey = process.env.SUPABASE_ANON_KEY;
