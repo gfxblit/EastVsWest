@@ -285,13 +285,14 @@ export class Input {
     if (targetObj.target && targetObj.target.closest) {
       const target = targetObj.target;
 
-      // If it's the debug button, definitely not a joystick touch
+      // These are explicit UI buttons that should NOT trigger the joystick
+      if (target.closest('.touch-btn')) return false;
       if (target.closest('.touch-debug-btn')) return false;
       if (target.closest('#debug-ui-overlay')) return false;
-      if (target.closest('.touch-btn')) return false;
 
-      // Only the canvas should trigger the joystick
-      return target.tagName.toLowerCase() === 'canvas';
+      // Everything else is a valid place to start a joystick
+      // This includes the canvas, the game-screen background, and even the joystick elements themselves
+      return true;
     }
     return true;
   }
