@@ -44,8 +44,9 @@ describe('Issue 250 Reproduction - Touch Dragging Fails', () => {
   });
 
   test('WhenTouchStartOnCanvas_ShouldActivateJoystick', () => {
+    const TOUCH_ID_CANVAS = 100;
     const touch = new Touch({
-      identifier: 1,
+      identifier: TOUCH_ID_CANVAS,
       target: mockCanvas,
       clientX: 100,
       clientY: 100
@@ -58,8 +59,9 @@ describe('Issue 250 Reproduction - Touch Dragging Fails', () => {
   });
 
   test('WhenTouchStartOnJoystickBase_ShouldActivateJoystick', () => {
+    const TOUCH_ID_JOYSTICK = 101;
     const touch = new Touch({
-      identifier: 2,
+      identifier: TOUCH_ID_JOYSTICK,
       target: mockJoystickBase,
       clientX: 100,
       clientY: 100
@@ -73,9 +75,10 @@ describe('Issue 250 Reproduction - Touch Dragging Fails', () => {
   });
 
   test('WhenTouchStartOnGameScreenOutsideCanvas_ShouldNOTActivateJoystick', () => {
+    const TOUCH_ID_OUTSIDE = 102;
     const mockGameScreen = document.getElementById('game-screen');
     const touch = new Touch({
-      identifier: 3,
+      identifier: TOUCH_ID_OUTSIDE,
       target: mockGameScreen,
       clientX: 5,
       clientY: 5

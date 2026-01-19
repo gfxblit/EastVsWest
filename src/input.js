@@ -288,7 +288,6 @@ export class Input {
       // These are explicit UI buttons that should NOT trigger the joystick
       if (target.closest('.touch-btn')) return false;
       if (target.closest('.touch-debug-btn')) return false;
-      if (target.closest('#debug-ui-overlay')) return false;
 
       // Only the canvas or joystick elements should trigger the joystick
       return target.tagName.toLowerCase() === 'canvas' ||
