@@ -69,11 +69,10 @@ describe('Issue 250 Reproduction - Touch Dragging Fails', () => {
 
     input.handleTouchStart(event);
     
-    // THIS IS EXPECTED TO FAIL BEFORE FIX
     expect(input.touchState.active).toBe(true);
   });
 
-  test('WhenTouchStartOnGameScreenOutsideCanvas_ShouldActivateJoystick', () => {
+  test('WhenTouchStartOnGameScreenOutsideCanvas_ShouldNOTActivateJoystick', () => {
     const mockGameScreen = document.getElementById('game-screen');
     const touch = new Touch({
       identifier: 3,
@@ -86,7 +85,6 @@ describe('Issue 250 Reproduction - Touch Dragging Fails', () => {
 
     input.handleTouchStart(event);
     
-    // THIS IS ALSO EXPECTED TO FAIL BEFORE FIX
-    expect(input.touchState.active).toBe(true);
+    expect(input.touchState.active).toBe(false);
   });
 });

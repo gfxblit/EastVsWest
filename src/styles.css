@@ -533,7 +533,7 @@ button:active {
   display: flex;
   align-items: center;
   justify-content: center;
-  pointer-events: none;
+  pointer-events: auto;
 }
 
 .joystick-stick {
@@ -546,7 +546,7 @@ button:active {
   top: 50%;
   left: 50%;
   transform: translate(-50%, -50%);
-  pointer-events: none;
+  pointer-events: auto;
   box-shadow: 0 2px 8px rgba(0, 0, 0, 0.3);
 }
 

@@ -290,9 +290,10 @@ export class Input {
       if (target.closest('.touch-debug-btn')) return false;
       if (target.closest('#debug-ui-overlay')) return false;
 
-      // Everything else is a valid place to start a joystick
-      // This includes the canvas, the game-screen background, and even the joystick elements themselves
-      return true;
+      // Only the canvas or joystick elements should trigger the joystick
+      return target.tagName.toLowerCase() === 'canvas' ||
+        target.closest('.joystick-base') ||
+        target.closest('.joystick-stick');
     }
     return true;
   }
