@@ -107,6 +107,12 @@ export class SessionManager {
 
         if (fetchError) throw fetchError;
         playerRecord = existingPlayer;
+
+        // If rejoining, retain existing player's health and alive status
+        if (playerRecord && typeof playerRecord.health !== 'undefined') {
+          playerRecord.health = existingPlayer.health;
+          playerRecord.is_alive = existingPlayer.is_alive;
+        }
       } else {
         throw insertError;
       }

@@ -1,6 +1,6 @@
 import { createClient } from '@supabase/supabase-js';
 import { Network } from '../src/network.js';
-import { waitFor } from './helpers/test-utils.js';
+import { waitFor, DEFAULT_WAIT_TIMEOUT } from './helpers/test-utils.js';
 
 // Ensure your local Supabase URL and anon key are set as environment variables
 // before running this test.
@@ -168,7 +168,7 @@ describe('Network Module Integration with Supabase', () => {
     await playerClient.auth.signOut();
   });
 
-  test('joinGame() should succeed when session is in active status (late join)', async () => {
+  test('joinGame() should succeed and set late joiner as spectator', async () => {
     // Create a session using the existing authenticated host
     const { session: hostSession } = await network.hostGame('HostPlayer');
 
@@ -249,7 +249,7 @@ describe('Network Module Integration with Supabase', () => {
     // Wait specifically for the new player's join event to propagate
     await waitFor(() => hostPostgresChangeEvents.some(e => 
       e.eventType === 'INSERT' && e.new?.player_name === playerName,
-    ), 10000);
+    ), DEFAULT_WAIT_TIMEOUT);
 
     // Verify host received the postgres_changes INSERT event for the new player
     const joinEvent = hostPostgresChangeEvents.find(e =>
