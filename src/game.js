@@ -130,6 +130,17 @@ export class Game {
     // Update conflict zone
     this.updateConflictZone(deltaTime);
 
+    // Auto-select or switch spectator target if needed
+    if (this.localPlayerController && this.localPlayerController.isDead()) {
+      const players = this.playersSnapshot?.getPlayers();
+      const currentTarget = this.spectatingTargetId ? players?.get(this.spectatingTargetId) : null;
+      
+      // If no target, or target is dead, or target disconnected
+      if (!currentTarget || currentTarget.is_alive === false || currentTarget.is_connected === false || (currentTarget.health !== undefined && currentTarget.health <= 0)) {
+        this.cycleSpectatorTarget();
+      }
+    }
+
     // Update local player
     if (this.localPlayerController) {
       this.localPlayerController.update(deltaTime, this.playersSnapshot, this.state.loot);
@@ -204,9 +215,28 @@ export class Game {
   handlePlayerDeath(message) {
     if (!this.state.isRunning) return;
     const { victim_id, killer_id } = message.data;
+    
+    // If I'm the one who died
     if (this.network && victim_id === this.network.playerId) {
       console.log(`You were killed by ${killer_id}. Switching to spectator mode.`);
-      this.spectatingTargetId = killer_id;
+      this.spectatingTargetId = killer_id !== 'zone' ? killer_id : null;
+      if (!this.spectatingTargetId) this.cycleSpectatorTarget();
+      return;
+    }
+
+    // If I'm already spectating and my target died
+    if (this.spectatingTargetId === victim_id) {
+      console.log(`Your spectator target was killed by ${killer_id}. Switching target.`);
+      // Try to switch to the killer if they are a valid player and still alive
+      const players = this.playersSnapshot?.getPlayers();
+      const killer = killer_id !== 'zone' ? players?.get(killer_id) : null;
+      
+      if (killer && killer.is_alive !== false && (killer.health === undefined || killer.health > 0)) {
+        this.spectatingTargetId = killer_id;
+      } else {
+        // Otherwise just cycle to the next available player
+        this.cycleSpectatorTarget();
+      }
     }
   }
 
@@ -216,23 +246,27 @@ export class Game {
       const players = this.playersSnapshot.getPlayers();
       const target = players.get(this.spectatingTargetId);
 
-      const interpolated = this.playersSnapshot.getInterpolatedPlayerState(this.spectatingTargetId, performance.now());
-      if (interpolated) {
-        return {
-          id: this.spectatingTargetId,
-          x: interpolated.x,
-          y: interpolated.y,
-          name: target ? target.player_name : 'Unknown',
-        };
-      }
+      // Verify target is still valid for spectating
+      if (target && target.is_connected !== false) {
+        const interpolated = this.playersSnapshot.getInterpolatedPlayerState(this.spectatingTargetId, performance.now());
+        if (interpolated) {
+          return {
+            id: this.spectatingTargetId,
+            x: interpolated.x,
+            y: interpolated.y,
+            name: target ? target.player_name : 'Unknown',
+          };
+        }
 
-      if (target) {
         return {
           id: this.spectatingTargetId,
           x: target.position_x,
           y: target.position_y,
           name: target.player_name,
         };
+      } else {
+        // Target lost or disconnected, clear it so we can find a new one
+        this.spectatingTargetId = null;
       }
     }
 
@@ -245,9 +279,17 @@ export class Game {
 
     const players = Array.from(this.playersSnapshot.getPlayers().values());
     // Filter for valid targets: Alive and not local player
-    const candidates = players.filter(p => p.health > 0 && p.player_id !== this.network.playerId);
+    const candidates = players.filter(p => 
+      p.player_id !== this.network.playerId && 
+      p.is_alive !== false && 
+      p.is_connected !== false &&
+      (p.health === undefined || p.health > 0)
+    );
 
-    if (candidates.length === 0) return; // No one else to spectate
+    if (candidates.length === 0) {
+      this.spectatingTargetId = null;
+      return;
+    }
 
     // Sort candidates to ensure consistent order
     candidates.sort((a, b) => a.player_id.localeCompare(b.player_id));

@@ -32,6 +32,9 @@ export class HostCombatManager {
     const damageAmount = damagePerSecond * this.healthUpdateAccumulator;
 
     for (const [playerId, player] of players) {
+      // Skip already dead players
+      if (player.is_alive === false || (player.health !== undefined && player.health <= 0)) continue;
+
       // Check if player is outside conflict zone
       const distanceFromCenter = Math.sqrt(
         Math.pow(player.position_x - this.state.conflictZone.centerX, 2) +
@@ -47,10 +50,22 @@ export class HostCombatManager {
           // Update snapshot directly so subsequent ticks use new value
           player.health = newHealth;
 
-          updates.push({
+          const update = {
             player_id: playerId,
             health: newHealth
-          });
+          };
+
+          // Handle Death from Zone
+          if (newHealth <= 0) {
+            player.is_alive = false;
+            update.is_alive = false;
+            this.network.send('player_death', {
+              victim_id: playerId,
+              killer_id: 'zone' // Special killer ID for zone damage
+            });
+          }
+
+          updates.push(update);
         }
       }
     }
@@ -72,7 +87,7 @@ export class HostCombatManager {
     const players = playersSnapshot.getPlayers();
     const attacker = players.get(attackerId);
 
-    if (!attacker || attacker.health <= 0) return;
+    if (!attacker || attacker.is_alive === false || attacker.health <= 0) return;
 
     // Server-side cooldown validation
     const now = Date.now();
@@ -105,7 +120,7 @@ export class HostCombatManager {
 
     const updates = [];
     for (const [victimId, victim] of players) {
-      if (victimId === attackerId || victim.health <= 0) continue;
+      if (victimId === attackerId || victim.is_alive === false || victim.health <= 0) continue;
 
       if (this.#isTargetInAttackArc(attacker, victim, aimAngle, arc, effectiveRange)) {
         const damage = this.#calculateDamage(attacker, victim, weaponConfig, is_special);
@@ -131,11 +146,11 @@ export class HostCombatManager {
                   update.stunned_until = stunUntil;
               }
           }
-          
-          updates.push(update);
 
           // Handle Death and Kills
           if (newHealth <= 0) {
+            victim.is_alive = false;
+            update.is_alive = false;
             this.network.send('player_death', {
               victim_id: victimId,
               killer_id: attackerId
@@ -147,6 +162,7 @@ export class HostCombatManager {
               kills: attacker.kills
             });
           }
+          updates.push(update);
         }
       }
     }
@@ -164,9 +180,11 @@ export class HostCombatManager {
     
     // Filter out inactive players:
     // 1. Must not be explicitly disconnected
-    // 2. Must have > 0 health (undefined defaults to 100, assuming fresh spawn)
+    // 2. Must be alive (is_alive !== false)
+    // 3. Must have > 0 health (undefined defaults to 100)
     const activePlayers = Array.from(players.values()).filter(p => {
       if (p.is_connected === false) return false;
+      if (p.is_alive === false) return false;
       return (p.health ?? 100) > 0;
     });
 
