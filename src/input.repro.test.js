@@ -72,7 +72,7 @@ describe('Issue 250 Reproduction - Touch Dragging Fails', () => {
     expect(input.touchState.active).toBe(true);
   });
 
-  test('WhenTouchStartOnGameScreenOutsideCanvas_ShouldNOTActivateJoystick', () => {
+  test('WhenTouchStartOnGameScreenOutsideCanvas_ShouldActivateJoystick', () => {
     const TOUCH_ID_OUTSIDE = 102;
     const mockGameScreen = document.getElementById('game-screen');
     const touch = new Touch({
@@ -83,6 +83,24 @@ describe('Issue 250 Reproduction - Touch Dragging Fails', () => {
     });
     const event = new TouchEvent('touchstart', { touches: [touch] });
     Object.defineProperty(event, 'target', { value: mockGameScreen });
+
+    input.handleTouchStart(event);
+    
+    expect(input.touchState.active).toBe(true);
+  });
+
+  test('WhenTouchStartOnDebugButton_ShouldNOTActivateJoystick', () => {
+    const TOUCH_ID_DEBUG = 103;
+    document.body.innerHTML += '<button id="debug-toggle-btn" class="touch-debug-btn"></button>';
+    const mockDebugBtn = document.getElementById('debug-toggle-btn');
+    const touch = new Touch({
+      identifier: TOUCH_ID_DEBUG,
+      target: mockDebugBtn,
+      clientX: 5,
+      clientY: 5
+    });
+    const event = new TouchEvent('touchstart', { touches: [touch] });
+    Object.defineProperty(event, 'target', { value: mockDebugBtn });
 
     input.handleTouchStart(event);
     
