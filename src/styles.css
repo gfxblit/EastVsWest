@@ -546,20 +546,22 @@ button:active {
   top: 50%;
   left: 50%;
   transform: translate(-50%, -50%);
-  pointer-events: none;
+  pointer-events: auto;
   box-shadow: 0 2px 8px rgba(0, 0, 0, 0.3);
 }
 
 .touch-buttons {
   display: none;
   position: fixed;
+  /* Position container on the bottom right to avoid conflict with the left-hand joystick */
   bottom: 40px;
   right: 30px;
+  /* Fixed size container allows for precise "encircling" layout of action buttons */
+  width: 180px;
+  height: 180px;
   z-index: 1000;
-  display: flex;
-  flex-direction: row-reverse;
-  align-items: flex-end;
-  gap: 15px;
+  /* Allow touches to pass through the container to the game canvas underneath */
+  pointer-events: none;
 }
 
 .touch-btn {
@@ -584,8 +586,11 @@ button:active {
   display: flex;
   justify-content: center;
   align-items: center;
-  position: relative;
+  /* Use absolute positioning to encircle the primary attack button */
+  position: absolute;
   overflow: hidden;
+  /* Re-enable pointer events for the buttons themselves */
+  pointer-events: auto;
 }
 
 .cooldown-overlay {
@@ -609,9 +614,12 @@ button:active {
 }
 
 .attack-btn {
+  /* Primary attack button is larger and in the bottom-right corner */
   width: 90px;
   height: 90px;
   background: linear-gradient(to bottom, #c86a5a 0%, #a84a3d 100%);
+  bottom: 0;
+  right: 0;
 }
 
 .attack-btn:active {
@@ -625,11 +633,17 @@ button:active {
 }
 
 .ability-btn {
+  /* Ability (Q) button positioned above the attack button */
   background: linear-gradient(to bottom, #7fb069 0%, #5a8f4f 100%);
+  bottom: 95px;
+  right: 5px;
 }
 
 .interact-btn {
+  /* Interact (F) button positioned to the left of the attack button */
   background: linear-gradient(to bottom, #74a5d4 0%, #5a86b8 100%);
+  bottom: 5px;
+  right: 95px;
 }
 
 .ability-btn:active,
@@ -650,7 +664,7 @@ button:active {
   }
 
   .touch-buttons {
-    display: flex;
+    display: block;
   }
 }
 

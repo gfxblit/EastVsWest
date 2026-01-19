@@ -285,13 +285,13 @@ export class Input {
     if (targetObj.target && targetObj.target.closest) {
       const target = targetObj.target;
 
-      // If it's the debug button, definitely not a joystick touch
-      if (target.closest('.touch-debug-btn')) return false;
-      if (target.closest('#debug-ui-overlay')) return false;
-      if (target.closest('.touch-btn')) return false;
+      // These are explicit UI buttons that should NOT trigger the joystick
+      if (target.closest('.touch-btn') || target.closest('.touch-debug-btn')) return false;
 
-      // Only the canvas should trigger the joystick
-      return target.tagName.toLowerCase() === 'canvas';
+      // The canvas or joystick elements should trigger the joystick
+      return target.tagName.toLowerCase() === 'canvas' ||
+        target.closest('.joystick-base') ||
+        target.closest('.joystick-stick');
     }
     return true;
   }
@@ -302,12 +302,6 @@ export class Input {
    */
   handleTouchStart(event) {
     this.lastTouchTime = Date.now();
-
-    // Check for debug button - it has its own listener, so just return to avoid joystick activation
-    // Note: We do NOT call handleDebugButtonTouchStart here - the button's own listener handles it
-    if (event.target && event.target.closest && event.target.closest('.touch-debug-btn')) {
-      return;
-    }
 
     // Ignore if touch is on other UI element
     if (!this.isValidJoystickTouch(event)) {
