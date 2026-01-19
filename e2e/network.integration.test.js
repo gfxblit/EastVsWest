@@ -169,7 +169,7 @@ describe('Network Module Integration with Supabase', () => {
     await playerClient.auth.signOut();
   });
 
-  test('joinGame() should fail when session is not in lobby status', async () => {
+  test('joinGame() should succeed when session is in active status (late join)', async () => {
     // Create a session using the existing authenticated host
     const { session: hostSession } = await network.hostGame('HostPlayer');
 
@@ -179,6 +179,35 @@ describe('Network Module Integration with Supabase', () => {
     await supabaseClient
       .from('game_sessions')
       .update({ status: 'active' })
+      .eq('id', hostSession.id);
+
+    // Create a new authenticated player to try joining
+    const playerClient = createClient(supabaseUrl, supabaseAnonKey);
+    const { data: playerAuthData } = await playerClient.auth.signInAnonymously();
+
+    const playerNetwork = new Network();
+    playerNetwork.initialize(playerClient, playerAuthData.user.id);
+
+    const result = await playerNetwork.joinGame(hostSession.join_code, 'TestPlayer');
+    expect(result.session.status).toBe('active');
+    expect(result.player.health).toBe(0);
+    expect(result.player.is_alive).toBe(false);
+
+    // Clean up
+    playerNetwork.disconnect();
+    await playerClient.auth.signOut();
+  });
+
+  test('joinGame() should fail when session status is ended', async () => {
+    // Create a session using the existing authenticated host
+    const { session: hostSession } = await network.hostGame('HostPlayer');
+
+    // Update session status to 'ended'
+    testSessionId = hostSession.id;
+
+    await supabaseClient
+      .from('game_sessions')
+      .update({ status: 'ended' })
       .eq('id', hostSession.id);
 
     // Create a new authenticated player to try joining

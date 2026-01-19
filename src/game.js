@@ -107,6 +107,11 @@ export class Game {
 
     this.localPlayerController = new LocalPlayerController(network, localPlayerData);
 
+    // If starting as a late joiner (dead), auto-select a spectator target
+    if (this.localPlayerController.isDead()) {
+      this.cycleSpectatorTarget();
+    }
+
     // Initialize previous health for all players in renderer (if available)
     if (this.playersSnapshot && this.renderer && this.renderer.previousPlayerHealth) {
       this.playersSnapshot.getPlayers().forEach(player => {

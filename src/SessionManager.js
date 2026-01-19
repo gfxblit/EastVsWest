@@ -68,7 +68,8 @@ export class SessionManager {
         if (!sessionData || sessionData.length === 0) throw new Error('Session not found');
 
         const session = sessionData[0];
-        if (session.status !== 'lobby') throw new Error('Session is not joinable.');
+        const isLateJoin = session.status === 'active';
+        if (session.status !== 'lobby' && !isLateJoin) throw new Error('Session is not joinable.');
 
         this.network.sessionId = session.id;
         this.network.isHost = false;
@@ -88,6 +89,8 @@ export class SessionManager {
                 position_x: CONFIG.WORLD.WIDTH / 2,
                 position_y: CONFIG.WORLD.HEIGHT / 2,
                 equipped_weapon: 'fist',
+                health: isLateJoin ? 0 : 100,
+                is_alive: !isLateJoin
             })
             .select()
             .single();

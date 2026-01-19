@@ -343,12 +343,61 @@ describe('Network', () => {
         .rejects.toThrow('Session not found');
     });
 
-    it('should throw an error when session status is not lobby', async () => {
+    it('should allow joining an active session (late join)', async () => {
       const mockSession = {
         id: MOCK_SESSION_ID,
         join_code: MOCK_JOIN_CODE,
         host_id: 'host-uuid',
         status: 'active',
+        max_players: 12,
+        realtime_channel_name: 'game_session:ABC123',
+      };
+
+      const mockNewPlayer = {
+        session_id: MOCK_SESSION_ID,
+        player_id: MOCK_PLAYER_ID,
+        player_name: MOCK_PLAYER_NAME,
+        is_host: false,
+        health: 0,
+        is_alive: false
+      };
+
+      mockSupabaseClient.rpc.mockResolvedValue({ data: [mockSession], error: null });
+
+      const mockChannel = {
+        on: jest.fn().mockReturnThis(),
+        subscribe: jest.fn((callback) => {
+          callback('SUBSCRIBED');
+          return mockChannel;
+        }),
+      };
+      mockSupabaseClient.channel.mockReturnValue(mockChannel);
+
+      mockSupabaseClient.from = jest.fn((table) => {
+        if (table === 'session_players') {
+          return {
+            insert: jest.fn().mockReturnValue({
+              select: jest.fn().mockReturnValue({
+                single: jest.fn().mockResolvedValue({ data: mockNewPlayer, error: null })
+              })
+            })
+          };
+        }
+      });
+
+      const result = await network.joinGame(MOCK_JOIN_CODE, MOCK_PLAYER_NAME);
+
+      expect(network.connected).toBe(true);
+      expect(result.session.status).toBe('active');
+      expect(result.player.health).toBe(0);
+    });
+
+    it('should throw an error when session status is ended', async () => {
+      const mockSession = {
+        id: MOCK_SESSION_ID,
+        join_code: MOCK_JOIN_CODE,
+        host_id: 'host-uuid',
+        status: 'ended',
         max_players: 12,
       };
 

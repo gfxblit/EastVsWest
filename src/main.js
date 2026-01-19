@@ -446,8 +446,13 @@ class App {
       // Start polling for lobby updates
       this.startLobbyPolling();
 
-      this.ui.showJoinCode(joinCode);
-      this.ui.showLobby('Game Lobby');
+      if (session.status === 'active') {
+        console.log('Joining active session, starting game immediately...');
+        this.startGame();
+      } else {
+        this.ui.showJoinCode(joinCode);
+        this.ui.showLobby('Game Lobby');
+      }
 
       // Initial UI update
       this.updateLobbyUI();
