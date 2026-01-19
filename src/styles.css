@@ -635,15 +635,15 @@ button:active {
 .ability-btn {
   /* Ability (Q) button positioned above the attack button */
   background: linear-gradient(to bottom, #7fb069 0%, #5a8f4f 100%);
-  bottom: 100px;
-  right: 10px;
+  bottom: 95px;
+  right: 5px;
 }
 
 .interact-btn {
   /* Interact (F) button positioned to the left of the attack button */
   background: linear-gradient(to bottom, #74a5d4 0%, #5a86b8 100%);
-  bottom: 70px;
-  right: 90px;
+  bottom: 5px;
+  right: 95px;
 }
 
 .ability-btn:active,
