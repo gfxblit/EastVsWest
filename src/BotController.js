@@ -10,6 +10,8 @@ export class BotController {
     this.game = game; // Access to game state (e.g., conflict zone)
     this.wanderAngle = Math.random() * Math.PI * 2;
     this.wanderTimer = 0;
+    this.lastPickupTime = 0;
+    this.targetLootId = null;
   }
 
   update(deltaTime) {
@@ -18,14 +20,74 @@ export class BotController {
 
     if (!bot || bot.health <= 0) return;
 
+    // Check if we need a weapon
+    const needsWeapon = !bot.equipped_weapon || bot.equipped_weapon === 'fist';
+
+    // Find nearest loot
+    let nearestLoot = null;
+
+    // If we were targeting a loot item, check its status
+    if (this.targetLootId) {
+      const targetedLoot = this.game?.state?.loot.find(l => l.id === this.targetLootId);
+      if (targetedLoot) {
+        // If targeted loot still exists and we need a weapon, keep targeting it
+        if (needsWeapon) {
+          nearestLoot = targetedLoot;
+        } else {
+          // If we no longer need a weapon, clear the target
+          this.targetLootId = null;
+        }
+      } else {
+        // If targeted loot is gone, clear targetLootId
+        this.targetLootId = null;
+      }
+    }
+
+    // If we still need a weapon and don't have a current nearestLoot (either never had one or it disappeared)
+    if (!nearestLoot && needsWeapon) {
+      nearestLoot = this.findNearestLoot(bot);
+      if (nearestLoot) {
+        this.targetLootId = nearestLoot.id; // Set new target if found
+      } else {
+        this.targetLootId = null; // No loot found
+      }
+    }
+
     const target = this.findTarget();
 
-    if (target) {
+    if (nearestLoot) {
+      this.targetLootId = nearestLoot.id;
+      const lootPos = { position_x: nearestLoot.x, position_y: nearestLoot.y };
+      this.moveTowards(bot, lootPos, deltaTime);
+      this.attemptPickupLoot(bot, nearestLoot);
+    } else if (target) {
       this.moveTowards(bot, target, deltaTime);
       this.attemptAttack(bot, target);
     } else {
       this.wander(bot, deltaTime);
     }
+  }
+
+  findNearestLoot(bot) {
+    const loot = this.game?.state?.loot;
+    if (!loot || loot.length === 0) return null;
+
+    let nearestLoot = null;
+    let minDistance = Infinity;
+
+    for (const item of loot) {
+      const dist = Math.hypot(
+        item.x - bot.position_x,
+        item.y - bot.position_y,
+      );
+
+      if (dist < minDistance) {
+        minDistance = dist;
+        nearestLoot = item;
+      }
+    }
+
+    return nearestLoot;
   }
 
   findTarget() {
@@ -41,7 +103,7 @@ export class BotController {
 
       const dist = Math.hypot(
         player.position_x - bot.position_x,
-        player.position_y - bot.position_y
+        player.position_y - bot.position_y,
       );
 
       if (dist < minDistance) {
@@ -63,8 +125,10 @@ export class BotController {
     // Stop if very close to avoid jitter
     if (Math.hypot(dx, dy) < (CONFIG.BOT?.STOPPING_DISTANCE || 10)) return;
 
-    const moveX = Math.cos(angle) * speed * deltaTime;
-    const moveY = Math.sin(angle) * speed * deltaTime;
+    const distance = Math.hypot(dx, dy);
+    const moveDistance = Math.min(distance, speed * deltaTime);
+    const moveX = Math.cos(angle) * moveDistance;
+    const moveY = Math.sin(angle) * moveDistance;
 
     const hitboxRadius = CONFIG.PLAYER.HITBOX_RADIUS;
 
@@ -83,12 +147,12 @@ export class BotController {
     // Broadcast movement (Host is authoritative for bots)
     // SessionPlayersSnapshot listens to these broadcasts and updates locally
     this.network.broadcastPlayerStateUpdate({
-        player_id: this.botId,
-        position_x: newX,
-        position_y: newY,
-        rotation: angle,
-        velocity_x: Math.cos(angle), // Normalized velocity
-        velocity_y: Math.sin(angle)
+      player_id: this.botId,
+      position_x: newX,
+      position_y: newY,
+      rotation: angle,
+      velocity_x: Math.cos(angle), // Normalized velocity
+      velocity_y: Math.sin(angle),
     });
   }
 
@@ -118,32 +182,49 @@ export class BotController {
     newY = Math.max(0, Math.min(CONFIG.WORLD.HEIGHT, newY));
     
     this.network.broadcastPlayerStateUpdate({
-        player_id: this.botId,
-        position_x: newX,
-        position_y: newY,
-        rotation: this.wanderAngle,
-        velocity_x: Math.cos(this.wanderAngle) * 0.5,
-        velocity_y: Math.sin(this.wanderAngle) * 0.5
+      player_id: this.botId,
+      position_x: newX,
+      position_y: newY,
+      rotation: this.wanderAngle,
+      velocity_x: Math.cos(this.wanderAngle) * 0.5,
+      velocity_y: Math.sin(this.wanderAngle) * 0.5,
     });
   }
 
   attemptAttack(bot, target) {
     const dist = Math.hypot(
-        target.position_x - bot.position_x,
-        target.position_y - bot.position_y
+      target.position_x - bot.position_x,
+      target.position_y - bot.position_y,
     );
 
     const weapon = CONFIG.WEAPONS[bot.equipped_weapon?.toUpperCase()] || CONFIG.WEAPONS.FIST;
     const range = weapon.range;
 
     if (dist <= range) {
-        // Send attack request (simulating input)
-        // We use sendFrom to ensure the attacker ID is the bot's ID, not the host's ID
-        this.network.sendFrom(this.botId, 'attack_request', {
-            aim_x: target.position_x,
-            aim_y: target.position_y,
-            is_special: false
-        });
+      // Send attack request (simulating input)
+      // We use sendFrom to ensure the attacker ID is the bot's ID, not the host's ID
+      this.network.sendFrom(this.botId, 'attack_request', {
+        aim_x: target.position_x,
+        aim_y: target.position_y,
+        is_special: false,
+      });
+    }
+  }
+
+  attemptPickupLoot(bot, lootItem) {
+    const now = Date.now();
+    if (now - this.lastPickupTime < 500) return;
+
+    const dist = Math.hypot(
+      lootItem.x - bot.position_x,
+      lootItem.y - bot.position_y,
+    );
+
+    if (dist <= (CONFIG.LOOT?.PICKUP_RADIUS || 50)) {
+      this.network.sendFrom(this.botId, 'pickup_request', {
+        loot_id: lootItem.id,
+      });
+      this.lastPickupTime = now;
     }
   }
 }

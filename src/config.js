@@ -72,6 +72,16 @@ export const CONFIG = {
   // Weapon Types
   WEAPONS,
 
+  // Weapon Abilities
+  WEAPON_ABILITIES: {
+    LUNGE_RANGE_EXTENSION: 100,
+    SMASH_STUN_DURATION: 1000,
+    CHARGED_SMACK_STUN_DURATION: 1000,
+    GRAB_THROW_STUN_DURATION: 500,
+    LUNGE_DURATION: 0.2,
+    LUNGE_SPEED_MULTIPLIER: 3,
+  },
+
   // Armor Types
   ARMOR: {
     PLATED: {
