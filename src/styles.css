@@ -558,6 +558,7 @@ button:active {
   width: 180px;
   height: 180px;
   z-index: 1000;
+  /* Allow touches to pass through the container to the game canvas underneath */
   pointer-events: none;
 }
 
@@ -585,6 +586,7 @@ button:active {
   align-items: center;
   position: absolute;
   overflow: hidden;
+  /* Re-enable pointer events for the buttons themselves */
   pointer-events: auto;
 }
 
