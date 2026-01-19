@@ -11,6 +11,7 @@ export class BotController {
     this.wanderAngle = Math.random() * Math.PI * 2;
     this.wanderTimer = 0;
     this.lastPickupTime = 0;
+    this.targetLootId = null;
   }
 
   update(deltaTime) {
@@ -23,17 +24,32 @@ export class BotController {
     const needsWeapon = !bot.equipped_weapon || bot.equipped_weapon === 'fist';
 
     // Find nearest loot
-    let nearestLoot = needsWeapon ? this.findNearestLoot(bot) : null;
-    
-    // If we have a target loot, check if it's still available in the game state
+    let nearestLoot = null;
+
+    // If we were targeting a loot item, check its status
     if (this.targetLootId) {
-      const lootExists = this.game?.state?.loot.some(l => l.id === this.targetLootId);
-      if (!lootExists) {
+      const targetedLoot = this.game?.state?.loot.find(l => l.id === this.targetLootId);
+      if (targetedLoot) {
+        // If targeted loot still exists and we need a weapon, keep targeting it
+        if (needsWeapon) {
+          nearestLoot = targetedLoot;
+        } else {
+          // If we no longer need a weapon, clear the target
+          this.targetLootId = null;
+        }
+      } else {
+        // If targeted loot is gone, clear targetLootId
         this.targetLootId = null;
-        nearestLoot = needsWeapon ? this.findNearestLoot(bot) : null;
-      } else if (needsWeapon) {
-        // If it still exists and we still need it, stay focused on it
-        nearestLoot = this.game.state.loot.find(l => l.id === this.targetLootId);
+      }
+    }
+
+    // If we still need a weapon and don't have a current nearestLoot (either never had one or it disappeared)
+    if (!nearestLoot && needsWeapon) {
+      nearestLoot = this.findNearestLoot(bot);
+      if (nearestLoot) {
+        this.targetLootId = nearestLoot.id; // Set new target if found
+      } else {
+        this.targetLootId = null; // No loot found
       }
     }
 
@@ -44,14 +60,11 @@ export class BotController {
       const lootPos = { position_x: nearestLoot.x, position_y: nearestLoot.y };
       this.moveTowards(bot, lootPos, deltaTime);
       this.attemptPickupLoot(bot, nearestLoot);
+    } else if (target) {
+      this.moveTowards(bot, target, deltaTime);
+      this.attemptAttack(bot, target);
     } else {
-      this.targetLootId = null;
-      if (target) {
-        this.moveTowards(bot, target, deltaTime);
-        this.attemptAttack(bot, target);
-      } else {
-        this.wander(bot, deltaTime);
-      }
+      this.wander(bot, deltaTime);
     }
   }
 

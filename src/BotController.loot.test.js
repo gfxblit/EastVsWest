@@ -142,4 +142,50 @@ describe('BotController Loot Interaction', () => {
       position_y: 500,
     }));
   });
+
+  test('WhenTargetingLoot_ShouldStayFocusedOnItEvenIfNewLootAppearsCloser', () => {
+    // 1. First update to set targetLootId to loot-1 (700, 500)
+    botController.update(0.1);
+    expect(botController.targetLootId).toBe('loot-1');
+    // Manually update position in snapshot to simulate movement
+    const bot = mockSnapshot.getPlayers().get(botId);
+    bot.position_x = 510;
+
+    // 2. Add loot-2 which is closer to the bot's current position (510, 500)
+    mockGame.state.loot.push({ id: 'loot-2', item_id: 'bo', x: 520, y: 500 });
+
+    // 3. Update again
+    botController.update(0.1);
+
+    // Should still be targeting loot-1
+    expect(botController.targetLootId).toBe('loot-1');
+    expect(mockNetwork.broadcastPlayerStateUpdate).toHaveBeenLastCalledWith(expect.objectContaining({
+      player_id: botId,
+      position_x: 520, // 510 + 100 * 0.1 = 520 (moving towards 700)
+      position_y: 500,
+    }));
+  });
+
+  test('WhenTargetedLootDisappears_ShouldFindNewTarget', () => {
+    // 1. Set target to loot-1
+    botController.update(0.1);
+    expect(botController.targetLootId).toBe('loot-1');
+    // Manually update position in snapshot to simulate movement
+    const bot = mockSnapshot.getPlayers().get(botId);
+    bot.position_x = 510;
+
+    // 2. Remove loot-1 and add loot-2
+    mockGame.state.loot = [{ id: 'loot-2', item_id: 'bo', x: 400, y: 500 }];
+
+    // 3. Update
+    botController.update(0.1);
+
+    // Should now target loot-2
+    expect(botController.targetLootId).toBe('loot-2');
+    expect(mockNetwork.broadcastPlayerStateUpdate).toHaveBeenLastCalledWith(expect.objectContaining({
+      player_id: botId,
+      position_x: 500, // 510 (current) - 100 * 0.1 (move) = 500 (moving towards 400)
+      position_y: 500,
+    }));
+  });
 });

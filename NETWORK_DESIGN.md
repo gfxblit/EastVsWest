@@ -364,10 +364,10 @@ We keep the lobby in sync by treating the database as the single source of truth
 
 ##### 3. Interaction Messages (Host-Authoritative)
 
-**CLIENT → HOST: `item_pickup_request`**
+**CLIENT → HOST: `pickup_request`**
 ```javascript
 {
-  type: 'item_pickup_request',
+  type: 'pickup_request',
   from: 'player_uuid',
   timestamp: 1703001234567,
   data: {
@@ -377,27 +377,15 @@ We keep the lobby in sync by treating the database as the single source of truth
 }
 ```
 
-**HOST → ALL: `item_pickup_result`**
+**HOST → ALL: `loot_picked_up`**
 ```javascript
 {
-  type: 'item_pickup_result',
+  type: 'loot_picked_up',
   from: 'host_uuid',
   timestamp: 1703001234567,
   data: {
-    success: true,
-    player_id: 'player_uuid',
-    item_id: 'item_uuid',
-    item: {
-      type: 'weapon',
-      name: 'Spear',
-      power_level: 5
-    },
-    dropped_item: {  // If player swapped equipment
-      id: 'dropped_uuid',
-      type: 'weapon',
-      name: 'Fist',
-      position: { x: 100, y: 200 }
-    }
+    loot_id: 'loot_uuid',
+    player_id: 'player_uuid'
   }
 }
 ```
@@ -571,16 +559,16 @@ Host accepts position update and broadcasts to all clients (including sender for
 ```
 Client A          Host              Other Clients
    |                |                     |
-   |--item_pickup-->|                     |
+   |--pickup_------>|                     |
    |   request      |                     |
    |                |                     |
    |                | [Validates]          |
    |                | [Updates DB]         |
    |                |                     |
-   |<--item_pickup--|                     |
-   |   result       |                     |
-   |                |---item_pickup------>|
-   |                |   result            |
+   |<--loot_picked--|                     |
+   |   up           |                     |
+   |                |---loot_picked------>|
+   |                |   up                |
 ```
 
 Host validates request, updates authoritative state, then broadcasts result.
@@ -684,12 +672,10 @@ CLIENT A          SUPABASE CHANNEL          HOST              DATABASE
    │    (local check)   │                     │                    │
    │                    │                     │                    │
    │ 3. Request pickup  │                     │                    │
-   ├──item_pickup_─────>│                     │                    │
-   │   request          │                     │                    │
+   ├──pickup_request───>│                     │                    │
    │                    │                     │                    │
    │                    │ 4. Forward request  │                    │
-   │                    ├──item_pickup_──────>│                    │
-   │                    │   request           │                    │
+   │                    ├──pickup_request────>│                    │
    │                    │                     │                    │
    │                    │                     │ 5. Validate:       │
    │                    │                     │    - Item exists?  │
@@ -713,13 +699,13 @@ CLIENT A          SUPABASE CHANNEL          HOST              DATABASE
    │                    │                     │  items (dropped)   │
    │                    │                     │                    │
    │                    │ 9. Broadcast result │                    │
-   │                    │<──item_pickup_──────┤                    │
-   │                    │   result            │                    │
+   │                    │<──loot_picked_up────┤                    │
+   │                    │                     │                    │
    │                    │                     │                    │
    │ 10. Update UI      │                     │                    │
    │     (equip item)   │                     │                    │
-   │<──item_pickup_─────┤                     │                    │
-   │   result           │                     │                    │
+   │<──loot_picked_up───┤                     │                    │
+   │                    │                     │                    │
 ```
 
 **Validation Rules** (enforced by host):
@@ -992,8 +978,8 @@ Health is **HOST-AUTHORITATIVE**:
 │          │  Main gameplay loop
 │          │
 │  Events: │  • movement_update (20 Hz, direct client broadcast)
-│          │  • item_pickup_request
-│          │  • item_pickup_result
+│          │  • pickup_request
+│          │  • loot_picked_up
 │          │  • attack_action
 │          │  • combat_event
 │          │  • player_eliminated
