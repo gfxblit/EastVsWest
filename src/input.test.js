@@ -139,7 +139,7 @@ describe('Input', () => {
       // On Dvorak, physical 'W' key produces ','
       const event = new KeyboardEvent('keydown', {
         key: ',',
-        code: 'KeyW'
+        code: 'KeyW',
       });
       input.handleKeyDown(event);
 
@@ -246,7 +246,7 @@ describe('Input', () => {
       input.updateMovement();
 
       const magnitude = Math.sqrt(
-        input.inputState.moveX ** 2 + input.inputState.moveY ** 2
+        input.inputState.moveX ** 2 + input.inputState.moveY ** 2,
       );
       expect(magnitude).toBeCloseTo(1, 5);
     });
@@ -287,7 +287,7 @@ describe('Input', () => {
       input.updateMovement();
 
       const magnitude = Math.sqrt(
-        input.inputState.moveX ** 2 + input.inputState.moveY ** 2
+        input.inputState.moveX ** 2 + input.inputState.moveY ** 2,
       );
       expect(magnitude).toBeCloseTo(1, 5);
     });
@@ -321,7 +321,7 @@ describe('Input', () => {
 
       // Verify diagonal movement is normalized to magnitude 1
       const magnitude = Math.sqrt(
-        input.inputState.moveX ** 2 + input.inputState.moveY ** 2
+        input.inputState.moveX ** 2 + input.inputState.moveY ** 2,
       );
       expect(magnitude).toBeCloseTo(1, 5);
     });
@@ -835,7 +835,7 @@ describe('Input', () => {
       const secondaryStartEvent = createMockTouchEvent(
         'touchstart', 
         [primaryTouch, secondaryTouch], 
-        [secondaryTouch]
+        [secondaryTouch],
       );
       input.handleTouchStart(secondaryStartEvent);
 
@@ -843,7 +843,7 @@ describe('Input', () => {
       const secondaryEndEvent = createMockTouchEvent(
         'touchend', 
         [primaryTouch], 
-        [secondaryTouch]
+        [secondaryTouch],
       );
       input.handleTouchEnd(secondaryEndEvent);
 
@@ -928,13 +928,13 @@ describe('Input', () => {
         cancelable: true,
       });
 
-            input.handleAbilityButtonTouchEnd(event);
+      input.handleAbilityButtonTouchEnd(event);
 
       
 
-            expect(input.inputState.specialAbility).toBe(false);
+      expect(input.inputState.specialAbility).toBe(false);
 
-          });
+    });
 
       
   });

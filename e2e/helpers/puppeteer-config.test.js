@@ -84,7 +84,7 @@ describe('Puppeteer Configuration Helper', () => {
     test('WhenCustomOptionsProvided_ShouldMergeWithBaseConfig', () => {
       const customOptions = {
         slowMo: 100,
-        args: ['--window-size=1920,1080']
+        args: ['--window-size=1920,1080'],
       };
       const config = getPuppeteerConfig(customOptions);
 

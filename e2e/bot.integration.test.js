@@ -102,45 +102,45 @@ describe('Bot Integration', () => {
     // Set all other bots to 0 health first
     const otherBots = Array.from(players.values()).filter(p => p.is_bot && p.player_id !== bot.player_id);
     const botUpdates = otherBots.map(b => ({
-        player_id: b.player_id,
-        health: 0
+      player_id: b.player_id,
+      health: 0,
     }));
     if (botUpdates.length > 0) {
-        await network.writePlayerStateToDB(botUpdates);
+      await network.writePlayerStateToDB(botUpdates);
     }
 
     // Position host and bot close together and set low host health
     await network.writePlayerStateToDB(hostUser.id, {
-        position_x: 100,
-        position_y: 100,
-        health: 5 // One hit kill
+      position_x: 100,
+      position_y: 100,
+      health: 5, // One hit kill
     });
     
     await network.writePlayerStateToDB(bot.player_id, {
-        position_x: 110, // Close to host
-        position_y: 100,
-        health: 100,
-        equipped_weapon: 'fist'
+      position_x: 110, // Close to host
+      position_y: 100,
+      health: 100,
+      equipped_weapon: 'fist',
     });
 
     // Wait for snapshot to reflect the health and position updates
     await waitFor(() => {
-        const h = snapshot.getPlayers().get(hostUser.id);
-        const b = snapshot.getPlayers().get(bot.player_id);
-        return h && h.health === 5 && b && b.position_x === 110;
+      const h = snapshot.getPlayers().get(hostUser.id);
+      const b = snapshot.getPlayers().get(bot.player_id);
+      return h && h.health === 5 && b && b.position_x === 110;
     }, 5000, 100);
 
     // Listen for Game Over
     let gameOverData = null;
     network.on('game_over', (msg) => {
-        gameOverData = msg;
+      gameOverData = msg;
     });
 
     // Manually trigger bot attack (simulating BotController)
     network.sendFrom(bot.player_id, 'attack_request', {
-        aim_x: 100,
-        aim_y: 100,
-        is_special: false
+      aim_x: 100,
+      aim_y: 100,
+      is_special: false,
     });
 
     // Wait for processing

@@ -208,17 +208,17 @@ describe('App', () => {
       init: jest.fn(),
       update: jest.fn(),
       handleInput: jest.fn(),
-      getState: jest.fn(() => ({}))
+      getState: jest.fn(() => ({})),
     }));
 
     MockRenderer = jest.fn().mockImplementation(() => ({
       init: jest.fn(),
-      render: jest.fn()
+      render: jest.fn(),
     }));
 
     MockInput = jest.fn().mockImplementation(() => ({
       init: jest.fn(),
-      destroy: jest.fn()
+      destroy: jest.fn(),
     }));
 
     MockUI = jest.fn().mockImplementation(() => ({
@@ -226,7 +226,7 @@ describe('App', () => {
       showJoinCode: jest.fn(),
       showScreen: jest.fn(),
       showLobby: jest.fn(),
-      updatePlayerList: jest.fn()
+      updatePlayerList: jest.fn(),
     }));
 
     MockNetwork = jest.fn().mockImplementation(() => ({
@@ -237,7 +237,7 @@ describe('App', () => {
       startPositionBroadcasting: jest.fn(),
       stopPositionBroadcasting: jest.fn(),
       disconnect: jest.fn(),
-      on: jest.fn()
+      on: jest.fn(),
     }));
 
     // Setup mock Supabase client
@@ -245,9 +245,9 @@ describe('App', () => {
       auth: {
         signInAnonymously: jest.fn(() => Promise.resolve({
           data: { user: { id: 'test-user-id' } },
-          error: null
-        }))
-      }
+          error: null,
+        })),
+      },
     };
 
     mockCreateClient.mockReturnValue(mockSupabaseClient);
@@ -255,7 +255,7 @@ describe('App', () => {
     // Mock environment variables
     import.meta.env = {
       VITE_SUPABASE_URL: 'http://localhost:54321',
-      VITE_SUPABASE_ANON_KEY: 'test-anon-key'
+      VITE_SUPABASE_ANON_KEY: 'test-anon-key',
     };
 
     // Mock global functions
@@ -294,7 +294,7 @@ describe('App', () => {
     test('WhenAuthenticationFails_ShouldNotInitializeComponents', async () => {
       mockSupabaseClient.auth.signInAnonymously.mockResolvedValueOnce({
         data: null,
-        error: new Error('Auth failed')
+        error: new Error('Auth failed'),
       });
 
       await app.init();
@@ -334,7 +334,7 @@ describe('App', () => {
     test('WhenSuccessful_ShouldShowLobbyWithJoinCode', async () => {
       app.network.hostGame.mockResolvedValue({
         session: { join_code: 'ABC123' },
-        player: { player_name: 'Host' }
+        player: { player_name: 'Host' },
       });
 
       await app.hostGame();

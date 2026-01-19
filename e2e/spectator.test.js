@@ -38,16 +38,16 @@ describe('Spectator Mode E2E', () => {
             player_name: 'LocalPlayer',
             health: 100,
             position_x: 100,
-            position_y: 100
+            position_y: 100,
           }],
           ['killer-player', { 
             player_id: 'killer-player', 
             player_name: 'KillerPlayer',
             health: 100,
             position_x: 800, // Far away
-            position_y: 800
-          }]
-        ])
+            position_y: 800,
+          }],
+        ]),
       };
 
       const listeners = {};
@@ -62,7 +62,7 @@ describe('Spectator Mode E2E', () => {
         broadcastPlayerStateUpdate: () => {},
         startPeriodicPlayerStateWrite: () => {},
         send: () => {},
-        disconnect: () => {}
+        disconnect: () => {},
       };
 
       const mockSnapshot = {
@@ -73,7 +73,7 @@ describe('Spectator Mode E2E', () => {
           if (p) return { x: p.position_x, y: p.position_y, rotation: 0, vx: 0, vy: 0 };
           return null;
         },
-        destroy: () => {}
+        destroy: () => {},
       };
 
       window.app.network = mockNetwork;
@@ -112,18 +112,18 @@ describe('Spectator Mode E2E', () => {
         window.mockListeners['player_death']({
           data: {
             victim_id: 'local-player',
-            killer_id: 'killer-player'
-          }
+            killer_id: 'killer-player',
+          },
         });
       }
     });
 
     // Wait for camera to move towards killer (800, 800)
     await page.waitForFunction(() => {
-        // Killer is at 800, 800. Camera should approach it.
-        const dx = window.camera.x - 800;
-        const dy = window.camera.y - 800;
-        return Math.sqrt(dx*dx + dy*dy) < 50;
+      // Killer is at 800, 800. Camera should approach it.
+      const dx = window.camera.x - 800;
+      const dy = window.camera.y - 800;
+      return Math.sqrt(dx * dx + dy * dy) < 50;
     }, { timeout: 5000 });
 
     const finalCamera = await page.evaluate(() => ({ x: window.camera.x, y: window.camera.y }));
@@ -151,23 +151,23 @@ describe('Spectator Mode E2E', () => {
             player_name: 'LocalPlayer',
             health: 100,
             position_x: 100,
-            position_y: 100
+            position_y: 100,
           }],
           ['player-2', { 
             player_id: 'player-2', 
             player_name: 'Player Two',
             health: 100,
             position_x: 800, 
-            position_y: 800
+            position_y: 800,
           }],
           ['player-3', { 
             player_id: 'player-3', 
             player_name: 'Player Three',
             health: 100,
             position_x: 1500, 
-            position_y: 1500
-          }]
-        ])
+            position_y: 1500,
+          }],
+        ]),
       };
 
       const listeners = {};
@@ -182,7 +182,7 @@ describe('Spectator Mode E2E', () => {
         broadcastPlayerStateUpdate: () => {},
         startPeriodicPlayerStateWrite: () => {},
         send: () => {},
-        disconnect: () => {}
+        disconnect: () => {},
       };
 
       const mockSnapshot = {
@@ -193,7 +193,7 @@ describe('Spectator Mode E2E', () => {
           if (p) return { x: p.position_x, y: p.position_y, rotation: 0, vx: 0, vy: 0 };
           return null;
         },
-        destroy: () => {}
+        destroy: () => {},
       };
 
       window.app.network = mockNetwork;
@@ -232,8 +232,8 @@ describe('Spectator Mode E2E', () => {
         window.mockListeners['player_death']({
           data: {
             victim_id: 'local-player',
-            killer_id: 'player-2'
-          }
+            killer_id: 'player-2',
+          },
         });
       }
     });
@@ -250,8 +250,8 @@ describe('Spectator Mode E2E', () => {
 
     // Wait for the name change to Player Three
     await page.waitForFunction(
-        () => document.getElementById('spectating-name').textContent === 'Player Three',
-        { timeout: 2000 }
+      () => document.getElementById('spectating-name').textContent === 'Player Three',
+      { timeout: 2000 },
     );
 
     spectatingName = await page.$eval('#spectating-name', el => el.textContent);

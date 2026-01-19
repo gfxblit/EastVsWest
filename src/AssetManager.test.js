@@ -32,15 +32,15 @@ describe('AssetManager', () => {
 
   // Helper to simulate image loading
   const loadAllImages = () => {
-      mockImageInstances.forEach(img => {
-          if (img.onload) img.onload();
-      });
+    mockImageInstances.forEach(img => {
+      if (img.onload) img.onload();
+    });
   };
 
   test('preloadAssets should load all images in the manifest', async () => {
     const manifest = [
       { key: 'img1.png', src: 'img1.png', type: 'image' },
-      { key: 'img2.png', src: 'img2.png', type: 'image' }
+      { key: 'img2.png', src: 'img2.png', type: 'image' },
     ];
 
     const loadPromise = assetManager.preloadAssets(manifest);
@@ -56,19 +56,19 @@ describe('AssetManager', () => {
 
   test('preloadAssets should report progress', async () => {
     const manifest = [
-        { key: 'img1.png', src: 'img1.png', type: 'image' },
-        { key: 'img2.png', src: 'img2.png', type: 'image' }
+      { key: 'img1.png', src: 'img1.png', type: 'image' },
+      { key: 'img2.png', src: 'img2.png', type: 'image' },
     ];
     const onProgress = jest.fn();
 
     const loadPromise = assetManager.preloadAssets(manifest, onProgress);
     
     // Simulate loading one by one
-    if(mockImageInstances[0]) mockImageInstances[0].onload();
+    if (mockImageInstances[0]) mockImageInstances[0].onload();
     // Wait for microtasks
     await new Promise(resolve => setTimeout(resolve, 0));
     
-    if(mockImageInstances[1]) mockImageInstances[1].onload();
+    if (mockImageInstances[1]) mockImageInstances[1].onload();
     
     await loadPromise;
 
@@ -78,18 +78,18 @@ describe('AssetManager', () => {
   });
   
   test('preloadAssets should handle image load errors', async () => {
-      const manifest = [
-          { key: 'bad.png', src: 'bad.png', type: 'image' }
-      ];
+    const manifest = [
+      { key: 'bad.png', src: 'bad.png', type: 'image' },
+    ];
       
-      const loadPromise = assetManager.preloadAssets(manifest);
+    const loadPromise = assetManager.preloadAssets(manifest);
       
-      // Simulate error
-      if(mockImageInstances[0]) mockImageInstances[0].onerror(new Error('Failed'));
+    // Simulate error
+    if (mockImageInstances[0]) mockImageInstances[0].onerror(new Error('Failed'));
       
-      await loadPromise;
+    await loadPromise;
       
-      // It should still complete (maybe with a warning, but promise resolves)
-      expect(assetManager.getImage('bad.png')).toBeDefined(); // It likely stores the broken image object
+    // It should still complete (maybe with a warning, but promise resolves)
+    expect(assetManager.getImage('bad.png')).toBeDefined(); // It likely stores the broken image object
   });
 });

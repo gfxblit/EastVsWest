@@ -36,8 +36,8 @@ describe('Player Death Flow E2E', () => {
           player_name: 'TestPlayer',
           health: 100,
           position_x: 500,
-          position_y: 500
-        }]])
+          position_y: 500,
+        }]]),
       };
 
       // Create a more robust mock for network
@@ -49,7 +49,7 @@ describe('Player Death Flow E2E', () => {
         broadcastPlayerStateUpdate: () => {},
         startPeriodicPlayerStateWrite: () => {},
         send: () => {},
-        disconnect: () => {}
+        disconnect: () => {},
       };
 
       const mockSnapshot = {
@@ -60,9 +60,9 @@ describe('Player Death Flow E2E', () => {
           y: 500,
           rotation: 0,
           vx: 0,
-          vy: 0
+          vy: 0,
         }),
-        destroy: () => {}
+        destroy: () => {},
       };
 
       window.app.network = mockNetwork;

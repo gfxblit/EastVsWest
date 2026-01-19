@@ -59,7 +59,7 @@ export class HostLootManager {
 
     // Send a single sync message for all initial loot
     this.network.send('loot_sync', {
-      loot: this.state.loot
+      loot: this.state.loot,
     });
   }
 
@@ -69,7 +69,7 @@ export class HostLootManager {
     // Send all loot in a single batch message to avoid rate limiting/message loss
     this.network.send('loot_sync', {
       loot: this.state.loot,
-      target_player_id: playerId // Optional: could be used by clients to ignore if not meant for them (though 'send' is broadcast)
+      target_player_id: playerId, // Optional: could be used by clients to ignore if not meant for them (though 'send' is broadcast)
     });
   }
 
@@ -116,7 +116,7 @@ export class HostLootManager {
 
     const playerUpdate = {
       player_id: playerId,
-      equipped_weapon: player.equipped_weapon
+      equipped_weapon: player.equipped_weapon,
     };
 
     // Broadcast player update
@@ -132,7 +132,7 @@ export class HostLootManager {
     // Notify clients loot is gone
     this.network.send('loot_picked_up', {
       loot_id: loot_id,
-      player_id: playerId
+      player_id: playerId,
     });
 
     // If player had a real weapon (not fist), drop it

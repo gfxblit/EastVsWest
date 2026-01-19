@@ -25,16 +25,16 @@ describe('Game Combat', () => {
           position_x: 100,
           position_y: 100,
           health: 100,
-          equipped_weapon: 'spear'
+          equipped_weapon: 'spear',
         }],
         ['player-2', {
           player_id: 'player-2',
           position_x: 150,
           position_y: 100,
           health: 100,
-          equipped_weapon: 'fist'
-        }]
-      ]))
+          equipped_weapon: 'fist',
+        }],
+      ])),
     };
 
     game = new Game();
@@ -55,7 +55,7 @@ describe('Game Combat', () => {
         attack: true, 
         specialAbility: false,
         aimX: 200, // Should be ignored
-        aimY: 100  // Should be ignored
+        aimY: 100,  // Should be ignored
       };
 
       // Player is at 100,100 with rotation 0 (North). 
@@ -67,7 +67,7 @@ describe('Game Combat', () => {
         weapon_id: 'spear',
         aim_x: 100,
         aim_y: 0,
-        is_special: false
+        is_special: false,
       }));
     });
 
@@ -76,7 +76,7 @@ describe('Game Combat', () => {
         attack: false, 
         specialAbility: true,
         aimX: 200, // Should be ignored
-        aimY: 100  // Should be ignored
+        aimY: 100,  // Should be ignored
       };
 
       game.handleInput(inputState);
@@ -86,7 +86,7 @@ describe('Game Combat', () => {
         weapon_id: 'spear',
         aim_x: 100,
         aim_y: 0,
-        is_special: true
+        is_special: true,
       }));
     });
 
@@ -123,8 +123,8 @@ describe('Game Combat', () => {
           weapon_id: 'spear',
           aim_x: 150,
           aim_y: 100,
-          is_special: false
-        }
+          is_special: false,
+        },
       };
 
       // Manually trigger the handler on the HostCombatManager
@@ -139,8 +139,8 @@ describe('Game Combat', () => {
       expect(mockNetwork.broadcastPlayerStateUpdate).toHaveBeenCalledWith(expect.arrayContaining([
         expect.objectContaining({
           player_id: 'player-2',
-          health: 75
-        })
+          health: 75,
+        }),
       ]));
     });
 
@@ -151,7 +151,7 @@ describe('Game Combat', () => {
       const attackRequest = {
         type: 'attack_request',
         from: 'player-1',
-        data: { weapon_id: 'spear', aim_x: 150, aim_y: 100, is_special: false }
+        data: { weapon_id: 'spear', aim_x: 150, aim_y: 100, is_special: false },
       };
 
       game.hostCombatManager.handleAttackRequest(attackRequest, mockPlayersSnapshot);
@@ -166,7 +166,7 @@ describe('Game Combat', () => {
       const attackRequest = {
         type: 'attack_request',
         from: 'player-1',
-        data: { weapon_id: 'spear', aim_x: 1000, aim_y: 100, is_special: false }
+        data: { weapon_id: 'spear', aim_x: 1000, aim_y: 100, is_special: false },
       };
 
       game.hostCombatManager.handleAttackRequest(attackRequest, mockPlayersSnapshot);
@@ -187,7 +187,7 @@ describe('Game Combat', () => {
       const attackRequest = {
         type: 'attack_request',
         from: 'player-1',
-        data: { weapon_id: 'spear', aim_x: 150, aim_y: 100, is_special: false }
+        data: { weapon_id: 'spear', aim_x: 150, aim_y: 100, is_special: false },
       };
 
       game.hostCombatManager.handleAttackRequest(attackRequest, mockPlayersSnapshot);
@@ -206,7 +206,7 @@ describe('Game Combat', () => {
       const attackRequest = {
         type: 'attack_request',
         from: 'player-1',
-        data: { weapon_id: 'fist', aim_x: 150, aim_y: 100, is_special: false }
+        data: { weapon_id: 'fist', aim_x: 150, aim_y: 100, is_special: false },
       };
 
       game.hostCombatManager.handleAttackRequest(attackRequest, mockPlayersSnapshot);

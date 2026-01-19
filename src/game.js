@@ -283,7 +283,7 @@ export class Game {
       p.player_id !== this.network.playerId && 
       p.is_alive !== false && 
       p.is_connected !== false &&
-      (p.health === undefined || p.health > 0)
+      (p.health === undefined || p.health > 0),
     );
 
     if (candidates.length === 0) {

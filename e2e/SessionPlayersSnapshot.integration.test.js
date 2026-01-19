@@ -178,7 +178,7 @@ describe('SessionPlayersSnapshot Integration with Network', () => {
 
       // Should NOT see player from other session
       const otherSessionPlayer = Array.from(players.values()).find(
-        p => p.player_name === 'OtherPlayer'
+        p => p.player_name === 'OtherPlayer',
       );
       expect(otherSessionPlayer).toBeUndefined();
 
@@ -292,7 +292,7 @@ describe('SessionPlayersSnapshot Integration with Network', () => {
         position_y: 200,
         rotation: 1.5,
         velocity_x: 10,
-        velocity_y: 5
+        velocity_y: 5,
       });
 
       // Wait for broadcast to propagate (Supabase Realtime latency)

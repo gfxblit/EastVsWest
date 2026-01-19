@@ -26,7 +26,7 @@ export class AssetManager {
 
   createImage(filename) {
     if (this.images.has(filename)) {
-        return this.images.get(filename);
+      return this.images.get(filename);
     }
 
     const img = new Image();
@@ -90,7 +90,7 @@ export class AssetManager {
   }
 
   getImage(filename) {
-      return this.images.get(filename);
+    return this.images.get(filename);
   }
 
   async preloadAssets(manifest, onProgress) {
@@ -98,34 +98,34 @@ export class AssetManager {
     const total = manifest.length;
     
     const updateProgress = () => {
-        loaded++;
-        if (onProgress) onProgress(loaded / total);
+      loaded++;
+      if (onProgress) onProgress(loaded / total);
     };
 
     const promises = manifest.map(async item => {
-        try {
-            if (item.type === 'spritesheet') {
-                await this.loadSpriteSheet(item.key, item.metadata, item.src);
+      try {
+        if (item.type === 'spritesheet') {
+          await this.loadSpriteSheet(item.key, item.metadata, item.src);
+        } else {
+          // Default to image
+          await new Promise((resolve) => {
+            const img = this.createImage(item.src);
+            if (img.complete) {
+              resolve();
             } else {
-                // Default to image
-                await new Promise((resolve) => {
-                     const img = this.createImage(item.src);
-                     if (img.complete) {
-                         resolve();
-                     } else {
-                         img.onload = resolve;
-                         img.onerror = () => {
-                             console.warn(`Failed to preload ${item.src}`);
-                             resolve();
-                         };
-                     }
-                });
+              img.onload = resolve;
+              img.onerror = () => {
+                console.warn(`Failed to preload ${item.src}`);
+                resolve();
+              };
             }
-        } catch (e) {
-            console.error(`Error loading asset ${item.src}:`, e);
-        } finally {
-            updateProgress();
+          });
         }
+      } catch (e) {
+        console.error(`Error loading asset ${item.src}:`, e);
+      } finally {
+        updateProgress();
+      }
     });
 
     await Promise.all(promises);

@@ -3,5 +3,5 @@ export default {
   testMatch: ['**/e2e/**/*.test.js'],
   transform: {},
   testTimeout: 30000,
-  maxWorkers: 1
+  maxWorkers: 1,
 };

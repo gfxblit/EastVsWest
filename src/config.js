@@ -222,12 +222,12 @@ export const CONFIG = {
       TREE: { 
         renderWidth: 70, renderHeight: 150, 
         hitboxWidth: 60, hitboxHeight: 140, 
-        color: '#2d5a27', type: 'tree', src: 'assets/props/tree.png' 
+        color: '#2d5a27', type: 'tree', src: 'assets/props/tree.png', 
       },
       ROCK: { 
         renderWidth: 128, renderHeight: 100, 
         hitboxWidth: 70, hitboxHeight: 50, 
-        color: '#7a7a7a', type: 'rock', src: 'assets/props/rock.png' 
+        color: '#7a7a7a', type: 'rock', src: 'assets/props/rock.png', 
       },
     },
     // Static map definition
@@ -237,6 +237,6 @@ export const CONFIG = {
       { id: 'rock_1', type: 'rock', x: 600, y: 300 },
       { id: 'rock_2', type: 'rock', x: 1000, y: 600 },
       { id: 'tree_3', type: 'tree', x: 1600, y: 1200 },
-    ]
+    ],
   },
 };

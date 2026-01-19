@@ -14,7 +14,7 @@ import {
   validateFrames,
   generateSpriteSheet,
   generateMetadata,
-  SpriteSheetGenerator
+  SpriteSheetGenerator,
 } from './generate-spritesheet.js';
 
 describe('Sprite Sheet Generator', () => {
@@ -32,7 +32,7 @@ describe('Sprite Sheet Generator', () => {
   async function setupTestAssets(baseDir, metaPath) {
     const directions = [
       'south', 'south-east', 'east', 'north-east', 
-      'north', 'north-west', 'west', 'south-west'
+      'north', 'north-west', 'west', 'south-west',
     ];
     
     const animations = {};
@@ -54,8 +54,8 @@ describe('Sprite Sheet Generator', () => {
             width: 96,
             height: 96,
             channels: 4,
-            background: { r: 255, g: 0, b: 0, alpha: 255 }
-          }
+            background: { r: 255, g: 0, b: 0, alpha: 255 },
+          },
         }).png().toFile(filePath);
         
         // Store relative path as expected in metadata
@@ -68,9 +68,9 @@ describe('Sprite Sheet Generator', () => {
       character: { size: { width: 96, height: 96 } },
       frames: {
         animations: {
-          walking: animations
-        }
-      }
+          walking: animations,
+        },
+      },
     };
 
     await fs.writeFile(metaPath, JSON.stringify(metadata, null, 2));
@@ -123,10 +123,10 @@ describe('Sprite Sheet Generator', () => {
         frames: {
           animations: {
             walking: {
-              south: ['animations/walking/south/missing.png']
-            }
-          }
-        }
+              south: ['animations/walking/south/missing.png'],
+            },
+          },
+        },
       };
 
       const result = await validateFrames(fakeMetadata, pixelLabDir);
@@ -148,8 +148,8 @@ describe('Sprite Sheet Generator', () => {
           width: 50,
           height: 50,
           channels: 4,
-          background: { r: 255, g: 0, b: 0, alpha: 1 }
-        }
+          background: { r: 255, g: 0, b: 0, alpha: 1 },
+        },
       }).png().toFile(wrongSizeFrame);
 
       const fakeMetadata = {
@@ -157,10 +157,10 @@ describe('Sprite Sheet Generator', () => {
         frames: {
           animations: {
             walking: {
-              south: [path.relative(pixelLabDir, wrongSizeFrame)]
-            }
-          }
-        }
+              south: [path.relative(pixelLabDir, wrongSizeFrame)],
+            },
+          },
+        },
       };
 
       const result = await validateFrames(fakeMetadata, pixelLabDir);
@@ -221,7 +221,7 @@ describe('Sprite Sheet Generator', () => {
       // At least some pixels should have non-zero values
       let hasContent = false;
       for (let i = 0; i < firstFrame.length; i += 4) {
-        if (firstFrame[i] !== 0 || firstFrame[i+1] !== 0 || firstFrame[i+2] !== 0) {
+        if (firstFrame[i] !== 0 || firstFrame[i + 1] !== 0 || firstFrame[i + 2] !== 0) {
           hasContent = true;
           break;
         }
@@ -236,7 +236,7 @@ describe('Sprite Sheet Generator', () => {
         'south',
         'east',
         'north',
-        'west'
+        'west',
       ];
 
       await generateMetadata(outputMetadataPath, expectedDirections, 96, 96, 6);

@@ -198,18 +198,18 @@ describe('Renderer', () => {
     test('WhenRenderingWithoutCamera_ShouldClearCanvasWithBackgroundColor', () => {
       const gameState = {
         conflictZone: { centerX: 600, centerY: 400, radius: 300 },
-        loot: []
+        loot: [],
       };
 
       // Track fillStyle assignments
-      let fillStyleHistory = [];
+      const fillStyleHistory = [];
       Object.defineProperty(ctx, 'fillStyle', {
         get: function() { return this._fillStyle; },
         set: function(val) {
           this._fillStyle = val;
           fillStyleHistory.push(val);
         },
-        configurable: true
+        configurable: true,
       });
 
       renderer.render(gameState, null, null, null, 0.016);
@@ -294,7 +294,7 @@ describe('Renderer', () => {
       Object.defineProperty(ctx, 'fillStyle', {
         get: function() { return currentFillStyle; },
         set: function(val) { currentFillStyle = val; },
-        configurable: true
+        configurable: true,
       });
 
       const callOrder = [];
@@ -305,7 +305,7 @@ describe('Renderer', () => {
           operation: 'fillRect',
           args: [x, y, w, h],
           fillStyle: currentFillStyle,
-          order: callOrder.length
+          order: callOrder.length,
         };
         fillRectCalls.push(call);
         callOrder.push(`fillRect(${x}, ${y}, ${w}, ${h})`);
@@ -343,8 +343,8 @@ describe('Renderer', () => {
             position_x: 2000, // Off-screen to the right
             position_y: 800,
             health: 100,
-          }]
-        ])
+          }],
+        ]),
       };
 
       const camera = {
@@ -377,8 +377,8 @@ describe('Renderer', () => {
             position_x: 1200, // In view
             position_y: 800,
             health: 100,
-          }]
-        ])
+          }],
+        ]),
       };
 
       const camera = {
@@ -403,8 +403,8 @@ describe('Renderer', () => {
       // Arrange
       const gameState = {
         loot: [
-          { id: 'loot-1', x: 2000, y: 800 } // Off-screen to the right
-        ]
+          { id: 'loot-1', x: 2000, y: 800 }, // Off-screen to the right
+        ],
       };
 
       const camera = {
@@ -461,7 +461,7 @@ describe('Renderer', () => {
       // Find the rect call that draws the danger overlay
       const rectCalls = ctx.rect.mock.calls;
       const dangerOverlayCall = rectCalls.find(
-        call => call[0] === 0 && call[1] === 0 && call[2] > 1200 && call[3] > 800
+        call => call[0] === 0 && call[1] === 0 && call[2] > 1200 && call[3] > 800,
       );
 
       expect(dangerOverlayCall).toBeDefined();
@@ -830,8 +830,8 @@ describe('Renderer', () => {
 
         newRenderer.init();
 
-      // Should create shadow image + background image + slash images + thrust images + blunt images + weapon icons + 1 death image + 2 prop images (tree, rock)
-      expect(global.Image).toHaveBeenCalledTimes(22);
+        // Should create shadow image + background image + slash images + thrust images + blunt images + weapon icons + 1 death image + 2 prop images (tree, rock)
+        expect(global.Image).toHaveBeenCalledTimes(22);
       });
 
     });
@@ -1006,10 +1006,10 @@ describe('Renderer', () => {
                 south: { row: 0, frames: 4 },
                 east: { row: 1, frames: 4 },
                 north: { row: 2, frames: 4 },
-                west: { row: 3, frames: 4 }
-              }
-            })
-          })
+                west: { row: 3, frames: 4 },
+              },
+            }),
+          }),
         );
 
         const newRenderer = new Renderer(canvas, new AssetManager());
@@ -1038,8 +1038,8 @@ describe('Renderer', () => {
         global.fetch = jest.fn(() =>
           Promise.resolve({
             ok: false,
-            statusText: 'Not Found'
-          })
+            statusText: 'Not Found',
+          }),
         );
 
         const newRenderer = new Renderer(canvas, new AssetManager());
@@ -1051,54 +1051,54 @@ describe('Renderer', () => {
     describe('updateAnimationState', () => {
       test('WhenPlayerIsAttacking_ShouldUseSlashSpritesheet', () => {
       // Mock both spritesheets
-      const walkSheet = { complete: true, naturalWidth: 128, naturalHeight: 128 };
-      const slashSheet = { complete: true, naturalWidth: 1750, naturalHeight: 1400 }; // 5 frames * 350, 4 rows * 350
+        const walkSheet = { complete: true, naturalWidth: 128, naturalHeight: 128 };
+        const slashSheet = { complete: true, naturalWidth: 1750, naturalHeight: 1400 }; // 5 frames * 350, 4 rows * 350
       
-      renderer.assetManager._spriteSheets.set('walk', walkSheet);
-      renderer.assetManager._spriteSheets.set('slash', slashSheet);
+        renderer.assetManager._spriteSheets.set('walk', walkSheet);
+        renderer.assetManager._spriteSheets.set('slash', slashSheet);
       
-      renderer.assetManager._spriteSheetMetadata.set('walk', {
-        frameWidth: 32, frameHeight: 32, columns: 4, rows: 4
+        renderer.assetManager._spriteSheetMetadata.set('walk', {
+          frameWidth: 32, frameHeight: 32, columns: 4, rows: 4,
+        });
+        renderer.assetManager._spriteSheetMetadata.set('slash', {
+          frameWidth: 350, frameHeight: 350, columns: 5, rows: 4,
+        });
+
+        const player = {
+          id: 'player-1',
+          x: 100,
+          y: 100,
+          rotation: Math.PI / 2, // East
+          isAttacking: true,
+          attackAnimTime: 0.1, // Halfway through 0.2s animation
+          animationState: {
+            currentFrame: 0,
+            lastDirection: 1, // East
+          },
+        };
+
+        renderer.playerRenderer.render(ctx, player, false);
+
+        // Should draw from slash spritesheet
+        // 5th argument of drawImage is sourceWidth, which is 350 for slash sheet
+        expect(ctx.drawImage).toHaveBeenCalledWith(
+          slashSheet,
+          expect.any(Number), // sourceX
+          expect.any(Number), // sourceY
+          350,                // sourceWidth
+          350,                // sourceHeight
+          expect.any(Number), // destX
+          expect.any(Number), // destY
+          expect.any(Number), // destWidth
+          expect.any(Number),  // destHeight
+        );
       });
-      renderer.assetManager._spriteSheetMetadata.set('slash', {
-        frameWidth: 350, frameHeight: 350, columns: 5, rows: 4
-      });
 
-      const player = {
-        id: 'player-1',
-        x: 100,
-        y: 100,
-        rotation: Math.PI / 2, // East
-        isAttacking: true,
-        attackAnimTime: 0.1, // Halfway through 0.2s animation
-        animationState: {
-          currentFrame: 0,
-          lastDirection: 1, // East
-        },
-      };
-
-      renderer.playerRenderer.render(ctx, player, false);
-
-      // Should draw from slash spritesheet
-      // 5th argument of drawImage is sourceWidth, which is 350 for slash sheet
-      expect(ctx.drawImage).toHaveBeenCalledWith(
-        slashSheet,
-        expect.any(Number), // sourceX
-        expect.any(Number), // sourceY
-        350,                // sourceWidth
-        350,                // sourceHeight
-        expect.any(Number), // destX
-        expect.any(Number), // destY
-        expect.any(Number), // destWidth
-        expect.any(Number)  // destHeight
-      );
-    });
-
-    test('WhenPlayerIsMoving_ShouldAdvanceFrame', () => {
+      test('WhenPlayerIsMoving_ShouldAdvanceFrame', () => {
         const animState = {
           currentFrame: 0,
           timeAccumulator: 0,
-          lastDirection: 1 // East
+          lastDirection: 1, // East
         };
 
         const deltaTime = 1 / CONFIG.ANIMATION.FPS; // One frame duration
@@ -1116,7 +1116,7 @@ describe('Renderer', () => {
         const animState = {
           currentFrame: 3,
           timeAccumulator: 0,
-          lastDirection: 1 // East
+          lastDirection: 1, // East
         };
 
         const deltaTime = 1 / CONFIG.ANIMATION.FPS; // One frame duration
@@ -1133,7 +1133,7 @@ describe('Renderer', () => {
         const animState = {
           currentFrame: 3, // Last frame
           timeAccumulator: 0,
-          lastDirection: 2 // North
+          lastDirection: 2, // North
         };
 
         const deltaTime = 1 / CONFIG.ANIMATION.FPS; // One frame duration
@@ -1149,7 +1149,7 @@ describe('Renderer', () => {
         const animState = {
           currentFrame: 2,
           timeAccumulator: 0,
-          lastDirection: 1 // East
+          lastDirection: 1, // East
         };
 
         const deltaTime = 0.01; // Small delta
@@ -1206,7 +1206,7 @@ describe('Renderer', () => {
           1500 - CONFIG.RENDER.PLAYER_RADIUS, // destX (centered)
           900 - CONFIG.RENDER.PLAYER_RADIUS,  // destY (centered)
           CONFIG.RENDER.PLAYER_RADIUS * 2,    // destWidth
-          CONFIG.RENDER.PLAYER_RADIUS * 2     // destHeight
+          CONFIG.RENDER.PLAYER_RADIUS * 2,     // destHeight
         );
       });
 
@@ -1258,7 +1258,7 @@ describe('Renderer', () => {
           expect.any(Number),
           expect.any(Number),
           expect.any(Number),
-          expect.any(Number)
+          expect.any(Number),
         );
       });
     });
@@ -1469,7 +1469,7 @@ describe('Renderer', () => {
       
       const gameState = {
         conflictZone: { centerX: 600, centerY: 400, radius: 300 },
-        loot: []
+        loot: [],
       };
 
       renderer.render(gameState, null, null, null, 0.016);
@@ -1479,8 +1479,8 @@ describe('Renderer', () => {
     });
 
     test('render should remove expired floating texts', () => {
-       // Mock active and expired text objects
-       const activeText = {
+      // Mock active and expired text objects
+      const activeText = {
         update: jest.fn(),
         draw: jest.fn(),
         isExpired: jest.fn(() => false),
@@ -1495,7 +1495,7 @@ describe('Renderer', () => {
       
       const gameState = {
         conflictZone: { centerX: 600, centerY: 400, radius: 300 },
-        loot: []
+        loot: [],
       };
 
       renderer.render(gameState, null, null, null, 0.016);
@@ -1510,7 +1510,7 @@ describe('Renderer', () => {
     test('renderLoot should draw circles and labels for each loot item', () => {
       const lootItems = [
         { id: '1', item_id: 'spear', x: 100, y: 100 },
-        { id: '2', item_id: 'bo', x: 200, y: 200 }
+        { id: '2', item_id: 'bo', x: 200, y: 200 },
       ];
 
       renderer.lootRenderer.render(ctx, lootItems);
@@ -1525,7 +1525,7 @@ describe('Renderer', () => {
       const player = { x: 50, y: 50 };
       const lootItems = [
         { id: '1', x: 100, y: 100 }, // distance ~70.7
-        { id: '2', x: 60, y: 60 }    // distance ~14.1
+        { id: '2', x: 60, y: 60 },    // distance ~14.1
       ];
 
       const result = renderer.uiRenderer.findNearestLoot(player, lootItems);
@@ -1545,7 +1545,7 @@ describe('Renderer', () => {
       expect(ctx.fillText).toHaveBeenCalledWith(
         expect.stringContaining('Picking up spear'),
         100,
-        expect.any(Number)
+        expect.any(Number),
       );
     });
 
@@ -1560,7 +1560,7 @@ describe('Renderer', () => {
       expect(ctx.fillText).toHaveBeenCalledWith(
         expect.stringContaining('swap bo for spear'),
         100,
-        expect.any(Number)
+        expect.any(Number),
       );
     });
   });

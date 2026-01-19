@@ -3,244 +3,244 @@ import { startViteServer, stopViteServer } from './helpers/vite-server.js';
 import { getPuppeteerConfig } from './helpers/puppeteer-config.js';
 
 describe('Debug UI E2E', () => {
-    let browser;
-    let page;
-    let baseUrl;
+  let browser;
+  let page;
+  let baseUrl;
 
-    beforeAll(async () => {
-        baseUrl = await startViteServer();
-        browser = await puppeteer.launch(getPuppeteerConfig());
-        page = await browser.newPage();
-    });
+  beforeAll(async () => {
+    baseUrl = await startViteServer();
+    browser = await puppeteer.launch(getPuppeteerConfig());
+    page = await browser.newPage();
+  });
 
-    afterAll(async () => {
-        if (browser) {
-            await browser.close();
-        }
-        await stopViteServer();
-    });
-
-    async function setupMocks(page, options = {}) {
-        const {
-            playerId = 'local-player',
-            playerName = 'DebugUser',
-            joinCode = 'DEBUG1'
-        } = options;
-
-        await page.evaluate(({ playerId, playerName, joinCode }) => {
-            window.app.network = {
-                playerId,
-                isHost: true,
-                initialize: () => { },
-                on: () => { },
-                hostGame: async () => ({ session: { id: 's1', join_code: joinCode }, player: { id: playerId } }),
-                startGame: async () => { },
-                startPeriodicPlayerStateWrite: () => { },
-                broadcastPlayerStateUpdate: () => { },
-                writePlayerStateToDB: async () => { },
-                send: () => { },
-                disconnect: () => { },
-            };
-
-            window.app.playersSnapshot = {
-                ready: async () => { },
-                getPlayers: () => new Map([[playerId, {
-                    player_id: playerId,
-                    player_name: playerName,
-                    health: 100,
-                    position_x: 100,
-                    position_y: 100
-                }]]),
-                getInterpolatedPlayerState: () => ({ x: 100, y: 100 }),
-                destroy: () => { }
-            };
-
-            // Mock hostGame to immediately start
-            window.app.hostGame = async function () {
-                this.ui.showJoinCode(joinCode);
-                this.startGame();
-            };
-        }, { playerId, playerName, joinCode });
+  afterAll(async () => {
+    if (browser) {
+      await browser.close();
     }
+    await stopViteServer();
+  });
 
-    test('Should allow configuring weapon stats in real-time', async () => {
-        await page.goto(baseUrl);
-        await page.waitForSelector('body.loaded');
+  async function setupMocks(page, options = {}) {
+    const {
+      playerId = 'local-player',
+      playerName = 'DebugUser',
+      joinCode = 'DEBUG1',
+    } = options;
 
-        await setupMocks(page, { joinCode: 'DEBUG1', playerName: 'DebugUser' });
+    await page.evaluate(({ playerId, playerName, joinCode }) => {
+      window.app.network = {
+        playerId,
+        isHost: true,
+        initialize: () => { },
+        on: () => { },
+        hostGame: async () => ({ session: { id: 's1', join_code: joinCode }, player: { id: playerId } }),
+        startGame: async () => { },
+        startPeriodicPlayerStateWrite: () => { },
+        broadcastPlayerStateUpdate: () => { },
+        writePlayerStateToDB: async () => { },
+        send: () => { },
+        disconnect: () => { },
+      };
 
-        // Start game
-        await page.click('#host-game-btn');
-        await page.waitForSelector('#game-screen.active');
+      window.app.playersSnapshot = {
+        ready: async () => { },
+        getPlayers: () => new Map([[playerId, {
+          player_id: playerId,
+          player_name: playerName,
+          health: 100,
+          position_x: 100,
+          position_y: 100,
+        }]]),
+        getInterpolatedPlayerState: () => ({ x: 100, y: 100 }),
+        destroy: () => { },
+      };
 
-        // Wait for game initialization
-        await page.waitForFunction(() => window.game && window.game.state.isRunning);
+      // Mock hostGame to immediately start
+      window.app.hostGame = async function () {
+        this.ui.showJoinCode(joinCode);
+        this.startGame();
+      };
+    }, { playerId, playerName, joinCode });
+  }
 
-        // Simulate pressing 'O' to toggle Debug UI
-        await page.keyboard.press('o');
+  test('Should allow configuring weapon stats in real-time', async () => {
+    await page.goto(baseUrl);
+    await page.waitForSelector('body.loaded');
 
-        // Check if debug UI overlay appears
-        await page.waitForSelector('#debug-ui-overlay', { visible: true, timeout: 5000 });
+    await setupMocks(page, { joinCode: 'DEBUG1', playerName: 'DebugUser' });
 
-        // Select 'SPEAR' (assuming it's the first or available)
-        await page.select('#debug-weapon-select', 'SPEAR');
+    // Start game
+    await page.click('#host-game-btn');
+    await page.waitForSelector('#game-screen.active');
 
-        // Change damage to 999
-        await page.evaluate(() => {
-            const input = document.getElementById('debug-baseDamage');
-            input.value = '999';
-            input.dispatchEvent(new Event('input'));
-        });
+    // Wait for game initialization
+    await page.waitForFunction(() => window.game && window.game.state.isRunning);
 
-        // Verify UI value persistence (simple check)
-        const spearDamage = await page.evaluate(() => {
-            return document.getElementById('debug-baseDamage').value;
-        });
+    // Simulate pressing 'O' to toggle Debug UI
+    await page.keyboard.press('o');
 
-        expect(spearDamage).toBe('999');
+    // Check if debug UI overlay appears
+    await page.waitForSelector('#debug-ui-overlay', { visible: true, timeout: 5000 });
 
-        // Close Debug UI
-        await page.keyboard.press('o');
-        await page.waitForSelector('#debug-ui-overlay', { hidden: true });
+    // Select 'SPEAR' (assuming it's the first or available)
+    await page.select('#debug-weapon-select', 'SPEAR');
 
-        // Open again
-        await page.keyboard.press('o');
-        await page.waitForSelector('#debug-ui-overlay', { visible: true });
-
-        // Check if value is still 999
-        const damageAfterReopen = await page.evaluate(() => {
-            return document.getElementById('debug-baseDamage').value;
-        });
-        expect(damageAfterReopen).toBe('999');
+    // Change damage to 999
+    await page.evaluate(() => {
+      const input = document.getElementById('debug-baseDamage');
+      input.value = '999';
+      input.dispatchEvent(new Event('input'));
     });
 
-    test('Should allow pausing simulation', async () => {
-        await page.goto(baseUrl);
-        await page.waitForSelector('body.loaded');
-
-        // Mock network and game to bypass Supabase
-        await setupMocks(page, { joinCode: 'DEBUG3', playerName: 'DebugUser' });
-
-        // Start game
-        await page.click('#host-game-btn');
-        await page.waitForSelector('#game-screen.active');
-        await page.waitForFunction(() => window.game && window.game.state.isRunning);
-
-        // Open Debug UI
-        await page.keyboard.press('o');
-        await page.waitForSelector('#debug-ui-overlay', { visible: true });
-        
-        // Pause simulation
-        await page.click('#debug-pause-simulation-btn');
-
-        // Get time immediately after pause
-        const pausedTime = await page.evaluate(() => window.game.state.gameTime);
-        
-        // Wait a bit
-        await new Promise(resolve => setTimeout(resolve, 500));
-        
-        // Time should NOT have changed
-        const timeAfterWait = await page.evaluate(() => window.game.state.gameTime);
-        expect(timeAfterWait).toBe(pausedTime);
-
-        // Resume simulation
-        await page.click('#debug-pause-simulation-btn');
-        
-        // Wait a bit
-        await new Promise(resolve => setTimeout(resolve, 500));
-        
-        // Time should HAVE changed
-        const resumedTime = await page.evaluate(() => window.game.state.gameTime);
-        expect(resumedTime).toBeGreaterThan(timeAfterWait);
+    // Verify UI value persistence (simple check)
+    const spearDamage = await page.evaluate(() => {
+      return document.getElementById('debug-baseDamage').value;
     });
 
-    test('Should allow toggling Debug UI via touch button on small screens', async () => {
-        // Set viewport to mobile size
-        await page.setViewport({ width: 400, height: 800, isMobile: true, hasTouch: true });
+    expect(spearDamage).toBe('999');
 
-        await page.goto(`${baseUrl}?debug=true`);
-        await page.waitForSelector('body.loaded');
+    // Close Debug UI
+    await page.keyboard.press('o');
+    await page.waitForSelector('#debug-ui-overlay', { hidden: true });
 
-        // Setup mocks after page load
-        await setupMocks(page, { playerName: 'TouchUser', joinCode: 'DEBUG2' });
+    // Open again
+    await page.keyboard.press('o');
+    await page.waitForSelector('#debug-ui-overlay', { visible: true });
 
-        // Start game
-        await page.click('#host-game-btn');
-        await page.waitForSelector('#game-screen.active');
-
-        // Wait for game initialization
-        await page.waitForFunction(() => window.game && window.game.state.isRunning);
-
-        // Verify debug button is visible
-        await page.waitForSelector('#debug-toggle-btn', { visible: true });
-
-        // Tap Debug Button to open
-        await page.tap('#debug-toggle-btn');
-
-        // Check if debug UI overlay appears
-        await page.waitForFunction(() => {
-            const el = document.getElementById('debug-ui-overlay');
-            return el && !el.classList.contains('hidden');
-        }, { timeout: 5000 });
-
-        // Wait a bit for stabilization
-        await new Promise(resolve => setTimeout(resolve, 100));
-
-        // Tap Debug Button again to close
-        await page.tap('#debug-toggle-btn');
-
-        // Wait for it to be hidden
-        await page.waitForFunction(() => {
-            const el = document.getElementById('debug-ui-overlay');
-            return !el || el.classList.contains('hidden');
-        }, { timeout: 5000 });
+    // Check if value is still 999
+    const damageAfterReopen = await page.evaluate(() => {
+      return document.getElementById('debug-baseDamage').value;
     });
+    expect(damageAfterReopen).toBe('999');
+  });
 
-    test('Should allow minimizing and maximizing the debug panel', async () => {
-        await page.goto(baseUrl);
-        await page.waitForSelector('body.loaded');
+  test('Should allow pausing simulation', async () => {
+    await page.goto(baseUrl);
+    await page.waitForSelector('body.loaded');
 
-        await setupMocks(page, { playerId: 'host', joinCode: 'DEBUG3' });
+    // Mock network and game to bypass Supabase
+    await setupMocks(page, { joinCode: 'DEBUG3', playerName: 'DebugUser' });
 
-        // Start game and open debug UI
-        await page.click('#host-game-btn');
-        await page.keyboard.press('o');
-        await page.waitForSelector('#debug-ui-overlay', { visible: true });
+    // Start game
+    await page.click('#host-game-btn');
+    await page.waitForSelector('#game-screen.active');
+    await page.waitForFunction(() => window.game && window.game.state.isRunning);
 
-        // Verify initial state (maximized)
-        const isContentVisible = await page.evaluate(() => {
-            const content = document.getElementById('debug-content');
-            return content && !content.classList.contains('hidden');
-        });
-        expect(isContentVisible).toBe(true);
+    // Open Debug UI
+    await page.keyboard.press('o');
+    await page.waitForSelector('#debug-ui-overlay', { visible: true });
+        
+    // Pause simulation
+    await page.click('#debug-pause-simulation-btn');
 
-        const initialBtnText = await page.$eval('#debug-minimize-btn', el => el.innerText);
-        expect(initialBtnText).toBe('-');
+    // Get time immediately after pause
+    const pausedTime = await page.evaluate(() => window.game.state.gameTime);
+        
+    // Wait a bit
+    await new Promise(resolve => setTimeout(resolve, 500));
+        
+    // Time should NOT have changed
+    const timeAfterWait = await page.evaluate(() => window.game.state.gameTime);
+    expect(timeAfterWait).toBe(pausedTime);
 
-        // Minimize
-        await page.click('#debug-minimize-btn');
+    // Resume simulation
+    await page.click('#debug-pause-simulation-btn');
+        
+    // Wait a bit
+    await new Promise(resolve => setTimeout(resolve, 500));
+        
+    // Time should HAVE changed
+    const resumedTime = await page.evaluate(() => window.game.state.gameTime);
+    expect(resumedTime).toBeGreaterThan(timeAfterWait);
+  });
 
-        // Verify minimized state
-        const isContentHidden = await page.evaluate(() => {
-            const content = document.getElementById('debug-content');
-            return content && content.classList.contains('hidden');
-        });
-        expect(isContentHidden).toBe(true);
+  test('Should allow toggling Debug UI via touch button on small screens', async () => {
+    // Set viewport to mobile size
+    await page.setViewport({ width: 400, height: 800, isMobile: true, hasTouch: true });
 
-        const minimizedBtnText = await page.$eval('#debug-minimize-btn', el => el.innerText);
-        expect(minimizedBtnText).toBe('+');
+    await page.goto(`${baseUrl}?debug=true`);
+    await page.waitForSelector('body.loaded');
 
-        // Maximize
-        await page.click('#debug-minimize-btn');
+    // Setup mocks after page load
+    await setupMocks(page, { playerName: 'TouchUser', joinCode: 'DEBUG2' });
 
-        // Verify maximized again
-        const isContentVisibleAgain = await page.evaluate(() => {
-            const content = document.getElementById('debug-content');
-            return content && !content.classList.contains('hidden');
-        });
-        expect(isContentVisibleAgain).toBe(true);
+    // Start game
+    await page.click('#host-game-btn');
+    await page.waitForSelector('#game-screen.active');
 
-        const maximizedBtnText = await page.$eval('#debug-minimize-btn', el => el.innerText);
-        expect(maximizedBtnText).toBe('-');
+    // Wait for game initialization
+    await page.waitForFunction(() => window.game && window.game.state.isRunning);
+
+    // Verify debug button is visible
+    await page.waitForSelector('#debug-toggle-btn', { visible: true });
+
+    // Tap Debug Button to open
+    await page.tap('#debug-toggle-btn');
+
+    // Check if debug UI overlay appears
+    await page.waitForFunction(() => {
+      const el = document.getElementById('debug-ui-overlay');
+      return el && !el.classList.contains('hidden');
+    }, { timeout: 5000 });
+
+    // Wait a bit for stabilization
+    await new Promise(resolve => setTimeout(resolve, 100));
+
+    // Tap Debug Button again to close
+    await page.tap('#debug-toggle-btn');
+
+    // Wait for it to be hidden
+    await page.waitForFunction(() => {
+      const el = document.getElementById('debug-ui-overlay');
+      return !el || el.classList.contains('hidden');
+    }, { timeout: 5000 });
+  });
+
+  test('Should allow minimizing and maximizing the debug panel', async () => {
+    await page.goto(baseUrl);
+    await page.waitForSelector('body.loaded');
+
+    await setupMocks(page, { playerId: 'host', joinCode: 'DEBUG3' });
+
+    // Start game and open debug UI
+    await page.click('#host-game-btn');
+    await page.keyboard.press('o');
+    await page.waitForSelector('#debug-ui-overlay', { visible: true });
+
+    // Verify initial state (maximized)
+    const isContentVisible = await page.evaluate(() => {
+      const content = document.getElementById('debug-content');
+      return content && !content.classList.contains('hidden');
     });
+    expect(isContentVisible).toBe(true);
+
+    const initialBtnText = await page.$eval('#debug-minimize-btn', el => el.innerText);
+    expect(initialBtnText).toBe('-');
+
+    // Minimize
+    await page.click('#debug-minimize-btn');
+
+    // Verify minimized state
+    const isContentHidden = await page.evaluate(() => {
+      const content = document.getElementById('debug-content');
+      return content && content.classList.contains('hidden');
+    });
+    expect(isContentHidden).toBe(true);
+
+    const minimizedBtnText = await page.$eval('#debug-minimize-btn', el => el.innerText);
+    expect(minimizedBtnText).toBe('+');
+
+    // Maximize
+    await page.click('#debug-minimize-btn');
+
+    // Verify maximized again
+    const isContentVisibleAgain = await page.evaluate(() => {
+      const content = document.getElementById('debug-content');
+      return content && !content.classList.contains('hidden');
+    });
+    expect(isContentVisibleAgain).toBe(true);
+
+    const maximizedBtnText = await page.$eval('#debug-minimize-btn', el => el.innerText);
+    expect(maximizedBtnText).toBe('-');
+  });
 });

@@ -272,7 +272,7 @@ describe('Network', () => {
                   subChain.eq = jest.fn().mockImplementation((col2, val2) => {
                     if (col2 === 'player_id') {
                       return {
-                        single: jest.fn().mockResolvedValue({ data: mockExistingPlayer, error: null })
+                        single: jest.fn().mockResolvedValue({ data: mockExistingPlayer, error: null }),
                       };
                     }
                     return subChain;
@@ -284,13 +284,13 @@ describe('Network', () => {
                 return chain;
               });
               return chain;
-            })
+            }),
           };
         }
         return {
           select: jest.fn().mockReturnThis(),
           eq: jest.fn().mockReturnThis(),
-          single: jest.fn().mockResolvedValue({ data: null, error: null })
+          single: jest.fn().mockResolvedValue({ data: null, error: null }),
         };
       });
 

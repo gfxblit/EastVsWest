@@ -23,7 +23,6 @@ describe('Game Throttling', () => {
       isHost: true,
       on: jest.fn(),
       broadcastPlayerStateUpdate: jest.fn(),
-      on: jest.fn(), // Added missing method
       send: jest.fn(),
     };
 
@@ -74,30 +73,30 @@ describe('Game Throttling', () => {
 
   describe('Health Throttling', () => {
     beforeEach(() => {
-        // Set zone radius to be small so players are outside and take damage
-        game.state.conflictZone.radius = 10;
-        // Set phase to 1 so damage > 0
-        game.state.phase = 1;
+      // Set zone radius to be small so players are outside and take damage
+      game.state.conflictZone.radius = 10;
+      // Set phase to 1 so damage > 0
+      game.state.phase = 1;
     });
 
     test('WhenCalledFrequencyIsHigh_ShouldThrottleHealthUpdates', () => {
-        // Initial update
-        game.update(0.016);
+      // Initial update
+      game.update(0.016);
         
-        const initialCallCount = mockNetwork.broadcastPlayerStateUpdate.mock.calls.length;
+      const initialCallCount = mockNetwork.broadcastPlayerStateUpdate.mock.calls.length;
         
-        // Advance time by slightly less than the update interval (5 seconds)
-        const interval = CONFIG.ZONE.DAMAGE_INTERVAL_SECONDS;
-        game.update(interval - 0.1);
+      // Advance time by slightly less than the update interval (5 seconds)
+      const interval = CONFIG.ZONE.DAMAGE_INTERVAL_SECONDS;
+      game.update(interval - 0.1);
         
-        // Should stay at initialCallCount (threshold not reached)
-        expect(mockNetwork.broadcastPlayerStateUpdate).toHaveBeenCalledTimes(initialCallCount);
+      // Should stay at initialCallCount (threshold not reached)
+      expect(mockNetwork.broadcastPlayerStateUpdate).toHaveBeenCalledTimes(initialCallCount);
         
-        // Now advance enough to cross the threshold
-        game.update(0.2); 
+      // Now advance enough to cross the threshold
+      game.update(0.2); 
         
-        // Should trigger an update now
-        expect(mockNetwork.broadcastPlayerStateUpdate).toHaveBeenCalledTimes(initialCallCount + 1);
-      });
+      // Should trigger an update now
+      expect(mockNetwork.broadcastPlayerStateUpdate).toHaveBeenCalledTimes(initialCallCount + 1);
+    });
   });
 });

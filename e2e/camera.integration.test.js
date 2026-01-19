@@ -69,7 +69,7 @@ describe('Camera Follow System Integration', () => {
         localPlayer.velocity = { x: 0, y: 0 };
         // Force camera update immediately
         if (window.camera) {
-            window.camera.update(1200, 800, 1.0); // Snap to position
+          window.camera.update(1200, 800, 1.0); // Snap to position
         }
       }
     });

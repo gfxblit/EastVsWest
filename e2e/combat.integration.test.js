@@ -79,34 +79,34 @@ describe('Combat Integration', () => {
   beforeEach(async () => {
     // Reset host combat manager cooldowns
     if (hostGame.hostCombatManager) {
-        hostGame.hostCombatManager.playerCooldowns.clear();
+      hostGame.hostCombatManager.playerCooldowns.clear();
     }
     // Reset local player controller cooldowns
     if (hostGame.localPlayerController && hostGame.localPlayerController.player) {
-        hostGame.localPlayerController.player.lastAttackTime = 0;
-        hostGame.localPlayerController.player.lastSpecialTime = 0;
+      hostGame.localPlayerController.player.lastAttackTime = 0;
+      hostGame.localPlayerController.player.lastSpecialTime = 0;
         
-        // Force local state to match desired test state
-        hostGame.localPlayerController.player.x = 1200;
-        hostGame.localPlayerController.player.y = 800;
-        hostGame.localPlayerController.player.health = 100;
-        hostGame.localPlayerController.player.velocity = { x: 0, y: 0 };
+      // Force local state to match desired test state
+      hostGame.localPlayerController.player.x = 1200;
+      hostGame.localPlayerController.player.y = 800;
+      hostGame.localPlayerController.player.health = 100;
+      hostGame.localPlayerController.player.velocity = { x: 0, y: 0 };
     }
     if (playerGame.localPlayerController && playerGame.localPlayerController.player) {
-        playerGame.localPlayerController.player.x = 1250;
-        playerGame.localPlayerController.player.y = 800;
-        playerGame.localPlayerController.player.health = 100;
-        playerGame.localPlayerController.player.velocity = { x: 0, y: 0 };
+      playerGame.localPlayerController.player.x = 1250;
+      playerGame.localPlayerController.player.y = 800;
+      playerGame.localPlayerController.player.health = 100;
+      playerGame.localPlayerController.player.velocity = { x: 0, y: 0 };
     }
 
     // Reset player states in DB
     await Promise.all([
-        hostSupabase.from('session_players')
-            .update({ equipped_weapon: 'spear', position_x: 1200, position_y: 800, health: 100, velocity_x: 0, velocity_y: 0 })
-            .eq('player_id', hostUserId),
-        playerSupabase.from('session_players')
-            .update({ position_x: 1250, position_y: 800, health: 100, velocity_x: 0, velocity_y: 0 })
-            .eq('player_id', playerUserId)
+      hostSupabase.from('session_players')
+        .update({ equipped_weapon: 'spear', position_x: 1200, position_y: 800, health: 100, velocity_x: 0, velocity_y: 0 })
+        .eq('player_id', hostUserId),
+      playerSupabase.from('session_players')
+        .update({ position_x: 1250, position_y: 800, health: 100, velocity_x: 0, velocity_y: 0 })
+        .eq('player_id', playerUserId),
     ]);
 
     // Small sleep to let Realtime catch up
@@ -114,24 +114,24 @@ describe('Combat Integration', () => {
 
     // Wait for state to sync in snapshots
     await waitFor(() => {
-        hostGame.update(0.016);
-        playerGame.update(0.016);
-        const h = hostSnapshot.getPlayers().get(hostUserId);
-        const p = hostSnapshot.getPlayers().get(playerUserId);
+      hostGame.update(0.016);
+      playerGame.update(0.016);
+      const h = hostSnapshot.getPlayers().get(hostUserId);
+      const p = hostSnapshot.getPlayers().get(playerUserId);
         
-        if (!h || !p) return false;
+      if (!h || !p) return false;
         
-        const healthSynced = h.health === 100 && p.health === 100;
-        const posSynced = Math.abs(h.position_x - 1200) < 5 && Math.abs(p.position_x - 1250) < 5;
+      const healthSynced = h.health === 100 && p.health === 100;
+      const posSynced = Math.abs(h.position_x - 1200) < 5 && Math.abs(p.position_x - 1250) < 5;
         
-        return healthSynced && posSynced;
+      return healthSynced && posSynced;
     }, 10000);
 
     // Ensure local controller is aware of weapon
     await waitFor(() => {
-        hostGame.update(0.016);
-        const localWeapon = hostGame.getLocalPlayer().equipped_weapon;
-        return localWeapon === 'spear';
+      hostGame.update(0.016);
+      const localWeapon = hostGame.getLocalPlayer().equipped_weapon;
+      return localWeapon === 'spear';
     }, 10000);
   });
 
@@ -208,12 +208,12 @@ describe('Combat Integration', () => {
     const startTime = Date.now();
     let victimAtHost = null;
     while (Date.now() - startTime < 5000) {
-        hostGame.update(0.1);
-        playerGame.update(0.1);
-        await new Promise(resolve => setTimeout(resolve, 50));
+      hostGame.update(0.1);
+      playerGame.update(0.1);
+      await new Promise(resolve => setTimeout(resolve, 50));
         
-        victimAtHost = hostSnapshot.getPlayers().get(playerUserId);
-        if (victimAtHost && victimAtHost.health <= 50) break;
+      victimAtHost = hostSnapshot.getPlayers().get(playerUserId);
+      if (victimAtHost && victimAtHost.health <= 50) break;
     }
     hostGame.handleInput({ attack: false });
 
@@ -231,12 +231,12 @@ describe('Combat Integration', () => {
     const startTime = Date.now();
     let victimAtHost = null;
     while (Date.now() - startTime < 5000) {
-        hostGame.update(0.1);
-        playerGame.update(0.1);
-        await new Promise(resolve => setTimeout(resolve, 50));
+      hostGame.update(0.1);
+      playerGame.update(0.1);
+      await new Promise(resolve => setTimeout(resolve, 50));
         
-        victimAtHost = hostSnapshot.getPlayers().get(playerUserId);
-        if (victimAtHost && victimAtHost.health <= 25) break;
+      victimAtHost = hostSnapshot.getPlayers().get(playerUserId);
+      if (victimAtHost && victimAtHost.health <= 25) break;
     }
     hostGame.handleInput({ specialAbility: false });
 

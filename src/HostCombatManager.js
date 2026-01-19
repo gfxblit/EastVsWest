@@ -38,7 +38,7 @@ export class HostCombatManager {
       // Check if player is outside conflict zone
       const distanceFromCenter = Math.sqrt(
         Math.pow(player.position_x - this.state.conflictZone.centerX, 2) +
-        Math.pow(player.position_y - this.state.conflictZone.centerY, 2)
+        Math.pow(player.position_y - this.state.conflictZone.centerY, 2),
       );
 
       if (distanceFromCenter > this.state.conflictZone.radius) {
@@ -52,7 +52,7 @@ export class HostCombatManager {
 
           const update = {
             player_id: playerId,
-            health: newHealth
+            health: newHealth,
           };
 
           // Handle Death from Zone
@@ -61,7 +61,7 @@ export class HostCombatManager {
             update.is_alive = false;
             this.network.send('player_death', {
               victim_id: playerId,
-              killer_id: 'zone' // Special killer ID for zone damage
+              killer_id: 'zone', // Special killer ID for zone damage
             });
           }
 
@@ -130,7 +130,7 @@ export class HostCombatManager {
           victim.health = newHealth;
           const update = {
             player_id: victimId,
-            health: newHealth
+            health: newHealth,
           };
 
           // Apply Status Effects for Special Abilities
@@ -153,13 +153,13 @@ export class HostCombatManager {
             update.is_alive = false;
             this.network.send('player_death', {
               victim_id: victimId,
-              killer_id: attackerId
+              killer_id: attackerId,
             });
 
             attacker.kills = (attacker.kills || 0) + 1;
             updates.push({
               player_id: attackerId,
-              kills: attacker.kills
+              kills: attacker.kills,
             });
           }
           updates.push(update);
@@ -203,13 +203,13 @@ export class HostCombatManager {
         player_id: p.player_id || p.id,
         name: p.player_name || p.name || 'Unknown',
         kills: p.kills || 0,
-        is_bot: !!p.is_bot
+        is_bot: !!p.is_bot,
       }));
 
       setTimeout(() => {
         this.network.send('game_over', {
           winner_id: winner ? (winner.player_id || winner.id) : null,
-          stats: stats
+          stats: stats,
         });
         
         this.state.isRunning = false;

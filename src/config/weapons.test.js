@@ -37,12 +37,12 @@ describe('WEAPONS Config', () => {
 
   test('should include all required weapon properties', () => {
     Object.values(WEAPONS).forEach(weapon => {
-        expect(weapon.id).toBeDefined();
-        expect(weapon.name).toBeDefined();
-        expect(weapon.faction).toBeDefined();
-        expect(weapon.range).toBeGreaterThan(0);
-        expect(weapon.baseDamage).toBeGreaterThan(0);
-        expect(weapon.attackSpeed).toBeGreaterThan(0);
+      expect(weapon.id).toBeDefined();
+      expect(weapon.name).toBeDefined();
+      expect(weapon.faction).toBeDefined();
+      expect(weapon.range).toBeGreaterThan(0);
+      expect(weapon.baseDamage).toBeGreaterThan(0);
+      expect(weapon.attackSpeed).toBeGreaterThan(0);
     });
   });
 });
