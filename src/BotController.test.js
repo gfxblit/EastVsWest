@@ -8,8 +8,8 @@ describe('BotController', () => {
   let mockNetwork;
   let mockSnapshot;
   let mockGame;
-  let botId = 'bot-1';
-  let targetId = 'player-1';
+  const botId = 'bot-1';
+  const targetId = 'player-1';
 
   // Store original config
   const originalPlayerConfig = { ...CONFIG.PLAYER };
@@ -24,7 +24,7 @@ describe('BotController', () => {
     CONFIG.COMBAT.ATTACK_AIM_DISTANCE = 100;
     CONFIG.BOT = { 
       STOPPING_DISTANCE: 10,
-      MOVEMENT_SPEED: 100
+      MOVEMENT_SPEED: 100,
     };
 
     mockNetwork = {
@@ -32,7 +32,7 @@ describe('BotController', () => {
       sendFrom: jest.fn(),
       broadcastPlayerStateUpdate: jest.fn(),
       isHost: true,
-      playerId: 'host-player'
+      playerId: 'host-player',
     };
 
     const players = new Map();
@@ -44,7 +44,7 @@ describe('BotController', () => {
       position_y: 0,
       health: 100,
       equipped_weapon: 'fist',
-      is_bot: true
+      is_bot: true,
     });
     // Target Player
     players.set(targetId, {
@@ -53,22 +53,22 @@ describe('BotController', () => {
       position_x: 200, // Distance 200
       position_y: 0,
       health: 100,
-      is_bot: false
+      is_bot: false,
     });
 
     mockSnapshot = {
-      getPlayers: () => players
+      getPlayers: () => players,
     };
     
     // Minimal mock of game state for zone checks if needed
     mockGame = {
-        state: {
-            conflictZone: {
-                centerX: 0,
-                centerY: 0,
-                radius: 1000
-            }
-        }
+      state: {
+        conflictZone: {
+          centerX: 0,
+          centerY: 0,
+          radius: 1000,
+        },
+      },
     };
 
     // Mock Math.random for predictable behavior
@@ -93,7 +93,7 @@ describe('BotController', () => {
       player_id: 'player-far',
       position_x: 500,
       position_y: 500,
-      health: 100
+      health: 100,
     });
 
     const target = botController.findTarget();
@@ -108,7 +108,7 @@ describe('BotController', () => {
     expect(mockNetwork.broadcastPlayerStateUpdate).toHaveBeenCalledWith(expect.objectContaining({
       player_id: botId,
       position_x: 100,
-      position_y: 0
+      position_y: 0,
     }));
   });
 
@@ -122,16 +122,16 @@ describe('BotController', () => {
   });
   
   test('should wander if no target', () => {
-      mockSnapshot.getPlayers().delete(targetId); // Remove target
+    mockSnapshot.getPlayers().delete(targetId); // Remove target
       
-      const initialX = mockSnapshot.getPlayers().get(botId).position_x;
-      botController.update(1.0);
+    const initialX = mockSnapshot.getPlayers().get(botId).position_x;
+    botController.update(1.0);
       
-      // Should have broadcasted some movement
-      expect(mockNetwork.broadcastPlayerStateUpdate).toHaveBeenCalled();
-      const lastUpdate = mockNetwork.broadcastPlayerStateUpdate.mock.calls[0][0];
+    // Should have broadcasted some movement
+    expect(mockNetwork.broadcastPlayerStateUpdate).toHaveBeenCalled();
+    const lastUpdate = mockNetwork.broadcastPlayerStateUpdate.mock.calls[0][0];
       
-      expect(lastUpdate.position_x !== initialX || lastUpdate.position_y !== 0).toBe(true);
+    expect(lastUpdate.position_x !== initialX || lastUpdate.position_y !== 0).toBe(true);
   });
 
   test('WhenBotMovesIntoProp_ShouldBeBlocked', () => {

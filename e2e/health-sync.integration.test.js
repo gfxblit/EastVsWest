@@ -4,7 +4,7 @@ import { Game } from '../src/game.js';
 import { Network } from '../src/network.js';
 import { CONFIG } from '../src/config.js';
 import { SessionPlayersSnapshot } from '../src/SessionPlayersSnapshot.js';
-import { waitFor } from './helpers/wait-utils.js';
+import { waitFor } from './helpers/test-utils.js';
 
 describe('Health Synchronization Integration', () => {
   let hostClient, playerClient;
@@ -111,11 +111,11 @@ describe('Health Synchronization Integration', () => {
     
     // Trigger the host-authoritative update
     for (let i = 0; i < iterations; i++) {
-        // We need to access the method we are going to implement
-        // Since it's not implemented yet, this test will fail
-        if (typeof hostGame.update === 'function') {
-            hostGame.update(deltaTime);
-        }
+      // We need to access the method we are going to implement
+      // Since it's not implemented yet, this test will fail
+      if (typeof hostGame.update === 'function') {
+        hostGame.update(deltaTime);
+      }
     }
     
     // 3. Trigger periodic DB write
@@ -177,8 +177,8 @@ describe('Health Synchronization Integration', () => {
 
     // 2. Broadcast update (simulating what hostGame.updateAllPlayersHealth would do)
     hostNetwork.broadcastPlayerStateUpdate({
-        player_id: playerId,
-        health: playerOnHost.health
+      player_id: playerId,
+      health: playerOnHost.health,
     });
     
     // 3. Wait for client to receive update via broadcast
@@ -187,9 +187,9 @@ describe('Health Synchronization Integration', () => {
     
     // 4. Verify snapshot is also updated (via its own listener)
     await waitFor(() => {
-        const clientPlayerMap = playerSnapshot.getPlayers();
-        const playerOnClient = clientPlayerMap.get(playerId);
-        return playerOnClient && playerOnClient.health === (initialHealth - damage);
+      const clientPlayerMap = playerSnapshot.getPlayers();
+      const playerOnClient = clientPlayerMap.get(playerId);
+      return playerOnClient && playerOnClient.health === (initialHealth - damage);
     }, 5000);
     
     const clientPlayerMap = playerSnapshot.getPlayers();
@@ -209,8 +209,8 @@ describe('Health Synchronization Integration', () => {
     // 2. Client tries to cheat by broadcasting full health
     // Use player_state_update which allows health field
     playerNetwork.broadcastPlayerStateUpdate({
-        player_id: playerId,
-        health: 100
+      player_id: playerId,
+      health: 100,
     });
     
     // 3. Wait a bit to ensure message would have arrived

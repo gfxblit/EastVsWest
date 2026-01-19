@@ -55,15 +55,15 @@ describe('HostLootManager', () => {
         position_x: 105, 
         position_y: 105, 
         health: 100,
-        equipped_weapon: 'fist' 
-      }]
+        equipped_weapon: 'fist', 
+      }],
     ]);
     const mockSnapshot = { getPlayers: () => mockPlayers };
 
     // Act
     lootManager.handlePickupRequest({
       from: 'player-1',
-      data: { loot_id: lootItem.id }
+      data: { loot_id: lootItem.id },
     }, mockSnapshot);
 
     // Assert
@@ -71,12 +71,12 @@ describe('HostLootManager', () => {
     expect(mockNetwork.broadcastPlayerStateUpdate).toHaveBeenCalledWith(expect.arrayContaining([
       expect.objectContaining({
         player_id: 'player-1',
-        equipped_weapon: 'spear'
-      })
+        equipped_weapon: 'spear',
+      }),
     ]));
     expect(mockNetwork.send).toHaveBeenCalledWith('loot_picked_up', {
       loot_id: lootItem.id,
-      player_id: 'player-1'
+      player_id: 'player-1',
     });
   });
 
@@ -90,15 +90,15 @@ describe('HostLootManager', () => {
         position_x: 500, 
         position_y: 500, 
         health: 100,
-        equipped_weapon: 'fist' 
-      }]
+        equipped_weapon: 'fist', 
+      }],
     ]);
     const mockSnapshot = { getPlayers: () => mockPlayers };
 
     // Act
     lootManager.handlePickupRequest({
       from: 'player-1',
-      data: { loot_id: lootItem.id }
+      data: { loot_id: lootItem.id },
     }, mockSnapshot);
 
     // Assert
@@ -116,15 +116,15 @@ describe('HostLootManager', () => {
         position_x: 105, 
         position_y: 105, 
         health: 100,
-        equipped_weapon: 'bo' 
-      }]
+        equipped_weapon: 'bo', 
+      }],
     ]);
     const mockSnapshot = { getPlayers: () => mockPlayers };
 
     // Act
     lootManager.handlePickupRequest({
       from: 'player-1',
-      data: { loot_id: lootItem.id }
+      data: { loot_id: lootItem.id },
     }, mockSnapshot);
 
     // Assert
@@ -132,15 +132,15 @@ describe('HostLootManager', () => {
     expect(mockNetwork.broadcastPlayerStateUpdate).toHaveBeenCalledWith(expect.arrayContaining([
       expect.objectContaining({
         player_id: 'player-1',
-        equipped_weapon: 'spear'
-      })
+        equipped_weapon: 'spear',
+      }),
     ]));
     
     // Old weapon 'bo' dropped (spawned)
     expect(state.loot).toHaveLength(1);
     expect(state.loot[0].item_id).toBe('bo');
     expect(mockNetwork.send).toHaveBeenCalledWith('loot_spawned', expect.objectContaining({
-      item_id: 'bo'
+      item_id: 'bo',
     }));
   });
 
@@ -152,16 +152,16 @@ describe('HostLootManager', () => {
     expect(state.loot).toHaveLength(5);
     expect(mockNetwork.send).toHaveBeenCalledTimes(1);
     expect(mockNetwork.send).toHaveBeenCalledWith('loot_sync', expect.objectContaining({
-      loot: expect.any(Array)
+      loot: expect.any(Array),
     }));
     
     // Check that items are within bounds
     state.loot.forEach(item => {
-        expect(item.x).toBeGreaterThanOrEqual(50);
-        expect(item.x).toBeLessThanOrEqual(CONFIG.WORLD.WIDTH - 50);
-        expect(item.y).toBeGreaterThanOrEqual(50);
-        expect(item.y).toBeLessThanOrEqual(CONFIG.WORLD.HEIGHT - 50);
-        expect(item.item_id).not.toBe('fist');
+      expect(item.x).toBeGreaterThanOrEqual(50);
+      expect(item.x).toBeLessThanOrEqual(CONFIG.WORLD.WIDTH - 50);
+      expect(item.y).toBeGreaterThanOrEqual(50);
+      expect(item.y).toBeLessThanOrEqual(CONFIG.WORLD.HEIGHT - 50);
+      expect(item.item_id).not.toBe('fist');
     });
   });
 });

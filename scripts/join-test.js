@@ -83,7 +83,7 @@ async function main() {
     sessionId = result.session.id;
     playerRecordId = result.player.id;
 
-    console.log(`✅ Successfully joined session!`);
+    console.log('✅ Successfully joined session!');
     console.log(`   Session ID: ${sessionId}`);
     console.log(`   Player Name: ${playerName}`);
     console.log(`   Player Record ID: ${playerRecordId}`);

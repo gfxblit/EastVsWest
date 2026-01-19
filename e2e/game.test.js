@@ -38,7 +38,7 @@ describe('Conflict Zone: East vs West E2E', () => {
     await page.waitForSelector('#intro-screen.active', { timeout: 10000 });
 
     const introVisible = await page.$eval('#intro-screen', (el) =>
-      el.classList.contains('active')
+      el.classList.contains('active'),
     );
     expect(introVisible).toBe(true);
   });

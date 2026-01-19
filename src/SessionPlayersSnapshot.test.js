@@ -133,7 +133,7 @@ describe('SessionPlayersSnapshot (Built on Network)', () => {
       await snapshot.ready();
 
       expect(consoleWarnSpy).toHaveBeenCalledWith(
-        expect.stringContaining('Failed to fetch initial snapshot')
+        expect.stringContaining('Failed to fetch initial snapshot'),
       );
 
       consoleWarnSpy.mockRestore();
@@ -331,7 +331,7 @@ describe('SessionPlayersSnapshot (Built on Network)', () => {
       playerStateUpdateHandler({
         type: 'player_state_update',
         from: TEST_PLAYER_ID,
-        data: { position_x: 10, position_y: 20 }
+        data: { position_x: 10, position_y: 20 },
       });
 
       expect(snapshot.getPlayers().get(TEST_PLAYER_ID).positionHistory).toBeDefined();
@@ -344,7 +344,7 @@ describe('SessionPlayersSnapshot (Built on Network)', () => {
         id: 'record-id-123', 
         health: 80, 
         position_x: 10, 
-        position_y: 20 
+        position_y: 20, 
       });
       
       postgresChangesHandler({
@@ -450,7 +450,7 @@ describe('SessionPlayersSnapshot (Built on Network)', () => {
       // Simulate Network emitting postgres_changes for different session
       const playerInDifferentSession = createMockPlayer({
         session_id: 'different-session-id',
-        player_id: 'player-2'
+        player_id: 'player-2',
       });
       postgresChangesHandler({
         eventType: 'INSERT',
@@ -475,7 +475,7 @@ describe('SessionPlayersSnapshot (Built on Network)', () => {
         position_y: 200,
         health: 100,
         velocity_x: 0,
-        velocity_y: 0
+        velocity_y: 0,
       })];
 
       mockSupabaseClient.from().select().eq.mockResolvedValue({
@@ -575,7 +575,7 @@ describe('SessionPlayersSnapshot (Built on Network)', () => {
       const mockPlayers = [createMockPlayer({
         position_x: 100,
         position_y: 200,
-        health: 100
+        health: 100,
       })];
 
       mockSupabaseClient.from().select().eq.mockResolvedValue({
@@ -648,7 +648,7 @@ describe('SessionPlayersSnapshot (Built on Network)', () => {
 
       const initialPlayers = [
         createMockPlayer({ player_id: 'p1', player_name: 'Player 1' }),
-        createMockPlayer({ player_id: 'p2', player_name: 'Player 2' })
+        createMockPlayer({ player_id: 'p2', player_name: 'Player 2' }),
       ];
 
       snapshot.updatePlayers(initialPlayers);
@@ -659,7 +659,7 @@ describe('SessionPlayersSnapshot (Built on Network)', () => {
 
       const updatedPlayers = [
         createMockPlayer({ player_id: 'p1', player_name: 'Player 1 Updated' }),
-        createMockPlayer({ player_id: 'p3', player_name: 'Player 3' })
+        createMockPlayer({ player_id: 'p3', player_name: 'Player 3' }),
       ];
 
       snapshot.updatePlayers(updatedPlayers);
@@ -896,7 +896,7 @@ describe('SessionPlayersSnapshot (Built on Network)', () => {
         is_alive: true,
         kills: 0,
         damage_dealt: 0,
-        is_connected: true
+        is_connected: true,
       })];
       mockSupabaseClient.from().select().eq.mockResolvedValue({
         data: mockPlayers,
@@ -939,7 +939,7 @@ describe('SessionPlayersSnapshot (Built on Network)', () => {
         is_alive: true,
         kills: 0,
         damage_dealt: 0,
-        is_connected: true
+        is_connected: true,
       })];
       mockSupabaseClient.from().select().eq.mockResolvedValue({
         data: mockPlayers,
@@ -1049,7 +1049,7 @@ describe('SessionPlayersSnapshot (Built on Network)', () => {
           position_y: 210,
           rotation: 1.0,
           velocity_x: 10,
-          velocity_y: 10
+          velocity_y: 10,
         },
       });
 
@@ -1062,7 +1062,7 @@ describe('SessionPlayersSnapshot (Built on Network)', () => {
         rotation: 1.0,
         velocity_x: 10,
         velocity_y: 10,
-        timestamp: 1000
+        timestamp: 1000,
       });
     });
 
@@ -1097,7 +1097,7 @@ describe('SessionPlayersSnapshot (Built on Network)', () => {
             position_y: 200 + index,
             rotation: 0,
             velocity_x: 0,
-            velocity_y: 0
+            velocity_y: 0,
           },
         });
       });
@@ -1143,7 +1143,7 @@ describe('SessionPlayersSnapshot (Built on Network)', () => {
           position_y: 250,
           rotation: 2.0,
           velocity_x: 5,
-          velocity_y: 5
+          velocity_y: 5,
         },
       });
 
@@ -1222,7 +1222,7 @@ describe('SessionPlayersSnapshot (Built on Network)', () => {
       const player = snapshot.getPlayers().get(TEST_PLAYER_ID);
       player.positionHistory = [
         { x: 0, y: 0, velocity_x: 0, velocity_y: 0, rotation: 0, timestamp: 1000 },
-        { x: 100, y: 100, velocity_x: 10, velocity_y: 10, rotation: 1, timestamp: 2000 }
+        { x: 100, y: 100, velocity_x: 10, velocity_y: 10, rotation: 1, timestamp: 2000 },
       ];
 
       // Delay is 100ms. We want target time to be 1500. So renderTime = 1600.
@@ -1237,42 +1237,42 @@ describe('SessionPlayersSnapshot (Built on Network)', () => {
     });
     
     test('ShouldInterpolateRotationShortestPath', async () => {
-        const mockPlayers = [createMockPlayer()];
-        mockSupabaseClient.from().select().eq.mockResolvedValue({ data: mockPlayers, error: null });
-        snapshot = new SessionPlayersSnapshot(mockNetwork, TEST_SESSION_ID);
-        await snapshot.ready();
+      const mockPlayers = [createMockPlayer()];
+      mockSupabaseClient.from().select().eq.mockResolvedValue({ data: mockPlayers, error: null });
+      snapshot = new SessionPlayersSnapshot(mockNetwork, TEST_SESSION_ID);
+      await snapshot.ready();
         
-        const player = snapshot.getPlayers().get(TEST_PLAYER_ID);
-        // 350 degrees (approx 6.10 rad) to 10 degrees (approx 0.17 rad)
-        // Shortest path crosses 0.
-        const startRot = 350 * Math.PI / 180; 
-        const endRot = 10 * Math.PI / 180;
+      const player = snapshot.getPlayers().get(TEST_PLAYER_ID);
+      // 350 degrees (approx 6.10 rad) to 10 degrees (approx 0.17 rad)
+      // Shortest path crosses 0.
+      const startRot = 350 * Math.PI / 180; 
+      const endRot = 10 * Math.PI / 180;
         
-        player.positionHistory = [
-          { x: 0, y: 0, vx: 0, vy: 0, rotation: startRot, timestamp: 1000 },
-          { x: 0, y: 0, vx: 0, vy: 0, rotation: endRot, timestamp: 2000 }
-        ];
+      player.positionHistory = [
+        { x: 0, y: 0, vx: 0, vy: 0, rotation: startRot, timestamp: 1000 },
+        { x: 0, y: 0, vx: 0, vy: 0, rotation: endRot, timestamp: 2000 },
+      ];
   
-        // t = 0.5 (renderTime 1600)
-        const result = snapshot.getInterpolatedPlayerState(TEST_PLAYER_ID, 1600);
+      // t = 0.5 (renderTime 1600)
+      const result = snapshot.getInterpolatedPlayerState(TEST_PLAYER_ID, 1600);
         
-        // Expected: 0 degrees (0 rad)
-        // But since we normalize to 0-2PI, 0 is 0.
-        // Wait, 350 (-10) to 10 is 20 deg diff. Halfway is 0.
-        // Let's check boundaries.
-        // 350 is 6.10865
-        // 10 is 0.174533
-        // Diff is 0.17 - 6.10 = -5.93. 
-        // -5.93 < -PI, so add 2PI => -5.93 + 6.28 = 0.35 radians (approx 20 degrees positive diff)
-        // t=0.5 -> start + 0.35 * 0.5 = 6.108 + 0.175 = 6.283 (approx 2PI/0)
+      // Expected: 0 degrees (0 rad)
+      // But since we normalize to 0-2PI, 0 is 0.
+      // Wait, 350 (-10) to 10 is 20 deg diff. Halfway is 0.
+      // Let's check boundaries.
+      // 350 is 6.10865
+      // 10 is 0.174533
+      // Diff is 0.17 - 6.10 = -5.93. 
+      // -5.93 < -PI, so add 2PI => -5.93 + 6.28 = 0.35 radians (approx 20 degrees positive diff)
+      // t=0.5 -> start + 0.35 * 0.5 = 6.108 + 0.175 = 6.283 (approx 2PI/0)
         
-        const expectedRot = 0; // or 2PI
-        // Allow for floating point wrapping, so check if close to 0 OR close to 2PI
-        const isCloseToZero = Math.abs(result.rotation) < 0.01;
-        const isCloseToTwoPi = Math.abs(result.rotation - 2 * Math.PI) < 0.01;
+      const expectedRot = 0; // or 2PI
+      // Allow for floating point wrapping, so check if close to 0 OR close to 2PI
+      const isCloseToZero = Math.abs(result.rotation) < 0.01;
+      const isCloseToTwoPi = Math.abs(result.rotation - 2 * Math.PI) < 0.01;
         
-        expect(isCloseToZero || isCloseToTwoPi).toBe(true);
-      });
+      expect(isCloseToZero || isCloseToTwoPi).toBe(true);
+    });
   });
 
   describe('Destroy', () => {
@@ -1317,7 +1317,7 @@ describe('SessionPlayersSnapshot (Built on Network)', () => {
         is_bot: true,
         health: 100,
         position_x: 0,
-        position_y: 0
+        position_y: 0,
       };
 
       // Setup mock to return initial state first
@@ -1343,7 +1343,7 @@ describe('SessionPlayersSnapshot (Built on Network)', () => {
       mockSupabaseClient.from().select().eq.mockResolvedValueOnce({
         data: [{ 
           ...initialBotState, 
-          health: 100 // Explicitly 100
+          health: 100, // Explicitly 100
         }],
         error: null,
       });

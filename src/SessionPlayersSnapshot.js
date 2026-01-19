@@ -247,7 +247,7 @@ export class SessionPlayersSnapshot {
       rotation: data.rotation,
       velocity_x: data.velocity_x,
       velocity_y: data.velocity_y,
-      timestamp: timestamp
+      timestamp: timestamp,
     };
 
     player.positionHistory.push(snapshot);
@@ -341,7 +341,7 @@ export class SessionPlayersSnapshot {
         y: player.position_y || 0,
         rotation: player.rotation || 0,
         vx: player.velocity_x || 0,
-        vy: player.velocity_y || 0
+        vy: player.velocity_y || 0,
       };
     }
 

@@ -1,12 +1,12 @@
 import { CONFIG } from './config.js';
 
 const UI_TEXT = {
-    TITLE: 'Weapon Config Debugger',
-    MINIMIZE: '-',
-    MAXIMIZE: '+',
-    SELECT_WEAPON_LABEL: 'Select Weapon: ',
-    EXPORT_BTN: 'Export to Clipboard',
-    CONFIG_EXPORT_PREFIX: 'export const WEAPONS = '
+  TITLE: 'Weapon Config Debugger',
+  MINIMIZE: '-',
+  MAXIMIZE: '+',
+  SELECT_WEAPON_LABEL: 'Select Weapon: ',
+  EXPORT_BTN: 'Export to Clipboard',
+  CONFIG_EXPORT_PREFIX: 'export const WEAPONS = ',
 };
 
 export class DebugUI {
@@ -99,18 +99,18 @@ export class DebugUI {
     // Select first weapon by default if available
     const firstKey = Object.keys(CONFIG.WEAPONS)[0];
     if (firstKey) {
-        this.handleWeaponSelect(firstKey);
+      this.handleWeaponSelect(firstKey);
     }
   }
 
   toggleMinimize() {
     this.isMinimized = !this.isMinimized;
     if (this.isMinimized) {
-        this.contentContainer.classList.add('hidden');
-        this.minimizeBtn.innerText = UI_TEXT.MAXIMIZE;
+      this.contentContainer.classList.add('hidden');
+      this.minimizeBtn.innerText = UI_TEXT.MAXIMIZE;
     } else {
-        this.contentContainer.classList.remove('hidden');
-        this.minimizeBtn.innerText = UI_TEXT.MINIMIZE;
+      this.contentContainer.classList.remove('hidden');
+      this.minimizeBtn.innerText = UI_TEXT.MINIMIZE;
     }
   }
 
@@ -140,58 +140,58 @@ export class DebugUI {
     
     // Fields to edit
     const fields = [
-        { key: 'baseDamage', type: 'number' },
-        { key: 'range', type: 'number' },
-        { key: 'attackSpeed', type: 'number', step: 0.1 },
-        { key: 'vfxType', type: 'select', options: ['slash', 'thrust', 'blunt'] },
-        { key: 'damageType', type: 'select', options: ['slashing', 'piercing', 'blunt'] }
+      { key: 'baseDamage', type: 'number' },
+      { key: 'range', type: 'number' },
+      { key: 'attackSpeed', type: 'number', step: 0.1 },
+      { key: 'vfxType', type: 'select', options: ['slash', 'thrust', 'blunt'] },
+      { key: 'damageType', type: 'select', options: ['slashing', 'piercing', 'blunt'] },
     ];
 
     fields.forEach(field => {
-        const wrapper = document.createElement('div');
-        wrapper.className = 'debug-field';
+      const wrapper = document.createElement('div');
+      wrapper.className = 'debug-field';
         
-        const label = document.createElement('label');
-        label.innerText = field.key + ': ';
-        wrapper.appendChild(label);
+      const label = document.createElement('label');
+      label.innerText = field.key + ': ';
+      wrapper.appendChild(label);
 
-        let input;
-        if (field.type === 'select') {
-            input = document.createElement('select');
-            field.options.forEach(opt => {
-                const option = document.createElement('option');
-                option.value = opt;
-                option.innerText = opt;
-                input.appendChild(option);
-            });
-            input.value = weapon[field.key];
-        } else {
-            input = document.createElement('input');
-            input.type = field.type;
-            input.id = `debug-${field.key}`;
-            input.value = weapon[field.key];
-            if (field.step) input.step = field.step;
-        }
-
-        input.addEventListener('input', (e) => {
-            const val = field.type === 'number' ? parseFloat(e.target.value) : e.target.value;
-            this.updateConfig(field.key, val);
+      let input;
+      if (field.type === 'select') {
+        input = document.createElement('select');
+        field.options.forEach(opt => {
+          const option = document.createElement('option');
+          option.value = opt;
+          option.innerText = opt;
+          input.appendChild(option);
         });
-        // Also listen for change for selects
-        if (field.type === 'select') {
-             input.addEventListener('change', (e) => {
-                this.updateConfig(field.key, e.target.value);
-            });
-        }
+        input.value = weapon[field.key];
+      } else {
+        input = document.createElement('input');
+        input.type = field.type;
+        input.id = `debug-${field.key}`;
+        input.value = weapon[field.key];
+        if (field.step) input.step = field.step;
+      }
 
-        wrapper.appendChild(input);
-        this.formContainer.appendChild(wrapper);
+      input.addEventListener('input', (e) => {
+        const val = field.type === 'number' ? parseFloat(e.target.value) : e.target.value;
+        this.updateConfig(field.key, val);
+      });
+      // Also listen for change for selects
+      if (field.type === 'select') {
+        input.addEventListener('change', (e) => {
+          this.updateConfig(field.key, e.target.value);
+        });
+      }
+
+      wrapper.appendChild(input);
+      this.formContainer.appendChild(wrapper);
     });
   }
 
   updateConfig(field, value) {
     if (this.selectedWeaponKey && CONFIG.WEAPONS[this.selectedWeaponKey]) {
-        CONFIG.WEAPONS[this.selectedWeaponKey][field] = value;
+      CONFIG.WEAPONS[this.selectedWeaponKey][field] = value;
     }
   }
 
@@ -200,11 +200,11 @@ export class DebugUI {
     
     // Attempt to write to clipboard
     if (navigator.clipboard && navigator.clipboard.writeText) {
-        navigator.clipboard.writeText(exportString)
-            .then(() => console.log('Config exported to clipboard!'))
-            .catch(err => console.error('Failed to export config:', err));
+      navigator.clipboard.writeText(exportString)
+        .then(() => console.log('Config exported to clipboard!'))
+        .catch(err => console.error('Failed to export config:', err));
     } else {
-        console.log(exportString);
+      console.log(exportString);
     }
   }
 

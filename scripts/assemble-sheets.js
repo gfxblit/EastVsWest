@@ -12,11 +12,11 @@ const DIRECTION_ORDER = [
   'south', // 0
   'east',  // 1
   'north', // 2
-  'west'   // 3
+  'west',   // 3
 ];
 
 const FLIP_MAP = {
-  'west': 'east'
+  'west': 'east',
 };
 
 async function assemble(action) {
@@ -35,27 +35,27 @@ async function assemble(action) {
   let frameCount = 0;
 
   try {
-      const configPath = path.join(artSrcDir, 'config.json');
-      const config = JSON.parse(await fs.readFile(configPath, 'utf-8'));
-      globalWidth = config.config.globalWidth;
-      globalHeight = config.config.globalHeight;
-      frameCount = config.config.frameCount;
-      console.log(`Using config.json: ${globalWidth}x${globalHeight}, Frames: ${frameCount}`);
+    const configPath = path.join(artSrcDir, 'config.json');
+    const config = JSON.parse(await fs.readFile(configPath, 'utf-8'));
+    globalWidth = config.config.globalWidth;
+    globalHeight = config.config.globalHeight;
+    frameCount = config.config.frameCount;
+    console.log(`Using config.json: ${globalWidth}x${globalHeight}, Frames: ${frameCount}`);
   } catch (e) {
-      // Fallback to searching first strip.json
-      const files = await fs.readdir(artSrcDir);
-      const firstMeta = files.find(f => f.endsWith('.strip.json'));
-      if (firstMeta) {
-          const meta = JSON.parse(await fs.readFile(path.join(artSrcDir, firstMeta), 'utf-8'));
-          globalWidth = meta.frameWidth;
-          globalHeight = meta.frameHeight;
-          frameCount = meta.animations.animation.frames;
-          console.log(`Fallback to ${firstMeta}: ${globalWidth}x${globalHeight}`);
-      }
+    // Fallback to searching first strip.json
+    const files = await fs.readdir(artSrcDir);
+    const firstMeta = files.find(f => f.endsWith('.strip.json'));
+    if (firstMeta) {
+      const meta = JSON.parse(await fs.readFile(path.join(artSrcDir, firstMeta), 'utf-8'));
+      globalWidth = meta.frameWidth;
+      globalHeight = meta.frameHeight;
+      frameCount = meta.animations.animation.frames;
+      console.log(`Fallback to ${firstMeta}: ${globalWidth}x${globalHeight}`);
+    }
   }
 
   if (!globalWidth || !globalHeight) {
-    throw new Error("Could not determine global dimensions. Ensure config.json or .strip.json exists.");
+    throw new Error('Could not determine global dimensions. Ensure config.json or .strip.json exists.');
   }
 
   const sheetWidth = globalWidth * frameCount;
@@ -104,36 +104,36 @@ async function assemble(action) {
         
         // Ensure we don't extract outside the source image bounds
         if (left + localWidth > stripImgMetadata.width) {
-            console.warn(`    Warning: Frame ${j} out of bounds for ${stripPath}. Skipping.`);
-            continue;
+          console.warn(`    Warning: Frame ${j} out of bounds for ${stripPath}. Skipping.`);
+          continue;
         }
 
         const extractArea = {
-            left: left,
-            top: 0,
-            width: localWidth,
-            height: Math.min(localHeight, stripImgMetadata.height)
+          left: left,
+          top: 0,
+          width: localWidth,
+          height: Math.min(localHeight, stripImgMetadata.height),
         };
 
         let frameProcessor = sharp(stripBuffer).extract(extractArea);
         
         if (shouldFlip) {
-            frameProcessor = frameProcessor.flop();
+          frameProcessor = frameProcessor.flop();
         }
 
         // Normalize frame to global dimensions: 
         // Resize while preserving aspect ratio, then extend with transparent padding to fill global cell
         const frameBuffer = await frameProcessor
-            .resize(globalWidth, globalHeight, {
-                fit: 'contain',
-                background: { r: 0, g: 0, b: 0, alpha: 0 }
-            })
-            .toBuffer();
+          .resize(globalWidth, globalHeight, {
+            fit: 'contain',
+            background: { r: 0, g: 0, b: 0, alpha: 0 },
+          })
+          .toBuffer();
 
         compositeOperations.push({
           input: frameBuffer,
           left: j * globalWidth,
-          top: i * globalHeight
+          top: i * globalHeight,
         });
       }
 
@@ -141,11 +141,13 @@ async function assemble(action) {
       try {
         const prompt = await fs.readFile(promptPath, 'utf-8');
         promptsUsed[direction] = {
-            source: finalDirectionSource,
-            flipped: shouldFlip,
-            text: prompt.trim()
+          source: finalDirectionSource,
+          flipped: shouldFlip,
+          text: prompt.trim(),
         };
-      } catch (e) {}
+      } catch (e) {
+        // Prompt file may not exist, which is fine
+      }
     } else {
       console.log(`  Row ${i} (${direction}): [EMPTY]`);
     }
@@ -157,12 +159,12 @@ async function assemble(action) {
       width: sheetWidth,
       height: sheetHeight,
       channels: 4,
-      background: { r: 0, g: 0, b: 0, alpha: 0 }
-    }
+      background: { r: 0, g: 0, b: 0, alpha: 0 },
+    },
   })
-  .composite(compositeOperations)
-  .png()
-  .toFile(outputSpritePath);
+    .composite(compositeOperations)
+    .png()
+    .toFile(outputSpritePath);
 
   const metadata = {
     frameWidth: globalWidth,
@@ -170,7 +172,7 @@ async function assemble(action) {
     columns: frameCount,
     rows: DIRECTION_ORDER.length,
     directions: DIRECTION_ORDER,
-    prompts: promptsUsed
+    prompts: promptsUsed,
   };
 
   await fs.writeFile(outputMetadataPath, JSON.stringify(metadata, null, 2));
@@ -182,7 +184,7 @@ async function assemble(action) {
 
 const action = process.argv[2];
 if (!action) {
-  console.error("Usage: node scripts/assemble-sheets.js <action>");
+  console.error('Usage: node scripts/assemble-sheets.js <action>');
   process.exit(1);
 }
 

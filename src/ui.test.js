@@ -108,7 +108,7 @@ describe('UI', () => {
     test('WhenPlayersProvided_ShouldUpdateList', () => {
       const players = [
         { player_name: 'Player 1', is_host: true },
-        { player_name: 'Player 2', is_host: false }
+        { player_name: 'Player 2', is_host: false },
       ];
       ui.updatePlayerList(players, true);
 
@@ -328,24 +328,24 @@ describe('UI', () => {
     let attackOverlay, abilityOverlay;
 
     beforeEach(() => {
-        // Need to manually add overlay elements to DOM mock for this test
-        const attackBtn = document.getElementById('attack-button');
-        const abilityBtn = document.getElementById('ability-button');
+      // Need to manually add overlay elements to DOM mock for this test
+      const attackBtn = document.getElementById('attack-button');
+      const abilityBtn = document.getElementById('ability-button');
         
-        // Ensure overlays exist
-        if (!attackBtn.querySelector('.cooldown-overlay')) {
-            const overlay = document.createElement('div');
-            overlay.className = 'cooldown-overlay';
-            attackBtn.appendChild(overlay);
-        }
-        if (!abilityBtn.querySelector('.cooldown-overlay')) {
-             const overlay = document.createElement('div');
-             overlay.className = 'cooldown-overlay';
-             abilityBtn.appendChild(overlay);
-        }
+      // Ensure overlays exist
+      if (!attackBtn.querySelector('.cooldown-overlay')) {
+        const overlay = document.createElement('div');
+        overlay.className = 'cooldown-overlay';
+        attackBtn.appendChild(overlay);
+      }
+      if (!abilityBtn.querySelector('.cooldown-overlay')) {
+        const overlay = document.createElement('div');
+        overlay.className = 'cooldown-overlay';
+        abilityBtn.appendChild(overlay);
+      }
 
-        attackOverlay = document.querySelector('#attack-button .cooldown-overlay');
-        abilityOverlay = document.querySelector('#ability-button .cooldown-overlay');
+      attackOverlay = document.querySelector('#attack-button .cooldown-overlay');
+      abilityOverlay = document.querySelector('#ability-button .cooldown-overlay');
     });
 
     test('WhenCooldownActive_ShouldUpdateOverlayHeight', () => {

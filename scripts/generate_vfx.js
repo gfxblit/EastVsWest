@@ -16,7 +16,7 @@ const DEFAULT_CONFIG = {
   width: 64,
   height: 64,
   frames: 5,
-  inputLayout: 'h' // 'h' for horizontal, 'v' for vertical
+  inputLayout: 'h', // 'h' for horizontal, 'v' for vertical
 };
 
 // Parse command line arguments
@@ -129,7 +129,7 @@ async function generateVariant(baseBuffer, transformFn) {
     compositeOperations.push({
       input: transformedFrame,
       left: i * FRAME_WIDTH,
-      top: 0
+      top: 0,
     });
   }
   
@@ -138,8 +138,8 @@ async function generateVariant(baseBuffer, transformFn) {
       width: SHEET_WIDTH,
       height: SHEET_HEIGHT,
       channels: 4,
-      background: { r: 0, g: 0, b: 0, alpha: 0 }
-    }
+      background: { r: 0, g: 0, b: 0, alpha: 0 },
+    },
   });
   
   return spriteSheet.composite(compositeOperations).png();

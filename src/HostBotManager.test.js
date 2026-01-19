@@ -15,12 +15,12 @@ describe('HostBotManager', () => {
       on: jest.fn().mockImplementation((event, handler) => {
         eventHandlers[event] = handler;
       }),
-      broadcastPlayerStateUpdate: jest.fn()
+      broadcastPlayerStateUpdate: jest.fn(),
     };
 
     const players = new Map();
     mockSnapshot = {
-      getPlayers: () => players
+      getPlayers: () => players,
     };
     
     mockGame = { state: { isRunning: true } };
@@ -39,7 +39,7 @@ describe('HostBotManager', () => {
     eventHandlers['postgres_changes']({
       table: 'session_players',
       eventType: 'INSERT',
-      new: { player_id: botId, is_bot: true }
+      new: { player_id: botId, is_bot: true },
     });
 
     expect(hostBotManager.botControllers.has(botId)).toBe(true);

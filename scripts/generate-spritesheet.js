@@ -16,7 +16,7 @@ const DIRECTION_ORDER = [
   'south',
   'east',
   'north',
-  'west'
+  'west',
 ];
 
 const ROWS = DIRECTION_ORDER.length;
@@ -47,7 +47,7 @@ export async function validateFrames(metadata, pixelLabDir) {
       framePaths: [],
       width: expectedWidth,
       height: expectedHeight,
-      columns: 0
+      columns: 0,
     };
   }
 
@@ -78,7 +78,7 @@ export async function validateFrames(metadata, pixelLabDir) {
 
     const directionFrames = {
       direction,
-      frames: []
+      frames: [],
     };
 
     // Validate each frame
@@ -95,7 +95,7 @@ export async function validateFrames(metadata, pixelLabDir) {
 
         if (imageMetadata.width !== expectedWidth || imageMetadata.height !== expectedHeight) {
           errors.push(
-            `Frame ${framePath} has incorrect dimensions (${imageMetadata.width}x${imageMetadata.height}), expected ${expectedWidth}x${expectedHeight}`
+            `Frame ${framePath} has incorrect dimensions (${imageMetadata.width}x${imageMetadata.height}), expected ${expectedWidth}x${expectedHeight}`,
           );
         } else {
           directionFrames.frames.push(fullPath);
@@ -116,7 +116,7 @@ export async function validateFrames(metadata, pixelLabDir) {
     framePaths,
     width: expectedWidth,
     height: expectedHeight,
-    columns
+    columns,
   };
 }
 
@@ -139,8 +139,8 @@ export async function generateSpriteSheet(framePaths, outputPath, frameWidth, fr
       width: sheetWidth,
       height: sheetHeight,
       channels: 4,
-      background: { r: 0, g: 0, b: 0, alpha: 0 }
-    }
+      background: { r: 0, g: 0, b: 0, alpha: 0 },
+    },
   });
 
   // Composite all frames onto the sprite sheet
@@ -157,7 +157,7 @@ export async function generateSpriteSheet(framePaths, outputPath, frameWidth, fr
       compositeOperations.push({
         input: framePath,
         left,
-        top
+        top,
       });
     }
   }
@@ -183,7 +183,7 @@ export async function generateMetadata(outputPath, directions, frameWidth, frame
     frameHeight,
     columns,
     rows: ROWS,
-    directions
+    directions,
   };
 
   await fs.writeFile(outputPath, JSON.stringify(metadata, null, 2));
@@ -222,7 +222,7 @@ export class SpriteSheetGenerator {
       this.outputSpritePath,
       validation.width,
       validation.height,
-      validation.columns
+      validation.columns,
     );
 
     console.log('Generating metadata...');
@@ -232,7 +232,7 @@ export class SpriteSheetGenerator {
       directions,
       validation.width,
       validation.height,
-      validation.columns
+      validation.columns,
     );
 
     console.log(`✓ Sprite sheet generated: ${this.outputSpritePath}`);

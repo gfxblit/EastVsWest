@@ -7,7 +7,7 @@
 import { createClient } from '@supabase/supabase-js';
 import { SessionPlayersSnapshot } from '../src/SessionPlayersSnapshot.js';
 import { Network } from '../src/network.js';
-import { waitFor, waitForSilence } from './helpers/wait-utils.js';
+import { waitFor, waitForSilence } from './helpers/test-utils.js';
 
 const supabaseUrl = process.env.SUPABASE_URL;
 const supabaseAnonKey = process.env.SUPABASE_ANON_KEY;
@@ -201,7 +201,7 @@ describe('Main.js Lobby Integration with Real Supabase', () => {
         expect.arrayContaining([
           expect.objectContaining({ player_name: 'HostPlayer' }),
           expect.objectContaining({ player_name: 'Player1' }),
-        ])
+        ]),
       );
     });
   });
@@ -237,7 +237,7 @@ describe('Main.js Lobby Integration with Real Supabase', () => {
         expect.arrayContaining([
           expect.objectContaining({ player_name: 'HostPlayer' }),
           expect.objectContaining({ player_name: 'Player1' }),
-        ])
+        ]),
       );
     });
   });
@@ -319,8 +319,8 @@ describe('Main.js Lobby Integration with Real Supabase', () => {
 
       // Wait for DELETE event to propagate
       await waitFor(() => {
-         const latestPoll = hostPlayersList[hostPlayersList.length - 1];
-         return latestPoll && latestPoll.length === 1;
+        const latestPoll = hostPlayersList[hostPlayersList.length - 1];
+        return latestPoll && latestPoll.length === 1;
       });
 
       // Assert - Host should only see themselves

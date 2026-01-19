@@ -9,8 +9,8 @@ import { initializeDebugTools } from './main.js';
 // Mock eruda module
 jest.unstable_mockModule('eruda', () => ({
   default: {
-    init: jest.fn()
-  }
+    init: jest.fn(),
+  },
 }));
 
 describe('initializeDebugTools', () => {

@@ -52,7 +52,7 @@ export class LocalPlayerController {
       lungeTime: 0,
       velocity: {
         x: data?.velocity_x || 0,
-        y: data?.velocity_y || 0
+        y: data?.velocity_y || 0,
       },
       animationState: new AnimationState(),
     };
@@ -102,8 +102,8 @@ export class LocalPlayerController {
     }
     
     if (playersSnapshot) {
-        this.#syncWithSnapshot(playersSnapshot);
-        this.#broadcastPosition();
+      this.#syncWithSnapshot(playersSnapshot);
+      this.#broadcastPosition();
     }
 
     this.wasInteracting = this.inputState.interact;
@@ -128,7 +128,7 @@ export class LocalPlayerController {
 
         if (isUnarmed || wantsToSwap) {
           this.network.send('pickup_request', {
-            loot_id: item.id
+            loot_id: item.id,
           });
           this.lastPickupRequestTime = now;
           // Only process one pickup per frame to avoid spamming multiple items if stacked
@@ -142,11 +142,11 @@ export class LocalPlayerController {
     const hitboxRadius = CONFIG.PLAYER.HITBOX_RADIUS;
 
     // Apply X movement
-    let nextX = this.player.x + this.player.velocity.x * deltaTime;
+    const nextX = this.player.x + this.player.velocity.x * deltaTime;
     this.player.x = resolveCollisionX(nextX, this.player.y, hitboxRadius);
 
     // Apply Y movement
-    let nextY = this.player.y + this.player.velocity.y * deltaTime;
+    const nextY = this.player.y + this.player.velocity.y * deltaTime;
     this.player.y = resolveCollisionY(this.player.x, nextY, hitboxRadius);
 
     // Keep player within world bounds
@@ -164,26 +164,26 @@ export class LocalPlayerController {
 
     // Update rotation based on velocity (if moving)
     if (this.player.velocity.x !== 0 || this.player.velocity.y !== 0) {
-        // Map 4-way direction index to rotation radians
-        // North (2) -> 0
-        // East (1) -> PI/2
-        // South (0) -> PI
-        // West (3) -> 3PI/2
-        switch (direction) {
-            case 2: this.player.rotation = 0; break;
-            case 1: this.player.rotation = Math.PI / 2; break;
-            case 0: this.player.rotation = Math.PI; break;
-            case 3: this.player.rotation = 3 * Math.PI / 2; break;
-        }
-        this.#normalizeRotation();
+      // Map 4-way direction index to rotation radians
+      // North (2) -> 0
+      // East (1) -> PI/2
+      // South (0) -> PI
+      // West (3) -> 3PI/2
+      switch (direction) {
+        case 2: this.player.rotation = 0; break;
+        case 1: this.player.rotation = Math.PI / 2; break;
+        case 0: this.player.rotation = Math.PI; break;
+        case 3: this.player.rotation = 3 * Math.PI / 2; break;
+      }
+      this.#normalizeRotation();
     } else {
-        // Snap to nearest 90 degrees (PI/2) when stopped
-        const snapInterval = Math.PI / 2;
-        this.player.rotation = Math.round(this.player.rotation / snapInterval) * snapInterval;
-        this.#normalizeRotation();
+      // Snap to nearest 90 degrees (PI/2) when stopped
+      const snapInterval = Math.PI / 2;
+      this.player.rotation = Math.round(this.player.rotation / snapInterval) * snapInterval;
+      this.#normalizeRotation();
         
-        // Ensure sprite animation frame matches the snapped rotation
-        this.player.animationState.lastDirection = getDirectionFromRotation(this.player.rotation);
+      // Ensure sprite animation frame matches the snapped rotation
+      this.player.animationState.lastDirection = getDirectionFromRotation(this.player.rotation);
     }
 
     // Update attack animation timer
@@ -351,7 +351,7 @@ export class LocalPlayerController {
           weapon_id: weaponConfig.id,
           aim_x: aimX,
           aim_y: aimY,
-          is_special: isSpecial
+          is_special: isSpecial,
         });
       }
     }
@@ -393,7 +393,7 @@ export class LocalPlayerController {
 
     return {
       attackPct: Math.max(0, Math.min(1, attackPct)),
-      abilityPct: Math.max(0, Math.min(1, abilityPct))
+      abilityPct: Math.max(0, Math.min(1, abilityPct)),
     };
   }
 }

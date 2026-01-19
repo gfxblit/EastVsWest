@@ -34,7 +34,7 @@ describe('DebugUI', () => {
     DebugUI = module.DebugUI;
 
     mockGame = {
-      state: { isRunning: true }
+      state: { isRunning: true },
     };
     debugUI = new DebugUI(mockGame);
     container = document.getElementById('debug-ui-overlay');

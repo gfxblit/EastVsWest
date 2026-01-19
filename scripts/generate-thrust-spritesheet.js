@@ -13,7 +13,7 @@ const DEFAULT_CONFIG = {
   crop: '1024x1024+0+0',
   outputWidth: null,
   tolerance: 10,
-  output: path.join(PROJECT_ROOT, 'public/assets/vfx/thrust-right.png')
+  output: path.join(PROJECT_ROOT, 'public/assets/vfx/thrust-right.png'),
 };
 
 // Parse command line arguments
@@ -56,7 +56,7 @@ const options = parseArgs();
 async function createSpritesheet() {
   const numImages = 5;
   const filenames = Array.from({ length: numImages }, (_, i) => 
-    path.join(options.inputDir, `thrust-${i + 1}.png`)
+    path.join(options.inputDir, `thrust-${i + 1}.png`),
   );
 
   try {
@@ -72,7 +72,7 @@ async function createSpritesheet() {
     const outH = Math.round(outW * (cropH / cropW));
 
     console.log(`Crop Area: ${cropW}x${cropH} at (${cropX}, ${cropY})`);
-    console.log(`Output Frame: ${outW}x${outH} (Aspect Ratio: ${(cropH/cropW).toFixed(4)})`);
+    console.log(`Output Frame: ${outW}x${outH} (Aspect Ratio: ${(cropH / cropW).toFixed(4)})`);
 
     const processedFrames = [];
 
@@ -128,7 +128,7 @@ async function createSpritesheet() {
           left: cropX,
           top: cropY,
           width: cropW,
-          height: cropH
+          height: cropH,
         })
         .resize(outW, outH)
         .png()
@@ -143,14 +143,14 @@ async function createSpritesheet() {
         width: outW,
         height: outH * numImages,
         channels: 4,
-        background: { r: 0, g: 0, b: 0, alpha: 0 }
-      }
+        background: { r: 0, g: 0, b: 0, alpha: 0 },
+      },
     });
 
     const compositeArr = processedFrames.map((buffer, i) => ({
       input: buffer,
       top: i * outH,
-      left: 0
+      left: 0,
     }));
 
     await spritesheet

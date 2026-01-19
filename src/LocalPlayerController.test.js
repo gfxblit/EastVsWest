@@ -70,9 +70,9 @@ describe('LocalPlayerController', () => {
     const player = controller.getPlayer();
 
     const mockSnapshot = {
-        getPlayers: () => new Map([
-            ['test-player', { health: 50, equipped_weapon: 'spear' }]
-        ])
+      getPlayers: () => new Map([
+        ['test-player', { health: 50, equipped_weapon: 'spear' }],
+      ]),
     };
 
     controller.update(0.1, mockSnapshot);
@@ -188,7 +188,7 @@ describe('LocalPlayerController', () => {
       controller.update(0.016, null);
       expect(mockNetwork.send).toHaveBeenLastCalledWith('attack_request', expect.objectContaining({
         aim_x: expect.any(Number),
-        aim_y: player.y // Should be East (aim_y same as player.y)
+        aim_y: player.y, // Should be East (aim_y same as player.y)
       }));
 
       // 2. Wait for cooldown and change movement to South
@@ -199,7 +199,7 @@ describe('LocalPlayerController', () => {
       expect(mockNetwork.send).toHaveBeenCalledTimes(2);
       expect(mockNetwork.send).toHaveBeenLastCalledWith('attack_request', expect.objectContaining({
         aim_x: player.x, // Should be South (aim_x same as player.x)
-        aim_y: expect.any(Number)
+        aim_y: expect.any(Number),
       }));
 
       jest.restoreAllMocks();
@@ -262,14 +262,14 @@ describe('LocalPlayerController', () => {
     beforeEach(() => {
       controller = new LocalPlayerController(mockNetwork, null);
       mockLoot = [
-        { id: 'loot-1', item_id: 'spear', x: CONFIG.WORLD.WIDTH / 2 + 10, y: CONFIG.WORLD.HEIGHT / 2 + 10 }
+        { id: 'loot-1', item_id: 'spear', x: CONFIG.WORLD.WIDTH / 2 + 10, y: CONFIG.WORLD.HEIGHT / 2 + 10 },
       ];
       now = 10000;
       jest.spyOn(Date, 'now').mockImplementation(() => now);
     });
 
     afterEach(() => {
-        jest.restoreAllMocks();
+      jest.restoreAllMocks();
     });
 
     test('WhenUnarmedAndCollidingWithLoot_ShouldSendPickupRequest', () => {
@@ -283,7 +283,7 @@ describe('LocalPlayerController', () => {
       controller.update(0.016, null, mockLoot);
 
       expect(mockNetwork.send).toHaveBeenCalledWith('pickup_request', {
-        loot_id: 'loot-1'
+        loot_id: 'loot-1',
       });
     });
 
@@ -313,7 +313,7 @@ describe('LocalPlayerController', () => {
       controller.update(0.016, null, mockLoot);
 
       expect(mockNetwork.send).toHaveBeenCalledWith('pickup_request', {
-        loot_id: 'loot-1'
+        loot_id: 'loot-1',
       });
     });
 

@@ -93,13 +93,13 @@ describe('Match Resolution Integration', () => {
       position_x: 100,
       position_y: 100,
       equipped_weapon: 'spear', // Ensure weapon
-      health: 100
+      health: 100,
     });
     
     await playerNetwork.writePlayerStateToDB(playerUser.id, {
       position_x: 150,
       position_y: 100,
-      health: 10 // Low health to die quickly
+      health: 10, // Low health to die quickly
     });
 
     // Wait for sync
@@ -107,16 +107,16 @@ describe('Match Resolution Integration', () => {
     
     // 3. Setup listener for Game Over
     const gameOverPromise = new Promise(resolve => {
-        playerNetwork.on('game_over', (data) => resolve(data));
+      playerNetwork.on('game_over', (data) => resolve(data));
     });
 
     // 4. Host attacks Player
     // Simulate attack request from Host
     hostNetwork.send('attack_request', {
-        weapon_id: 'spear',
-        aim_x: 150,
-        aim_y: 100,
-        is_special: false
+      weapon_id: 'spear',
+      aim_x: 150,
+      aim_y: 100,
+      is_special: false,
     });
 
     // Wait for combat processing
@@ -137,8 +137,8 @@ describe('Match Resolution Integration', () => {
     // 6. Verify Game Over Broadcast
     // This will time out if not implemented
     const gameOverData = await Promise.race([
-        gameOverPromise,
-        new Promise((_, reject) => setTimeout(() => reject(new Error('Timeout waiting for game_over')), 6000))
+      gameOverPromise,
+      new Promise((_, reject) => setTimeout(() => reject(new Error('Timeout waiting for game_over')), 6000)),
     ]);
 
     expect(gameOverData).toBeDefined();
@@ -153,11 +153,11 @@ describe('Match Resolution Integration', () => {
     // 1. Setup Game Over state (Host wins, Client dead)
     await hostNetwork.writePlayerStateToDB(hostUser.id, {
       kills: 5,
-      health: 50
+      health: 50,
     });
     await hostNetwork.writePlayerStateToDB(playerUser.id, {
       kills: 0,
-      health: 0
+      health: 0,
     });
 
     // Wait for sync
@@ -173,18 +173,18 @@ describe('Match Resolution Integration', () => {
     const spawnY = CONFIG.WORLD.HEIGHT / 2;
 
     for (const [playerId, player] of players) {
-        updates.push({
-            player_id: playerId,
-            health: 100,
-            kills: 0,
-            position_x: spawnX + (Math.random() * 200 - 100),
-            position_y: spawnY + (Math.random() * 200 - 100),
-            velocity_x: 0,
-            velocity_y: 0,
-            rotation: 0,
-            equipped_weapon: 'fist',
-            equipped_armor: null
-        });
+      updates.push({
+        player_id: playerId,
+        health: 100,
+        kills: 0,
+        position_x: spawnX + (Math.random() * 200 - 100),
+        position_y: spawnY + (Math.random() * 200 - 100),
+        velocity_x: 0,
+        velocity_y: 0,
+        rotation: 0,
+        equipped_weapon: 'fist',
+        equipped_armor: null,
+      });
     }
 
     // Write reset to DB

@@ -48,12 +48,12 @@ describe('CONFIG', () => {
     expect(CONFIG.ARMOR.PLATED.weaknesses).toBeDefined();
   });
 
-    test('WhenCheckingInputConfig_ShouldHaveCorrectDefaults', () => {
-      expect(CONFIG.INPUT.KEYBOARD_MOVE_KEYS).toBeDefined();
-      expect(CONFIG.INPUT.SPECIAL_ABILITY_KEY).toBe('KeyQ');
-      expect(CONFIG.INPUT.INTERACT_KEY).toBe('KeyF');
-      expect(CONFIG.INPUT.MAX_JOYSTICK_DISTANCE).toBe(45);
-    });
+  test('WhenCheckingInputConfig_ShouldHaveCorrectDefaults', () => {
+    expect(CONFIG.INPUT.KEYBOARD_MOVE_KEYS).toBeDefined();
+    expect(CONFIG.INPUT.SPECIAL_ABILITY_KEY).toBe('KeyQ');
+    expect(CONFIG.INPUT.INTERACT_KEY).toBe('KeyF');
+    expect(CONFIG.INPUT.MAX_JOYSTICK_DISTANCE).toBe(45);
+  });
 
   test('double-handed weapons should have stance property set correctly', () => {
     const doubleHandedWeapons = [

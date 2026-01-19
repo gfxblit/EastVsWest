@@ -17,7 +17,7 @@ const FILES = [
   'Character_Down.png',      // 0: South
   'Character_Right.png',     // 1: East
   'Character_Up.png',        // 2: North
-  'Character_Left.png'       // 3: West
+  'Character_Left.png',       // 3: West
 ];
 
 const FRAME_WIDTH = 32;
@@ -57,11 +57,11 @@ async function generate() {
         width: width,
         height: height,
         channels: 4,
-        background: { r: 0, g: 0, b: 0, alpha: 0 }
-      }
+        background: { r: 0, g: 0, b: 0, alpha: 0 },
+      },
     })
-    .composite(composites)
-    .toFile(OUTPUT_IMAGE);
+      .composite(composites)
+      .toFile(OUTPUT_IMAGE);
 
     console.log(`Sprite sheet written to: ${OUTPUT_IMAGE}`);
 
@@ -76,8 +76,8 @@ async function generate() {
         south: { row: 0, frames: 4 },
         east: { row: 1, frames: 4 },
         north: { row: 2, frames: 4 },
-        west: { row: 3, frames: 4 }
-      }
+        west: { row: 3, frames: 4 },
+      },
     };
 
     fs.writeFileSync(OUTPUT_METADATA, JSON.stringify(metadata, null, 2));

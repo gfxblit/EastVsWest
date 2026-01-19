@@ -1,6 +1,6 @@
 import { createClient } from '@supabase/supabase-js';
 import { Network } from '../src/network';
-import { waitFor } from './helpers/wait-utils.js';
+import { waitFor } from './helpers/test-utils.js';
 
 // Ensure your local Supabase URL and anon key are set as environment variables
 const supabaseUrl = process.env.SUPABASE_URL;
@@ -54,7 +54,7 @@ describe('Position Synchronization Integration', () => {
       position_y: 678.90,
       rotation: 1.57,
       velocity_x: 10.5,
-      velocity_y: 20.5
+      velocity_y: 20.5,
     };
 
     // 3. Call writePlayerStateToDB
@@ -88,7 +88,7 @@ describe('Position Synchronization Integration', () => {
       position_y: 300.2,
       rotation: 3.14,
       velocity_x: 5.5,
-      velocity_y: 6.6
+      velocity_y: 6.6,
     });
 
     // 3. Start periodic write
@@ -146,7 +146,7 @@ describe('Position Synchronization Integration', () => {
       position_y: 600,
       velocity_x: 10,
       velocity_y: 20,
-      rotation: 0
+      rotation: 0,
     };
     await network.writePlayerStateToDB(hostUser.id, newState);
 

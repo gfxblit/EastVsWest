@@ -34,24 +34,24 @@ describe('HostCombatManager', () => {
       position_x: 0,
       position_y: 0,
       health: 100,
-      equipped_weapon: 'fist'
+      equipped_weapon: 'fist',
     };
     const victim = {
       id: 'victim',
       position_x: 10,
       position_y: 0,
       health: 10, // Low health, will die from 15 dmg fist
-      equipped_armor: null
+      equipped_armor: null,
     };
 
     mockSnapshot.getPlayers.mockReturnValue(new Map([
       ['attacker', attacker],
-      ['victim', victim]
+      ['victim', victim],
     ]));
 
     const msg = {
       from: 'attacker',
-      data: { weapon_id: 'fist', aim_x: 10, aim_y: 0, is_special: false }
+      data: { weapon_id: 'fist', aim_x: 10, aim_y: 0, is_special: false },
     };
 
     manager.handleAttackRequest(msg, mockSnapshot);
@@ -65,27 +65,27 @@ describe('HostCombatManager', () => {
     // Should broadcast death event
     expect(mockNetwork.send).toHaveBeenCalledWith('player_death', expect.objectContaining({
       victim_id: 'victim',
-      killer_id: 'attacker'
+      killer_id: 'attacker',
     }));
   });
 
   test('ShouldApplyZoneDamageToPlayersOutsideZone', () => {
     const playerOutside = {
-        id: 'p1',
-        position_x: 200,
-        position_y: 200,
-        health: 100
+      id: 'p1',
+      position_x: 200,
+      position_y: 200,
+      health: 100,
     };
     const playerInside = {
-        id: 'p2',
-        position_x: 0,
-        position_y: 0,
-        health: 100
+      id: 'p2',
+      position_x: 0,
+      position_y: 0,
+      health: 100,
     };
 
     mockSnapshot.getPlayers.mockReturnValue(new Map([
-        ['p1', playerOutside],
-        ['p2', playerInside]
+      ['p1', playerOutside],
+      ['p2', playerInside],
     ]));
 
     // Accumulate enough time ( > ZONE.DAMAGE_INTERVAL_SECONDS)
@@ -109,17 +109,17 @@ describe('HostCombatManager', () => {
 
   test('ShouldValidateAttackCooldown', () => {
     const attacker = {
-        id: 'attacker',
-        position_x: 0,
-        position_y: 0,
-        health: 100,
-        equipped_weapon: 'fist'
+      id: 'attacker',
+      position_x: 0,
+      position_y: 0,
+      health: 100,
+      equipped_weapon: 'fist',
     };
     mockSnapshot.getPlayers.mockReturnValue(new Map([['attacker', attacker]]));
 
     const msg = {
-        from: 'attacker',
-        data: { weapon_id: 'fist', aim_x: 10, aim_y: 0, is_special: false }
+      from: 'attacker',
+      data: { weapon_id: 'fist', aim_x: 10, aim_y: 0, is_special: false },
     };
 
     // Mock Date.now to control time
@@ -145,29 +145,29 @@ describe('HostCombatManager', () => {
   });
 
   test('ShouldCalculateDamageAndBroadcastUpdate', () => {
-     const attacker = {
-        id: 'attacker',
-        position_x: 0,
-        position_y: 0,
-        health: 100,
-        equipped_weapon: 'fist'
+    const attacker = {
+      id: 'attacker',
+      position_x: 0,
+      position_y: 0,
+      health: 100,
+      equipped_weapon: 'fist',
     };
     const victim = {
-        id: 'victim',
-        position_x: 10, // Close enough for fist
-        position_y: 0,
-        health: 100,
-        equipped_armor: null
+      id: 'victim',
+      position_x: 10, // Close enough for fist
+      position_y: 0,
+      health: 100,
+      equipped_armor: null,
     };
 
     mockSnapshot.getPlayers.mockReturnValue(new Map([
-        ['attacker', attacker],
-        ['victim', victim]
+      ['attacker', attacker],
+      ['victim', victim],
     ]));
 
     const msg = {
-        from: 'attacker',
-        data: { weapon_id: 'fist', aim_x: 10, aim_y: 0, is_special: false }
+      from: 'attacker',
+      data: { weapon_id: 'fist', aim_x: 10, aim_y: 0, is_special: false },
     };
 
     manager.handleAttackRequest(msg, mockSnapshot);
@@ -182,39 +182,39 @@ describe('HostCombatManager', () => {
 
   test('ShouldUseAuthoritativeWeaponFromSnapshotIgnoringMessageWeaponId', () => {
     const attacker = {
-       id: 'attacker',
-       position_x: 0,
-       position_y: 0,
-       health: 100,
-       equipped_weapon: 'spear' // Authoritative weapon
-   };
-   const victim = {
-       id: 'victim',
-       position_x: 10,
-       position_y: 0,
-       health: 100,
-       equipped_armor: null
-   };
+      id: 'attacker',
+      position_x: 0,
+      position_y: 0,
+      health: 100,
+      equipped_weapon: 'spear', // Authoritative weapon
+    };
+    const victim = {
+      id: 'victim',
+      position_x: 10,
+      position_y: 0,
+      health: 100,
+      equipped_armor: null,
+    };
 
-   mockSnapshot.getPlayers.mockReturnValue(new Map([
-       ['attacker', attacker],
-       ['victim', victim]
-   ]));
+    mockSnapshot.getPlayers.mockReturnValue(new Map([
+      ['attacker', attacker],
+      ['victim', victim],
+    ]));
 
-   const msg = {
-       from: 'attacker',
-       data: { weapon_id: 'fist', aim_x: 10, aim_y: 0, is_special: false } // Client tries to spoof fist
-   };
+    const msg = {
+      from: 'attacker',
+      data: { weapon_id: 'fist', aim_x: 10, aim_y: 0, is_special: false }, // Client tries to spoof fist
+    };
 
-   manager.handleAttackRequest(msg, mockSnapshot);
+    manager.handleAttackRequest(msg, mockSnapshot);
 
-   expect(mockNetwork.broadcastPlayerStateUpdate).toHaveBeenCalled();
-   const updates = mockNetwork.broadcastPlayerStateUpdate.mock.calls[0][0];
-   const victimUpdate = updates.find(u => u.player_id === 'victim');
+    expect(mockNetwork.broadcastPlayerStateUpdate).toHaveBeenCalled();
+    const updates = mockNetwork.broadcastPlayerStateUpdate.mock.calls[0][0];
+    const victimUpdate = updates.find(u => u.player_id === 'victim');
    
-   expect(victimUpdate).toBeDefined();
-   // Spear base damage is 25, Fist is 15.
-   // If it uses authoritative spear, health should be 75.
-   expect(victimUpdate.health).toBe(75); 
- });
+    expect(victimUpdate).toBeDefined();
+    // Spear base damage is 25, Fist is 15.
+    // If it uses authoritative spear, health should be 75.
+    expect(victimUpdate.health).toBe(75); 
+  });
 });

@@ -32,14 +32,14 @@ async function rotateFrames(inputPath, outputPath, degrees) {
     // Extract and rotate each frame
     console.log(`Processing ${inputPath}...`);
     for (let i = 0; i < NUM_FRAMES; i++) {
-      let framePipeline = sharp(inputBuffer)
-          .extract({ 
-              left: i * FRAME_WIDTH, 
-              top: 0, 
-              width: FRAME_WIDTH, 
-              height: FRAME_HEIGHT 
-          })
-          .rotate(angle, { background: { r: 0, g: 0, b: 0, alpha: 0 } });
+      const framePipeline = sharp(inputBuffer)
+        .extract({ 
+          left: i * FRAME_WIDTH, 
+          top: 0, 
+          width: FRAME_WIDTH, 
+          height: FRAME_HEIGHT, 
+        })
+        .rotate(angle, { background: { r: 0, g: 0, b: 0, alpha: 0 } });
 
       const rotatedBuffer = await framePipeline.toBuffer();
       
@@ -55,14 +55,14 @@ async function rotateFrames(inputPath, outputPath, degrees) {
           left: Math.max(0, left),
           top: Math.max(0, top),
           width: FRAME_WIDTH,
-          height: FRAME_HEIGHT
+          height: FRAME_HEIGHT,
         })
         .toBuffer();
 
       compositeOperations.push({
         input: croppedBuffer,
         left: i * FRAME_WIDTH,
-        top: 0
+        top: 0,
       });
     }
 
@@ -72,8 +72,8 @@ async function rotateFrames(inputPath, outputPath, degrees) {
         width: FRAME_WIDTH * NUM_FRAMES,
         height: FRAME_HEIGHT,
         channels: 4,
-        background: { r: 0, g: 0, b: 0, alpha: 0 }
-      }
+        background: { r: 0, g: 0, b: 0, alpha: 0 },
+      },
     });
 
     // Save output

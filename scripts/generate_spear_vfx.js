@@ -13,7 +13,7 @@ const DEFAULT_CONFIG = {
   output: null,
   width: 64,
   height: 64,
-  frames: 5
+  frames: 5,
 };
 
 // Parse command line arguments
@@ -95,13 +95,15 @@ function generateFrameSVG(frameIndex, direction) {
   const progress = frameIndex / (NUM_FRAMES - 1);
   const opacity = frameIndex === 0 ? 0.4 : (frameIndex === NUM_FRAMES - 1 ? 0.2 : 0.8);
   
-  // Base coordinates for 'right' direction
-  // Spear thrust is a horizontal line moving right
-  let x1, x2, y1, y2, strokeWidth;
-  
   const centerY = FRAME_HEIGHT / 2;
   const startX = FRAME_WIDTH * 0.2;
   const maxReach = FRAME_WIDTH * 0.8;
+
+  // Base coordinates for 'right' direction
+  // Spear thrust is a horizontal line moving right
+  let x1, x2, strokeWidth;
+  const y1 = centerY;
+  const y2 = centerY;
   
   if (frameIndex === 0) {
     x1 = startX;
@@ -124,9 +126,6 @@ function generateFrameSVG(frameIndex, direction) {
     x2 = maxReach + 10;
     strokeWidth = 2;
   }
-  
-  y1 = centerY;
-  y2 = centerY;
 
   let transform = '';
   if (direction === 'left') {
@@ -163,7 +162,7 @@ async function generateSpriteSheet(direction) {
     compositeOperations.push({
       input: frameBuffer,
       left: i * FRAME_WIDTH,
-      top: 0
+      top: 0,
     });
   }
   
@@ -172,8 +171,8 @@ async function generateSpriteSheet(direction) {
       width: FRAME_WIDTH * NUM_FRAMES,
       height: FRAME_HEIGHT,
       channels: 4,
-      background: { r: 0, g: 0, b: 0, alpha: 0 }
-    }
+      background: { r: 0, g: 0, b: 0, alpha: 0 },
+    },
   });
   
   return spriteSheet.composite(compositeOperations).png();

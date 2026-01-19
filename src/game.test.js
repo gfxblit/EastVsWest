@@ -73,7 +73,7 @@ describe('Game', () => {
             velocity_x: 10,
             velocity_y: 20,
             rotation: 0.5, 
-            health: 90 
+            health: 90, 
           }],
         ])),
       };
@@ -230,10 +230,10 @@ describe('Game', () => {
         playerId: 'player-1', 
         on: jest.fn(), 
         send: jest.fn(),
-        isHost: false 
+        isHost: false, 
       };
       mockSnapshot = { 
-        getPlayers: jest.fn().mockReturnValue(new Map()) 
+        getPlayers: jest.fn().mockReturnValue(new Map()), 
       };
       game.init(mockSnapshot, mockNetwork);
     });
@@ -269,7 +269,7 @@ describe('Game', () => {
         playerId: 'player-1', 
         on: jest.fn(), 
         send: jest.fn(),
-        isHost: false 
+        isHost: false, 
       };
       // Mock players
       const players = new Map();
@@ -279,9 +279,9 @@ describe('Game', () => {
       mockSnapshot = { 
         getPlayers: jest.fn().mockReturnValue(players),
         getInterpolatedPlayerState: jest.fn((id) => {
-            if (id === 'killer-1') return { x: 100, y: 100 };
-            return null;
-        })
+          if (id === 'killer-1') return { x: 100, y: 100 };
+          return null;
+        }),
       };
       
       game.init(mockSnapshot, mockNetwork);
@@ -298,7 +298,7 @@ describe('Game', () => {
       // Execute handler
       deathHandler({ 
         from: 'host', 
-        data: { victim_id: 'player-1', killer_id: 'killer-1' } 
+        data: { victim_id: 'player-1', killer_id: 'killer-1' }, 
       });
 
       expect(game.spectatingTargetId).toBe('killer-1');
@@ -309,11 +309,11 @@ describe('Game', () => {
       const deathHandlerEntry = calls.find(call => call[0] === 'player_death');
       
       if (deathHandlerEntry) {
-          const deathHandler = deathHandlerEntry[1];
-          deathHandler({ 
-            from: 'host', 
-            data: { victim_id: 'other-player', killer_id: 'killer-1' } 
-          });
+        const deathHandler = deathHandlerEntry[1];
+        deathHandler({ 
+          from: 'host', 
+          data: { victim_id: 'other-player', killer_id: 'killer-1' }, 
+        });
       }
 
       expect(game.spectatingTargetId).toBeNull();
@@ -372,62 +372,62 @@ describe('Game', () => {
       expect(game.spectatingTargetId).toBe('bystander-1');
     });
 
-  describe('Game Simulation Pause', () => {
-    let mockNetwork;
-    let mockSnapshot;
+    describe('Game Simulation Pause', () => {
+      let mockNetwork;
+      let mockSnapshot;
 
-    beforeEach(() => {
-      mockNetwork = { 
-        playerId: 'player-1', 
-        on: jest.fn(), 
-        send: jest.fn(),
-        isHost: true 
-      };
+      beforeEach(() => {
+        mockNetwork = { 
+          playerId: 'player-1', 
+          on: jest.fn(), 
+          send: jest.fn(),
+          isHost: true, 
+        };
       
-      mockSnapshot = { 
-        getPlayers: jest.fn().mockReturnValue(new Map([
-          ['player-1', { player_id: 'player-1', health: 100 }]
-        ]))
-      };
+        mockSnapshot = { 
+          getPlayers: jest.fn().mockReturnValue(new Map([
+            ['player-1', { player_id: 'player-1', health: 100 }],
+          ])),
+        };
       
-      game.init(mockSnapshot, mockNetwork);
-    });
+        game.init(mockSnapshot, mockNetwork);
+      });
 
-    test('WhenPaused_ShouldNotProcessLootSpawnedEvents', () => {
+      test('WhenPaused_ShouldNotProcessLootSpawnedEvents', () => {
       // 1. Pause the game
-      game.state.isRunning = false;
+        game.state.isRunning = false;
       
-      // 2. Simulate incoming loot_spawned event
-      // Find the handler
-      const lootSpawnedHandler = mockNetwork.on.mock.calls.find(call => call[0] === 'loot_spawned')[1];
-      expect(lootSpawnedHandler).toBeDefined();
+        // 2. Simulate incoming loot_spawned event
+        // Find the handler
+        const lootSpawnedHandler = mockNetwork.on.mock.calls.find(call => call[0] === 'loot_spawned')[1];
+        expect(lootSpawnedHandler).toBeDefined();
 
-      const lootItem = { id: 'loot-pause-test', type: 'weapon', item_id: 'spear', x: 100, y: 100 };
+        const lootItem = { id: 'loot-pause-test', type: 'weapon', item_id: 'spear', x: 100, y: 100 };
       
-      // 3. Trigger event
-      lootSpawnedHandler({ data: lootItem });
+        // 3. Trigger event
+        lootSpawnedHandler({ data: lootItem });
 
-      // 4. Assert that loot was NOT added because simulation is paused
-      expect(game.state.loot).not.toContainEqual(lootItem);
-    });
+        // 4. Assert that loot was NOT added because simulation is paused
+        expect(game.state.loot).not.toContainEqual(lootItem);
+      });
 
-    test('WhenPaused_ShouldNotProcessAttackRequests', () => {
+      test('WhenPaused_ShouldNotProcessAttackRequests', () => {
       // 1. Pause the game
-      game.state.isRunning = false;
+        game.state.isRunning = false;
       
-      // 2. Simulate incoming attack_request
-      const attackHandler = mockNetwork.on.mock.calls.find(call => call[0] === 'attack_request')[1];
-      expect(attackHandler).toBeDefined();
+        // 2. Simulate incoming attack_request
+        const attackHandler = mockNetwork.on.mock.calls.find(call => call[0] === 'attack_request')[1];
+        expect(attackHandler).toBeDefined();
 
-      // Mock hostCombatManager to verify it's not called
-      const spy = jest.spyOn(game.hostCombatManager, 'handleAttackRequest');
+        // Mock hostCombatManager to verify it's not called
+        const spy = jest.spyOn(game.hostCombatManager, 'handleAttackRequest');
 
-      // 3. Trigger event
-      attackHandler({ from: 'player-2', data: {} });
+        // 3. Trigger event
+        attackHandler({ from: 'player-2', data: {} });
 
-      // 4. Assert that combat manager was NOT invoked
-      expect(spy).not.toHaveBeenCalled();
+        // 4. Assert that combat manager was NOT invoked
+        expect(spy).not.toHaveBeenCalled();
+      });
     });
   });
-});
 });

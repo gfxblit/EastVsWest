@@ -103,7 +103,7 @@ describe('Main.js Lobby Unit Tests', () => {
           // Should create SessionPlayersSnapshot
           this.playersSnapshot = new MockSessionPlayersSnapshot(
             this.network,
-            session.id
+            session.id,
           );
           await this.playersSnapshot.ready();
 
@@ -148,7 +148,7 @@ describe('Main.js Lobby Unit Tests', () => {
       // Assert
       expect(MockSessionPlayersSnapshot).toHaveBeenCalledWith(
         mockNetwork,
-        mockSession.id
+        mockSession.id,
       );
       expect(mockSessionPlayersSnapshot.ready).toHaveBeenCalled();
       expect(app.lobbyUpdateInterval).not.toBeNull();
@@ -191,7 +191,7 @@ describe('Main.js Lobby Unit Tests', () => {
           // Should create SessionPlayersSnapshot
           this.playersSnapshot = new MockSessionPlayersSnapshot(
             this.network,
-            session.id
+            session.id,
           );
           await this.playersSnapshot.ready();
 
@@ -221,7 +221,7 @@ describe('Main.js Lobby Unit Tests', () => {
       // Assert
       expect(MockSessionPlayersSnapshot).toHaveBeenCalledWith(
         mockNetwork,
-        mockSession.id
+        mockSession.id,
       );
       expect(mockSessionPlayersSnapshot.ready).toHaveBeenCalled();
       expect(app.lobbyUpdateInterval).not.toBeNull();
@@ -271,7 +271,7 @@ describe('Main.js Lobby Unit Tests', () => {
           expect.objectContaining({ player_name: 'Host' }),
           expect.objectContaining({ player_name: 'Player1' }),
         ]),
-        false
+        false,
       );
 
       // Fast-forward more
@@ -362,7 +362,7 @@ describe('Main.js Lobby Unit Tests', () => {
         expect.arrayContaining([
           expect.objectContaining({ player_name: 'Host' }),
         ]),
-        false
+        false,
       );
 
       // Second poll - 2 players
@@ -372,7 +372,7 @@ describe('Main.js Lobby Unit Tests', () => {
           expect.objectContaining({ player_name: 'Host' }),
           expect.objectContaining({ player_name: 'NewPlayer' }),
         ]),
-        false
+        false,
       );
 
       jest.useRealTimers();

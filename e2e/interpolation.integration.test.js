@@ -5,7 +5,7 @@ import { SessionPlayersSnapshot } from '../src/SessionPlayersSnapshot';
 import { Renderer } from '../src/renderer';
 import { AssetManager } from '../src/AssetManager';
 import { CONFIG } from '../src/config';
-import { waitFor } from './helpers/wait-utils.js';
+import { waitFor } from './helpers/test-utils.js';
 
 const supabaseUrl = process.env.SUPABASE_URL;
 const supabaseAnonKey = process.env.SUPABASE_ANON_KEY;
@@ -48,7 +48,7 @@ describe('Client Interpolation Integration (Real Network)', () => {
 
     const [{ data: hostAuth }, { data: playerAuth }] = await Promise.all([
       hostClient.auth.signInAnonymously(),
-      playerClient.auth.signInAnonymously()
+      playerClient.auth.signInAnonymously(),
     ]);
 
     hostUser = hostAuth.user;
@@ -81,7 +81,7 @@ describe('Client Interpolation Integration (Real Network)', () => {
       textAlign: '',
       font: '',
       shadowColor: '',
-      shadowBlur: 0
+      shadowBlur: 0,
     };
     const mockCanvas = { getContext: () => mockCtx, width: 800, height: 600 };
     mockCtx.canvas = mockCanvas;
@@ -125,7 +125,7 @@ describe('Client Interpolation Integration (Real Network)', () => {
         position_y: 0,
         rotation: 0,
         velocity_x: 100,
-        velocity_y: 0
+        velocity_y: 0,
       });
       await new Promise(resolve => setTimeout(resolve, 100));
     };
@@ -184,7 +184,7 @@ describe('Client Interpolation Integration (Real Network)', () => {
         position_y: 0,
         rotation: 0,
         velocity_x: 100,
-        velocity_y: 0
+        velocity_y: 0,
       });
       await new Promise(resolve => setTimeout(resolve, 50));
     }
@@ -200,15 +200,15 @@ describe('Client Interpolation Integration (Real Network)', () => {
     const startTime = performance.now();
     const duration = 500; // 0.5s of animation
     const fps = 60;
-    const dt = 1/fps;
+    const dt = 1 / fps;
     const mockGameState = {
       conflictZone: { centerX: 0, centerY: 0, radius: 1000 },
-      loot: []
+      loot: [],
     };
 
-    for (let t = 0; t < duration; t += (1000/fps)) {
+    for (let t = 0; t < duration; t += (1000 / fps)) {
       renderer.render(mockGameState, null, playerSnapshot, null, dt);
-      await new Promise(resolve => setTimeout(resolve, 1000/fps));
+      await new Promise(resolve => setTimeout(resolve, 1000 / fps));
     }
 
     // 6. Verify Animation State

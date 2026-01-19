@@ -31,7 +31,7 @@ let supabase;
 let playerId;
 let sessionId;
 let playerRecordId;
-let currentPosition = { x: 400, y: 400 };
+const currentPosition = { x: 400, y: 400 };
 let currentRotation = 0;
 let currentHealth = 100;
 let isConnected = false;
@@ -40,7 +40,7 @@ let isConnected = false;
 const rl = readline.createInterface({
   input: process.stdin,
   output: process.stdout,
-  prompt: '> '
+  prompt: '> ',
 });
 
 console.log('🎮 Interactive Player Movement REPL');
@@ -97,7 +97,7 @@ async function joinSession(joinCode) {
     sessionId = result.session.id;
     playerRecordId = result.player.id;
 
-    console.log(`✅ Successfully joined session!`);
+    console.log('✅ Successfully joined session!');
     console.log(`   Session ID: ${sessionId}`);
     console.log(`   Player Name: ${playerName}`);
     console.log(`   Status: ${result.session.status}`);
@@ -145,11 +145,11 @@ async function updatePosition(dx, dy) {
   try {
     // Broadcast movement update via Realtime using flattened format
     network.broadcastPlayerStateUpdate({
-      position_x: x,
-      position_y: y,
-      rotation: 0,
+      position_x: currentPosition.x,
+      position_y: currentPosition.y,
+      rotation: currentRotation,
       velocity_x: 0,
-      velocity_y: 0
+      velocity_y: 0,
     });
     console.log('   ✅ Broadcasted via Realtime');
 

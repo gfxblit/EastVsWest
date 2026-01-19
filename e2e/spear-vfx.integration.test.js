@@ -1,7 +1,7 @@
 import puppeteer from 'puppeteer';
 import { getPuppeteerConfig } from './helpers/puppeteer-config.js';
 import { startViteServer, stopViteServer } from './helpers/vite-server.js';
-import { waitFor } from './helpers/wait-utils.js';
+import { waitFor } from './helpers/test-utils.js';
 
 describe('Spear VFX E2E', () => {
   let browser;

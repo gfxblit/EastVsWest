@@ -14,15 +14,15 @@ export default defineConfig(async () => {
       rollupOptions: {
         input: {
           main: resolve(process.cwd(), 'index.html'),
-          frameTool: resolve(process.cwd(), 'tools/frame-tool/index.html')
-        }
-      }
+          frameTool: resolve(process.cwd(), 'tools/frame-tool/index.html'),
+        },
+      },
     },
     server: {
       port,
       open: true,
       host: true,
-      allowedHosts: true
-    }
+      allowedHosts: true,
+    },
   };
 });

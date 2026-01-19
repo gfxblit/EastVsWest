@@ -45,7 +45,7 @@ describe('HostCombatManager Victory Delay', () => {
       position_y: 0,
       health: 100,
       equipped_weapon: 'fist',
-      is_bot: false
+      is_bot: false,
     };
     
     const loser = {
@@ -56,17 +56,17 @@ describe('HostCombatManager Victory Delay', () => {
       position_y: 0,
       health: 10, // Low health
       equipped_armor: null,
-      is_bot: true
+      is_bot: true,
     };
 
     mockSnapshot.getPlayers.mockReturnValue(new Map([
       ['winner-id', winner],
-      ['loser-id', loser]
+      ['loser-id', loser],
     ]));
 
     const msg = {
       from: 'winner-id',
-      data: { weapon_id: 'fist', aim_x: 0, aim_y: 0, is_special: false }
+      data: { weapon_id: 'fist', aim_x: 0, aim_y: 0, is_special: false },
     };
 
     // Winner kills Loser
@@ -88,7 +88,7 @@ describe('HostCombatManager Victory Delay', () => {
 
     // Verify Game Over IS sent after delay
     expect(mockNetwork.send).toHaveBeenCalledWith('game_over', expect.objectContaining({
-        winner_id: 'winner-id'
+      winner_id: 'winner-id',
     }));
     
     // Verify state is no longer running

@@ -45,7 +45,7 @@ describe('HostCombatManager Reproduction', () => {
       position_y: 0,
       health: 10, // Low health
       equipped_armor: null,
-      is_bot: false
+      is_bot: false,
     };
     
     const botPlayer = {
@@ -56,17 +56,17 @@ describe('HostCombatManager Reproduction', () => {
       position_y: 0,
       health: 100,
       equipped_weapon: 'fist',
-      is_bot: true
+      is_bot: true,
     };
 
     mockSnapshot.getPlayers.mockReturnValue(new Map([
       ['host-player-id', hostPlayer],
-      ['bot-player-id', botPlayer]
+      ['bot-player-id', botPlayer],
     ]));
 
     const msg = {
       from: 'bot-player-id',
-      data: { weapon_id: 'fist', aim_x: 10, aim_y: 0, is_special: false }
+      data: { weapon_id: 'fist', aim_x: 10, aim_y: 0, is_special: false },
     };
 
     // Bot attacks Host
@@ -83,7 +83,7 @@ describe('HostCombatManager Reproduction', () => {
     // Verify death event
     expect(mockNetwork.send).toHaveBeenCalledWith('player_death', expect.objectContaining({
       victim_id: 'host-player-id',
-      killer_id: 'bot-player-id'
+      killer_id: 'bot-player-id',
     }));
 
     // Verify Game Over
@@ -95,7 +95,7 @@ describe('HostCombatManager Reproduction', () => {
     // Game Over should be sent
     // Game Over should be sent
     expect(mockNetwork.send).toHaveBeenCalledWith('game_over', expect.objectContaining({
-        winner_id: 'bot-player-id'
+      winner_id: 'bot-player-id',
     }));
     
     expect(mockState.isRunning).toBe(false);
@@ -109,7 +109,7 @@ describe('HostCombatManager Reproduction', () => {
       position_y: 0,
       health: 10,
       equipped_armor: null,
-      is_bot: false
+      is_bot: false,
     };
     
     const bot1 = {
@@ -119,7 +119,7 @@ describe('HostCombatManager Reproduction', () => {
       position_y: 0,
       health: 100,
       equipped_weapon: 'fist',
-      is_bot: true
+      is_bot: true,
     };
 
     const bot2 = {
@@ -129,19 +129,19 @@ describe('HostCombatManager Reproduction', () => {
       position_y: 100,
       health: 100,
       equipped_weapon: 'fist',
-      is_bot: true
+      is_bot: true,
     };
 
     mockSnapshot.getPlayers.mockReturnValue(new Map([
       ['host-player-id', hostPlayer],
       ['bot-1-id', bot1],
-      ['bot-2-id', bot2]
+      ['bot-2-id', bot2],
     ]));
 
     // Bot 1 kills Host
     manager.handleAttackRequest({
       from: 'bot-1-id',
-      data: { weapon_id: 'fist', aim_x: 10, aim_y: 0, is_special: false }
+      data: { weapon_id: 'fist', aim_x: 10, aim_y: 0, is_special: false },
     }, mockSnapshot);
 
     // Verify Host health is 0
@@ -162,7 +162,7 @@ describe('HostCombatManager Reproduction', () => {
     // Bot 1 kills Bot 2
     manager.handleAttackRequest({
       from: 'bot-1-id',
-      data: { weapon_id: 'fist', aim_x: 10, aim_y: 0, is_special: false }
+      data: { weapon_id: 'fist', aim_x: 10, aim_y: 0, is_special: false },
     }, mockSnapshot);
 
     expect(bot2.health).toBe(0);
@@ -173,7 +173,7 @@ describe('HostCombatManager Reproduction', () => {
     // Game Over should be sent
     // NOW Game Over should trigger
     expect(mockNetwork.send).toHaveBeenCalledWith('game_over', expect.objectContaining({
-        winner_id: 'bot-1-id'
+      winner_id: 'bot-1-id',
     }));
     expect(mockState.isRunning).toBe(false);
   });
@@ -184,14 +184,14 @@ describe('HostCombatManager Reproduction', () => {
       player_id: 'host-player-id',
       name: 'Host',
       health: 0,
-      is_bot: false
+      is_bot: false,
     };
     
     const botPlayer = {
       player_id: 'bot-player-id',
       name: 'Bot',
       health: 100,
-      is_bot: true
+      is_bot: true,
     };
 
     const ghostPlayer = {
@@ -199,13 +199,13 @@ describe('HostCombatManager Reproduction', () => {
       name: 'Ghost',
       health: undefined, // Simulating undefined health
       is_connected: false, // Simulating disconnected
-      is_bot: false
+      is_bot: false,
     };
 
     mockSnapshot.getPlayers.mockReturnValue(new Map([
       ['host-player-id', hostPlayer],
       ['bot-player-id', botPlayer],
-      ['ghost-player-id', ghostPlayer]
+      ['ghost-player-id', ghostPlayer],
     ]));
 
     // Trigger check (using update loop to trigger)
@@ -215,7 +215,7 @@ describe('HostCombatManager Reproduction', () => {
     jest.advanceTimersByTime(CONFIG.GAME.VICTORY_DELAY_MS);
     
     expect(mockNetwork.send).toHaveBeenCalledWith('game_over', expect.objectContaining({
-        winner_id: 'bot-player-id'
+      winner_id: 'bot-player-id',
     }));
     expect(mockState.isRunning).toBe(false);
   });
@@ -225,18 +225,18 @@ describe('HostCombatManager Reproduction', () => {
     const bot1 = {
       player_id: 'bot-1-id',
       health: 100,
-      is_connected: true
+      is_connected: true,
     };
     
     const bot2 = {
       player_id: 'bot-2-id',
       health: 100,
-      is_connected: false // Disconnected but has health
+      is_connected: false, // Disconnected but has health
     };
 
     mockSnapshot.getPlayers.mockReturnValue(new Map([
       ['bot-1-id', bot1],
-      ['bot-2-id', bot2]
+      ['bot-2-id', bot2],
     ]));
 
     manager.checkForWinCondition(mockSnapshot);
@@ -245,7 +245,7 @@ describe('HostCombatManager Reproduction', () => {
     
     // Should win because bot2 is disconnected
     expect(mockNetwork.send).toHaveBeenCalledWith('game_over', expect.objectContaining({
-        winner_id: 'bot-1-id'
+      winner_id: 'bot-1-id',
     }));
   });
 });

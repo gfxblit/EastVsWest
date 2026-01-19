@@ -37,7 +37,7 @@ export class HostBotManager {
       console.log(`Initializing controller for bot ${botId}`);
       this.botControllers.set(
         botId, 
-        new BotController(botId, this.network, this.playersSnapshot, this.game)
+        new BotController(botId, this.network, this.playersSnapshot, this.game),
       );
     }
   }

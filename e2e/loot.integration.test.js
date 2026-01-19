@@ -2,7 +2,7 @@ import { createClient } from '@supabase/supabase-js';
 import { Network } from '../src/network';
 import { Game } from '../src/game';
 import { SessionPlayersSnapshot } from '../src/SessionPlayersSnapshot';
-import { waitFor } from './helpers/wait-utils.js';
+import { waitFor } from './helpers/test-utils.js';
 import { CONFIG } from '../src/config';
 
 const supabaseUrl = process.env.SUPABASE_URL;
@@ -82,7 +82,7 @@ describe('Loot Integration', () => {
 
     // Wait for Host to see player in snapshot before moving
     await waitFor(() => {
-        return hostSnapshot.getPlayers().has(playerNetwork.playerId);
+      return hostSnapshot.getPlayers().has(playerNetwork.playerId);
     }, 10000);
 
     // 3. Host spawns a spear
@@ -101,12 +101,12 @@ describe('Loot Integration', () => {
       
       // If player is missing loot, request sync periodically (every 2s)
       if (playerGame.state.loot.length < expectedCount) {
-          const now = Date.now();
-          if (now - syncRequestTime > 2000) {
-              console.log('Test: Player missing loot, requesting sync...');
-              playerNetwork.send('request_loot_sync', {});
-              syncRequestTime = now;
-          }
+        const now = Date.now();
+        if (now - syncRequestTime > 2000) {
+          console.log('Test: Player missing loot, requesting sync...');
+          playerNetwork.send('request_loot_sync', {});
+          syncRequestTime = now;
+        }
       }
 
       if (hostGame.state.loot.length !== expectedCount || playerGame.state.loot.length !== expectedCount) {
@@ -126,12 +126,12 @@ describe('Loot Integration', () => {
 
     // Send position update via network so Host sees it immediately
     playerNetwork.broadcastPlayerStateUpdate({
-        player_id: playerNetwork.playerId,
-        position_x: lootX - 5,
-        position_y: lootY - 5,
-        health: 100,
-        velocity_x: 0,
-        velocity_y: 0
+      player_id: playerNetwork.playerId,
+      position_x: lootX - 5,
+      position_y: lootY - 5,
+      health: 100,
+      velocity_x: 0,
+      velocity_y: 0,
     });
 
     // Wait for player position to sync at host (so pickup logic can run)
@@ -143,29 +143,29 @@ describe('Loot Integration', () => {
 
     // Update player game to trigger collision detection
     await waitFor(() => {
-        playerGame.update(0.1);
-        hostGame.update(0.1);
-        return playerGame.getLocalPlayer().equipped_weapon === 'spear';
+      playerGame.update(0.1);
+      hostGame.update(0.1);
+      return playerGame.getLocalPlayer().equipped_weapon === 'spear';
     }, 15000);
 
     // Verify loot is gone for both
     await waitFor(() => {
-        playerGame.update(0.1);
-        hostGame.update(0.1);
+      playerGame.update(0.1);
+      hostGame.update(0.1);
 
-        const hasWeapon = playerGame.getLocalPlayer().equipped_weapon === 'spear';
-        const hasLoot = playerGame.state.loot.some(item => item.id === spawnedSpear.id);
+      const hasWeapon = playerGame.getLocalPlayer().equipped_weapon === 'spear';
+      const hasLoot = playerGame.state.loot.some(item => item.id === spawnedSpear.id);
         
-        if (hasWeapon && hasLoot) {
-             const now = Date.now();
-             if (now - syncRequestTime > 2000) {
-                 console.log('Test: Player has weapon but loot exists, requesting sync...');
-                 playerNetwork.send('request_loot_sync', {});
-                 syncRequestTime = now;
-             }
+      if (hasWeapon && hasLoot) {
+        const now = Date.now();
+        if (now - syncRequestTime > 2000) {
+          console.log('Test: Player has weapon but loot exists, requesting sync...');
+          playerNetwork.send('request_loot_sync', {});
+          syncRequestTime = now;
         }
+      }
 
-        return !playerGame.state.loot.some(item => item.id === spawnedSpear.id);
+      return !playerGame.state.loot.some(item => item.id === spawnedSpear.id);
     }, 10000);
     
     expect(playerGame.state.loot.some(item => item.id === spawnedSpear.id)).toBe(false);
@@ -194,7 +194,7 @@ describe('Loot Integration', () => {
 
     // Wait for Host to see player in snapshot before interacting
     await waitFor(() => {
-        return hostSnapshot.getPlayers().has(playerNetwork.playerId);
+      return hostSnapshot.getPlayers().has(playerNetwork.playerId);
     }, 10000);
 
     // Give player a 'bo' initially
@@ -204,17 +204,17 @@ describe('Loot Integration', () => {
 
     // Wait for weapon sync
     await waitFor(() => {
-        playerGame.update(0.1);
-        hostGame.update(0.1);
-        const localP = playerGame.getLocalPlayer();
-        return localP.equipped_weapon === 'bo';
+      playerGame.update(0.1);
+      hostGame.update(0.1);
+      const localP = playerGame.getLocalPlayer();
+      return localP.equipped_weapon === 'bo';
     }, 15000);
 
     // Wait for initial loot sync (20 items)
     await waitFor(() => {
-        playerGame.update(0.1);
-        hostGame.update(0.1);
-        return playerGame.state.loot.length >= CONFIG.GAME.INITIAL_LOOT_COUNT;
+      playerGame.update(0.1);
+      hostGame.update(0.1);
+      return playerGame.state.loot.length >= CONFIG.GAME.INITIAL_LOOT_COUNT;
     }, 20000);
 
     // 3. Host spawns a spear
@@ -224,18 +224,18 @@ describe('Loot Integration', () => {
 
     let syncRequestTime = 0;
     await waitFor(() => {
-        hostGame.update(0.016);
-        playerGame.update(0.016);
+      hostGame.update(0.016);
+      playerGame.update(0.016);
 
-        // Retry sync if loot not found
-        if (!playerGame.state.loot.some(l => l.id === spawnedSpear.id)) {
-            const now = Date.now();
-            if (now - syncRequestTime > 2000) {
-                 playerNetwork.send('request_loot_sync', {});
-                 syncRequestTime = now;
-            }
+      // Retry sync if loot not found
+      if (!playerGame.state.loot.some(l => l.id === spawnedSpear.id)) {
+        const now = Date.now();
+        if (now - syncRequestTime > 2000) {
+          playerNetwork.send('request_loot_sync', {});
+          syncRequestTime = now;
         }
-        return playerGame.state.loot.some(l => l.id === spawnedSpear.id);
+      }
+      return playerGame.state.loot.some(l => l.id === spawnedSpear.id);
     }, 25000);
 
     // 4. Player moves to loot but does NOT press F (should NOT pickup)
@@ -243,18 +243,18 @@ describe('Loot Integration', () => {
     playerGame.localPlayerController.player.y = lootY - 5;
 
     playerNetwork.broadcastPlayerStateUpdate({
-        player_id: playerNetwork.playerId,
-        position_x: lootX - 5,
-        position_y: lootY - 5,
-        velocity_x: 0,
-        velocity_y: 0
+      player_id: playerNetwork.playerId,
+      position_x: lootX - 5,
+      position_y: lootY - 5,
+      velocity_x: 0,
+      velocity_y: 0,
     });
 
     // Wait for sync
     await waitFor(() => {
-        hostGame.update(0.05);
-        const p = hostSnapshot.getPlayers().get(playerNetwork.playerId);
-        return p && Math.abs(p.position_x - (lootX - 5)) < 1;
+      hostGame.update(0.05);
+      const p = hostSnapshot.getPlayers().get(playerNetwork.playerId);
+      return p && Math.abs(p.position_x - (lootX - 5)) < 1;
     }, 10000);
 
     playerGame.update(0.1);
@@ -266,29 +266,29 @@ describe('Loot Integration', () => {
 
     // 5. Player presses F (with retry logic for network robustness)
     await waitFor(async () => {
-        // Press F
-        playerGame.handleInput({ interact: true });
+      // Press F
+      playerGame.handleInput({ interact: true });
         
-        // Run a few updates to allow message to send and process
-        playerGame.update(0.1);
-        hostGame.update(0.1);
+      // Run a few updates to allow message to send and process
+      playerGame.update(0.1);
+      hostGame.update(0.1);
         
-        if (playerGame.getLocalPlayer().equipped_weapon === 'spear') return true;
+      if (playerGame.getLocalPlayer().equipped_weapon === 'spear') return true;
 
-        // Release F to reset the 'rising edge' detection
-        playerGame.handleInput({ interact: false });
-        playerGame.update(0.1); 
+      // Release F to reset the 'rising edge' detection
+      playerGame.handleInput({ interact: false });
+      playerGame.update(0.1); 
 
-        return playerGame.getLocalPlayer().equipped_weapon === 'spear';
+      return playerGame.getLocalPlayer().equipped_weapon === 'spear';
     }, 15000, 200); // Polling every 200ms
 
     // 6. Verify old weapon 'bo' was dropped
     let droppedBo = null;
     await waitFor(() => {
-        playerGame.update(0.1);
-        hostGame.update(0.1);
-        droppedBo = playerGame.state.loot.find(item => item.item_id === 'bo');
-        return droppedBo !== undefined && !playerGame.state.loot.some(l => l.id === spawnedSpear.id);
+      playerGame.update(0.1);
+      hostGame.update(0.1);
+      droppedBo = playerGame.state.loot.find(item => item.item_id === 'bo');
+      return droppedBo !== undefined && !playerGame.state.loot.some(l => l.id === spawnedSpear.id);
     }, 15000);
 
     expect(droppedBo).toBeDefined();

@@ -120,15 +120,15 @@ export function getDirectionFromVelocity(vx, vy) {
  * @param {number|null} direction - Direction index (0-7) or null if idle
  */
 export function updateAnimationState(animState, deltaTime, isMoving, direction) {
-   // Helper wrapper for backward compatibility or direct object usage
-   const stateHelper = new AnimationState();
-   stateHelper.currentFrame = animState.currentFrame;
-   stateHelper.timeAccumulator = animState.timeAccumulator;
-   stateHelper.lastDirection = animState.lastDirection;
+  // Helper wrapper for backward compatibility or direct object usage
+  const stateHelper = new AnimationState();
+  stateHelper.currentFrame = animState.currentFrame;
+  stateHelper.timeAccumulator = animState.timeAccumulator;
+  stateHelper.lastDirection = animState.lastDirection;
 
-   stateHelper.update(deltaTime, isMoving, direction);
+  stateHelper.update(deltaTime, isMoving, direction);
 
-   animState.currentFrame = stateHelper.currentFrame;
-   animState.timeAccumulator = stateHelper.timeAccumulator;
-   animState.lastDirection = stateHelper.lastDirection;
+  animState.currentFrame = stateHelper.currentFrame;
+  animState.timeAccumulator = stateHelper.timeAccumulator;
+  animState.lastDirection = stateHelper.lastDirection;
 }
