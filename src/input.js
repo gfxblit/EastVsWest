@@ -288,9 +288,8 @@ export class Input {
       // These are explicit UI buttons that should NOT trigger the joystick
       if (target.closest('.touch-btn') || target.closest('.touch-debug-btn')) return false;
 
-      // The canvas, joystick elements, or the game screen itself should trigger the joystick
+      // The canvas or joystick elements should trigger the joystick
       return target.tagName.toLowerCase() === 'canvas' ||
-        target.id === 'game-screen' ||
         target.closest('.joystick-base') ||
         target.closest('.joystick-stick');
     }
