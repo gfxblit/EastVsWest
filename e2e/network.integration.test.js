@@ -1,6 +1,6 @@
 import { createClient } from '@supabase/supabase-js';
-import { Network } from '../src/network';
-import { waitFor, waitForSilence } from './helpers/wait-utils.js';
+import { Network } from '../src/network.js';
+import { waitFor } from './helpers/test-utils.js';
 
 // Ensure your local Supabase URL and anon key are set as environment variables
 // before running this test.
@@ -58,7 +58,7 @@ describe('Network Module Integration with Supabase', () => {
 
   test('hostGame() should create a new record in the game_sessions table', async () => {
     const hostName = 'HostPlayer';
-    const { session: hostSession, player: hostPlayerRecord } = await network.hostGame(hostName);
+    const { session: hostSession, player: _hostPlayerRecord } = await network.hostGame('HostPlayer');
 
     expect(hostSession.join_code).toBeDefined();
     expect(typeof hostSession.join_code).toBe('string');
@@ -98,8 +98,7 @@ describe('Network Module Integration with Supabase', () => {
 
   test('joinGame() should add a player to an existing session (host-authority flow)', async () => {
     // Host creates a session
-    const hostName = 'HostPlayer';
-    const { session: hostSession, player: hostPlayerRecord } = await network.hostGame(hostName);
+    const { session: hostSession, player: _hostPlayerRecord } = await network.hostGame('HostPlayer');
     testSessionId = hostSession.id;
     const joinCode = hostSession.join_code;
 
@@ -227,8 +226,7 @@ describe('Network Module Integration with Supabase', () => {
 
   test('host should receive postgres_changes event when a player joins', async () => {
     // Host creates a session
-    const hostName = 'HostPlayer';
-    const { session: hostSession, player: hostPlayerRecord } = await network.hostGame(hostName);
+    const { session: hostSession, player: _hostPlayerRecord } = await network.hostGame('HostPlayer');
     testSessionId = hostSession.id;
     const joinCode = hostSession.join_code;
 
@@ -250,13 +248,13 @@ describe('Network Module Integration with Supabase', () => {
 
     // Wait specifically for the new player's join event to propagate
     await waitFor(() => hostPostgresChangeEvents.some(e => 
-      e.eventType === 'INSERT' && e.new?.player_name === playerName
+      e.eventType === 'INSERT' && e.new?.player_name === playerName,
     ), 10000);
 
     // Verify host received the postgres_changes INSERT event for the new player
     const joinEvent = hostPostgresChangeEvents.find(e =>
       e.eventType === 'INSERT' &&
-      e.new?.player_name === playerName
+      e.new?.player_name === playerName,
     );
 
     // Clean up listener

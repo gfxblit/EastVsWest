@@ -13,6 +13,21 @@ export default [
 				navigator: 'readonly',
 				console: 'readonly',
 				performance: 'readonly',
+				crypto: 'readonly',
+				fetch: 'readonly',
+				setTimeout: 'readonly',
+				clearTimeout: 'readonly',
+				setInterval: 'readonly',
+				clearInterval: 'readonly',
+				requestAnimationFrame: 'readonly',
+				cancelAnimationFrame: 'readonly',
+				URL: 'readonly',
+				URLSearchParams: 'readonly',
+				AbortController: 'readonly',
+				Blob: 'readonly',
+				FileReader: 'readonly',
+				Image: 'readonly',
+				alert: 'readonly',
 				// Node.js globals
 				process: 'readonly',
 				__dirname: 'readonly',
@@ -33,7 +48,7 @@ export default [
 			'comma-dangle': ['error', 'always-multiline'],
 
 			// No unused vars (warning only)
-			'no-unused-vars': ['warn', { 'argsIgnorePattern': '^_' }],
+			'no-unused-vars': ['warn', { 'argsIgnorePattern': '^_', 'varsIgnorePattern': '^_' }],
 
 			// Consistent spacing
 			'space-before-blocks': 'error',

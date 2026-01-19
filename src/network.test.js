@@ -60,8 +60,8 @@ describe('Network', () => {
       // Mock two separate insert operations
       const mockSessionPlayersInsert = jest.fn().mockReturnValue({
         select: jest.fn().mockReturnValue({
-          single: jest.fn().mockResolvedValue({ data: mockPlayerRecord, error: null })
-        })
+          single: jest.fn().mockResolvedValue({ data: mockPlayerRecord, error: null }),
+        }),
       });
 
       mockSupabaseClient.from = jest.fn((table) => {
@@ -69,13 +69,13 @@ describe('Network', () => {
           return {
             insert: jest.fn().mockReturnValue({
               select: jest.fn().mockReturnValue({
-                single: jest.fn().mockResolvedValue({ data: mockSession, error: null })
-              })
-            })
+                single: jest.fn().mockResolvedValue({ data: mockSession, error: null }),
+              }),
+            }),
           };
         } else if (table === 'session_players') {
           return {
-            insert: mockSessionPlayersInsert
+            insert: mockSessionPlayersInsert,
           };
         }
       });
@@ -87,7 +87,7 @@ describe('Network', () => {
       expect(mockSessionPlayersInsert).toHaveBeenCalledWith(expect.objectContaining({
         position_x: 1200,
         position_y: 800,
-        equipped_weapon: 'fist'
+        equipped_weapon: 'fist',
       }));
       expect(result.session.join_code).toBe(mockJoinCode);
       expect(result.player.id).toBe(mockPlayerRecord.id);
@@ -102,9 +102,9 @@ describe('Network', () => {
       mockSupabaseClient.from = jest.fn(() => ({
         insert: jest.fn().mockReturnValue({
           select: jest.fn().mockReturnValue({
-            single: jest.fn().mockResolvedValue({ data: null, error: mockError })
-          })
-        })
+            single: jest.fn().mockResolvedValue({ data: null, error: mockError }),
+          }),
+        }),
       }));
 
       await expect(network.hostGame('TestHost')).rejects.toThrow(mockError);
@@ -151,7 +151,7 @@ describe('Network', () => {
       const mockExistingPlayer = {
         player_id: 'host-uuid',
         player_name: 'Host',
-        is_host: true
+        is_host: true,
       };
 
       const mockNewPlayer = {
@@ -177,17 +177,17 @@ describe('Network', () => {
       // 3. Mock table interactions
       const mockSessionPlayersInsert = jest.fn().mockReturnValue({
         select: jest.fn().mockReturnValue({
-          single: jest.fn().mockResolvedValue({ data: mockNewPlayer, error: null })
-        })
+          single: jest.fn().mockResolvedValue({ data: mockNewPlayer, error: null }),
+        }),
       });
 
       mockSupabaseClient.from = jest.fn((table) => {
         if (table === 'session_players') {
           return {
             select: jest.fn().mockReturnValue({
-              eq: jest.fn().mockResolvedValue({ data: [mockExistingPlayer], error: null })
+              eq: jest.fn().mockResolvedValue({ data: [mockExistingPlayer], error: null }),
             }),
-            insert: mockSessionPlayersInsert
+            insert: mockSessionPlayersInsert,
           };
         }
       });
@@ -202,7 +202,7 @@ describe('Network', () => {
       expect(mockSessionPlayersInsert).toHaveBeenCalledWith(expect.objectContaining({
         position_x: 1200,
         position_y: 800,
-        equipped_weapon: 'fist'
+        equipped_weapon: 'fist',
       }));
       
       expect(network.sessionId).toBe(MOCK_SESSION_ID);
@@ -235,7 +235,7 @@ describe('Network', () => {
       const mockHostPlayer = {
         player_id: 'host-uuid',
         player_name: 'Host',
-        is_host: true
+        is_host: true,
       };
 
       // 1. Mock RPC
@@ -256,62 +256,30 @@ describe('Network', () => {
         if (table === 'session_players') {
           return {
             // Mock snapshot fetch
-            select: jest.fn().mockImplementation((query) => {
+            select: jest.fn().mockImplementation((_query) => {
               // If it's the snapshot fetch (no arguments usually in this mock setup unless chain is inspected)
               // But here we rely on the chain.
               // Let's inspect the chain structure carefully.
               // The logic is: insert -> if err -> select(single) -> then snapshot select(all)
               
-              const mockChain = {
-                 eq: jest.fn().mockImplementation((field, value) => {
-                    // Check if this is the "fetch existing player" call (session_id AND player_id)
-                    // The test setup is a bit rigid, so we need a flexible mock or just return a chain that can handle both.
-                    
-                    if (field === 'session_id') {
-                       return {
-                         eq: jest.fn().mockImplementation((field2, value2) => {
-                            if (field2 === 'player_id' && value2 === MOCK_PLAYER_ID) {
-                               // This is the "fetch existing player" call
-                               return {
-                                 single: jest.fn().mockResolvedValue({ data: mockExistingPlayer, error: null })
-                               }
-                            }
-                         })
-                       }
-                    }
-                    
-                    // If it's just session_id, it's the snapshot fetch
-                     return {
-                        // The snapshot fetch usually ends with .select('*').eq(...) which returns a promise-like
-                        // But here the chain is .from().select().eq()
-                        // Wait, the code is:
-                        // .from('session_players').select('*').eq('session_id', this.sessionId)
-                        // AND
-                        // .from('session_players').select('*').eq('session_id', ...).eq('player_id', ...).single()
-                        
-                        // We need to support both.
-                     }
-                 })
-              };
-              
               // Simplification: Return a chain that mocks both paths
               return {
-                 eq: jest.fn().mockImplementation((col, val) => {
-                    if (col === 'session_id') {
-                        // Return object that handles next .eq or .then (snapshot)
-                        const nextChain = {
-                             eq: jest.fn().mockImplementation((col2, val2) => {
-                                 // Path: fetch existing player
-                                 return {
-                                     single: jest.fn().mockResolvedValue({ data: mockExistingPlayer, error: null })
-                                 }
-                             })
+                eq: jest.fn().mockImplementation((col, _val) => {
+                  if (col === 'session_id') {
+                    // Return object that handles next .eq or .then (snapshot)
+                    const nextChain = {
+                      eq: jest.fn().mockImplementation((_col2, _val2) => {
+                        // Path: fetch existing player
+                        return {
+                          single: jest.fn().mockResolvedValue({ data: mockExistingPlayer, error: null }),
                         };
-                        // Make nextChain also behave like a promise for the snapshot fetch
-                        nextChain.then = (cb) => Promise.resolve({ data: [mockHostPlayer, mockExistingPlayer], error: null }).then(cb);
-                        return nextChain;
-                    }
-                 })
+                      }),
+                    };
+                    // Make nextChain also behave like a promise for the snapshot fetch
+                    nextChain.then = (cb) => Promise.resolve({ data: [mockHostPlayer, mockExistingPlayer], error: null }).then(cb);
+                    return nextChain;
+                  }
+                }),
               };
             }),
             
@@ -319,10 +287,10 @@ describe('Network', () => {
               select: jest.fn().mockReturnValue({
                 single: jest.fn().mockResolvedValue({ 
                   data: null, 
-                  error: { code: '23505', message: 'Unique violation' } 
-                })
-              })
-            })
+                  error: { code: '23505', message: 'Unique violation' }, 
+                }),
+              }),
+            }),
           };
         }
       });
@@ -359,7 +327,7 @@ describe('Network', () => {
         player_name: MOCK_PLAYER_NAME,
         is_host: false,
         health: 0,
-        is_alive: false
+        is_alive: false,
       };
 
       mockSupabaseClient.rpc.mockResolvedValue({ data: [mockSession], error: null });
@@ -378,9 +346,9 @@ describe('Network', () => {
           return {
             insert: jest.fn().mockReturnValue({
               select: jest.fn().mockReturnValue({
-                single: jest.fn().mockResolvedValue({ data: mockNewPlayer, error: null })
-              })
-            })
+                single: jest.fn().mockResolvedValue({ data: mockNewPlayer, error: null }),
+              }),
+            }),
           };
         }
       });
@@ -436,7 +404,7 @@ describe('Network', () => {
         new: newPlayer,
         old: null,
         schema: 'public',
-        table: 'session_players'
+        table: 'session_players',
       };
 
       network._handlePostgresChange(payload);
@@ -456,7 +424,7 @@ describe('Network', () => {
         old: { player_id: 'player-2' },
         new: null,
         schema: 'public',
-        table: 'session_players'
+        table: 'session_players',
       };
 
       network._handlePostgresChange(payload);
@@ -476,7 +444,7 @@ describe('Network', () => {
         new: { player_id: 'player-2', player_name: 'UpdatedPlayer' },
         old: { player_id: 'player-2', player_name: 'OldPlayer' },
         schema: 'public',
-        table: 'session_players'
+        table: 'session_players',
       };
 
       network._handlePostgresChange(payload);
@@ -496,7 +464,7 @@ describe('Network', () => {
         new: { id: 'item-1', name: 'Sword' },
         old: null,
         schema: 'public',
-        table: 'session_items'
+        table: 'session_items',
       };
 
       network._handlePostgresChange(payload);
@@ -623,12 +591,12 @@ describe('Network', () => {
         it('should write client-authoritative fields to database', async () => {
           const mockUpdate = jest.fn().mockReturnValue({
             eq: jest.fn().mockReturnValue({
-              eq: jest.fn().mockResolvedValue({ error: null })
-            })
+              eq: jest.fn().mockResolvedValue({ error: null }),
+            }),
           });
 
           mockSupabaseClient.from = jest.fn(() => ({
-            update: mockUpdate
+            update: mockUpdate,
           }));
 
           const stateData = {
@@ -652,12 +620,12 @@ describe('Network', () => {
 
           const mockUpdate = jest.fn().mockReturnValue({
             eq: jest.fn().mockReturnValue({
-              eq: jest.fn().mockResolvedValue({ error: null })
-            })
+              eq: jest.fn().mockResolvedValue({ error: null }),
+            }),
           });
 
           mockSupabaseClient.from = jest.fn(() => ({
-            update: mockUpdate
+            update: mockUpdate,
           }));
 
           const stateData = {
@@ -688,9 +656,9 @@ describe('Network', () => {
           mockSupabaseClient.from = jest.fn(() => ({
             update: jest.fn().mockReturnValue({
               eq: jest.fn().mockReturnValue({
-                eq: jest.fn(() => Promise.resolve(mockUpdatePromises[callCount++]))
-              })
-            })
+                eq: jest.fn(() => Promise.resolve(mockUpdatePromises[callCount++])),
+              }),
+            }),
           }));
 
           await network.writePlayerStateToDB(batchUpdates);
@@ -706,16 +674,16 @@ describe('Network', () => {
         mockSupabaseClient.from = jest.fn(() => ({
           update: jest.fn().mockReturnValue({
             eq: jest.fn().mockReturnValue({
-              eq: jest.fn().mockResolvedValue({ error: mockError })
-            })
-          })
+              eq: jest.fn().mockResolvedValue({ error: mockError }),
+            }),
+          }),
         }));
 
         await network.writePlayerStateToDB(MOCK_PLAYER_ID, { health: 100 });
 
         expect(consoleErrorSpy).toHaveBeenCalledWith(
           'Failed to write player state to DB:',
-          mockError.message
+          mockError.message,
         );
 
         consoleErrorSpy.mockRestore();
@@ -852,8 +820,8 @@ describe('Network', () => {
       network.isHost = false;
       const deleteMock = jest.fn().mockReturnValue({
         eq: jest.fn().mockReturnValue({
-          eq: jest.fn().mockResolvedValue({ error: null })
-        })
+          eq: jest.fn().mockResolvedValue({ error: null }),
+        }),
       });
       mockSupabaseClient.from = jest.fn((table) => {
         if (table === 'session_players') {
@@ -873,7 +841,7 @@ describe('Network', () => {
     it('should delete session record and broadcast session_terminated when the host leaves', async () => {
       network.isHost = true;
       const deleteMock = jest.fn().mockReturnValue({
-        eq: jest.fn().mockResolvedValue({ error: null })
+        eq: jest.fn().mockResolvedValue({ error: null }),
       });
       mockSupabaseClient.from = jest.fn((table) => {
         if (table === 'game_sessions') {
@@ -887,7 +855,7 @@ describe('Network', () => {
       await network.leaveGame();
 
       expect(sendSpy).toHaveBeenCalledWith('session_terminated', expect.objectContaining({
-        reason: 'host_left'
+        reason: 'host_left',
       }));
       expect(mockSupabaseClient.from).toHaveBeenCalledWith('game_sessions');
       expect(deleteMock).toHaveBeenCalled();
@@ -899,9 +867,9 @@ describe('Network', () => {
       mockSupabaseClient.from = jest.fn(() => ({
         delete: jest.fn().mockReturnValue({
           eq: jest.fn().mockReturnValue({
-            eq: jest.fn().mockResolvedValue({ error: new Error('DB error') })
-          })
-        })
+            eq: jest.fn().mockResolvedValue({ error: new Error('DB error') }),
+          }),
+        }),
       }));
 
       const disconnectSpy = jest.spyOn(network, 'disconnect');

@@ -69,7 +69,7 @@ describe('Late Join Integration', () => {
     try {
       await playerPage.waitForSelector('#game-screen.active', { timeout: 15000 });
       console.log('Late joiner entered game screen');
-    } catch (err) {
+    } catch {
       const errorMsg = await playerPage.evaluate(() => {
         const errEl = document.getElementById('lobby-error');
         return errEl ? errEl.textContent : 'No error shown';

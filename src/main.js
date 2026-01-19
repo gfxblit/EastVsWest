@@ -66,11 +66,11 @@ class App {
 
     // Load assets
     try {
-        await this.loadAssets();
+      await this.loadAssets();
     } catch (e) {
-        console.error('Failed to load assets:', e);
-        this.showError('Failed to load game assets. Please refresh.');
-        return;
+      console.error('Failed to load assets:', e);
+      this.showError('Failed to load game assets. Please refresh.');
+      return;
     }
     
     // Show intro screen
@@ -89,9 +89,9 @@ class App {
         // If we are on a custom hostname (like Tailscale or LAN IP), try to use that for the backend too
         // This assumes the backend is running on port 54321 on the same machine
         if (currentHost !== 'localhost' && currentHost !== '127.0.0.1') {
-            const dynamicUrl = `http://${currentHost}:54321`;
-            console.log(`Overriding VITE_SUPABASE_URL to match hostname: ${dynamicUrl}`);
-            supabaseUrl = dynamicUrl;
+          const dynamicUrl = `http://${currentHost}:54321`;
+          console.log(`Overriding VITE_SUPABASE_URL to match hostname: ${dynamicUrl}`);
+          supabaseUrl = dynamicUrl;
         }
       }
 
@@ -122,20 +122,20 @@ class App {
         // Fetch the root of the REST API to check reachability
         const response = await fetch(`${supabaseUrl}/rest/v1/`, { 
           signal: controller.signal,
-          headers: { 'apikey': supabaseKey }
+          headers: { 'apikey': supabaseKey },
         });
         clearTimeout(id);
         
         if (!response.ok) {
-           if (response.status === 401 || response.status === 403) {
-             const msg = 'Supabase API Key (Anon Key) is invalid. Check .env.local';
-             console.error(msg);
-             this.showError(msg);
-             return;
-           }
-           console.warn('Supabase connectivity check returned non-OK status:', response.status);
+          if (response.status === 401 || response.status === 403) {
+            const msg = 'Supabase API Key (Anon Key) is invalid. Check .env.local';
+            console.error(msg);
+            this.showError(msg);
+            return;
+          }
+          console.warn('Supabase connectivity check returned non-OK status:', response.status);
         } else {
-           console.log('Supabase is reachable.');
+          console.log('Supabase is reachable.');
         }
       } catch (netErr) {
         console.error('Failed to reach Supabase server:', netErr);
@@ -154,6 +154,10 @@ class App {
       // Check for existing session first to support reconnection
       console.log('Checking for existing session...');
       const { data: sessionData, error: sessionError } = await this.supabase.auth.getSession();
+      
+      if (sessionError) {
+        console.warn('Error fetching session:', sessionError.message);
+      }
       
       let userId;
       
@@ -191,51 +195,50 @@ class App {
     console.log('Starting asset loading...');
     const manifest = [];
     const { ASSETS, WEAPONS } = CONFIG;
-    const baseUrl = ASSETS.BASE_URL.endsWith('/') ? ASSETS.BASE_URL : `${ASSETS.BASE_URL}/`;
-    const weaponsBaseUrl = ASSETS.WEAPONS_BASE_URL;
+    const weaponsBaseUrl = CONFIG.ASSETS.WEAPONS_BASE_URL;
 
     // Spritesheets
     manifest.push({ 
-        key: 'walk', 
-        src: ASSETS.SPRITE_SHEET.PATH, 
-        metadata: ASSETS.SPRITE_SHEET.METADATA, 
-        type: 'spritesheet' 
+      key: 'walk', 
+      src: ASSETS.SPRITE_SHEET.PATH, 
+      metadata: ASSETS.SPRITE_SHEET.METADATA, 
+      type: 'spritesheet', 
     });
     manifest.push({
-        key: 'slash',
-        src: ASSETS.PLAYER_SLASH.PATH,
-        metadata: ASSETS.PLAYER_SLASH.METADATA,
-        type: 'spritesheet'
+      key: 'slash',
+      src: ASSETS.PLAYER_SLASH.PATH,
+      metadata: ASSETS.PLAYER_SLASH.METADATA,
+      type: 'spritesheet',
     });
     
     // Death spritesheet
     if (ASSETS.PLAYER_DEATH && ASSETS.PLAYER_DEATH.PATH) {
-         manifest.push({
-             key: 'death',
-             src: ASSETS.PLAYER_DEATH.PATH,
-             type: 'image'
-         });
+      manifest.push({
+        key: 'death',
+        src: ASSETS.PLAYER_DEATH.PATH,
+        type: 'image',
+      });
     }
 
     // VFX
     if (ASSETS.VFX) {
-        Object.values(ASSETS.VFX).forEach(group => {
-            Object.values(group).forEach(path => {
-                manifest.push({ src: path, type: 'image' });
-            });
+      Object.values(ASSETS.VFX).forEach(group => {
+        Object.values(group).forEach(path => {
+          manifest.push({ src: path, type: 'image' });
         });
+      });
     }
 
     // Weapons
     if (WEAPONS) {
-        Object.values(WEAPONS).forEach(weapon => {
-            if (weapon.icon) {
-                manifest.push({ 
-                    src: `${weaponsBaseUrl}${weapon.icon}`, 
-                    type: 'image' 
-                });
-            }
-        });
+      Object.values(WEAPONS).forEach(weapon => {
+        if (weapon.icon) {
+          manifest.push({ 
+            src: `${weaponsBaseUrl}${weapon.icon}`, 
+            type: 'image', 
+          });
+        }
+      });
     }
 
     // Backgrounds
@@ -244,17 +247,17 @@ class App {
 
     // Props
     if (CONFIG.PROPS && CONFIG.PROPS.TYPES) {
-        Object.values(CONFIG.PROPS.TYPES).forEach(propType => {
-            if (propType.src) {
-                manifest.push({ src: propType.src, type: 'image' });
-            }
-        });
+      Object.values(CONFIG.PROPS.TYPES).forEach(propType => {
+        if (propType.src) {
+          manifest.push({ src: propType.src, type: 'image' });
+        }
+      });
     }
 
     console.log(`Loading ${manifest.length} assets...`);
     
     await this.assetManager.preloadAssets(manifest, (progress) => {
-        this.ui.updateLoading(progress);
+      this.ui.updateLoading(progress);
     });
     
     console.log('Assets loaded');
@@ -390,7 +393,7 @@ class App {
 
     try {
       const playerName = `Host-${Math.random().toString(36).substr(2, 5)}`;
-      const { session, player } = await this.network.hostGame(playerName);
+      const { session, player: _player } = await this.network.hostGame(playerName);
 
       // Create SessionPlayersSnapshot for lobby synchronization
       this.playersSnapshot = new SessionPlayersSnapshot(this.network, session.id);
@@ -436,7 +439,7 @@ class App {
     console.log('Joining game with code:', joinCode);
     try {
       const playerName = `Player-${Math.random().toString(36).substr(2, 5)}`;
-      const { session, player } = await this.network.joinGame(joinCode, playerName);
+      const { session, player: _player } = await this.network.joinGame(joinCode, playerName);
 
       // Create SessionPlayersSnapshot for lobby synchronization
       this.playersSnapshot = new SessionPlayersSnapshot(this.network, session.id);
@@ -497,7 +500,7 @@ class App {
     const totalPlayers = players.size;
     const angleStep = (Math.PI * 2) / (totalPlayers || 1);
 
-    for (const [playerId, player] of players) {
+    for (const [playerId, _player] of players) {
       const angle = i * angleStep;
       const x = centerX + Math.cos(angle) * spawnRadius;
       const y = centerY + Math.sin(angle) * spawnRadius;
@@ -513,7 +516,7 @@ class App {
         velocity_y: 0,
         rotation: 0,
         equipped_weapon: 'fist',
-        equipped_armor: null
+        equipped_armor: null,
       });
       i++;
     }
@@ -528,7 +531,7 @@ class App {
 
   async leaveGame() {
     if (this.network?.isHost) {
-      const confirmed = window.confirm("Leaving as host will end the game for all players. Are you sure?");
+      const confirmed = window.confirm('Leaving as host will end the game for all players. Are you sure?');
       if (!confirmed) return;
     }
 
@@ -652,7 +655,7 @@ class App {
       CONFIG.WORLD.WIDTH,
       CONFIG.WORLD.HEIGHT,
       canvas.width,
-      canvas.height
+      canvas.height,
     );
 
     // Initialize camera to local player position
@@ -713,7 +716,7 @@ class App {
             if (player.health !== undefined) {
               updates.push({
                 player_id: playerId,
-                health: player.health
+                health: player.health,
               });
             }
           }

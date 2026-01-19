@@ -152,7 +152,7 @@ export class Game {
       const shrinkRate = CONFIG.ZONE.BASE_SHRINK_RATE * Math.pow(CONFIG.ZONE.SHRINK_RATE_MULTIPLIER, this.state.phase);
       this.state.conflictZone.radius = Math.max(
         CONFIG.ZONE.MIN_RADIUS,
-        this.state.conflictZone.radius - shrinkRate * deltaTime
+        this.state.conflictZone.radius - shrinkRate * deltaTime,
       );
     }
   }
@@ -222,7 +222,7 @@ export class Game {
           id: this.spectatingTargetId,
           x: interpolated.x,
           y: interpolated.y,
-          name: target ? target.player_name : 'Unknown'
+          name: target ? target.player_name : 'Unknown',
         };
       }
 
@@ -231,7 +231,7 @@ export class Game {
           id: this.spectatingTargetId,
           x: target.position_x,
           y: target.position_y,
-          name: target.player_name
+          name: target.player_name,
         };
       }
     }
@@ -253,7 +253,7 @@ export class Game {
     candidates.sort((a, b) => a.player_id.localeCompare(b.player_id));
 
     // Find current index
-    let currentIndex = candidates.findIndex(p => p.player_id === this.spectatingTargetId);
+    const currentIndex = candidates.findIndex(p => p.player_id === this.spectatingTargetId);
 
     // If current target is not in candidates (e.g. they died), start from 0. 
     // Otherwise go to next.
