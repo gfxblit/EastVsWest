@@ -553,13 +553,12 @@ button:active {
 .touch-buttons {
   display: none;
   position: fixed;
-  bottom: 40px;
+  bottom: 30px;
   right: 30px;
+  width: 180px;
+  height: 180px;
   z-index: 1000;
-  display: flex;
-  flex-direction: row-reverse;
-  align-items: flex-end;
-  gap: 15px;
+  pointer-events: none;
 }
 
 .touch-btn {
@@ -584,8 +583,9 @@ button:active {
   display: flex;
   justify-content: center;
   align-items: center;
-  position: relative;
+  position: absolute;
   overflow: hidden;
+  pointer-events: auto;
 }
 
 .cooldown-overlay {
@@ -612,6 +612,8 @@ button:active {
   width: 90px;
   height: 90px;
   background: linear-gradient(to bottom, #c86a5a 0%, #a84a3d 100%);
+  bottom: 0;
+  right: 0;
 }
 
 .attack-btn:active {
@@ -626,10 +628,14 @@ button:active {
 
 .ability-btn {
   background: linear-gradient(to bottom, #7fb069 0%, #5a8f4f 100%);
+  bottom: 100px;
+  right: 10px;
 }
 
 .interact-btn {
   background: linear-gradient(to bottom, #74a5d4 0%, #5a86b8 100%);
+  bottom: 10px;
+  right: 100px;
 }
 
 .ability-btn:active,
@@ -650,7 +656,7 @@ button:active {
   }
 
   .touch-buttons {
-    display: flex;
+    display: block;
   }
 }
 
