@@ -100,7 +100,7 @@ export class HostCombatManager {
     // Special Ability adjustments
     let effectiveRange = weaponConfig.range;
     if (is_special && weaponConfig.specialAbility === 'lunge') {
-        effectiveRange += 100; // Extend range for lunge
+        effectiveRange += CONFIG.WEAPON_ABILITIES.LUNGE_RANGE_EXTENSION;
     }
 
     const updates = [];
@@ -121,9 +121,9 @@ export class HostCombatManager {
           // Apply Status Effects for Special Abilities
           if (is_special) {
               let stunDuration = 0;
-              if (weaponConfig.specialAbility === 'smash') stunDuration = 1000; // 1s stun
-              if (weaponConfig.specialAbility === 'charged_smack') stunDuration = 1000; // 1s stun
-              if (weaponConfig.specialAbility === 'grab_throw') stunDuration = 500; // 0.5s stun (Grab)
+              if (weaponConfig.specialAbility === 'smash') stunDuration = CONFIG.WEAPON_ABILITIES.SMASH_STUN_DURATION;
+              if (weaponConfig.specialAbility === 'charged_smack') stunDuration = CONFIG.WEAPON_ABILITIES.CHARGED_SMACK_STUN_DURATION;
+              if (weaponConfig.specialAbility === 'grab_throw') stunDuration = CONFIG.WEAPON_ABILITIES.GRAB_THROW_STUN_DURATION;
 
               if (stunDuration > 0) {
                   const stunUntil = Date.now() + stunDuration;

@@ -98,7 +98,7 @@ describe('BotController Loot Interaction', () => {
     
     botController.update(0.1);
 
-    expect(mockNetwork.sendFrom).toHaveBeenCalledWith(botId, 'pickup_loot', {
+    expect(mockNetwork.sendFrom).toHaveBeenCalledWith(botId, 'pickup_request', {
       loot_id: 'loot-1',
     });
   });

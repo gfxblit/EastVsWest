@@ -325,10 +325,10 @@ export class LocalPlayerController {
       // Special Ability Logic: Spear Lunge
       if (isSpecial && weaponConfig.specialAbility === 'lunge') {
          this.player.isLunging = true;
-         this.player.lungeTime = 0.2; // 200ms dash
+         this.player.lungeTime = CONFIG.WEAPON_ABILITIES.LUNGE_DURATION;
          
          // Calculate lunge velocity (3x speed)
-         const speed = CONFIG.PLAYER.BASE_MOVEMENT_SPEED * 3;
+         const speed = CONFIG.PLAYER.BASE_MOVEMENT_SPEED * CONFIG.WEAPON_ABILITIES.LUNGE_SPEED_MULTIPLIER;
          const angle = this.player.rotation - Math.PI / 2;
          this.player.velocity = {
              x: Math.cos(angle) * speed,

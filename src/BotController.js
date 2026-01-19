@@ -21,18 +21,37 @@ export class BotController {
 
     // Check if we need a weapon
     const needsWeapon = !bot.equipped_weapon || bot.equipped_weapon === 'fist';
-    const nearestLoot = needsWeapon ? this.findNearestLoot(bot) : null;
+
+    // Find nearest loot
+    let nearestLoot = needsWeapon ? this.findNearestLoot(bot) : null;
+    
+    // If we have a target loot, check if it's still available in the game state
+    if (this.targetLootId) {
+      const lootExists = this.game?.state?.loot.some(l => l.id === this.targetLootId);
+      if (!lootExists) {
+        this.targetLootId = null;
+        nearestLoot = needsWeapon ? this.findNearestLoot(bot) : null;
+      } else if (needsWeapon) {
+        // If it still exists and we still need it, stay focused on it
+        nearestLoot = this.game.state.loot.find(l => l.id === this.targetLootId);
+      }
+    }
+
     const target = this.findTarget();
 
     if (nearestLoot) {
+      this.targetLootId = nearestLoot.id;
       const lootPos = { position_x: nearestLoot.x, position_y: nearestLoot.y };
       this.moveTowards(bot, lootPos, deltaTime);
       this.attemptPickupLoot(bot, nearestLoot);
-    } else if (target) {
-      this.moveTowards(bot, target, deltaTime);
-      this.attemptAttack(bot, target);
     } else {
-      this.wander(bot, deltaTime);
+      this.targetLootId = null;
+      if (target) {
+        this.moveTowards(bot, target, deltaTime);
+        this.attemptAttack(bot, target);
+      } else {
+        this.wander(bot, deltaTime);
+      }
     }
   }
 
@@ -189,7 +208,7 @@ export class BotController {
     );
 
     if (dist <= (CONFIG.LOOT?.PICKUP_RADIUS || 50)) {
-      this.network.sendFrom(this.botId, 'pickup_loot', {
+      this.network.sendFrom(this.botId, 'pickup_request', {
         loot_id: lootItem.id,
       });
       this.lastPickupTime = now;

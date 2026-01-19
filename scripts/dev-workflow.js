@@ -485,7 +485,8 @@ export class WorkflowManager {
       this.logger.log('--------------------------------------\n');
     }
 
-    const reviewContent = await this.invokeGemini(systemPrompt, ['--yolo'], 'gemini-2.5-pro');
+    const REVIEWER_PREFERRED_MODEL = 'gemini-2.5-pro';
+    const reviewContent = await this.invokeGemini(systemPrompt, ['--yolo'], REVIEWER_PREFERRED_MODEL);
 
     // Flexible check for "APPROVED" as a standalone word in the response
     const isApproved = /\bAPPROVED\b/i.test(reviewContent);
